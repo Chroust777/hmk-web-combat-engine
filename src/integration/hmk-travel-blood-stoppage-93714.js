@@ -60,6 +60,9 @@ function availableHealer({patient,wound,healer,party}){
 }
 function bloodML(patient){
  const h=patient?.hmk||{};
+ // HMK 178 explicit exception: beasts other than Folk test Blood Loss at ML50,
+ // including an individually registered horse (NOT its printed STR ×5).
+ if(h.verifiedMountedBreed&&h.livestockOwnerId)return 50;
  const isFolk=typeof h.isFolk==='boolean'?h.isFolk:
   folkNames.has(String(h.folk||'').trim().toLowerCase())?true:null;
  check(typeof isFolk==='boolean','Blood Loss: není doloženo, zda je pacient Folk');

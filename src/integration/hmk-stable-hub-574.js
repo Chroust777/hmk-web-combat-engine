@@ -111,7 +111,7 @@ export function stableBurden(data,campaignId,animal){
 export function validateStableHub(data,offerForId=null){
  const animals=new Map();
  for(const owner of data?.characters||[])for(const a of owner.hmk?.livestock||[])animals.set(a.id,{...a,holder:owner.id});
- const touched=new Set(),entryIds=new Set(),transactionIds=new Set(),recoveredInventoryIds=new Set();const snapshots=new Map();
+ const touched=new Set(),entryIds=new Set(),transactionIds=new Set(),recoveredInventoryIds=new Set();const snapshots=new Map(),carriedPatients=new Map();
  for(const j of data?.journal||[]){const x=j.stableHub574;if(x===undefined)continue;
   requireValid(x&&typeof x==='object'&&x.format===STABLE_HUB_FORMAT_574&&types.has(x.type),'neznámý doklad správy zvířete');
   requireValid(isId(j.id)&&!touched.has(j.id),'duplicitní ID stájového dokladu');touched.add(j.id);
@@ -210,9 +210,23 @@ export function validateStableHub(data,offerForId=null){
    requireValid(state.vehicles.has(x.vehicleId)&&isId(x.entryId)&&!entryIds.has(x.entryId)&&
     typeof x.name==='string'&&x.name.length>=2&&x.name.length<=90&&nonnegative(x.weightLb)&&x.weightLb>0&&
     narrative(x.reason),'vozidlo nemá doložený fyzický náklad');
+   if(x.carriedAnimalId!==undefined){
+    const patient=animals.get(x.carriedAnimalId);
+    requireValid(isId(x.carriedAnimalId)&&patient&&patient.campaignId===animal.campaignId&&
+     patient.id!==animal.id&&patient.name&&x.name==='Zvíře · '+patient.name&&
+     nonnegative(x.bodyWeightLb)&&x.bodyWeightLb>0&&nonnegative(x.gearAndCargoLb)&&
+     x.weightLb===x.bodyWeightLb+x.gearAndCargoLb&&
+     x.patientProofFormat==='hmk-stable-animal-cargo-93879-v1'&&x.gmConfirmed===true&&
+     !carriedPatients.has(x.carriedAnimalId),
+     'přepravované zvíře nemá jedinou originální identitu, hmotnost a potvrzení GM');
+    carriedPatients.set(x.carriedAnimalId,x.entryId);
+   }
    entryIds.add(x.entryId);state.vehicleCargo.set(x.entryId,x);
   }else if(x.type==='vehicle-cargo-remove'){
-   requireValid(state.vehicleCargo.has(x.entryId)&&narrative(x.reason),'náklad není ve vozidle');state.vehicleCargo.delete(x.entryId);
+   requireValid(state.vehicleCargo.has(x.entryId)&&narrative(x.reason),'náklad není ve vozidle');
+   const previous=state.vehicleCargo.get(x.entryId);
+   if(previous.carriedAnimalId)carriedPatients.delete(previous.carriedAnimalId);
+   state.vehicleCargo.delete(x.entryId);
   }else if(x.type==='rider-mount'){
    // A rider is a real campaign character, and their full weight must be
    // recorded once; this is NOT a pack-harness cargo-capacity test.

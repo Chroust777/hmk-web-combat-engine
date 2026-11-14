@@ -155,6 +155,7 @@ import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} fr
 import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,stableGearFit93838,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js';
 import {stableAnimalZones575,stableTraining575,effectiveStableBeast575,stableHauling575,validateStableTravel575} from './src/integration/hmk-stable-operations-575.js';
 import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js';
+import {carriedStableAnimal93879,loadedStableAnimalIds93879} from './src/integration/hmk-transport-animal-cargo-93879.js';
 import {certifiedTransportMass93816,securedMountedPassenger93816,validateTransportMassEvidence93816} from './src/integration/hmk-transport-passengers-93816.js';
 import {validateTravelPositions93764} from './src/integration/hmk-trek-positions-93764.js';
 import {releaseCalendarMembers93765} from './src/integration/hmk-calendar-member-release-93765.js';
@@ -361,7 +362,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.878';
+const APP_VERSION='93.879';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7165,6 +7166,14 @@ function stableHubAnimalHTML(a,campaignId){
  <h4>Tažený náklad vozidla (oddělený od hřbetu zvířete)</h4>
  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Náklad / vozidlo</th><th>Váha</th><th>Akce</th></tr></thead><tbody>${p.vehicleCargo.map(q=>`<tr><td>${esc(q.name)} · položka ${p.vehicleCargo.indexOf(q)+1}</td><td>${q.weightLb} lb</td><td>${dead?'—':`<form data-hmk-stable-event><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-remove"><input type="hidden" name="entryId" value="${esc(q.entryId)}"><input type="hidden" name="reason" value="Skutečně vyloženo z taženého vozidla"><button class="secondary hc-small">Vyložit z vozu</button></form>`}</td></tr>`).join('')||'<tr><td colspan="3">Vozidlo nemá zaevidovaný náklad</td></tr>'}</tbody></table></div>
  ${!dead&&activeVehicles.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-add"><label>Vozidlo<select name="vehicleId">${activeVehicles.map(q=>`<option value="${esc(q.entryId)}">${esc(VEHICLES_TACK_P122.find(t=>t.id===q.itemId)?.name)}</option>`).join('')}</select></label><label>Náklad ve voze<input name="name" minlength="2" maxlength="90" required></label><label>Skutečná hmotnost (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Potvrzení GM<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Zapsat náklad vozidla</button></form>`:''}
+ ${!dead&&activeVehicles.length?`<form data-hmk-stable-event class="hc-fields" data-hmk-carried-animal-93879><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="vehicle-cargo-add-animal">
+ <strong>Přeprava nepohyblivého zvířete · konkrétní zvíře jako náklad (HMK 122, 145)</strong>
+ <label>Vozidlo<select name="vehicleId">${activeVehicles.map(q=>`<option value="${esc(q.entryId)}">${esc(VEHICLES_TACK_P122.find(t=>t.id===q.itemId)?.name)}</option>`).join('')}</select></label>
+ <label>Nepohyblivé zvíře ze Stáje<select name="carriedAnimalId" required><option value="">— Vyberte skutečného pacienta —</option>${verifiedLivestock(data,campaignId).filter(z=>z.id!==a.id).flatMap(z=>{try{const x=carriedStableAnimal93879(data,campaignId,z.id);return [`<option value="${esc(z.id)}">${esc(z.name)} · ${x.weightLb} lb (tělo ${x.bodyWeightLb} + výstroj/náklad ${x.gearAndCargoLb})</option>`]}catch{return []}}).join('')}</select></label>
+ <p class="hc-hint">Váha se převezme z HMK profilu stejného zvířete a jeho skutečné výstroje; nic se nepřepisuje ručně. Po naložení nesmí samo táhnout ani jít. Při změně nákladu je nutné nejprve vyložit a znovu naložit. Tato volba ještě neposune čas ani nevytvoří Pochod.</p>
+ <label>Skutečné fyzické naložení a místo (GM)<input name="reason" minlength="3" maxlength="240" required></label>
+ <label class="hc-check"><input name="animalLoadConfirmed" type="checkbox" required> GM potvrzuje skutečné naložení právě tohoto zvířete do uvedeného vozu.</label>
+ <button type="submit">Naložit konkrétní zvíře jako náklad</button></form>`:''}
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="cargo-add"><label>Položka nákladu (samostatný fyzický předmět, nikoli kopie inventáře postavy)<input name="name" required minlength="2" maxlength="90" placeholder="Např. pytel zrní"></label><label>Skutečná hmotnost položky (lb)<input name="weightLb" type="number" min="1" max="1000000" step="1" required></label><label>Původ / potvrzení GM<input name="reason" required minlength="3" maxlength="240" placeholder="Kde a jak bylo skutečně naloženo"></label><button type="submit">Naložit do evidovaného prostoru</button></form>`:''}</section>
  <section class="hmk-stable-block"><h4>Krmení, voda a péče</h4><p>HMK zde neuvádí pevnou univerzální denní dávku podle druhu. Protokol zaznamenává skutečně provedenou péči a hmotnost vydané potravy či vody. Bez potvrzení zdroje se zásoby nevytvářejí, čas se neposouvá.</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="care"><label>Úkon<select name="kind"><option value="food">Nakrmilo se</option><option value="water">Napojilo se</option><option value="grooming">Ošetření srsti / kopyt</option><option value="shelter">Ustájení / přístřeší</option><option value="veterinary">Veterinární úkon GM (bez automatického léčení)</option><option value="other">Jiná péče</option></select></label><label>Skutečné množství (lb; povinné pro jídlo/vodu)<input name="amount" type="number" min="0" step="0.1" placeholder="Např. 8"></label><label>Odkud pochází krmivo/voda a co se stalo<input name="reason" required minlength="3" maxlength="240" placeholder="Např. napájelo se u doloženého potoka"></label><button type="submit">Zapsat skutečnou péči</button></form>`:''}
@@ -7230,11 +7239,12 @@ function characterStableView(owner){
     `${h.seriousWounds.length} vážných zranění · ${h.immobile||h.shock!=='NONE'||h.comaActive||h.extendedShockActive||h.fatigue>=40?'NELZE TÁHNOUT':'pohyblivé podle aktuálních záznamů'}.`;
   }catch(err){canonicalText='Autoritativní zdravotní profil nelze ověřit: '+esc(err.message);}
  }
+ const stableBlood=canonicalAnimal?hskWeatherBleedingCarePanel(canonicalAnimal.id):'';
  const healthOnly=lastVisit?.active
   ?bestiaryHealthPanel567([lastVisit],cid,clock?.minute??0)
   :`<div class="hmk-stable-reference"><p>${canonicalAnimal?canonicalText:healthDetails?
    `Zdravotní historie je zachována: ${healthDetails.wounds.filter(w=>!w.healed).length} aktivních ran · Shock ${esc(healthDetails.shock)}. Pro nové léčebné úkony musí být tentýž tvor aktivní v Combat; zde se žádný encounter nezakládá.`:
-   'Zdravotní doklad zatím není založen. To neznamená automaticky zdravé zvíře.'}</p></div>`;
+   'Zdravotní doklad zatím není založen. To neznamená automaticky zdravé zvíře.'}</p>${stableBlood?`<div data-weather-blood-patient-id="${esc(canonicalAnimal.id)}">${stableBlood}</div>`:''}</div>`;
  const trainingHTML=animalTrainingNextHTML(data.journal,owner.id,cid);
  const secondary=`<details class="hmk-stable-accordion"><summary>Zdraví · zranění, léčení a Shock (bez bojového menu)</summary>${healthOnly}</details><details class="hmk-stable-accordion"><summary>Animalcraft · úplný výcvik dle HMK 65</summary><div class="hmk-stable-reference"><p>Výcvik vyžaduje doložený Skill Value, skutečný hod a časovou podmínku; nová hodnota nevzniká otevřením karty.</p><button type="button" class="secondary hc-small" data-hmk-stable-animalcraft="${esc(selectedAnimal.id)}">Otevřít Skill Tests · Animalcraft (${esc(owner.name)})</button>${trainingHTML||'<p>Nejdříve proveďte doložený Animalcraft Skill Test postavy.</p>'}</div></details>
 `;
@@ -12300,7 +12310,7 @@ function hskWeatherBleedingCarePanel(actorId){
     <label>${helpTerm('Physician d100','Skutečný hod léčitele, EML vypočítá systém z Physician ML, Fatigue, metody, případného předchozího bonusu a počtu současně ošetřených ran.')}
     <input type="number" name="physicianRoll" min="1" max="100" required></label>`:
     '<p>V předchozím intervalu nebylo zahájeno doložené ošetření. Vyhodnoťte pouze Blood Loss.</p>'}
-   <label>${helpTerm('Blood Loss · Strength d100','Povinný jeden skutečný hod pacienta proti Strength ×5 bez Fatigue a impairment. Po Critical Success (CS) u Physician ponechte prázdné; po CF/F/S jej vyplňte.')}
+   <label>${helpTerm('Blood Loss · d100',actor?.hmk?.verifiedMountedBreed&&actor.hmk?.livestockOwnerId?'Povinný jeden skutečný hod registrovaného zvířete proti ML 50 (HMK 178). Po Physician CS neházejte; po CF/F/S vyplňte.':'Povinný jeden skutečný hod postavy proti Strength ×5 bez Fatigue a impairment. Po Physician CS neházejte; po CF/F/S vyplňte.')}
    <input type="number" name="strengthRoll" min="1" max="100" ${plan?'':'required'}></label>
    <button type="submit">${plan?'Zapsat Blood Stoppage + případný Blood Loss':'Zapsat Blood Loss Advance'}</button>
    </form></article>`;}
@@ -13734,9 +13744,14 @@ document.addEventListener('submit',event=>{
  event.preventDefault();event.stopImmediatePropagation();
  const out=form.querySelector('output');
  try{
-  const actor=character(selected),clock=data.campaignClock,woundId=String(form.elements.namedItem('woundId')?.value||'');
-  if(!actor||!clock||combatInitiativeSequence||view!=='sheet'||activeSheetSection!=='hazards')
-   throw Error('Blood Stoppage z Cestování musí probíhat v Zdraví & Expozice mimo Combat');
+  const stablePatientId=form.closest('[data-weather-blood-patient-id]')?.dataset.weatherBloodPatientId||null;
+  const actor=character(stablePatientId||selected),clock=data.campaignClock,woundId=String(form.elements.namedItem('woundId')?.value||'');
+  const stableRoute=!!stablePatientId&&activeSheetSection==='stable'&&
+   character(selected)?.id===actor?.hmk?.livestockOwnerId&&
+   verifiedLivestock(data,campaignKey(clock)).some(a=>a.id===actor?.id&&a.ownerId===selected)&&
+   isStableAnimalProfile93813(actor);
+  if(!actor||!clock||combatInitiativeSequence||view!=='sheet'||(!stableRoute&&activeSheetSection!=='hazards'))
+   throw Error('Blood Stoppage je povolen jen v autoritativním Zdraví & Expozice nebo u téhož konkrétního registrovaného zvířete ve Stáji.');
   const party=calendarMemberIds(clock,data.characters);
   if(!party.some(c=>c.id===actor.id))throw Error('Pacient není člen aktuální kampaně');
   const state=persistentStateOf(actor);
@@ -13783,7 +13798,9 @@ document.addEventListener('submit',event=>{
    'Pětiminutový zdravotní interval zapsán: '+(outcome.stopped?'Bleeder zastaven.':'krvácení pokračuje.')+
     ' BP '+outcome.bp+'/4, Shock '+outcome.shock+
     (outcome.nextDueMinute?' · další interval '+displayCampaignMinute(outcome.nextDueMinute):'')};
-  selected=actor.id;activeSheetSection='hazards';view='sheet';render();
+  if(stableRoute){selected=actor.hmk.livestockOwnerId;stableOwnerFocusedId=actor.id;activeSheetSection='stable';}
+  else{selected=actor.id;activeSheetSection='hazards';}
+  view='sheet';render();
  }catch(error){if(out)out.textContent='Blood Stoppage nebyl zapsán: '+error.message;
   else alert('Blood Stoppage nebyl zapsán: '+error.message);
   focusTravelBloodError93787(form,error.message);}
@@ -19007,6 +19024,17 @@ document.addEventListener('submit',e=>{
    const name=String(raw.name||'').trim(),weightLb=asInt(raw.weightLb,'hmotnost ve voze');
    if(!vehicle||!['Cart, 2-wheel','Wagon, 4-wheel','Sled'].includes(VEHICLES_TACK_P122.find(x=>x.id===vehicle.itemId)?.name)||name.length<2||name.length>90||weightLb<1)throw Error('Náklad vyžaduje registrovaný vůz/káru a skutečnou váhu.');
    Object.assign(event,{entryId:uuid(),vehicleId:vehicle.entryId,name,weightLb});
+  }else if(type==='vehicle-cargo-add-animal'){
+   const vehicle=p.vehicles.find(q=>q.entryId===raw.vehicleId);
+   if(!vehicle||!['Cart, 2-wheel','Wagon, 4-wheel'].includes(VEHICLES_TACK_P122.find(x=>x.id===vehicle.itemId)?.name)||raw.animalLoadConfirmed!=='on')
+    throw Error('Zvířecí pacient vyžaduje skutečnou káru/vůz a výslovné potvrzení naložení GM.');
+   const patient=carriedStableAnimal93879(data,campaignId,String(raw.carriedAnimalId||''));
+   if(patient.animal.id===animal.id)throw Error('Zvíře nemůže být naloženo do vlastního vozu.');
+   event.type='vehicle-cargo-add';
+   Object.assign(event,{entryId:uuid(),vehicleId:vehicle.entryId,carriedAnimalId:patient.animal.id,
+    name:'Zvíře · '+patient.animal.name,weightLb:patient.weightLb,
+    bodyWeightLb:patient.bodyWeightLb,gearAndCargoLb:patient.gearAndCargoLb,
+    patientProofFormat:'hmk-stable-animal-cargo-93879-v1',gmConfirmed:true});
   }else if(type==='vehicle-cargo-remove'){
    const record=p.vehicleCargo.find(q=>q.entryId===raw.entryId);
    if(!record)throw Error('Náklad není ve vozidle.');event.entryId=record.entryId;
@@ -19057,7 +19085,7 @@ document.addEventListener('submit',e=>{
    if(type==='sale'){event.transactionId=uuid();cashDelta=event.priceD;}
   }else throw Error('Neznámý úkon správy zvířete.');
   if(cashDelta<0)prepareLibraryPurchase(owner,-cashDelta,campaignId);
-  const label={sale:'prodej',release:'opuštění / darování','tack-add':'převzetí výstroje','tack-remove':'sejmutí výstroje','vehicle-add':'pořízení vozidla','vehicle-remove':'vyřazení vozidla','cargo-add':'naložení','cargo-remove':'vyložení','rider-mount':'nasednutí jezdce','rider-dismount':'sesednutí jezdce','inventory-load':'převod z inventáře','inventory-unload':'vrácení do inventáře','inventory-gear-attach':'nasazení vlastněné výstroje','inventory-gear-detach':'sejmutí vlastněné výstroje','vehicle-cargo-add':'naložení vozu','vehicle-cargo-remove':'vyložení vozu','training-activate':'aktivace výcviku',care:'péče'}[type];
+  const label={sale:'prodej',release:'opuštění / darování','tack-add':'převzetí výstroje','tack-remove':'sejmutí výstroje','vehicle-add':'pořízení vozidla','vehicle-remove':'vyřazení vozidla','cargo-add':'naložení','cargo-remove':'vyložení','rider-mount':'nasednutí jezdce','rider-dismount':'sesednutí jezdce','inventory-load':'převod z inventáře','inventory-unload':'vrácení do inventáře','inventory-gear-attach':'nasazení vlastněné výstroje','inventory-gear-detach':'sejmutí vlastněné výstroje','vehicle-cargo-add':'naložení vozu','vehicle-cargo-add-animal':'naložení konkrétního nepohyblivého zvířete','vehicle-cargo-remove':'vyložení vozu','training-activate':'aktivace výcviku',care:'péče'}[type];
   if(!['inventory-load','inventory-unload','inventory-gear-attach','inventory-gear-detach','rider-mount','rider-dismount'].includes(type)&&!ask(`Stáj · ${animal.name}: GM potvrzuje ${label}?\n${reason}${cashDelta?'\nZměna hotovosti '+cashDelta+'d':''}`))return;
   if(mutate(()=>{
    const key=campaignKey(data.campaignClock),live=character(animal.ownerId);
@@ -24946,6 +24974,8 @@ function episodeDroverRequirement93851(v){
 /** Authoritative animal cargo for the active campaign. No name-based matching with Combat State. */
 function episodeStableAnimals(stableIds,clock){
  const result=[];if(!stableIds?.length)return result;
+ const loaded=new Set(loadedStableAnimalIds93879(data,campaignKey(clock)));
+ if(stableIds.some(id=>loaded.has(id)))throw Error('Zvíře naložené ve voze nemůže současně samostatně cestovat; nejprve je fyzicky vyložte.');
  const candidates=new Map(verifiedLivestock(data,campaignKey(clock)).map(a=>[a.id,a]));
  const unique=new Set();
  for(const id of stableIds){

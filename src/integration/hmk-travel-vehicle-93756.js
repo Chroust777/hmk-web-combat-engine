@@ -8,6 +8,7 @@ import {stableHubProjection,stableBurden} from './hmk-stable-hub-574.js';
 import {stableHauling575} from './hmk-stable-operations-575.js';
 import {STABLE_VEHICLES_P122} from './hmk-stable-hub-574.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
+import {carriedStableAnimal93879} from './hmk-transport-animal-cargo-93879.js';
 const insist=(yes,message)=>{if(!yes)throw Error('Převoz – vozidlo: '+message);};
 const lb=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000;
 const goodId=x=>typeof x==='string'&&x.length>0&&x.length<200;
@@ -67,8 +68,22 @@ function vehicleReceiptInternal93757({data,campaignId,minute,conveyance,
   insist(Number.isSafeInteger(burden.adjustedENC)&&!burden.cargoOverflow,animal.name+': přetížené nebo neúplné ENC.');
  }
  const vehicleState=stableHubProjection(data,campaignId,car.ownerAnimalId);
- const cargoLb=vehicleState.vehicleCargo.filter(c=>c.vehicleId===car.entryId).reduce((s,c)=>s+c.weightLb,0);
+ const vehicleCargo=vehicleState.vehicleCargo.filter(c=>c.vehicleId===car.entryId);
+ const cargoLb=vehicleCargo.reduce((s,c)=>s+c.weightLb,0);
  insist(lb(cargoLb),'neplatná hmotnost nákladu ve vozidle.');
+ const carriedAnimals=vehicleCargo.filter(c=>c.carriedAnimalId).map(c=>{
+  insist(!teamIds.includes(c.carriedAnimalId)&&!stableAnimalIds.includes(c.carriedAnimalId),
+   'přepravované nepohyblivé zvíře nemůže zároveň táhnout ani samostatně kráčet.');
+  const listed=all.find(a=>a.id===c.carriedAnimalId);
+  insist(listed&&c.patientProofFormat==='hmk-stable-animal-cargo-93879-v1'&&
+   listed.spec.bodyWeightLb===c.bodyWeightLb&&c.weightLb===c.bodyWeightLb+c.gearAndCargoLb,
+   'fyzický zvířecí náklad nemá původní tělesnou hmotnost a identitu.');
+  if(checkLiveHealth){
+   const live=carriedStableAnimal93879(data,campaignId,c.carriedAnimalId,{requireImmobile:false,checkCustody:false});
+   insist(live.weightLb===c.weightLb,'zvířecí náklad změnil váhu; vyložte a znovu potvrďte naložení.');
+  }
+  return {animalId:c.carriedAnimalId,entryId:c.entryId,weightLb:c.weightLb,bodyWeightLb:c.bodyWeightLb};
+ }).sort((a,b)=>a.animalId.localeCompare(b.animalId));
  insist(typeof otherLoadLb==='number'&&Number.isFinite(otherLoadLb)&&otherLoadLb>=0,'doložte skutečnou hmotnost dalších cestujících a nákladu v librách.');
  const keys=Object.keys(patientLoadLb);
  insist(keys.length===transportedMemberIds.length&&keys.every(id=>transportedMemberIds.includes(id))&&
@@ -82,7 +97,8 @@ function vehicleReceiptInternal93757({data,campaignId,minute,conveyance,
   vehicleItemId:car.itemId,vehicleProofId:car.vehicleProofId,vehicleName:car.name,
   teamIds:[...teamIds].sort(),capacityLb:haul.capacityLb,cargoLb,
   patientLoadLb:Object.fromEntries(Object.entries(patientLoadLb).sort(([a],[b])=>a.localeCompare(b))),
-  otherLoadLb,passengerLb,totalLb,gmCoLocated:true,sourcePages:[122,145]};
+  otherLoadLb,passengerLb,totalLb,gmCoLocated:true,sourcePages:[122,145],
+  ...(carriedAnimals.length?{carriedAnimals}:{} )};
 }
 export function transportVehicleReceipt93756(args){return vehicleReceiptInternal93757(args,true);}
 /** Replay at each historical departure. Previously confirmed watches are not
