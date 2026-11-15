@@ -366,7 +366,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.898';
+const APP_VERSION='93.899';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -28605,7 +28605,7 @@ function episodeCarrySettingsFromLast(){
  const settings=last?.calendarTimeEpisode?.settings;
  if(!settings)return {};
  const keep=['kind','memberIds','animalIds','stableAnimalIds','guideId','weatherSource','area','topography','terrain','conveyance','mapScale',
-  'travelRideAnimalId','travelRideRiderId','droverActorId','season','climate','alpine','aridDesert','lightPeriod','lightCalculation','latitudeBand','sunriseMinute','twilightMinutes','daylightSeason','extraSlow','environ','environOverride','environReason','habitat','forageTarget','herbName','orientationPriority',
+  'travelRideAnimalId','travelRideRiderId','droverActorId','season','climate','alpine','aridDesert','lightPeriod','lightCalculation','latitudeBand','sunriseMinute','twilightMinutes','daylightSeason','environ','environOverride','environReason','habitat','forageTarget','herbName','orientationPriority',
   'orientationFamiliar','orientationTorch','orientationMoon','orientationSnow','trackingTrail',
   'trackingLight','trackingRoad','trackingPartyTracked','trackingSnow','trackingRain','trackingAlpine','orientationAllocation','orientationLowChoice','weatherSafeShelter'];
  const draft=Object.fromEntries(keep.filter(k=>k in settings).map(k=>[k,settings[k]]));
