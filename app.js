@@ -33,7 +33,7 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
-import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js';
+import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
@@ -363,7 +363,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.887';
+const APP_VERSION='93.888';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3344,7 +3344,7 @@ function timeEpisodePageHTML(clock,participants){
 }
 /** A character reads the trip as a story, not as an audit table. Every inline
  * receipt and injury comes from the authoritative, previously committed data. */
-function personalTimeEpisodeChronicleHTML(clock,personalId){
+function personalTimeEpisodeChronicleHTML(clock,personalId,{gm=false}={}){
  const rows=episodeTimeline(data.journal,campaignKey(clock),personalId);
  const evidence=new Map(data.journal.map(j=>[j.id,j]));
  const name=id=>character(id)?.name||'Účastník';
@@ -3364,7 +3364,7 @@ function personalTimeEpisodeChronicleHTML(clock,personalId){
   const opposition=t.other?`<span class="hc-story-receipt__opposed">protistrana EML ${esc(t.other.eml??'—')}, d100 (${esc(t.other.roll??'—')}), ${esc(t.other.level||'—')}</span>`:'';
   const owner=t.actorId?`<span class="hc-story-receipt__actor">${esc(name(t.actorId))}</span>`:'';
   const atoms=[owner,`<b>${esc(t.kind)} · ${esc(t.skill)}</b>`,target,die,victory,sv,stars,opposition].filter(Boolean);
-  return `<span class="hc-story-receipt" data-personal-test-id="${esc(t.id)}" role="group" aria-label="Doložený hod: ${esc(t.kind)} · ${esc(t.skill)}"><span class="hc-story-receipt__bracket">(</span>${atoms.join('<span class="hc-story-receipt__sep" aria-hidden="true"> · </span>')}<span class="hc-story-receipt__bracket">)</span></span>`;
+  return `<span class="hc-story-receipt" data-personal-test-id="${esc(t.id)}" role="group" aria-label="Doložený hod: ${esc(t.kind)} · ${esc(t.skill)}">(<span class="hc-story-receipt__inner">${atoms.join('<span class="hc-story-receipt__sep" aria-hidden="true"> · </span>')}</span>)</span>`;
  };
  const renderWounds=injuries=>injuries.map(w=>{
   const aspect=({b:'tupý zásah',e:'sečný zásah',p:'bodný zásah'})[w.aspect]||w.aspect||'zásah neurčen';
@@ -3387,16 +3387,21 @@ function personalTimeEpisodeChronicleHTML(clock,personalId){
   const distance=Number.isFinite(p.distanceMeters)&&p.distanceMeters>0?` · ${(p.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:2})} km`:'';
   const locality=p.terrain?personalTerrainLabel(p.terrain):p.area||'';
   const timeRange=`${start}–${endShort}`;
-  const routePart=`${locality||''}${distance}`;
+  const routePart=locality?`Typ krajiny / cesta: ${locality}${distance}`:(distance?distance.slice(3):'');
   const tests=personalEpisodeTests(p,evidence),roles=personalEpisodeRoles(p,name);
   const hazard=personalEpisodeHazard(p,displayCampaignMinute,{healthEvents,name});
   const encounter=personalEpisodeEncounter(p);
   const beats=personalChronicleBeats(entry,p,tests,{hazard,encounter,name});
   const context=[personalEpisodeWeather(p),p.area&&p.area.toLowerCase()!==locality.toLowerCase()?`Oblast: ${p.area}`:'',Number.isInteger(p.minutes)?`${p.minutes} minut`:''].filter(Boolean);
   const narrative=String(p.narrative||'').trim();
-  return `<details class="hc-episode-history hc-personal-episode" data-personal-episode-id="${esc(entry.id)}"><summary><span class="hc-personal-episode__summary-text"><span class="hc-personal-episode__summary-time">${esc(timeRange)}</span><span class="hc-personal-episode__summary-action">${esc(activity)}</span>${routePart?`<span class="hc-personal-episode__summary-route">${esc(routePart)}</span>`:''}</span><span class="hc-personal-episode__count">${tests.length} ${tests.length===1?'hod':'hodů'}</span></summary><div class="hc-personal-episode__content"><div class="hc-personal-episode__context">${context.map(x=>`<span>${esc(x)}</span>`).join('')}</div>${roles.length?`<section class="hc-personal-episode__roles" aria-label="Účastníci, zvířata a role"><h4>Účastníci, zvířata a role</h4><ul>${roles.map(role=>`<li>${esc(role)}</li>`).join('')}</ul></section>`:''}<div class="hc-personal-episode__story hc-personal-episode__story--integrated">${beats.map(renderBeat).join('')}</div>${narrative?`<p class="hc-personal-episode__gm-note"><b>Poznámka GM:</b> ${esc(narrative)}</p>`:''}</div></details>`;
- }).join('');
- return `<details class="hc-calendar hc-episode-chronicle hc-episode-chronicle--personal" data-personal-chronicle><summary>Osobní zápis cestování <span>(${rows.length})</span></summary><div class="hc-episode-chronicle__body">${results||'<p>Zatím neexistuje dokončená cestovní epizoda.</p>'}</div></details>`;
+  const gmSuggestions=gm?personalGMFollowups(entry,p,tests,{name,hazard,encounter}):[];
+  const gmHTML=gmSuggestions.length?`<aside class="hc-personal-episode__gm-ideas" aria-label="Náměty pro GM po skončení epizody"><h4>Co může následovat – inspirace pro GM</h4><p class="hc-gm-ideas__notice">Následující situace jsou pouze dobrovolné náměty, nikoli nové povinné hody nebo již nastalé následky. GM rozhodne, zda a kdy vůbec vzniknou.</p>${gmSuggestions.map((idea,i)=>`<section class="hc-gm-idea"><h5>${i+1}. ${esc(idea.title)}</h5><p>${esc(idea.question)}</p><p><strong>Možný test:</strong> ${esc(idea.skill)}</p><details><summary>Inspirace pro možné vyústění</summary><p><b>Pokud uspějí:</b> ${esc(idea.success)}</p><p><b>Pokud neuspějí:</b> ${esc(idea.failure)}</p></details></section>`).join('')}</aside>`:'';
+  return `<details class="hc-episode-history hc-personal-episode" data-personal-episode-id="${esc(entry.id)}"><summary><span class="hc-personal-episode__summary-text"><span class="hc-personal-episode__summary-time">${esc(timeRange)} <small>${tests.length} ${tests.length===1?'hod':'hodů'}</small></span><span class="hc-personal-episode__summary-main"><span class="hc-personal-episode__summary-action">${esc(activity)}</span>${routePart?`<span class="hc-personal-episode__summary-route">${esc(routePart)}</span>`:''}</span></span></summary><div class="hc-personal-episode__content"><div class="hc-personal-episode__context">${context.map(x=>`<span>${esc(x)}</span>`).join('')}</div>${roles.length?`<section class="hc-personal-episode__roles" aria-label="Účastníci, zvířata a role"><h4>Účastníci, zvířata a role</h4><ul>${roles.map(role=>`<li>${esc(role)}</li>`).join('')}</ul></section>`:''}<div class="hc-personal-episode__story hc-personal-episode__story--integrated">${beats.map(renderBeat).join('')}</div>${narrative?`<p class="hc-personal-episode__gm-note"><b>Poznámka GM:</b> ${esc(narrative)}</p>`:''}${gmHTML}</div></details>`;
+ });
+ const sorted=results.slice(0,120); // already newest-first: rows were reversed before map
+ const recent=sorted.slice(0,5).join('');
+ const archive=sorted.length>5?`<details class="hc-personal-archive"><summary>Archiv starších cestovních zápisů (${sorted.length-5})</summary><div class="hc-personal-archive__items">${sorted.slice(5).join('')}</div></details>`:'';
+ return `<section class="hc-calendar hc-episode-chronicle hc-episode-chronicle--personal${gm?' hc-episode-chronicle--gm':''}" data-personal-chronicle><h3>Osobní zápis cestování <small>(${rows.length})</small></h3><div class="hc-episode-chronicle__body">${recent||'<p>Zatím neexistuje dokončená cestovní epizoda.</p>'}${archive}</div></section>`;
 }
 function timeEpisodeChronicleHTML(clock,personalId=null){
  if(personalId)return personalTimeEpisodeChronicleHTML(clock,personalId);
@@ -5495,6 +5500,18 @@ function historyGameTime(entry){
   return displayCampaignMinute(entry.campaignMinute);
  return 'Herní čas nedoložen';
 }
+/** In personal notes always show the immutable calendar witness and full TR date.
+ * Do not substitute the device's date, or the current game day for a past note. */
+function personalNoteGameMoment(entry){
+ const time=historyGameTime(entry),stored=entry?.campaignTRDate;
+ let tr=null;
+ if(stored&&Number.isInteger(stored.year)&&Number.isInteger(stored.month)&&Number.isInteger(stored.day))
+  tr={...stored,monthName:TR_MONTHS[stored.month-1]};
+ else if(Number.isSafeInteger(entry?.campaignMinute)&&entry.campaignMinute>=0&&data.campaignClock?.trOrigin&&
+  (!entry.calendarCampaignId||entry.calendarCampaignId===campaignKey(data.campaignClock)))
+  try{tr=campaignTRDate(data.campaignClock,entry.campaignMinute);}catch{}
+ return tr?`${formatTRDate(tr)} · ${time}`:`${time} · TR datum nedoloženo`;
+}
 /** One classification function for personal and GM histories. Classification is
  * display-only: the original journal evidence remains untouched and immutable. */
 const JOURNAL_HISTORY_CATEGORIES=Object.freeze([
@@ -6226,8 +6243,8 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id,{includeWeather:false})}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='notes'){
   const personalNotes=logs.filter(isPersonalNote).filter(j=>!hiddenLogbookIds(data,c.id).has(j.id));
-  const noteRows=personalNotes.map(l=>`<article class="journal-personal-note" data-journal-entry="${esc(l.id)}"><div class="journal-personal-note__heading"><b>${esc(l.title||'Bez názvu')}</b><time>${esc(historyGameTime(l))}</time></div><p>${esc(l.body||'').replace(/\n/g,'<br>')}</p><div class="actions"><button class="secondary" type="button" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" type="button" data-delete-log="${esc(l.id)}">Smazat</button></div></article>`).join('');
-  const currentTime=data.campaignClock&&calendarMemberIds(data.campaignClock,data.characters).some(a=>a.id===c.id)?displayCampaignMinute(data.campaignClock.minute):'Herní datum a čas nejsou dostupné';
+  const noteRows=personalNotes.map(l=>`<article class="journal-personal-note" data-journal-entry="${esc(l.id)}"><div class="journal-personal-note__heading"><b>${esc(l.title||'Bez názvu')}</b><time>${esc(personalNoteGameMoment(l))}</time></div><p>${esc(l.body||'').replace(/\n/g,'<br>')}</p><div class="actions"><button class="secondary" type="button" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" type="button" data-delete-log="${esc(l.id)}">Smazat</button></div></article>`).join('');
+  const currentTime=data.campaignClock&&calendarMemberIds(data.campaignClock,data.characters).some(a=>a.id===c.id)?medicalFullMoment(data.campaignClock.minute):'Herní datum a čas nejsou dostupné';
   const chroniclePanel=`<section class="panel panel--chapter hmk-notes-left"><h3>Osobní zápisník</h3><p class="journal-minor">Přehled cestovních epizod, doložených hodů a jejich skutečných následků.</p><button type="button" class="secondary" data-nav="gmhistory">▤ Historie GM</button>${data.campaignClock?timeEpisodeChronicleHTML(data.campaignClock,c.id):'<p>Postava nemá otevřenou kampaň.</p>'}</section>`;
   const notesPanel=`<aside class="panel panel--chapter hmk-notes-right"><h3>Vlastní poznámky</h3><p class="journal-note-current-time">Herní čas pro nový zápis: <strong>${esc(currentTime)}</strong></p><form id="journal-form" class="journal-personal-note-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form><div class="journal-personal-note-list">${noteRows||'<p class="muted">Zatím nejsou zapsány žádné vlastní poznámky.</p>'}</div></aside>`;
   return journalShell(`<section class="journal-technical-shell hmk-notes-screen"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Vlevo osobní kronika cestování; vpravo vlastní poznámky zapsané s herním datem a časem.</p></header><div class="journal-tech-columns hmk-notes-columns">${chroniclePanel}${notesPanel}</div></section>`,`journal-book--chapter journal-book--notes`);
@@ -7542,49 +7559,18 @@ function visibleEvidenceText(value){
   return owner?.name||'doložený záznam';
  });
 }
+/** GM chronicle is exactly the same committed episode projection as the
+ * personal notebook. Old journal events stay stored for rules and auditing,
+ * but they are no longer duplicated in this read-only presentation. */
 function gmHistoryView(){
- const names=new Map([...data.characters,...data.trash].map(c=>[c.id,c.name]));
- const entries=(data.journal||[]).map(j=>({...j,origin:'journal'}));
- // Render original authoritative calendar advance events, not duplicate
- // records in character journals. A single event ID yields one GM history row.
- if(data.campaignClock?.events){
-  const clock=data.campaignClock;
-  let previousMinute=clock.events.find(e=>e.type==='init')?.minute??0;
-  for(const e of clock.events){
-   if(e.type==='advance')entries.push({id:'clock:'+e.id,characterId:null,
-    campaignMinute:e.minute,createdAt:'',origin:'calendar-clock',
-    title:'GM · Nastavení času kampaně',
-    body:`${displayCampaignMinute(previousMinute)} → ${displayCampaignMinute(e.minute)}\nDůvod GM: ${e.reason}`});
-   if(e.type==='advance'||e.type==='init')previousMinute=e.minute;
-  }
- }
- for(const c of data.characters){
-  for(const account of Object.values(c.hmk?.campaignCashAccounts||{})){
-   for(const x of account.purchases||[])entries.push({id:'cash-purchase:'+x.id,characterId:c.id,createdAt:x.at||'',campaignMinute:x.campaignMinute,title:'Nákup · '+(x.label||'vybavení'),body:'−'+x.amountPence+'d',origin:'cash'});
-   for(const x of account.adjustments||[])entries.push({id:'cash-adjustment:'+x.id,characterId:c.id,createdAt:x.at||'',campaignMinute:x.campaignMinute,title:'Úprava hotovosti',body:(x.deltaPence>=0?'+':'')+x.deltaPence+'d · '+(x.reason||''),origin:'cash'});
-  }
- }
- // Presentation only. Never remove original custody or physical-water evidence.
- const meaningfulEntries=entries.filter(j=>!isRoutineInventoryHistory(j));
- meaningfulEntries.sort((a,b)=>(b.campaignMinute??-1)-(a.campaignMinute??-1)||String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
- const row=(j,viewCharacterId=null)=>{
-  const ownerId=viewCharacterId||j.characterId;
-  const name=names.get(ownerId)||'GM / svět',ref=!!names.get(ownerId),proof=j.skillTestProof;
-  const procedure=j.origin==='cash'?'gear':j.calendarInventoryRationStock||j.calendarInventoryWaterFill||j.calendarInventoryRationLoss||j.calendarInventoryWaterLoss||j.calendarNutritionPolicy||j.calendarForagingSupplyUse?'provisions':null;
-  const linkedEpisode=data.campaignClock&&data.journal.find(e=>e.calendarCampaignId===campaignKey(data.campaignClock)&&e.calendarTimeEpisode?.skillLinks?.some(link=>link.id===j.id)&&e.calendarTimeEpisode?.memberIds?.includes(ownerId));
-  const travelLink=ref&&linkedEpisode?`<button type="button" class="secondary" data-gm-history-open="${esc(ownerId)}" data-gm-history-episode="${esc(linkedEpisode.id)}">Otevřít cestovní zápis ↗</button>`:'';
-  // Full-width evidence lives in the following cell spanning all four columns.
-  // It remains visually attached to its own event and never changes the journal.
-  return `<tr class="gm-history-event-row"><td>${esc(historyGameTime(j))}</td><td>${esc(name)}</td><td><strong ${j.calendarMalnutritionMedical?journalHelp('HR',HR_HELP_558):''}>${esc(visibleEvidenceText(historyDisplayTitle(j,id=>names.get(id))))}</strong></td><td class="gm-history-links">${travelLink}${ref&&!linkedEpisode&&isPersonalNote(j)?`<button type="button" class="secondary" data-gm-history-open="${esc(ownerId)}" data-gm-history-entry="${esc(j.id)}">Vlastní poznámka ↗</button>`:''}${ref&&procedure?`<button type="button" class="secondary" data-gm-history-procedure="${esc(procedure)}" data-gm-history-actor="${esc(ownerId)}">${procedure==='skills'?'Skill Test':procedure==='gear'?'Arsenal & Gear':'Zásoby'} ↗</button>`:''}</td></tr><tr class="gm-history-expanded-row"><td colspan="4"><div class="gm-history-detail">${j.skillTestProof?skillTestEvidenceHTML(j,esc,{nameById:id=>names.get(id)}):`<div class="gm-history-plain-body">${esc(visibleEvidenceText(j.body||'Bez popisu')).replace(/\n/g,'<br>')}</div>`}</div></td></tr>`;
- };
- const table=(rows,personId)=>`<div class="hc-provision-table-scroll"><table class="hc-provision-table gm-history-table"><thead><tr><th>Herní čas</th><th>Postava</th><th>Událost</th><th>Otevřít</th></tr></thead><tbody>${rows.map(j=>row(j,personId)).join('')}</tbody></table></div>`;
- const characters=[...data.characters,...data.trash].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'cs')||String(a.id).localeCompare(String(b.id)));
- const grouped=groupHistoryByCharacter(meaningfulEntries,characters);
- const groupSection=(person)=>`<details class="gm-history-person" data-gm-history-person="${esc(person.id)}"><summary>${esc(person.name)} <span>(${person.entries.length})</span></summary><div class="gm-history-person__content">${journalCategorySections(person.entries,rows=>table(rows,person.id),{limit:30,detailsClass:'gm-history-category'})}</div></details>`;
- const unassigned=grouped.unassigned.length?groupSection({id:'__world__',name:'GM / svět a nezařazené záznamy',entries:grouped.unassigned}):'';
- const filter=grouped.groups.length||grouped.unassigned.length?`<label class="gm-history-person-filter">Vyhledat historii postavy<select data-gm-history-person-filter><option value="">Všechny postavy</option>${grouped.groups.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} (${p.entries.length})</option>`).join('')}${grouped.unassigned.length?'<option value="__world__">GM / svět</option>':''}</select></label>`:'';
- return journalChapterShell('GM · Historie činností',`${czCount(meaningfulEntries.length,'doložený záznam','doložené záznamy','doložených záznamů')} postav a kampaní`,
- `<section class="panel"><h3>Historie rozdělená podle postav</h3><p class="muted">Vyberte postavu, pak typ události. Opposed Test je v přehledu obou účastníků, ale zůstává jediným původním pravidlovým záznamem; souhrnný počet proto uvádí jedinečné události. Odkaz u doloženého cestovního testu otevře přímo příslušnou epizodu v osobním zápisníku.</p>${filter}<div class="gm-history-person-groups">${grouped.groups.map(groupSection).join('')}${unassigned}</div></section>`,'journal-book--gm-history');
+ const clock=data.campaignClock;
+ const people=clock?registryCharacters93813(data.characters).filter(c=>!isStableAnimalProfile93813(c)&&episodeTimeline(data.journal,campaignKey(clock),c.id).length):[];
+ const total=people.reduce((sum,c)=>sum+episodeTimeline(data.journal,campaignKey(clock),c.id).length,0);
+ const cards=people.map(c=>`<section class="panel hmk-gm-chronicle-person" data-gm-chronicle-person="${esc(c.id)}"><h3>${esc(c.name)}</h3>${personalTimeEpisodeChronicleHTML(clock,c.id,{gm:true})}<button type="button" class="secondary hc-small" data-gm-history-open="${esc(c.id)}">Otevřít osobní zápisník postavy ↗</button></section>`);
+ const content=cards.length?cards.join(''):'<section class="panel"><p>Zatím nejsou doložené cestovní epizody postav v aktivním kalendáři.</p></section>';
+ return journalChapterShell('GM · Historie činností',`${total} osobních cestovních záznamů · ${people.length} postavy`,
+ `<section class="panel hmk-gm-chronicle-intro"><p>Stejná cestovní kronika jako v osobních zápisnících, doplněná o dobrovolné náměty pro GM. Vidět je posledních pět epizod každé postavy; starší jsou v jejím archivu.</p></section>${content}`,
+ 'journal-book--gm-history journal-book--notes');
 }
 function trashView(){return journalChapterShell('Archiv postav','Archivované profily zůstávají zachované spolu s inventářem a historií.',`<section class="panel folio-archive-list"><h3>Archivované postavy</h3><p class="muted">Obnovení postavu vrátí do registru. Trvalé smazání vyžaduje samostatné potvrzení.</p>${data.trash.length?data.trash.map(c=>`<div class="folio-archive-row"><div class="folio-archive-identity"><b>${esc(c.name)}</b><span>${esc(c.occupation||'Bez povolání')}</span></div><div class="actions folio-archive-actions"><button data-restore="${esc(c.id)}">Obnovit</button><button class="secondary" data-export-character="${esc(c.id)}">Záloha postavy</button><button class="danger" data-purge="${esc(c.id)}">Definitivně smazat</button></div></div>`).join(''):'<div class="empty">Archiv je prázdný.</div>'}</section><section class="panel folio-archive-info"><h3>Evidence archivu</h3><dl class="folio-archive-metrics"><div><dt>Archivované postavy</dt><dd>${data.trash.length}</dd></div><div><dt>Aktivní postavy</dt><dd>${registryCharacters93813(data.characters).length}</dd></div></dl><p class="muted">Archivace nepřepisuje deník ani inventář postavy. Obnovení ji vrátí do registru.</p><button type="button" class="secondary" data-nav="characters">Otevřít registr postav</button></section>`,'journal-book--archive')}
 function readinessReport(c){
@@ -19643,7 +19629,7 @@ document.addEventListener('click',e=>{
  view='sheet';activeSheetSection='notes';render();
  if(t.dataset.gmHistoryEpisode){
   const target=[...document.querySelectorAll('[data-personal-episode-id]')].find(el=>el.dataset.personalEpisodeId===t.dataset.gmHistoryEpisode);
-  if(target){const parent=target.closest('[data-personal-chronicle]');if(parent)parent.open=true;target.open=true;target.scrollIntoView({block:'start',behavior:'instant'});}return;
+  if(target){const parent=target.closest('[data-personal-chronicle]');if(parent?.tagName==='DETAILS')parent.open=true;const archive=target.closest('.hc-personal-archive');if(archive)archive.open=true;target.open=true;target.scrollIntoView({block:'start',behavior:'instant'});}return;
  }
  const row=[...document.querySelectorAll('[data-journal-entry]')].find(el=>el.dataset.journalEntry===t.dataset.gmHistoryEntry);
  if(row){for(let p=row.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;row.querySelector('details')?.setAttribute('open','');row.scrollIntoView({block:'center',behavior:'instant'});}
