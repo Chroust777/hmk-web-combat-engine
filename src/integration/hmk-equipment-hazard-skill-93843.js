@@ -17,8 +17,8 @@ export function equipmentHazardSkill93843(item){
  const patterns=[
   [/\b(horseshoe|horseshoes|podkov)/i,'Metalcraft'],
   [/\b(wheel|axle|kolo|náprav)/i,'Woodworking'],
-  [/\b(rope|cordage|provaz|lano)\b/i,'Textilecraft'],
-  [/\b(harness|strap|waterskin|postroj|řemen|měch)\b/i,'Hideworking']
+  [/(?<!\p{L})(rope|ropes|cordage|provaz(?:y|ů|em)?|lan(?:o|a|em|y))(?!\p{L})/iu,'Textilecraft'],
+  [/(?<!\p{L})(harness|harnesses|strap|straps|waterskin|waterskins|postroj(?:e|ů|em)?|řemen(?:y|ů|em)?|měch(?:y|ů|em)?)(?!\p{L})/iu,'Hideworking']
  ];
  for(const [re,skill] of patterns)if(re.test(name))return {skill,source:'hmk-148-example',reason:'Přímo podle příkladů Equipment Hazard v HMK str. 148.'};
  const raw=String(p.craftSkill??'').trim();
