@@ -366,7 +366,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.899';
+const APP_VERSION='93.900';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -26010,7 +26010,7 @@ function episodePreviewFromForm(form,clock){
  if(generalStop93869&&result.hazardDetails.some(h=>h.hazard==='accident'||
   h.hazard==='complication'&&['F','CF','long-delay','irreparable'].includes(h.result)))
   throw Error('Potvrzený Survival Accident/Complication už určuje přerušení. Nezadávejte stejnou událost podruhé.');
- const foragingAccidentMinute93869=kind==='forage'?result.hazardDetails.find(h=>h.hazard==='accident'&&h.eventWindow93868)?.eventWindow93868?.movingMinutes:null;
+ const foragingAccidentMinute93869=kind==='forage'?(result.hazardDetails.find(h=>h.hazard==='accident'&&h.eventWindow93868)?.eventWindow93868?.movingMinutes??null):null;
  const stationForageMinutes93869=foragingAccidentMinute93869===null?actualActivityMinutes93869:
   Math.min(actualActivityMinutes93869,foragingAccidentMinute93869);
  if(kind==='forage'&&foragingAccidentMinute93869!==null)
