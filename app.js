@@ -366,7 +366,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.897';
+const APP_VERSION='93.898';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -22543,9 +22543,14 @@ document.addEventListener('submit',event=>{
    calendarMemberIds(clock,data.characters).some(x=>x.id===actor.id),minute=inCalendar?clock.minute:null;
   const result=prepareGMShockStateChange({state:before,eventId,shock:v.shock,
    reason:String(v.reason||''),minute,gmConfirmed:v.gmConfirmed==='yes',standingConfirmed:v.standingConfirmed==='yes'});
+  // Report the actual computed posture transition, never claim that
+  // PRONE is unchanged when a GM-confirmed INC/UNC status makes it true.
+  const proneBefore=before.posture?.prone===true,proneAfter=result.state.posture?.prone===true;
+  const postureSummary=proneBefore&&!proneAfter?'GM potvrzuje, že postava stojí; ruší se staré PRONE. ':
+   !proneBefore&&proneAfter?'Poloha se tímto rozhodnutím mění na PRONE. ':
+   proneAfter?'Poloha PRONE zůstává zachována. ':'Poloha bez PRONE zůstává zachována. ';
   if(!uiConfirm('GM '+(before.shock===v.shock?'potvrzuje polohu postavy při Shock '+v.shock:
-   'mění zdravotní Shock '+before.shock+' → '+v.shock)+'. '+
-   (result.postureCleared?'GM potvrzuje, že postava stojí; ruší se staré PRONE. ':'Poloha prone zůstane zachována. ')+
+   'mění zdravotní Shock '+before.shock+' → '+v.shock)+'. '+postureSummary+
    'Původní zdravotní průběhy a rány se nemění; dosavadní Shock Reroll/Coma/Extended Shock se administrativně ukončí. Pokračovat?'))return;
   if(!mutate(()=>{
    const current=character(actor.id);
