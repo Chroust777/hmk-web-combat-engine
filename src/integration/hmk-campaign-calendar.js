@@ -8,6 +8,7 @@ import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentPr
  */
 import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly} from './hmk-calendar-planner.js';
 import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js';
+import {calendarMoraleProjection} from './hmk-calendar-morale-93891.js';
 import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
 import {automaticAilmentOnset} from './hmk-calendar-automatic-onsets.js';
 import {gmCalendarCancellationMatches} from './hmk-calendar-gm-cancellation.js';
@@ -65,9 +66,16 @@ export function validateCampaignCalendar(clock){
  let last=-1;const eventIds=new Set();
  for(const e of clock.events){
   ensure(e&&typeof e.id==='string'&&e.id.length>0&&!eventIds.has(e.id)&&
-   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan','membership','gm-defer','gm-cancel'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
+   ['init','advance','anchor','resolution','tr-origin','plan','resolve-plan','cancel-plan','membership','gm-defer','gm-cancel','morale-origin','morale-safety'].includes(e.type)&&validInt(e.minute,0,MAX_MINUTE)&&
    e.minute>=last&&typeof e.reason==='string'&&e.reason.length>0&&e.reason.length<=400,
    'Neplatná nebo zpětně vložená časová událost');
+  if(e.type==='morale-origin')ensure(typeof e.characterId==='string'&&e.characterId&&
+   ['withdrawing','routed'].includes(e.moraleState)&&validInt(e.originMinute,0,e.minute)&&
+   e.gmConfirmed===true&&e.reason.length>=10,'Neplatný GM počátek Morale');
+  if(e.type==='morale-safety')ensure(typeof e.characterId==='string'&&e.characterId&&
+   ['withdrawing','routed'].includes(e.moraleState)&&e.safe===false&&
+   validInt(e.checkAfterMinute,e.minute+1,MAX_MINUTE)&&e.gmConfirmed===true&&
+   e.reason.length>=10,'Neplatné GM potvrzení nebezpečí Morale');
   if(e.type==='gm-defer')ensure(typeof e.obligationId==='string'&&e.obligationId.length>0&&e.obligationId.length<=350&&
    typeof e.characterId==='string'&&e.characterId.length>0&&e.characterId.length<=200&&
    GM_DEFERABLE_HEALTH_KINDS.has(e.kind)&&validInt(e.dueMinute,0,MAX_MINUTE)&&
@@ -320,6 +328,9 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
    }
   }
  }
+ const morale=calendarMoraleProjection(clock,characters,journal);
+ all.push(...morale.all);
+ unknown.push(...morale.unknown);
  const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor,inventory);
  // A saved Trekking Routine is only a PREPARATION. It does not by itself
  // start a journey or expose the party to its possible hazards. Preserve its
@@ -393,7 +404,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  const liveUnknown=unknown.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
  const liveSuspended=suspended.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
  return {due:actionable.filter(x=>x.status==='due'),future:actionable.filter(x=>x.status==='future'),
-  unknown:liveUnknown,all:actionable,deferred,suspended:liveSuspended,prepared:prepared.filter(x=>!gmCalendarCancellationMatches(clock,x,journal))};
+  unknown:liveUnknown,moraleWarnings:morale.warnings,all:actionable,deferred,suspended:liveSuspended,prepared:prepared.filter(x=>!gmCalendarCancellationMatches(clock,x,journal))};
 }
 export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[],inventory=[],deferConcurrentTreatmentAtStart=false}={}){
  validateCampaignCalendar(clock);

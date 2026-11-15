@@ -196,6 +196,7 @@ import {travelBleedingTerm,beginTravelBloodStoppage,completeTravelBleedingInterv
 import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
+import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
 import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
@@ -364,7 +365,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.889';
+const APP_VERSION='93.891';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3487,6 +3488,26 @@ function campaignCalendarView(){
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
  const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button><button type="button" class="hc-small danger" data-cal-gm-cancel-due="${esc(x.id)}" data-cal-gm-cancel-actor="${esc(x.characterId)}" title="GM: zrušit povinnost a navázané termíny">×</button></div></div>`;};
+ const moraleChecks=agenda.due.filter(x=>x.kind==='morale-reaction');
+ const moraleUnknown=agenda.unknown.filter(x=>x.kind==='morale-reaction');
+ const moraleWarnings=agenda.moraleWarnings||[];
+ const moraleCalendarHTML=`<section class="panel hc-calendar hc-morale-reactions" data-calendar-morale-checks><h3>Morale Reaction · časované kontroly (HMK str. 162)</h3>
+ <p class="hc-hint">Withdrawing: jedna skutečná minuta bez ohrožení; Routed: pět skutečných minut v bezpečí mimo dohled protivníků. Kalendář hlídá termín a rozhodnutí GM, žádný hod neprovádí automaticky. Stav Morale se mění jen po uložení skutečné d100.</p>
+ ${moraleWarnings.map(w=>`<p class="notice"><strong>Historický audit · ${esc(w.name)}:</strong> Mezi ${esc(displayCampaignMinute(w.from))} a ${esc(displayCampaignMinute(w.to))} nebyly doložené všechny minutové kontroly. Pozdější hod jejich výsledky nenahrazuje.</p>`).join('')}
+ ${moraleChecks.map(x=>`<form data-calendar-morale-reaction="${esc(x.characterId)}" data-calendar-morale-due="${x.minute}" class="hc-morale-check"><strong>${esc(x.name)} · ${esc(x.moraleState)} · termín ${esc(displayCampaignMinute(x.minute))}</strong>
+ ${x.minute<data.campaignClock.minute?`<p class="notice">Opožděný termín: ${esc(displayCampaignMinute(x.minute))}. Nynější hod bude označen jako opožděný a nezastoupí historické neprovedené hody.</p>`:''}
+ <label>Byla příslušná bezpečná doba skutečně splněna?<select name="condition"><option value="safe">ANO – GM potvrzuje nepřerušené bezpečí (${x.duration} min)</option><option value="unsafe">NE – podmínky nebyly splněny, bez hodu</option></select></label>
+ <label>Skutečný d100 (pouze při ANO)<input type="number" name="roll" min="1" max="100" step="1" placeholder="1–100"><button type="button" class="secondary hc-small" data-calendar-morale-die>⚄ Hodit d100 (software)</button></label>
+ <label>Zdůvodnění GM při nesplněných podmínkách<input name="reason" maxlength="400" placeholder="Kde a proč trvalo ohrožení"></label>
+ <p class="hc-hint">Při trvajícím ohrožení se bez hodu plánuje jen nejbližší možné nové posouzení (1 minuta pro withdrawing, 5 minut pro routed). Nejde o potvrzení budoucích podmínek.</p>
+ <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje skutečné podmínky a použitý hod</label>
+ <button type="submit">${esc(x.name)} · potvrdit Morale</button></form>`).join('')}
+ ${moraleUnknown.map(x=>`<form data-calendar-morale-origin="${esc(x.characterId)}"><p class="notice">${esc(x.name)}: ${esc(x.reason)}</p>
+ <label>Skutečně uplynulé celé minuty od původního Morale Rollu<input name="elapsed" type="number" min="0" max="${clock.minute}" required></label>
+ <label>Důvod a doklad času<input name="reason" minlength="10" maxlength="400" required></label>
+ <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený počátek stavu</label>
+ <button type="submit">Doložit počátek Morale bez nového hodu</button></form>`).join('')}
+ ${!moraleChecks.length&&!moraleUnknown.length?'<p class="hc-hint">Žádná okamžitě splatná Morale Reaction; budoucí termíny jsou v seznamu Kalendáře.</p>':''}</section>`;
  const renderDueGroups=events=>groupConcurrentObligations(events).map(g=>{
   const person=character(g.characterId)?.name||g.items[0]?.name||g.characterId;
   return `<section class="hc-calendar-concurrent" data-calendar-concurrent-minute="${g.minute}" data-calendar-concurrent-actor="${esc(g.characterId)}">
@@ -3975,7 +3996,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
    ${independentCriticalDue.map(renderItem).join('')}</section>`:'';
  const deferredHealthHTML=agenda.deferred?.length?
   `<section class="panel hc-calendar-gm-deferred" role="status"><h3>Neuzavřené zdravotní výjimky GM · ${agenda.deferred.length}</h3><p class="notice">GM výslovně odložil povinné testy. ŽÁDNÝ hod ani zdravotní zlepšení nebyly domyšleny. Příslušná nemoc, rána nebo jiný stav trvá; vyhodnoťte jej dodatečně v původním modulu nebo opravte evidenci se skutečným podkladem.</p>${agenda.deferred.map(x=>`<p><strong>${esc(x.name)}</strong> · ${esc(x.description)} · původní termín ${esc(displayCampaignMinute(x.minute))}</p>`).join('')}</section>`:'';
- const overviewHTML=`${deferredHealthHTML}${independentCriticalHTML}${concurrentMedicalProceduresHTML()}${board}${timedSkillPending590}${unknownFallNotice}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section>`;
+ const overviewHTML=`${deferredHealthHTML}${moraleCalendarHTML}${independentCriticalHTML}${concurrentMedicalProceduresHTML()}${board}${timedSkillPending590}${unknownFallNotice}${preparedTrekHTML}<section class="panel hc-calendar"><h3>Posun času GM</h3><p class="hc-hint">Čas mění výhradně GM. Spotřeba potravy a vody se uzavře teprve s ověřeným uplynutím 24 hodin.</p><form id="campaign-advance-form"><div class="field-grid">${field('days','Uplynulé celé dny',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}${field('reason','Důvod posunu času (GM)','odpočinek')}</div><button type="submit">Posunout čas (bez hodů)</button></form></section>`;
  const calendarPage=activeCalendarSection==='overview'?`${trekDailyWeatherFormHTML(clock)}${overviewHTML}`:
   activeCalendarSection==='travel'?`${timeEpisodePageHTML(clock,provisionParticipants)}${wildernessHTML}${activeHMKActivities(data.journal,clock).length?interruptionsHTML:''}`:
   activeCalendarSection==='chronicle'?timeEpisodeChronicleHTML(clock):
@@ -3983,7 +4004,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   activeCalendarSection==='craft'?`${herbalHTML}${alchemyHTML}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
- ${deferredHealthHTML}<section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Zdravotní následky cestování vyřešte ve Zdraví & Expozice. Kalendář pouze hlídá čas a nevytváří paralelní zdravotní zápisy; skutečný boj zahajuje GM samostatně.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
+ ${deferredHealthHTML}${moraleCalendarHTML}<section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Zdravotní následky cestování vyřešte ve Zdraví & Expozice. Kalendář pouze hlídá čas a nevytváří paralelní zdravotní zápisy; skutečný boj zahajuje GM samostatně.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
  <section class="panel"><h3>Historické rány – potvrzení počátku · ${unresolved.length}</h3><p>Starší rány nepřevádíme automaticky z čísla bojového kola. Zadejte jejich skutečný věk v celých dnech a zbývajících hodinách/minutách.</p>${anchorOptions?`<form id="campaign-anchor-wound-form"><label>Rána<select name="wound" required>${anchorOptions}</select></label><div class="field-grid">${field('days','Počet uplynulých dní',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený okamžik zranění</label><button type="submit">Ukotvit historickou ránu</button></form>`:'<p>Všechny existující otevřené rány mají doložený počátek.</p>'}</section>
  <section class="panel"><h3>Další historické procedury</h3>${timeOrigins.length?`<form id="campaign-anchor-procedure-form"><label>Procedura<select name="origin" required>${timeOrigins.map(x=>`<option value="${esc(x.kind+'::'+x.characterId+(x.episodeId?'::'+x.episodeId:''))}">${esc(x.label)} (${x.unit})</option>`).join('')}</select></label>${field('days','Skutečně uplynulé dny',0,'number')}${field('hours','Zbývající hodiny',0,'number')}${field('minutes','Zbývající minuty',0,'number')}<label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje počátek procedury</label><button type="submit">Ukotvit proceduru</button></form>`:'<p>Žádná další aktivní procedura nepotřebuje potvrzení počátku.</p>'}</section>
@@ -10548,7 +10569,7 @@ const SKILL_FOLLOWUP_FIELD_HELP=Object.freeze({
 function animalTrainingCalendarEligibility(form){
  if(!form?.matches?.('form[data-hmk-animal-training]'))return {ready:true};
  const selectedId=form.elements.namedItem('stableAnimalId')?.value;
- if(!selectedId)return {ready:true,reason:'Zvíře mimo stáj: časový doklad musí doložit GM; automatické ověření kalendáře není dostupné.'};
+ if(!selectedId)return {ready:false,reason:'Pro výcvik Animalcraft vyberte konkrétní registrované zvíře ze Stáje. Bez jeho identity nelze ověřit šest měsíců výcviku ani uložit výsledek.'};
  const origin=data.journal.find(j=>j.id===form.elements.namedItem('origin')?.value);
  const animal=bestiaryKnownAnimals().find(a=>a.id===selectedId);
  if(!animal||!origin)return {ready:false,reason:'Chybí původní doklad zvířete nebo Skill Testu.'};
@@ -11429,8 +11450,8 @@ document.addEventListener('submit',event=>{
   const selectedStableId=els.namedItem('stableAnimalId')?.value||null;
   const selectedStable=selectedStableId?bestiaryKnownAnimals().find(x=>x.id===selectedStableId):null;
   // A registered own animal cannot be replaced by unverified free text.
-  if(bestiaryKnownAnimals().some(x=>x.ownerId===actor.id)&&(!selectedStable||selectedStable.ownerId!==actor.id))
-   throw Error('Vyberte konkrétní vlastněné zvíře ze stáje. Název nelze zadat ručně, pokud je identita evidována.');
+  if(!selectedStable||selectedStable.ownerId!==actor.id)
+   throw Error('Vyberte konkrétní registrované zvíře ze Stáje této postavy. Ruční text ani nevlastněné zvíře nejsou platným dokladem výcviku.');
   const calendarEligibility=selectedStable?animalTrainingCalendarEligibility(f):{ready:true,startId:null};
   if(!calendarEligibility.ready)throw Error(calendarEligibility.reason);
   if(selectedStableId&&!selectedStable)throw Error('Vybrané zvíře už není ve stáji.');
@@ -18522,6 +18543,82 @@ document.addEventListener('click',e=>{
   return;
  }
 },true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-calendar-morale-die]');if(!b)return;
+ e.preventDefault();
+ const f=b.closest('form[data-calendar-morale-reaction]'),input=f?.elements.namedItem('roll');if(!input)return;
+ const die=secureAutoDie(100);input.value=String(die);input.dataset.hmkMoraleSoftwareDie=String(die);
+ b.textContent='⚄ d100 ('+die+')';
+},true);
+document.addEventListener('input',e=>{
+ if(e.target.matches?.('form[data-calendar-morale-reaction] input[name="roll"]'))
+  delete e.target.dataset.hmkMoraleSoftwareDie;
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;
+ if(!f.matches?.('form[data-calendar-morale-reaction],form[data-calendar-morale-origin]'))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const v=Object.fromEntries(new FormData(f));
+ try{
+  const clock=data.campaignClock;if(!clock)throw Error('Chybí aktivní kalendář');
+  if(combatInitiativeSequence)throw Error('Dokončete bojovou osu; mimo-bojové minuty nelze míchat s právě probíhajícími tahy.');
+  if(v.gmConfirmed!=='yes')throw Error('GM musí potvrdit skutečné podmínky');
+  const id=f.dataset.calendarMoraleReaction||f.dataset.calendarMoraleOrigin,patient=character(id);
+  if(!patient||!calendarMemberIds(clock,data.characters).some(c=>c.id===id))throw Error('Postava není v kampani');
+  const morale=persistentStateOf(patient).morale?.state;
+  if(!['withdrawing','routed'].includes(morale))throw Error('Morale stav se změnil; načtěte kalendář znovu');
+  if(f.hasAttribute('data-calendar-morale-origin')){
+   const elapsed=Number(v.elapsed),next=registerMoraleOrigin(clock,{eventId:uuid(),characterId:id,
+    moraleState:morale,elapsedMinutes:elapsed,reason:v.reason,gmConfirmed:true});
+   if(!uiConfirm('GM skutečně potvrzuje počátek '+morale+' před '+elapsed+' minutami?'))return;
+   if(mutate(()=>{data.campaignClock=next;}))render();return;
+  }
+  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory);
+  const due=agenda.due.find(x=>x.kind==='morale-reaction'&&x.characterId===id);
+  if(!due||due.minute!==Number(f.dataset.calendarMoraleDue)||due.moraleState!==morale)
+   throw Error('Morale termín se změnil; znovu otevřete kalendář');
+  if(v.condition==='unsafe'){
+   const next=registerMoraleUnsafe(clock,{eventId:uuid(),characterId:id,
+    moraleState:morale,reason:v.reason,gmConfirmed:true});
+   validateCampaignCalendar(next);
+   if(!uiConfirm('GM potvrzuje, že požadované bezpečí zatím nebylo splněno. Bez hodu; nejbližší další kontrola za '+due.duration+' min?'))return;
+   if(mutate(()=>{data.campaignClock=next;}))render();return;
+  }
+  if(v.condition!=='safe')throw Error('Zvolte skutečnou bezpečnostní podmínku');
+  const roll=Number(v.roll),software=f.elements.namedItem('roll')?.dataset.hmkMoraleSoftwareDie===String(v.roll);
+  if(!Number.isSafeInteger(roll)||roll<1||roll>100)throw Error('Zadejte jeden skutečný d100 1–100');
+  const state=persistentStateOf(patient),baseRound=Math.max(1,state.lastRound||0),
+   timelineId='calendar-morale:'+campaignKey(clock),
+   lastSame=state.morale?.lastReactionTimelineId===timelineId,
+   round=Math.max(baseRound+1,lastSame?state.morale.lastReactionRound+due.duration*12:1);
+  if(round>9999)throw Error('Morale dosáhlo limitu bojových kol: nepřevádět minuty na fiktivní kola; vyžaduje GM nový časový kontext');
+  const ml=(patient.hmk.skills||[]).find(x=>String(x.name||x.key||'').trim().toLowerCase()==='initiative')?.ml;
+  if(!Number.isSafeInteger(ml)||ml<0||ml>200)throw Error('Chybí doložený Initiative ML');
+  const eventId=uuid(),result=applyConfirmedMoraleReaction({state,round,eventId,
+   characterId:id,initiativeML:ml,roll,elapsedSafeMinutes:due.duration,
+   unthreatened:morale==='withdrawing',safeOutOfLOS:morale==='routed',
+   timelineId,gmConfirmed:true});
+  const dieSource=software?'cryptographic-software-die':'GM-entered-manual-value';
+  result.state.events.at(-1).details.physicalDice={format:'hmk-manual-dice-proof-v1',
+   source:'HMK World of Kèthîra p.162',rolls:[{id:'reactionD100',faces:100,actorId:id,value:roll,source:dieSource}]};
+  const nextClock=recordCampaignResolution(clock,{eventId:uuid(),sourceEventId:eventId,characterId:id,kind:'morale-reaction'});
+  if(!uiConfirm(patient.name+': uložit d100 ('+roll+') · '+morale+' → '+result.state.morale.state+'?'))return;
+  if(mutate(()=>{
+   if(JSON.stringify(persistentStateOf(character(id)))!==JSON.stringify(state))throw Error('Stav se před potvrzením změnil');
+   synchronizeCombatInjuries(character(id),result.state);data.campaignClock=nextClock;
+   data.journal.push({id:uuid(),characterId:id,createdAt:stamp(),calendarCampaignId:campaignKey(clock),
+    campaignMinute:clock.minute,...(campaignTRDate(clock,clock.minute)?{campaignTRDate:campaignTRDate(clock,clock.minute)}:{}),
+    title:'Morale Reaction · Kalendář · HMK 162',
+    body:patient.name+': '+morale+' → '+result.state.morale.state+' · Initiative EML '+(ml-combatFatigueTotals(state).total)+' · d100 ('+roll+').',
+    calendarMoraleReaction:{format:'hmk-calendar-morale-reaction-v1',sourceEventId:eventId,
+     dueMinute:due.minute,actualMinute:clock.minute,unsafeGapMinutes:Math.max(0,clock.minute-due.minute),
+     priorState:morale,resultState:result.state.morale.state,duration:due.duration,gmConfirmed:true},
+    combatProof:{sourceEventId:eventId,timelineId,round,actorId:id,actionKind:'calendar-morale-reaction',
+     physicalDice:structuredClone(result.state.events.at(-1).details.physicalDice),
+     transition:structuredClone(result.state.events.at(-1))}});
+  }))render();
+ }catch(err){alert('Morale Reaction nebyla uložena: '+err.message)}
+},true);
 document.addEventListener('submit',e=>{
  const f=e.target;
  if(!['campaign-start-form','campaign-advance-form','campaign-anchor-wound-form','campaign-anchor-procedure-form'].includes(f.id))return;
@@ -19080,6 +19177,8 @@ document.addEventListener('click',e=>{
   const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
   const animal=verifiedLivestock(data,cid).find(x=>x.id===b.dataset.hmkTrainingStartAnimal&&x.ownerId===selected);
   if(!animal)throw Error('Výcvik může začít pouze aktivní vlastník tohoto zvířete.');
+  const trainer=character(animal.ownerId),trainerShock=persistentStateOf(trainer).shock;
+  if(['INC','UNC','KIA'].includes(trainerShock))throw Error('Trenér nemůže začít výcvik ve stavu '+trainerShock+' (incapacitated / unconscious / dead). Nejprve vyřešte zdravotní následky.');
   const starts=data.journal.filter(j=>j.calendarCampaignId===cid&&j.calendarAnimalTrainingStart590?.animalId===animal.id);
   const completed=new Set(data.journal.filter(j=>j.livestockTraining?.animalId===animal.id&&j.skillTestProof?.type==='animal-training').map(j=>j.calendarAnimalTraining590?.startId).filter(Boolean));
   if(starts.some(j=>!completed.has(j.id)))throw Error('Zvíře již má zahájený, dosud neuzavřený výcvik.');
