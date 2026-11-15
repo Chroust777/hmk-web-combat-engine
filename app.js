@@ -365,7 +365,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.893';
+const APP_VERSION='93.894';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -20978,16 +20978,26 @@ document.addEventListener('submit',e=>{
   // implicit jump of the shared campaign clock. A verified result is calculated
   // in preview only; it is applied to the CURRENT patient at the true deadline.
   if(environmentalCare&&directTreatmentFinish){
+   // Optional values for Frost/Amputation are not present at all on the
+   // ordinary Treatment form. Number(undefined) would store NaN in the
+   // concurrent procedure; raw snapshots may then contain non-finite values.
+   const optionalCareInteger=(name)=>{
+    const raw=v[name];
+    if(raw==null||raw==='')return null;
+    const number=Number(raw);
+    if(!Number.isSafeInteger(number))throw Error('Neplatná volitelná hodnota zdravotního zákroku: '+name);
+    return number;
+   };
    const operation={formId:f.id,characterId:c.id,woundId,healerId:weatherHealer.id,
     startMinute:clock.minute,endMinute:treatmentFinish,eventId:args.eventId,confirmed:true,
     args:{daySinceInjury:args.daySinceInjury,physicianML:actualPhysicianML,
      physicianIndex:actualPhysicianIndex,physicianRoll:Number(v.physicianRoll),
      dexSecondaryModifier:actualDexSecondary,available:verifiedAvailable,bandagesUsedAtStart:bandageCount,
-     procedureTime,locationShock:v.locationShock===''?null:Number(v.locationShock),
-     shockML:v.shockML===''?null:Number(v.shockML),
-     shockRoll:v.shockRoll===''?null:Number(v.shockRoll),
-     amputationStrengthML:v.amputationStrengthML===''?null:Number(v.amputationStrengthML),
-     amputationRoll:v.amputationRoll===''?null:Number(v.amputationRoll)}};
+     procedureTime,locationShock:optionalCareInteger('locationShock'),
+     shockML:optionalCareInteger('shockML'),
+     shockRoll:optionalCareInteger('shockRoll'),
+     amputationStrengthML:optionalCareInteger('amputationStrengthML'),
+     amputationRoll:optionalCareInteger('amputationRoll')}};
    if(mutate(()=>{data.campaignClock=startConcurrentProcedure(data.campaignClock,{id:uuid(),procedure:operation});if(bandagePlan)commitBandageConsumption(data,bandagePlan,{eventId:args.eventId,patientId:c.id,woundId,kind:'Treatment (zahájení)',minute:clock.minute,campaignId:campaignKey(clock),createdAt:stamp()});}))
     notice='Zákrok zahájen v '+displayCampaignMinute(clock.minute)+'; dokončení '+displayCampaignMinute(treatmentFinish)+'. Ostatní současné události zůstávají přístupné.';
    return;
