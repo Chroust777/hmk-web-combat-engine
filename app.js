@@ -366,7 +366,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.900';
+const APP_VERSION='93.901';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11380,11 +11380,13 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
     j.calendarAnimalTrainingStart590.dueMinute<=source.campaignMinute):[];
    if(!starts.length)return includeAdvisory?
     '<p class="hsk-followup-advisory">Animalcraft CF bez dokončené Animal Training Routine: nevytváří d3 měsíců ani navazující hod. Pro HMK 65 je třeba doložený šestiměsíční výcvik a původní Success Value.</p>':'';
-   // A genuine six-month SV already has the complete Animal Training form,
-   // including the CF d3. Do not offer a second independent receipt for the
-   // SAME animal and same failure; only one resolution may be committed.
-   if(animalTrainingCandidate(proof))return includeAdvisory?
-    '<p class="hsk-followup-advisory">Animalcraft CF při výcviku: použijte jediný formulář Animal Training s výběrem registrovaného zvířete a potvrzeným d3.</p>':'';
+   // A real CF after the six-month SV must have an immutable, confirmed d3
+   // setback BEFORE the calendar can advance through the extra months.
+   // The original critical-followup form records that d3 once, linked to
+   // the original SV and animal. The final Training form consumes the same
+   // receipt (existingCF) and cannot invent or reroll the setback.
+   // Hiding this form would deadlock the mandatory calendar skill-critical
+   // obligation against the deferred Training completion.
   }
   // HMK p.145 / p.148: the CF on a Trekking Orienteering Survival SV
   // invokes a Survival Hazard d10 in the ORIGINAL travel routine, not a

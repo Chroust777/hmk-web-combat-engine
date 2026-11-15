@@ -318,15 +318,46 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
     {originId:e.id,side:x.side,level:x.result.level,decisionRequired:true});
   }
  }
- // A real d3 Animal Training extension and a Will-based Writing delay
- // cannot be assigned a calendar due minute without the ORIGINAL start/end
- // plan. Surface the unresolved scheduling decision, not a fabricated date.
+ // Animal Training CF adds a physically confirmed d3 number of 30-day
+ // Kethiran months (HMK pp.11,65). A training START already recorded for
+ // the SAME stable animal and SAME original Animalcraft SV determines the
+ // date exactly. Do not create a permanent unknown-date obligation when
+ // those immutable receipts exist: that would deadlock the Calendar before
+ // the extended training can be finished. Writing delays without a known
+ // work schedule (and legacy/unlinked training) must remain unresolved.
  for(const event of journal){
   if(event.calendarCampaignId!==clock.campaignId)continue;
   const t=event.skillTestProof?.trainingExtension,w=event.skillTestProof?.writingExtension;
   if(!t&&!w)continue;
   const person=characters.find(c=>c.id===event.characterId);if(!person)continue;
-  const reason=t?'Původní datum výcviku není doloženo: GM musí odvodit termín podle kalendářních měsíců.':'Doba psaní vyžaduje doložený původní kalendářní plán a skutečný pracovní rytmus.';
+  if(t){
+   const cf=event.skillTestProof;
+   const origin=journal.find(j=>j.id===cf.originId&&j.calendarCampaignId===clock.campaignId&&j.characterId===person.id);
+   const link=origin?.skillTestProof?.animalTrainingSV590;
+   const start=journal.find(j=>j.id===link?.startId&&j.calendarCampaignId===clock.campaignId);
+   const scheduled=start?.calendarAnimalTrainingStart590;
+   const reduced=t.timeReductionMonths;
+   const total=t.totalMonths;
+   const due=safe(scheduled?.startMinute)&&Number.isSafeInteger(total)?scheduled.startMinute+total*30*DAY:null;
+   const baseDue=safe(scheduled?.dueMinute)?(scheduled.calendarDayEligibility600===true?
+      Math.floor(scheduled.dueMinute/DAY)*DAY:scheduled.dueMinute):null;
+   if(cf.type==='critical-followup'&&cf.activity==='animal-training'&&
+      origin?.skillTestProof?.type==='secondary-mastery-value-test'&&
+      origin.skillTestProof?.result?.level==='CF'&&
+      link?.format==='hmk-animal-training-sv-93893-v1'&&
+      link.animalId===t.animalId&&link.ownerId===person.id&&
+      scheduled?.animalId===t.animalId&&scheduled?.ownerId===person.id&&
+      Number.isSafeInteger(reduced)&&(reduced===0||reduced===1)&&
+      [1,2,3].includes(t.dieD3)&&t.additionalMonths===t.dieD3&&
+      t.baseMonths===6-reduced&&total===t.baseMonths+t.dieD3&&
+      safe(scheduled.startMinute)&&safe(baseDue)&&safe(due)&&
+      safe(origin.campaignMinute)&&origin.campaignMinute>=baseDue-reduced*30*DAY){
+    // No new roll, fabricated end date, or automatic completion. The
+    // existing Animal Training form checks this same due when GM finishes.
+    continue;
+   }
+  }
+  const reason=t?'Původní datum a vazba Animalcraft SV na konkrétní zahájený výcvik nejsou doložené.':'Doba psaní vyžaduje doložený původní kalendářní plán a skutečný pracovní rytmus.';
   const description=t?`Animal Training CF · ${t.animalName}: d3 ${t.dieD3} → +${t.additionalMonths} měsíce (HMK 65)`:
    `Writing CF · ${w.scope}: ${w.completionTimeMultiplier*100} % původního času (HMK 132)`;
   unknown.push({characterId:person.id,name:person.name,kind:t?'animal-training-date':'writing-completion-date',
