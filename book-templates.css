@@ -8261,3 +8261,31 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .content-sheet .journal-book--chapter.journal-book--notes .hc-story-receipt > :is(span,b,strong){
  white-space:normal!important;
 }
+/* v93.889 – GM chronicles start collapsed; narrative edit/delete without altering proof. */
+.content-sheet .journal-book--gm-history details.hmk-gm-chronicle-person{
+ display:block!important;min-width:0;width:100%;box-sizing:border-box;
+ border:1px solid rgba(118,83,43,.38);border-radius:7px;
+ background:rgba(252,245,229,.23);padding:0!important;margin:0 0 11px!important;
+}
+.content-sheet .journal-book--gm-history details.hmk-gm-chronicle-person>summary{
+ cursor:pointer;display:list-item!important;padding:10px 13px!important;
+ margin:0!important;font:700 15px/1.5 Georgia,serif;color:#56391f;
+ background:rgba(190,155,92,.12);list-style-position:inside;
+}
+.content-sheet .journal-book--gm-history details.hmk-gm-chronicle-person>summary small{font-size:12px;font-weight:normal}
+.content-sheet .journal-book--gm-history .hmk-gm-chronicle-person__body{padding:8px 11px 13px;min-width:0}
+.content-sheet .journal-book--notes .hc-chronicle-editor-actions{
+ display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-end;
+ border-top:1px solid rgba(126,92,51,.26);padding-top:10px;margin-top:12px;
+}
+.content-sheet .journal-book--notes .hc-chronicle-editor-actions button{font:12px/1.4 Georgia,serif}
+.content-sheet .journal-book--notes .hc-chronicle-hidden-item{
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:8px;border-bottom:1px solid rgba(121,84,39,.2);padding:9px 8px;
+ font:12px/1.5 Georgia,serif;
+}
+.editor-dialog.hc-chronicle-editor{width:min(760px,96vw)!important;max-height:88vh;overflow:auto;box-sizing:border-box}
+.hc-chronicle-editor form{display:grid;gap:11px}
+.hc-chronicle-editor form textarea{width:100%;max-width:100%;box-sizing:border-box;min-height:68px;line-height:1.45}
+.hc-chronicle-editor .hc-chronicle-edit-beat{min-width:0;display:grid;gap:7px;padding:10px;border:1px solid rgba(125,87,47,.32)}
+.hc-chronicle-editor .hc-chronicle-edit-beat legend{font-weight:700}
