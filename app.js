@@ -365,7 +365,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.892';
+const APP_VERSION='93.893';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -553,9 +553,9 @@ if(!storageReadOnly){
   persistEncounterDraft();
  }
 }
-const trainingOpenMinute600=(proof,due)=>proof?.calendarDayEligibility600===true?calendarDayStart600(due):due;
+function trainingOpenMinute600(proof,due){return proof?.calendarDayEligibility600===true?calendarDayStart600(due):due;}
 function validateAnimalTrainingCalendar590(d){
- const journal=d?.journal||[],starts=new Map(),linked=new Set(),animals=new Map();
+ const journal=d?.journal||[],starts=new Map(),linked=new Set(),animalSVs=new Set(),animals=new Map();
  for(const owner of d?.characters||[])for(const animal of owner.hmk?.livestock||[])animals.set(animal.id,animal);
  for(const row of journal){
   const proof=row.calendarAnimalTrainingStart590;if(!proof)continue;
@@ -568,6 +568,18 @@ function validateAnimalTrainingCalendar590(d){
      (proof.calendarDayEligibility600!==undefined&&proof.calendarDayEligibility600!==true)||starts.has(row.id))
    throw Error('Animalcraft: nepřípustná změna kalendářního dokladu zahájení výcviku.');
   starts.set(row.id,{row,proof});
+ }
+ for(const row of journal){
+  const link=row.skillTestProof?.animalTrainingSV590;if(!link)continue;
+  const start=starts.get(link.startId),p=row.skillTestProof;
+  if(link.format!=='hmk-animal-training-sv-93893-v1'||!start||animalSVs.has(link.startId)||
+   link.animalId!==start.proof.animalId||link.ownerId!==start.proof.ownerId||
+   row.characterId!==start.proof.ownerId||row.calendarCampaignId!==start.row.calendarCampaignId||
+   p.type!=='secondary-mastery-value-test'||(p.skills?.[0]||p.skill)!=='Animalcraft'||
+   !Number.isSafeInteger(row.campaignMinute)||row.campaignMinute<trainingOpenMinute600(start.proof,start.proof.dueMinute)||
+   link.dueMinute!==trainingOpenMinute600(start.proof,start.proof.dueMinute))
+   throw Error('Animalcraft: SV není svázán s jediným dokončeným výcvikem konkrétního zvířete.');
+  animalSVs.add(link.startId);
  }
  const fishingStarts=new Map(),fishingUsed=new Set();
  for(const row of journal){
@@ -600,7 +612,12 @@ function validateAnimalTrainingCalendar590(d){
   const strictDue=start?.proof.startMinute+(training?.months||0)*30*1440;
   const eligibleDue=start?trainingOpenMinute600(start.proof,strictDue):null;
   const dueMatches=link.dueMinute===strictDue||(start?.proof.calendarDayEligibility600===true&&link.dueMinute===eligibleDue);
+  const origin=journal.find(j=>j.id===training?.originId);
+  const svLink=origin?.skillTestProof?.animalTrainingSV590;
   if(!start||!animal||link.animalId!==start.proof.animalId||
+     !svLink||svLink.startId!==link.startId||svLink.animalId!==animal.id||
+     origin.characterId!==animal.ownerId||origin.calendarCampaignId!==row.calendarCampaignId||
+     !Number.isSafeInteger(origin.campaignMinute)||origin.campaignMinute>row.campaignMinute||
      row.characterId!==animal.ownerId||row.calendarCampaignId!==animal.campaignId||
      row.livestockTraining?.animalId!==animal.id||training?.type!=='animal-training'||
      !dueMatches||
@@ -7303,7 +7320,7 @@ function stableHubAnimalHTML(a,campaignId){
  ${!dead?`<div class="hsk-training-calendar-panel"><p class="tiny">Pravidlový postup: nejprve zahájit šestiměsíční výcvik; po skutečném uplynutí doby v kalendáři provést Animalcraft SV a pokračující Training d10. Kalendář se sám neposouvá.</p><button type="button" class="secondary hc-small" data-hmk-training-start-animal="${esc(a.id)}">Zahájit šestiměsíční výcvik · HMK 65</button>${data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).slice(-2).map(j=>`<p class="tiny hsk-training-date">Výcvik začal ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.startMinute))}, základní termín ${esc(displayCampaignMinute(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)))}${j.calendarAnimalTrainingStart590.calendarDayEligibility600?' · od začátku tohoto dne':''}${data.campaignClock.minute<trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)?' · zbývá '+esc(chronicleRemainingTime(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)-data.campaignClock.minute)):' · základní doba uplynula'}</p>`).join('')}</div>`:''}
  <p>Animalcraft (HMK 65): základní ML zvířete neznamená automaticky získaný MB. Výcvik vyžaduje původní SV, skutečné hody a pravidlový čas. ${training.length?`Potvrzené doklady: ${training.map(t=>esc(t.title)).join(' · ')}`:'Výcvik zatím není pro tuto identitu doložen.'}</p>
  <p><strong>Skutečně aktivovaný výcvik:</strong> ${trainingState.boosts} MB · ${trainingState.sourceId?'ověřený kalendářní doklad':'žádný úplný kalendářní doklad'}. Zvlášť se ověřuje uplynutí alespoň ${training.length?'příslušného počtu':'šesti'} měsíců; až pak se MB používají v bojových náhledech.</p>
- ${!dead&&training.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="training-activate"><label>Dokončený výcvik<select name="trainingProofId">${training.map((t,i)=>`<option value="${esc(t.id)}">Výcvik ${i+1} · ${t.skillTestProof?.finalBoosts??0} MB · ${t.skillTestProof?.months??6} měs.</option>`).join('')}</select></label><label>Skutečný začátek (minuta kampaně)<input name="startMinute" type="number" min="0" step="1" required></label><label>Skutečný konec (minuta kampaně)<input name="endMinute" type="number" min="0" step="1" required></label><label>Doložený kalendářní podklad<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Aktivovat již dokončený výcvik v boji</button></form>`:''}
+ ${!dead&&training.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="training-activate"><label>Dokončený výcvik<select name="trainingProofId">${training.map((t,i)=>`<option value="${esc(t.id)}">Výcvik ${i+1} · ${t.skillTestProof?.finalBoosts??0} MB · ${t.skillTestProof?.months??6} měs.</option>`).join('')}</select></label><p class="hc-hint">Čas se převezme ze skutečného začátku a dokončení výcviku v kalendáři; nelze jej ručně změnit.</p><label>Doložený kalendářní podklad<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Aktivovat již dokončený výcvik v boji</button></form>`:''}
  ${p.events.length?`<details><summary>Kompletní časový registr stáje (${p.events.length})</summary><ol>${p.events.map(j=>`<li>minuta ${j.campaignMinute} · ${esc(j.stableHub574.type)} · ${esc(j.stableHub574.reason)}</li>`).join('')}</ol></details>`:''}
  <p>Veterinární rány, Shock, léčení, Frostbite a amputace se nezdvojují: jsou propojené s originálními doklady v Combat · Bestiář.</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><label>Vyřadit ze stáje<select name="type"><option value="sale">Prodat</option><option value="release">Opustit / darovat (bez hotovosti)</option></select></label><label>Skutečně sjednaná prodejní cena (d; nulová možná)<input name="priceD" type="number" min="0" max="1000000" value="0" step="1"></label><label>Komu / kde / jak (GM potvrdí skutečnou událost)<input name="reason" required minlength="3" maxlength="240"></label><button type="submit" class="secondary">Potvrdit trvalé vyřazení z vlastnictví</button></form>`:`<p>Vyřazeno v čase ${p.exit.minute} · ${esc(p.exit.reason)}. Stará identita a všechny zdravotní a finanční doklady zůstávají čitelné.</p>`}
@@ -10579,6 +10596,10 @@ function animalTrainingCalendarEligibility(form){
    j.calendarAnimalTrainingStart590.ownerId===animal.ownerId).at(-1);
  if(!latest)return {ready:false,reason:'Nejprve založte časový záznam zahájení výcviku v osobní stáji. Pak musí uběhnout šest měsíců.'};
  const start=latest.calendarAnimalTrainingStart590;
+ const link=origin?.skillTestProof?.animalTrainingSV590;
+ if(link?.format!=='hmk-animal-training-sv-93893-v1'||link.animalId!==animal.id||
+    link.ownerId!==animal.ownerId||link.startId!==latest.id)
+  return {ready:false,reason:'Animalcraft SV nebyl původně uložen pro tento konkrétní výcvik a zvíře. Nelze jej převzít z jiného testu.'};
  const c=animalTrainingCandidate(origin.skillTestProof),shorten=!!form.elements.namedItem('shorten')?.checked;
  const d3Text=form.elements.namedItem('criticalD3')?.value.trim()||'';
  const d3=c?.level==='CF'&&/^[1-3]$/.test(d3Text)?Number(d3Text):0;
@@ -10660,6 +10681,8 @@ function stableAnimalcraftSVTimeGate590(form){
  const pending=starts.filter(j=>!completed.has(j.id)).at(-1);
  if(!pending)return {ready:false,reason:'Výcvik '+animal.name+': nejprve ve stáji potvrďte zahájení šesti měsíců práce. Samostatný běžný Animalcraft Test tím není omezen.'};
  const source=pending.calendarAnimalTrainingStart590;
+ if(data.journal.some(j=>j.skillTestProof?.animalTrainingSV590?.startId===pending.id))
+  return {ready:false,reason:'Pro tento výcvik už byl Animalcraft SV zaznamenán. Dokončete jeho Training Rolls; neházejte druhý SV.'};
  const due=trainingOpenMinute600(source,source.dueMinute);
  if(now<due)return {ready:false,reason:'Animalcraft SV pro výcvik '+animal.name+' je možný až '+displayCampaignMinute(due)+'. Zbývá '+chronicleRemainingTime(due-now)+'.'};
  return {ready:true,reason:'Výcvik '+animal.name+': šest měsíců již uplynulo. Animalcraft SV nyní lze provést; případný CF d3 může prodloužit další výcvik.'};
@@ -11453,6 +11476,7 @@ document.addEventListener('submit',event=>{
   // A registered own animal cannot be replaced by unverified free text.
   if(!selectedStable||selectedStable.ownerId!==actor.id)
    throw Error('Vyberte konkrétní registrované zvíře ze Stáje této postavy. Ruční text ani nevlastněné zvíře nejsou platným dokladem výcviku.');
+  if(['INC','UNC','KIA'].includes(persistentStateOf(actor).shock))throw Error('Trenér nemůže dokončit Animal Training ve stavu INC, UNC nebo KIA.');
   const calendarEligibility=selectedStable?animalTrainingCalendarEligibility(f):{ready:true,startId:null};
   if(!calendarEligibility.ready)throw Error(calendarEligibility.reason);
   if(selectedStableId&&!selectedStable)throw Error('Vybrané zvíře už není ve stáji.');
@@ -12833,6 +12857,21 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
   const fishingStarts=fishingSkill?data.journal.filter(j=>j.characterId===selected&&j.calendarCampaignId===fishingCampaign&&j.calendarFishingStart590):[];
   const usedFishingStart=new Set(data.journal.filter(j=>j.calendarFishingSVStart590).map(j=>j.calendarFishingSVStart590.startId));
   const fishingStart=fishingStarts.findLast(j=>!usedFishingStart.has(j.id));
+  // HMK 65: a new Animalcraft SV opened from Stable is bound to this
+  // particular animal and six-month training start, never an unrelated SV.
+  const animalSVSource=isSV&&actualSkill==='Animalcraft'&&pendingStableAnimalcraftId&&
+    view==='skills'&&activeSkillTab==='value'?(()=>{
+     const animal=verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===pendingStableAnimalcraftId&&a.ownerId===selected);
+     if(!animal)throw Error('Animal Training: zvíře nebylo nalezeno ve vlastní stáji.');
+     const starts=data.journal.filter(j=>j.calendarCampaignId===animal.campaignId&&j.calendarAnimalTrainingStart590?.animalId===animal.id);
+     const completed=new Set(data.journal.filter(j=>j.calendarAnimalTraining590?.animalId===animal.id).map(j=>j.calendarAnimalTraining590.startId));
+     const start=starts.findLast(j=>!completed.has(j.id));
+     if(!start)throw Error('Animal Training: chybí aktivní začátek výcviku.');
+     if(data.journal.some(j=>j.skillTestProof?.animalTrainingSV590?.startId===start.id))throw Error('Animal Training: SV tohoto výcviku již byl uložen. Pokračujte v navazujících Training Rolls.');
+     const due=trainingOpenMinute600(start.calendarAnimalTrainingStart590,start.calendarAnimalTrainingStart590.dueMinute);
+     if(data.campaignClock.minute<due)throw Error('Animal Training: šest měsíců dosud neuplynulo.');
+     return {format:'hmk-animal-training-sv-93893-v1',startId:start.id,animalId:animal.id,ownerId:selected,dueMinute:due};
+    })():null;
   if(fishingStart&&data.campaignClock.minute<fishingStart.calendarFishingStart590.dueMinute)
    throw Error('Fishing: čtyřhodinový interval zatím neskončil; další Success Value hod nelze uložit.');
   if(view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='fishing'&&!fishingStart)throw Error('Časovaný Fishing: před SV nejprve založte skutečné 4 hodiny rybolovu v kalendáři.');
@@ -12855,7 +12894,8 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
    isSV===episodeSkillNeedsSV(er.field)&&actualSkill===er.skill?{
     requestId:er.id,episodeEpoch:er.episodeEpoch,field:er.field,skill:er.skill,
     actorId:er.actorId,campaignId:er.campaignId,minute:er.minute}:null;
-  data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:proof,
+  const recordedProof=animalSVSource?{...proof,animalTrainingSV590:animalSVSource}:proof;
+  data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:recordedProof,
     ...(explicitEpisodeLink?{calendarEpisodeSkillLink:explicitEpisodeLink}:
       !gmLink&&!link&&!timedId&&!trackingAwareness&&!fishingLink&&data.campaignClock?
       {calendarIndependentSkillTest:{format:'hmk-independent-skill-test-v1',
@@ -13035,6 +13075,17 @@ document.addEventListener('click',e=>{
  if(!/^[1-3]$/.test(field.value.trim())){hskConfirmTrainingD3State93881(f,null);return;}
  if(!field.dataset.origin)field.dataset.origin='manual';
  hskConfirmTrainingD3State93881(f,field.value.trim());
+},true);
+// Confirm on pointerdown as well: the follow-up chooser may reparent the
+// visible form between mousedown and click, losing a trusted mouse click.
+// Keyboard-triggered click remains supported by the existing handler.
+document.addEventListener('pointerdown',e=>{
+ const b=e.target.closest?.('[data-animal-training-d3-confirm]');if(!b)return;
+ const f=b.closest('form[data-skill-critical-form],form[data-hmk-animal-training]');
+ const field=f?.querySelector('[name="trainingD3"],[name="criticalD3"]');if(!field)return;
+ const value=field.value.trim();
+ if(!field.dataset.origin)field.dataset.origin='manual';
+ hskConfirmTrainingD3State93881(f,/^[1-3]$/.test(value)?value:null);
 },true);
 document.addEventListener('input',e=>{
  if(!e.target?.matches?.('[name="trainingD3"],[name="criticalD3"]'))return;
@@ -19357,9 +19408,16 @@ document.addEventListener('submit',e=>{
    if(!record)throw Error('Náklad není ve vozidle.');event.entryId=record.entryId;
   }else if(type==='training-activate'){
    const proof=data.journal.find(j=>j.id===raw.trainingProofId&&j.livestockTraining?.animalId===animal.id);
-   if(!proof?.skillTestProof||!/^\d+$/.test(raw.startMinute)||!/^\d+$/.test(raw.endMinute))throw Error('Chybí výcvik a časové intervaly.');
-   Object.assign(event,{trainingProofId:proof.id,startMinute:asInt(raw.startMinute,'začátek'),endMinute:asInt(raw.endMinute,'konec')});
-   if(event.startMinute<animal.minute||event.endMinute>minute||event.endMinute-event.startMinute<proof.skillTestProof.months*30*1440||proof.skillTestProof.finalBoosts>animal.maxMB)
+   const link=proof?.calendarAnimalTraining590;
+   const start=data.journal.find(j=>j.id===link?.startId&&j.calendarAnimalTrainingStart590?.animalId===animal.id&&
+     j.calendarCampaignId===campaignId&&j.characterId===animal.ownerId);
+   if(!proof?.skillTestProof||!link||!start||proof.calendarCampaignId!==campaignId||
+     proof.skillTestProof?.originId===undefined)throw Error('Chybí jednoznačně doložený výcvik, kalendářní začátek nebo originální Animalcraft SV.');
+   const actualDue=trainingOpenMinute600(start.calendarAnimalTrainingStart590,
+     start.calendarAnimalTrainingStart590.startMinute+proof.skillTestProof.months*30*1440);
+   Object.assign(event,{trainingProofId:proof.id,startMinute:start.calendarAnimalTrainingStart590.startMinute,
+     endMinute:proof.campaignMinute,trainingCalendarLink93893:true});
+   if(event.endMinute>minute||event.endMinute<actualDue||proof.skillTestProof.finalBoosts>animal.maxMB)
     throw Error('Výcvik není kalendářně dokončený nebo překračuje limit MB.');
   }else if(type==='cargo-add'){
    const name=String(raw.name||'').trim(),weightLb=asInt(raw.weightLb,'hmotnost nákladu');
