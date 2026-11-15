@@ -113,7 +113,7 @@ function fishingCatchNextHTML(journal,actorId,campaignId){
  * until the GM has identified/updated the real creature. */
 export function animalTrainingNextHTML(journal,actorId,campaignId){
  const pending=journal.filter(j=>j.characterId===actorId&&(!campaignId||j.calendarCampaignId===campaignId)&&
-  animalTrainingCandidate(j.skillTestProof)&&
+  animalTrainingCandidate(j.skillTestProof)&&j.skillTestProof?.animalTrainingSV590?.format==='hmk-animal-training-sv-93893-v1'&&
   !journal.some(q=>q.skillTestProof?.type==='animal-training'&&q.skillTestProof.originId===j.id));
  if(!pending.length)return '';
  return '<section class="hsk-special-commits"><h3>Animalcraft · Animal Training (HMK 65)</h3>'+pending.map(j=>{

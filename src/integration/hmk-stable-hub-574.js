@@ -261,8 +261,17 @@ export function validateStableHub(data,offerForId=null){
    const p=training?.skillTestProof;
    requireValid(training&&training.campaignMinute<=j.campaignMinute&&p?.type==='animal-training'&&p.periodConfirmed===true&&
     Number.isSafeInteger(x.startMinute)&&x.startMinute>=animal.minute&&Number.isSafeInteger(x.endMinute)&&
-    x.endMinute<=j.campaignMinute&&x.endMinute-x.startMinute>=p.months*30*1440&&
+    x.endMinute<=j.campaignMinute&&
+    (x.trainingCalendarLink93893===true||x.endMinute-x.startMinute>=p.months*30*1440)&&
     p.finalBoosts>=0&&p.finalBoosts<=animal.maxMB&&narrative(x.reason)&&
+    (!x.trainingCalendarLink93893||(()=>{const link=training.calendarAnimalTraining590;
+     const start=(data.journal||[]).find(q=>q.id===link?.startId&&q.calendarAnimalTrainingStart590?.animalId===animal.id);
+     const end=start?.calendarAnimalTrainingStart590?.startMinute;
+     const effectiveDue=start?.calendarAnimalTrainingStart590?.calendarDayEligibility600===true?
+      Math.floor((end+p.months*30*1440)/1440)*1440:end+p.months*30*1440;
+     return Number.isSafeInteger(end)&&x.startMinute===end&&x.endMinute===training.campaignMinute&&
+      x.endMinute>=effectiveDue&&link.animalId===animal.id;
+    })())&&
     ![...(data.journal||[]).slice(0,(data.journal||[]).indexOf(j))].some(old=>old.stableHub574?.type==='training-activate'&&old.stableHub574.animalId===animal.id&&old.stableHub574.trainingProofId===x.trainingProofId),
     'výcvik nemá splněný kalendářní interval, správného tvora nebo limit MB');
   }else if(x.type==='care'){
