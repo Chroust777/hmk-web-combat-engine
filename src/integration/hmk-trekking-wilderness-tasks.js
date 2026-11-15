@@ -202,6 +202,10 @@ export function validateTrackingJournal(journal=[]){
  * skills here or invent the opposing party's watchfulness.
  */
 export function trekWatchfulness({modes={},conveyance='foot',drovingAnimals=false}={}){
+ test(modes&&typeof modes==='object'&&!Array.isArray(modes)&&
+  ['lax','stalking','vigilance'].every(k=>modes[k]==null||[0,1,false,true].includes(modes[k]))&&
+  typeof drovingAnimals==='boolean',
+  'Neplatné režimy Stalking / Vigilance / Lax nebo údaj o vedení zvířat.');
  test(['foot','mount','cart','wagon'].includes(conveyance),'Neznámý cestovní prostředek');
  const level=modes.lax?'lax':(modes.stalking||modes.vigilance)?'alert':'normal';
  const afterAnimals=conveyance==='foot'&&!drovingAnimals?level:level==='alert'?'normal':'lax';
