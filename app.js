@@ -365,7 +365,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.891';
+const APP_VERSION='93.892';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3397,7 +3397,8 @@ function personalTimeEpisodeChronicleHTML(clock,personalId,{gm=false}={}){
   const tests=personalEpisodeTests(p,evidence),roles=personalEpisodeRoles(p,name);
   const hazard=personalEpisodeHazard(p,displayCampaignMinute,{healthEvents,name});
   const encounter=personalEpisodeEncounter(p);
-  const beats=personalChronicleBeats(entry,p,tests,{hazard,encounter,name});
+  const trForChronicle=clock?.trOrigin?campaignTRDate(clock,p.startMinute):null;
+  const beats=personalChronicleBeats(entry,p,tests,{hazard,encounter,name,calendar:trForChronicle?{month:trForChronicle.month,monthName:TR_MONTHS[trForChronicle.month-1]}:{}});
   const context=[personalEpisodeWeather(p),p.area&&p.area.toLowerCase()!==locality.toLowerCase()?`Oblast: ${p.area}`:'',Number.isInteger(p.minutes)?`${p.minutes} minut`:''].filter(Boolean);
   const narrative=String(p.narrative||'').trim();
   const gmSuggestions=gm?personalGMFollowups(entry,p,tests,{name,hazard,encounter}):[];

@@ -1,3 +1,4 @@
+import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */
 const txt = value => String(value ?? '').trim();
@@ -126,7 +127,7 @@ export function personalEpisodeRoles(p,name){
   const tags=[];if(id===guide)tags.push('průvodce');
   if(transported.has(id))tags.push('přepravovaný člen družiny');
   else{
-   if(riders.has(id))tags.push(`jel na koni (${riders.get(id)})`);
+   if(riders.has(id))tags.push(`jede na koni (${riders.get(id)})`);
    const individuallyAssigned=unmounted.filter(a=>txt(settings[`packHandler_${a.id}`])===id);
    // A drover leading a single accompanying, unmounted horse is direct evidence
    // for the user's description; in a multi-animal group do not invent handlers.
@@ -497,118 +498,10 @@ export function personalTestHelp(which,test){
  * consequence, and finally the travel endurance/encounter result. No new dice,
  * actors, wounds, encounters, or clock changes are generated here. */
 function chronicleName(name,id){return id?name(id):'Výprava';}
-function chronicleLocale(p){
- const group=terrainGroup(p);
- return group==='forest'?'lesní porost':group==='road'?'cesta':group==='urban'?'okolní zástavba':'okolní krajina';
-}
-function chronicleMoment(p){
- const hour=Math.floor((Number(p?.startMinute)||0)%1440/60);
- return hour>=20||hour<4?'Noc':hour<8?'Ráno':hour<12?'Dopoledne':hour<17?'Odpoledne':'Podvečer';
-}
-const LITERARY_SCENES={
- forest:[
-  'Mezi vysokými kmeny se dálka tříštila do úzkých průhledů. Na zemi ležely jehlice a vystouplé kořeny, které si žádaly pozornost při každém kroku.',
-  'Les neodhaloval směr snadno. Stromy stály v nepravidelných řadách a mezi jejich kmeny se střídala měkká půda s pevnějšími místy.',
-  'Pod korunami stromů se světlo rozbíjelo o větve. Stezka se tu dala sledovat po jednotlivých znacích, nikoli po vzdáleném horizontu.',
-  'Mezi jehličím a tmavšími pruhy země mizely drobné orientační body. I známý tvar cesty se z jiného úhlu mohl jevit cizí.',
-  'Lesní porost tlumil pohled do dálky. Kdo chtěl pokračovat jistě, musel číst nejen stezku, ale i její okraje.',
-  'Trasa se proplétala mezi kmeny, jejichž stíny zvolna přecházely přes zem. Krajina nabízela mnoho drobných znaků, ale jen málo jistých výhledů.',
-  'Kmeny a větve vytvářely téměř souvislou stěnu, v níž se daly rozeznat jen krátké průchody. Tady stačilo přehlédnout jediný bod a směr začal být nejistý.'
- ],
- road:[
-  'Cesta se táhla mezi proměnlivými okraji krajiny. Na jejím povrchu se dal držet směr, zatímco stopy mizely v tvrdších úsecích.',
-  'Pevnější povrch cesty určoval postup, ale každá odbočka žádala nové rozhodnutí. Směr byl čitelnější než to, kdo tudy prošel předtím.',
-  'Trasa se nabízela jako tenká jistota mezi okolními změnami terénu. I na cestě však bylo nutné vnímat její rozcestí.'
- ],
- urban:[
-  'Mezi stavbami se dohled zkracoval a zvuky se vracely od stěn. Směr se tu četl spíše z průchodů než z krajiny.',
-  'Pohyb určovaly uličky a rohy domů. Každá změna směru odkryla jiný kus okolí.'
- ],
- other:[
-  'Krajina se otevírala po krátkých úsecích a průchodnost terénu nebyla všude stejná. Pokračovat znamenalo neustále znovu číst cestu před sebou.',
-  'Podoba země se měnila s každým dalším úsekem. Některá místa nabízela jasnou cestu, jiná vyžadovala pomalejší pozorování.',
-  'Okolní terén určoval rytmus cesty. Vzdálenost na mapě nebyla totéž co jistota každého kroku.'
- ]
-};
-const SEASON_MOOD={
- spring:['Jaro se zatím projevovalo spíš ve svěžesti porostu než v jistotě počasí.','Jarní krajina ještě neodložila všechny stopy chladnějších dnů.','Nový porost měnil barvy krajiny a některé dříve patrné znaky zakrýval.'],
- summer:['V letní vegetaci se stezka místy ztrácela pod zelení.','Letní světlo sahalo daleko, i když pohled zůstával omezený terénem.','Dlouhý letní den dával cestě prostor, ne však záruku bezpečného postupu.'],
- autumn:['Podzimní listí měnilo barvu země i obrysů cest.','Podzim přinášel kratší světlo a zcela jiné stopy na povrchu.','Vzduch a porost už nesly znaky ustupujícího léta.'],
- winter:['Zimní stíny působily delší než jindy.','Chladnější období měnilo tvrdost povrchu i délku viditelného dne.','Zimní porost odhaloval jiné části krajiny než v době růstu.'],
- unknown:['Světlo a terén proměňovaly vzhled každého dalšího úseku.','Krajina nabízela jen takové vodítko, jaké se dalo skutečně rozeznat.']
-};
-const RAIN_MOOD=[
- 'Déšť šel s výpravou a jemně měnil zvuk kroků; na zemi se ztrácely některé starší stopy.',
- 'Déšť se zachytával na větvích a smýval drobné znaky z povrchu cesty.',
- 'Vlhkost měnila pevnost podkladu. Co před chvílí vypadalo jako obyčejný krok, vyžadovalo nyní větší opatrnost.',
- 'Déšť tlumil vzdálenější zvuky. Zůstávalo šustění oděvu, dopadání kapek a zvuk země pod nohama.',
- 'Voda stékala po porostu a na některých místech se držela ve stopách mezi kořeny.',
- 'Ve vzduchu se nesla vlhkost, která měnila nejen povrch stezky, ale i způsob, jakým bylo slyšet okolí.'
-];
-const SNOW_MOOD=[
- 'Sníh proměňoval obrysy stezky a ponechával v nich nové stopy.',
- 'Sněžení ubíralo dálce ostrost a měnilo povrch pod nohama.',
- 'Sněhové vločky pomalu překrývaly některá starší vodítka cesty.'
-];
-const DAY_MOOD={
- day:['Světla bylo ještě dost, ale les neukazoval více, než dovolily jeho průhledy.','Den nabízel možnost zkoumat cestu očima, nikoliv však bez omylu.'],
- twilight:['Soumrak prodlužoval stíny a rozmazával vzdálenější tvary.','S ubývajícím světlem získávaly zřetelnější obrysy jiné věci než za dne.'],
- night:['Noc nechávala nejbližší okolí vystoupit z temnoty, zatímco dálka mizela.','Za tmy byly jednotlivé zvuky čitelnější než vzdálené obrysy.']
-};
-const CHRONICLE_VISTAS={
- forest:[
-  'Pod korunami se ztrácela měřítka vzdálenosti a každý průchod mezi kmeny sliboval jinou cestu, než jakou ve skutečnosti nabízel.',
-  'Ve stínech mezi stromy se dalo číst mnohé, ale máloco bez pochyb: nalomenou větev, stopu v hlíně, nenápadný sklon země.',
-  'Když se vítr opřel do větví, šumění lesa dokázalo na chvíli přehlušit i zvuk vlastních kroků.',
-  'Hustší podrost skrýval povrch země, zatímco volnější místa poskytovala jen krátký pohled na další úsek.',
-  'Cesta se mezi kmeny neodvíjela jako přímá čára. Bylo nutné stále znovu hledat, kudy je vůbec možné pokračovat.',
-  'Jehličí a půda zachycovaly otisky pokaždé jinak; co bylo zřejmé před několika kroky, zde mohlo zcela zmizet.'
- ],
- road:[
-  'Stezka dovolovala pohlédnout dále, ale její okraje ukrývaly drobné změny, kterých by si uspěchaný cestující nevšiml.',
-  'Mezi vyježděnými pruhy země zůstávaly staré otisky i stopy nedávného deště; jejich význam nebyl vždy jednoznačný.',
-  'Při každé odbočce bylo třeba znovu zvážit, zda známý směr znamená také správnou cestu.',
-  'Pevný povrch pomáhal kroku, ne však vždy úsudku: správná volba se často skrývala až za následující zatáčkou.'
- ],
- urban:[
-  'Od zídek a staveb se vracely zvuky jinak než z otevřené krajiny a každá cesta měla vlastní rytmus.',
-  'Přímá ulice nenabízela jistotu dalšího průchodu; za rohem se mohly měnit podmínky i směr.',
-  'Dlážděná i hlinitá místa uchovávala odlišné stopy a pohyb výpravy se jim musel přizpůsobit.'
- ],
- other:[
-  'V takové krajině nebyla cesta dána jedinou stopou. Přirozené překážky nutily zvažovat směr i tempo.',
-  'Šířka výhledu se měnila a spolu s ní i jistota, že další úsek bude stejně průchodný jako předešlý.',
-  'Země nabízela jiné opory pro chůzi i orientaci, než jaké sliboval pohled z dálky.'
- ]
-};
-export function personalChronicleIntro(entry,p){
- const key=txt(entry?.id)||`${p?.startMinute}:${p?.terrain}`,mood=SEASON_MOOD[txt(p?.weather?.season||p?.settings?.season).toLowerCase()]||SEASON_MOOD.unknown;
- const terrainKey=terrainGroup(p),terrain=pick(LITERARY_SCENES[terrainKey]||LITERARY_SCENES.other,key+':land');
- const weather=p?.weather?.hasPrecipitation===true?
-  pick(txt(p?.precipitation?.precipitation)==='rain'?RAIN_MOOD:SNOW_MOOD,key+':rain'):
-  p?.weather?.hasPrecipitation===false&&hash(key+'dry')%4===0?'Srážky tentokrát do cesty nezasahovaly.':'';
- const light=pick(DAY_MOOD[daylightPeriod(p)]||DAY_MOOD.day,key+':light');
- const vista=pick(CHRONICLE_VISTAS[terrainKey]||CHRONICLE_VISTAS.other,key+':vista');
- const detail=pick([
-  'Rozvaha měla v takovém místě cenu právě proto, že cesta nedávala všechna vodítka najednou.',
-  'Teprve druhý pohled odhaloval drobné rozdíly, které první snadno přehlédl.',
-  'Za každým úsekem se podoba země proměnila natolik, že nebylo radno spoléhat na pouhou paměť.',
-  'Kdo chtěl odhadnout další cestu, musel pozorovat i to, co zůstávalo po stranách.',
-  'Jistotu pohybu zde neurčovala délka kroku, ale schopnost včas zpozorovat změnu.',
-  'Dálka nabízela příslib snadné cesty, avšak rozhodovalo vždy nejbližší místo pod nohama.',
-  'Jednotlivé znaky krajiny vystupovaly z okolí jen na krátký okamžik.',
-  'Cesta vyžadovala trpělivost i tam, kde se na první pohled nezdála obtížná.',
-  'Zprvu se vše zdálo podobné, ale zkušené oko mohlo rozpoznat odlišnosti podkladu.',
-  'Krajina neponechávala mnoho místa unáhleným závěrům.',
-  'Stejná zem se z různých míst ukazovala pokaždé trochu jinak.',
-  'Všímat si podrobností znamenalo zpomalit úsudek, nikoli nutně krok.',
-  'Bylo třeba pečlivě rozlišovat mezi tím, co cesta skutečně ukazovala, a tím, co si o ní cestující pouze mysleli.',
-  'Teprve když se člověk ohlédl, dokázal si spojit drobné znaky s celkem putování.'
- ],key+':manuscript-detail');
- // Long and short cadence alternate by actual episode identifier; text never
- // claims an encounter, injury or item the journal did not confirm.
- if(hash(key+':rhythm')%2===0)return [pick(mood,key+':mood')+' '+terrain,(weather?weather+' ':'')+light+' '+vista+' '+detail];
- return [terrain+' '+pick(mood,key+':mood'),vista+' '+(weather?weather+' ':'')+light+' '+detail];
+/** Fictional atmosphere only: anchored in saved month, climate and landscape.
+ * Every factual roll and consequence is rendered separately in the parent UI. */
+export function personalChronicleIntro(entry,p,calendar={}){
+ return literaryChronicleIntro(entry,p,calendar);
 }
 
 function chronicleActivity(entry,p,name){
@@ -649,24 +542,24 @@ function chronicleActivity(entry,p,name){
   'Kroky se zkrátily a pozornost přecházela od cesty k místům, odkud bylo možné někoho zahlédnout.'
  ],key+':activity-stalking');
  if(kind==='rest'||kind==='winded')return pick([
-  'Během odpočinku utichl pravidelný rytmus cesty. Skutečné zotavení určovaly až doložené změny únavy.',
-  'Čas patřil klidu; místo ubývání mil bylo podstatné obnovit síly pro další rozhodnutí.',
+  'Odpočinek utišil pravidelný rytmus cesty. Zůstalo jen pomalé navracení sil, jehož rozsah měl teprve potvrdit konec úseku.',
+  'Čas konečně přestal ubývat v podobě mil a kroků. Nyní měl jinou cenu: dovoloval vrátit tělu alespoň část ztracených sil.',
   'Přesun ustoupil odpočinku. Pro tuto chvíli byla důležitější výdrž než vzdálenost.'
  ],key+':activity-rest');
  if(kind==='sleep')return pick([
-  'Část času patřila spánku. Vnější krajina zůstávala stejná, ale rytmus dne se na chvíli zastavil.',
+  'Na místo kroků přišel spánek. Okolní krajina zůstala na svém místě, zatímco čas výpravy plynul bez dalšího přesunu.',
   'Pohyb ustoupil spánku a potřeba pokračovat musela počkat na konec zaznamenaného intervalu.',
-  'Doba spánku ubíhala bez dalších předpokládaných cestovních činů.'
+  'Spánek na čas odložil všechny vzdálenosti a cesty, které ještě čekaly.'
  ],key+':activity-sleep');
  return '';
 }
 function chronicleHorseLead(p,name){
  const drover=txt(p?.settings?.droverActorId),horses=(p?.stableAnimalLoad||[]).filter(a=>!a.rider);
- if(drover&&horses.length===1)return `${chronicleName(name,drover)} vedl za uzdu koně jménem ${horses[0].name}.`;
- if(drover&&horses.length>1)return `${chronicleName(name,drover)} se jako honák staral o vedená zvířata.`;
+ if(drover&&horses.length===1)return `${chronicleName(name,drover)} vede za uzdu koně jménem ${horses[0].name}.`;
+ if(drover&&horses.length>1)return `${chronicleName(name,drover)} se věnuje vedení doprovázejících zvířat.`;
  const ridden=(p?.stableAnimalLoad||[]).filter(a=>a.rider);
- if(ridden.length){return `${chronicleName(name,ridden[0].rider)} pokračoval v sedle zvířete jménem ${ridden[0].name}; ostatní drželi doložené tempo přesunu.`;}
- if(p?.kind==='travel'&&p?.memberIds?.length)return `${chronicleName(name,p.memberIds[0])} pokračoval zaznamenanou trasou.`;
+ if(ridden.length){return `${chronicleName(name,ridden[0].rider)} pokračuje v sedle zvířete jménem ${ridden[0].name}; zbývající členové výpravy drží společné tempo.`;}
+ if(p?.kind==='travel'&&p?.memberIds?.length)return `${chronicleName(name,p.memberIds[0])} pokračuje zvolenou trasou.`;
  return '';
 }
 const CHRONICLE_CONNECTORS=[
@@ -679,6 +572,8 @@ const CHRONICLE_CONNECTORS=[
  'Stačila další chvíle a bylo potřeba přizpůsobit se cestě.'
 ];
 function chronicleTextForTest(test,p,name,key){
+ const literary=literaryChronicleTest(test,p,name,key);
+ if(literary)return literary;
  const who=chronicleName(name,test.actorId),skill=txt(test.skill).toLowerCase(),sl=txt(test.level),failed=sl==='F'||sl==='CF';
  const partial=p?.orientation?.skillId===test.id,nav=txt(p?.navigationState),result=test.result;
  if(skill.includes('animalcraft'))return {
@@ -703,9 +598,9 @@ function chronicleTextForTest(test,p,name,key){
    post:txt(test.result).includes('neuzavřen')?'Hod zůstal zadaný, ale nález zatím nebyl potvrzen.':txt(test.result).includes('nalezeno')?`Výsledek pátrání: ${test.effect}`:txt(test.effect).startsWith('Potrava')?`Doložený výtěžek: ${test.effect}`:'Pátrání nepřineslo potvrzený nález.'};
  }
  if(skill.includes('climbing')||skill.includes('agility'))return {
-  pre:`${who} se pokusil překonat pohybovou obtíž, kterou tato část postupu přinesla.`,
+  pre:`${who} se pokouší překonat pohybovou obtíž, kterou tato část cesty přináší.`,
   post:failed?'Pokus selhal; další tělesný následek by vyžadoval vlastní potvrzené vyhodnocení.':'Pohybový úkon se podařil.'};
- return {pre:`${who} se při své činnosti spolehl na dovednost ${test.skill}.`,post:failed?'Tentokrát mu okolnosti nepřály a zamýšlený postup se nezdařil.':'Jeho záměr se podařil v rozsahu, který zachycuje původní hod.'};
+ return {pre:`${who} obrací pozornost k dovednosti ${test.skill}, na níž nyní záleží další krok.`,post:failed?'Pokus tentokrát nevyšel; další děj tím není předem rozhodnut.':'Zamýšlený úkon se podařil v rozsahu potvrzeném jeho výsledkem.'};
 }
 export function personalInjuryHelp(injury){
  const code=txt(injury?.code||injury?.injury).toUpperCase(),s=code[0],n=Number(code.slice(1));
@@ -805,14 +700,14 @@ export function personalGMFollowups(entry,p,tests,{name,hazard,encounter}={}){
  return rotated.slice(0,Math.min(3,rotated.length));
 }
 
-export function personalChronicleBeats(entry,p,tests,{name,encounter,hazard}={}){
+export function personalChronicleBeats(entry,p,tests,{name,encounter,hazard,calendar}={}){
  const key=txt(entry?.id)||`${p?.startMinute}:${p?.kind}`,all=Array.isArray(tests)?tests:[],getName=name||((id)=>id||'Výprava');
- const beats=[],intro=personalChronicleIntro(entry,p);
+ const beats=[],intro=personalChronicleIntro(entry,p,calendar);
  intro.forEach((text,i)=>beats.push({kind:'intro',text,group:i}));
  const activityText=chronicleActivity(entry,p,getName);if(activityText)beats.push({kind:'activity',text:activityText});
  const riding=chronicleHorseLead(p,getName);
  if(riding)beats.push({kind:'travel',text:riding+' '+pick([
-  'Zvolená činnost vyžadovala držet společné tempo, aniž by ztratil přehled o cestě.',
+  'Zvolená činnost vyžadovala společné tempo a pozornost k cestě před družinou.',
   'Kroky člověka a zvířete se musely přizpůsobit průchodnosti terénu.',
   'Přesun tak nebyl jen otázkou vzdálenosti, ale také souhry se zvířetem.'
  ],key+':horse')});
@@ -833,8 +728,8 @@ export function personalChronicleBeats(entry,p,tests,{name,encounter,hazard}={})
   ],key+':hazard-lead'):`${at} nastal ${hazard.hazard==='equipment'?'problém s výbavou':'zaznamenaný cestovní hazard'}.`;
   const injuryCount=hazard.injuryDetails?.length||0;
   const after=accident?injuryCount?
-   pick(['Následné vyhodnocení potvrdilo skutečné poranění:', 'Následná zdravotní sekvence zanechala konkrétní výsledek:', 'Herní doklad k této nehodě zachytil zranění:'],key+':hazard-result'):
-   'Další poranění se v navázaných dokladech této události nepodařilo potvrdit.':
+   pick(['Nehoda zanechala na těle skutečné stopy:', 'Když se první zmatek utišil, ukázalo se poranění:', 'Nejtěžší skutečnou stopou té chvíle bylo zranění:'],key+':hazard-result'):
+   'Nehoda je jistá, žádné další tělesné následky však nejsou v dochovaném zápisu potvrzeny.':
    hazard.outcome||'Konkrétní pokračování závisí na uloženém vyhodnocení hazardu.';
   const suggestion=accident?pick(hazard.injuries?.length?[
     'Příčinou mohla být zrádná půda, kterou déšť změkčil; přesný průběh pádu však zápis nepopisuje.',
@@ -847,29 +742,29 @@ export function personalChronicleBeats(entry,p,tests,{name,encounter,hazard}={})
    ],key+':hazard-why') : '';
   beats.push({kind:'hazard',before,test:accidentTest,after,injuries:hazard.injuryDetails||[],suggestion});
  }else if(accidentTest){
-  beats.push({kind:'hazard',before:'Do průběhu cesty vstoupil zaznamenaný Survival Hazard.',test:accidentTest,after:'Navazující následek není v této epizodě doložen samostatným výsledkem.'});
+  beats.push({kind:'hazard',before:'Na cestu padl stín nečekané obtíže; jeho povahu odhalil až následující hod.',test:accidentTest,after:'Zápis však neobsahuje potvrzený výsledek dalšího možného následku.'});
  }
  const directions=all.filter(t=>t.skill?.includes('Direction Hazard'));
  for(const t of directions){
   const lost=txt(p?.direction?.direction)==='lost-time';
   beats.push({kind:'direction',before:pick([
-   'Do pokračování cesty promluvil také hod na další vývoj směru.',
-   'Ani po tomto okamžiku se otázka směru nevyřešila sama; rozhodl navazující hod.',
-   'Další průběh trasy určil samostatný směrový hazard.'
+   'Nebylo snadné poznat, zda další kroky vrátí výpravu na zamýšlenou cestu.',
+   'Krajina neprozradila své odbočky bez další zkoušky orientace.',
+   'Cesta si žádala ještě jedno rozhodnutí, než se ukázalo, kolik času zbývá.'
   ],key+':direction-pre'),test:t,after:lost?
-  'Nejistý postup si vyžádal další čas a ubraná vzdálenost tak neodpovídala původnímu plánu.':
+  'Bloudění si vybralo svou daň v čase; ubývalo jej rychleji než vzdálenosti, která měla zůstat za zády.':
   `Vyhodnocený směr: ${txt(p?.direction?.direction)||'není určen'}.`});
  }
  const endurance=all.filter(t=>t.skill?.startsWith('Endurance ·'));
  for(const t of endurance){
   const who=chronicleName(getName,t.actorId),actor=(p?.actors||[]).find(a=>a.id===t.actorId),fat=Number(actor?.delta)||0;
   beats.push({kind:'endurance',before:pick([
-    `Na konci úseku se ukázalo, kolik sil si ${who} uchoval.`,
-    `Teprve závěrečný hod ukázal, jakou únavu cesta přinesla. Na řadě byl ${who}.`,
-    `${who} po přesunu posuzoval svou zbývající výdrž.`
+    `Na konci úseku se ukazuje, kolik sil ${who} ještě má.`,
+    `Na závěr je třeba zvážit únavu, kterou cesta přinesla. Teď přichází na řadu ${who}.`,
+    `${who} po přesunu zkoumá, kolik sil ještě zbývá na další úsek.`
    ],key+':endurance:'+t.actorId),test:t,after:fat===0?
-    `Další únava nepřibyla; Weariness zůstala na ${actor?.after??actor?.before??'—'}.`:
-    `Weariness se změnila z ${actor?.before??'—'} na ${actor?.after??'—'} podle doloženého výsledku.`});
+    `Úsek nepřinesl další únavu; její míra zůstala na ${actor?.after??actor?.before??'—'}.`:
+    `Úsek si vybral svou daň: únava vzrostla z ${actor?.before??'—'} na ${actor?.after??'—'}.`});
  }
  const ignored=new Set([...generic,...directions,...endurance,accidentTest].filter(Boolean));
  for(const t of all.filter(t=>!ignored.has(t))){
@@ -883,7 +778,7 @@ export function personalChronicleBeats(entry,p,tests,{name,encounter,hazard}={})
    'Někde za dalšími kmeny mohl být kdokoli; skutečnost ale určil až hod na setkání.'
   ],key+':encounter'),encounter,after:encounter.count?
    `Zaznamenáno ${encounter.count} setkání; jejich konkrétní podoba vychází z rozhodnutí GM.`:
-   'Žádné setkání se do tohoto úseku cesty nezapsalo.'});
+   'Cesta v tomto úseku zůstala bez setkání.'});
  }
  return beats;
 }
