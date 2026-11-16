@@ -4,6 +4,7 @@
  * spoilage itself remains governed by HMK p.85 and the GM, not an invented die.
  */
 import {foragedCarriedFood} from './hmk-foraging-carried-food.js';
+import {WILD_FRESH_CARRY_93912} from './hmk-wild-freshness-93912.js';
 import {trappingResult93908} from './hmk-trapping-93908.js?v=93.909';
 import {resolveFishingCatch} from './hmk-fishing-catch-548.js';
 const check=(ok,msg)=>{if(!ok)throw Error('Úlovek: '+msg)};
@@ -58,6 +59,14 @@ export function createCatchCarry93908({journal=[],campaignId,minute,sourceId,act
   resultIndex:0,quantity,itemId,itemName:name,totalWeightLb,freshUntilMinute,
   sourcePages:source.kind==='fishing'?[71,85,186]:[85,186],confirmedByGM:true};
 }
+/** New food parcels use real HMK p.85 daily checks instead of a guessed expiry.
+ * The historical 93908 function and ALL v1 receipts remain unchanged.
+ */
+export function createFreshCatchCarry93912(args={}){
+ const base=createCatchCarry93908({...args,freshUntilMinute:1e9});
+ const {freshUntilMinute,...withoutManualExpiry}=base;
+ return {...withoutManualExpiry,format:WILD_FRESH_CARRY_93912};
+}
 /** GM-confirmed abandonment of real carried fish/meat. Spoilage does not
  * magically remove ENC; the physical parcel leaves only on this receipt.
  */
@@ -67,7 +76,7 @@ export function discardWildCatch93908({journal=[],campaignId,minute,actorId,carr
   typeof carryId==='string'&&carryId&&half(quantity)&&gmConfirmed===true,
   'odložení nebo zkažení úlovku musí výslovně potvrdit GM.');
  const lot=foragedCarriedFood(journal,campaignId,minute).find(x=>
-  x.sourceJournalId===carryId&&x.actorId===actorId&&x.format===WILD_CARRY_FORMAT);
+  x.sourceJournalId===carryId&&x.actorId===actorId&&[WILD_CARRY_FORMAT,WILD_FRESH_CARRY_93912].includes(x.format));
  check(lot&&lot.remaining>=quantity,'daná nesená potrava už není k dispozici.');
  return {format:'hmk-wild-catch-discard-93908-v1',campaignId,minute,actorId,
   carryId,itemId:lot.itemId,quantity,weightLb:Math.round(lot.totalWeightLb*quantity/lot.quantity*100)/100,
@@ -77,8 +86,9 @@ export function validateCatchCarry93908(journal=[]){
  const prior=[];
  for(const row of journal){
   const c=row.calendarForagingCarry;
-  if(c?.format===WILD_CARRY_FORMAT){
-   const expected=createCatchCarry93908({journal:prior,campaignId:row.calendarCampaignId,
+  if([WILD_CARRY_FORMAT,WILD_FRESH_CARRY_93912].includes(c?.format)){
+   const maker=c.format===WILD_CARRY_FORMAT?createCatchCarry93908:createFreshCatchCarry93912;
+   const expected=maker({journal:prior,campaignId:row.calendarCampaignId,
     minute:row.campaignMinute,sourceId:c.sourceId,actorId:row.characterId,quantity:c.quantity,
     itemId:c.itemId,itemName:c.itemName,totalWeightLb:c.totalWeightLb,
     freshUntilMinute:c.freshUntilMinute,gmConfirmed:c.confirmedByGM});

@@ -5,6 +5,7 @@
  * Receipts overlay the live inventory for ENC and can never duplicate stock.
  */
 import {availableSupplyLots,createSupplyUse} from './hmk-foraging-supply-ledger.js';
+import {WILD_FRESH_CARRY_93912,wildFreshState93912} from './hmk-wild-freshness-93912.js';
 export const FORAGING_CARRY='hmk-foraging-carry-v1';
 export const FORAGING_CARRY_EAT='hmk-foraging-carry-eat-v1';
 const check=(v,m)=>{if(!v)throw Error(m)};
@@ -21,6 +22,15 @@ export function foragedCarriedFood(journal=[],campaignId,atMinute=1e9){
   if(e){const lot=byId.get(e.carryId);if(lot)lot.remaining=Math.round((lot.remaining-e.quantity)*2)/2;}
   const d=row.calendarForagingCarryDiscard;
   if(d){const lot=byId.get(d.carryId);if(lot)lot.remaining=Math.round((lot.remaining-d.quantity)*2)/2;}
+ }
+ for(const l of lots)if(l.format===WILD_FRESH_CARRY_93912){
+  const state=wildFreshState93912(journal,campaignId,l.sourceJournalId,atMinute);
+  if(state){l.spoiledRemaining=state.spoiledRemaining;
+   l.edibleRemaining=state.edibleRemaining;
+   l.freshnessDue=state.freshnessDue;
+   l.nextSpoilageMinute=state.nextDueMinute;
+   l.saltIntervalDays=state.intervalDays;
+   l.saltStartId=state.saltStartId;l.saltFinished=state.saltFinished;}
  }
  return lots;
 }
@@ -51,7 +61,7 @@ export function createForagingCarryEat({journal=[],campaignId,minute:at,actorId,
  if(nutritionDayId!==null)check(typeof nutritionDayId==='string'&&nutritionDayId.length>0,
   'Neplatný účetní identifikátor spotřeby v nutričním dni.');
  const lot=foragedCarriedFood(journal,campaignId,at).find(x=>x.sourceJournalId===carryId&&x.actorId===actorId);
- check(lot&&lot.remaining>=quantity&&(!Number.isSafeInteger(lot.freshUntilMinute)||at<=lot.freshUntilMinute),
+ check(lot&&(lot.edibleRemaining??lot.remaining)>=quantity&&!lot.freshnessDue&&(!Number.isSafeInteger(lot.freshUntilMinute)||at<=lot.freshUntilMinute),
   'Potrava není doložena, je zkažená podle potvrzené trvanlivosti nebo již byla snědena.');
  return {format:FORAGING_CARRY_EAT,campaignId,minute:at,actorId,carryId,quantity,
   itemId:lot.itemId,sourcePages:[147,186],confirmedByGM:true,
@@ -76,7 +86,7 @@ export function validateForagingCarriedJournal(journal=[]){
   const p=row.calendarForagingCarry,e=row.calendarForagingCarryEat,s=row.calendarForagingSupplyUse;
   if(s?.disposition==='packed-in-inventory')check(!!p,
    'Výdej nalezené potravy do inventáře musí mít odpovídající fyzický doklad.');
-  if(p&&p.format!=='hmk-wild-catch-carry-93908-v1'){
+  if(p&&!['hmk-wild-catch-carry-93908-v1',WILD_FRESH_CARRY_93912].includes(p.format)){
    const expected=createForagingCarry({journal:prior,campaignId:row.calendarCampaignId,
     minute:row.campaignMinute,actorId:row.characterId,sourceId:p.sourceId,
     resultIndex:p.resultIndex,quantity:p.quantity,itemName:p.itemName,
