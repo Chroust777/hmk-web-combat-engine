@@ -277,6 +277,20 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
  // travel overlap or an invalid animal rest must not produce a half-completed batch.
  for(const row of due){
   const activity=row.calendarActivityProof;
+  // Preflight every resting actor BEFORE mutating any due activity, even
+  // when several party members complete different rests at the same minute.
+  // A documented weather incident is an interruption, never free recovery.
+  if(activity.plan.kind!=='travel'){
+   const pos=database.journal.findIndex(x=>x.id===row.id);
+   const collision=database.journal.slice(pos+1).find(x=>
+    x.characterId===activity.characterId&&
+    x.calendarCampaignId===campaignId&&
+    Number.isSafeInteger(x.campaignMinute)&&
+    x.campaignMinute>=activity.startMinute&&x.campaignMinute<activity.endMinute&&
+    (x.combatProof||x.skillTestProof||x.calendarTrekProof||
+     x.calendarTrekWeatherRoll||x.calendarWeatherProof));
+   check(!collision,'Při plánovaném odpočinku proběhla jiná doložená událost; GM nejprve přerušte činnost v doložené minutě události.');
+  }
   if(!activity.plan.animalRestPolicy)continue;
   const actor=database.characters.find(c=>c.id===activity.characterId);
   check(actor,'Zvíře plánovaného odpočinku již není v registru.');
@@ -304,7 +318,8 @@ export function finishDueHMKActivities(database,{idFactory,stamp}={}){
    const collision=database.journal.slice(i+1).find(x=>x.characterId===actor.id&&
     x.calendarCampaignId===campaignId&&Number.isSafeInteger(x.campaignMinute)&&
     x.campaignMinute>=activity.startMinute&&x.campaignMinute<activity.endMinute&&
-    (x.combatProof||x.skillTestProof||x.calendarTrekProof));
+    (x.combatProof||x.skillTestProof||x.calendarTrekProof||
+     x.calendarTrekWeatherRoll||x.calendarWeatherProof));
    check(!collision,actor.name+': během plánovaného odpočinku proběhla jiná doložená akce. '+
     'Před dalším posunem času GM nejprve přerušte činnost v jejím aktuálním čase.');
   }

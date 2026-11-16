@@ -1052,3 +1052,14 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 #hmk-time-episode-form label[data-hazard-minute] .hc-episode-die input{flex:1 1 80px;min-width:70px;max-width:125px}
 #hmk-time-episode-form label[data-hazard-minute] .hc-episode-die button{flex:0 1 auto;width:auto!important;max-width:100%;font-size:.78rem;white-space:normal}
 #hmk-time-episode-form label[data-hazard-minute] .hc-episode-die .hc-episode-roll-accept{margin:0}
+
+/* HMK v93.913 · mandatory sequential noncombat dice confirmation. */
+.hmk-one-roll-93913{border:2px solid #ad2323!important;border-radius:9px;padding:12px;margin:12px 0;background:rgba(180,24,24,.095)}
+.hmk-one-roll-93913 .hmk-one-roll-prompt{color:#b21b1b;font-weight:800;margin:4px 0 10px}
+.hmk-one-roll-93913 label{display:block;font-weight:700}
+.hmk-one-roll-93913 input{border:2px solid #b21b1b!important;background:#fffafa!important;max-width:180px}
+.hmk-one-roll-93913 .hmk-one-roll-actions{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0}
+.hmk-one-roll-93913 [data-hmk-one-roll-confirm]{background:#a81919;color:white;border:1px solid #7e1111}
+.hmk-one-roll-93913 [data-hmk-one-roll-status]{display:block;min-height:1.2em;font-weight:600}
+.hmk-one-roll-93913.hmk-one-roll-complete{border-color:#397550!important;background:rgba(30,115,64,.08)}
+.hmk-one-roll-93913.hmk-one-roll-complete .hmk-one-roll-prompt{color:#23633d}

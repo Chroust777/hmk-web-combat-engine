@@ -1,3 +1,4 @@
+import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
 import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js';
@@ -43,8 +44,8 @@ import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk
 import {fishingCatchCandidate,resolveFishingCatch} from './src/integration/hmk-fishing-catch-548.js';
 import {FISH_START_V2,fishingStart93910,fishingProgress93910,fishingWork93910,fishingCancel93910,fishingSVLink93910,validateFishingTime93910} from './src/integration/hmk-fishing-time-93910.js?v=93.910';
 import {trappingStart93908,trappingStart93909,trappingProgress93909,trappingWork93909,trappingCancel93909,trappingSVLink93909,trappingResult93908,validateTrappingJournal93908} from './src/integration/hmk-trapping-93908.js?v=93.909';
-import {catchSource93908,createCatchCarry93908,createFreshCatchCarry93912,discardWildCatch93908,validateCatchCarry93908} from './src/integration/hmk-wild-catch-93908.js?v=93.912';
-import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltStart93912,wildSaltFinish93912,validateWildFreshness93912,assertWildDueBeforeAdvance93912} from './src/integration/hmk-wild-freshness-93912.js?v=93.912';
+import {catchSource93908,createCatchCarry93908,createFreshCatchCarry93912,discardWildCatch93908,validateCatchCarry93908} from './src/integration/hmk-wild-catch-93908.js?v=93.913';
+import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltStart93912,wildSaltFinish93912,validateWildFreshness93912,assertWildDueBeforeAdvance93912} from './src/integration/hmk-wild-freshness-93912.js?v=93.913';
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js';
@@ -372,7 +373,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.912';
+const APP_VERSION='93.913';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3655,7 +3656,7 @@ function campaignCalendarView(){
  
  <button type="submit" ${l.freshnessDue||((l.edibleRemaining??l.remaining)<=0)?'disabled':''}>Zapsat skutečnou spotřebu z inventáře</button></form>
  ${l.format===WILD_FRESH_CARRY_93912?`<div class="hc-weather-care-card"><p class="hc-hint"><strong>HMK 85 · čerstvost</strong> · jedlé ${l.edibleRemaining} food-days · zkažené a stále nesené ${l.spoiledRemaining} food-days · další kontrola ${l.nextSpoilageMinute===null?'není':displayCampaignMinute(l.nextSpoilageMinute)} · interval ${l.saltIntervalDays} d.</p>
- ${l.freshnessDue?`<form data-hmk-wild-spoil><input type="hidden" name="actorId" value="${esc(l.actorId)}"><input type="hidden" name="carryId" value="${esc(l.sourceJournalId)}"><strong>Povinný hod zkázy · ${Math.ceil(l.edibleRemaining)} kostek</strong><label>Skutečné počasí v místě skladování (potvrzuje GM)<select name="temperature"><option value="hot">Hot · d2</option><option value="warm">Warm · d4</option><option value="cool">Cool · d8</option><option value="cold">Cold · d12</option></select></label><label>Jednotlivé skutečné hody oddělené čárkami<input name="rolls" required placeholder="Např. 2,1,4"></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje teplotu, všechny jednotlivé hody a termín</label><button type="submit">Uložit denní kontrolu zkázy</button></form>`:''}
+ ${l.freshnessDue?`<form data-hmk-wild-spoil data-hmk-wild-roll-count="${Math.ceil(l.edibleRemaining)}"><input type="hidden" name="actorId" value="${esc(l.actorId)}"><input type="hidden" name="carryId" value="${esc(l.sourceJournalId)}"><strong>Povinný hod zkázy · ${Math.ceil(l.edibleRemaining)} kostek</strong><label>Skutečné počasí v místě skladování (potvrzuje GM)<select name="temperature"><option value="hot">Hot · d2</option><option value="warm">Warm · d4</option><option value="cool">Cool · d8</option><option value="cold">Cold · d12</option></select></label><label>Jednotlivé skutečné hody oddělené čárkami<input name="rolls" required placeholder="Např. 2,1,4"></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje teplotu, všechny jednotlivé hody a termín</label><button type="submit">Uložit denní kontrolu zkázy</button></form>`:''}
  ${!l.saltFinished&&l.edibleRemaining>0&&!l.freshnessDue&&!l.saltStartId?`<form data-hmk-wild-salt-start><input type="hidden" name="actorId" value="${esc(l.actorId)}"><input type="hidden" name="carryId" value="${esc(l.sourceJournalId)}"><p>Nasolit čerstvý úlovek – celý den podle HMK 85. Kalendář se neposouvá automaticky.</p><label class="hc-check"><input type="checkbox" name="saltConfirmed" required> GM potvrzuje skutečné dostupné množství soli pro celý balík</label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje zahájení jednodenní konzervace</label><button type="submit">Zahájit konzervaci</button></form>`:''}
  ${l.saltStartId?`<form data-hmk-wild-salt-finish><input type="hidden" name="actorId" value="${esc(l.actorId)}"><input type="hidden" name="carryId" value="${esc(l.sourceJournalId)}"><input type="hidden" name="startId" value="${esc(l.saltStartId)}"><p>Ukončení nasolení: GM musí nejdříve potvrdit celý den v Kalendáři a potom Survival/Cookery ve Skill Workbench.</p><label>Doložený původní SV<select name="skillId">${wildSaltSkillRows.filter(x=>x.characterId===l.actorId).map(x=>`<option value="${esc(x.id)}">${esc(x.skillTestProof.skills[0])} · SV ${x.skillTestProof.a.sv} · ${esc(x.id)}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje den konzervace a původní SV</label><button type="submit" ${wildSaltSkillRows.some(x=>x.characterId===l.actorId)?'':'disabled'}>Dokončit konzervaci</button></form>`:''}</div>`:''}
  ${['hmk-wild-catch-carry-93908-v1',WILD_FRESH_CARRY_93912].includes(l.format)?`<form data-hmk-wild-catch-discard>
@@ -10409,6 +10410,8 @@ function enhanceHMKDiceFields(){
   input.insertAdjacentElement('afterend',b);
  }
 }
+document.addEventListener('change',e=>{if(e.target.closest?.('form[data-hmk-animal-training]'))
+ decorateNoncombatRollQueue93913(document.getElementById('app'),secureHMKDie);},true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-hmk-general-auto-die]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -11236,6 +11239,7 @@ function render(){
  refreshAllCalendarHealingFields();
  hskHydrateAccidentAgility93864(app);
  enhanceHMKDiceFields();
+ decorateNoncombatRollQueue93913(app,secureHMKDie);
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
  scheduleStableAutoMigration93861();
