@@ -368,7 +368,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.904';
+const APP_VERSION='93.905';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -26468,7 +26468,10 @@ function episodePreviewFromForm(form,clock){
     const herbName=String(n===0?v.herbName:v['forageHerb'+n]||'').trim();
     const key=JSON.stringify([target,target==='herbs'?herbName:'']);
     const carryIn=partial.has(key)?partial.get(key):lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
-    const f=calculateEpisodeForaging({minutes:stationForageMinutes93869,habitat:v.habitat,season,roll,target,herbName,carryIn});
+    // v93.905: Complication F/CF ends active foraging at its confirmed obstacle minute.
+    // Use the SAME worked duration on commitment as on historical replay.
+    const foragingWorkedMinutes93905=result.foragingComplication93875?.workedMinutes??stationForageMinutes93869;
+    const f=calculateEpisodeForaging({minutes:foragingWorkedMinutes93905,habitat:v.habitat,season,roll,target,herbName,carryIn});
     result.standaloneForaging.push(f);partial.set(key,f.carryOut);
    }
    if(result.standaloneForaging.length)result.foraging=result.standaloneForaging[0];
