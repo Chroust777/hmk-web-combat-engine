@@ -9,6 +9,7 @@ const SPEC = Object.freeze({
  'data-trek-global-shift': ['trekWeatherShiftTemperature', 'trekWeatherShiftPrecipitation'],
  'data-hmk-wild-spoil': ['rolls'],
  'data-hmk-animal-training': ['trainingD10'],
+ 'data-malnutrition-course': ['roll'],
 });
 const names={temperature:'Denní teplota',precipitation:'Denní srážky',
  trekWeatherShiftTemperature:'Nová teplota',trekWeatherShiftPrecipitation:'Nové srážky',
@@ -19,7 +20,7 @@ export function decorateNoncombatRollQueue93913(root,die){
  if(!root||typeof die!=='function')return;
  for(const [attribute,fields] of Object.entries(SPEC))for(const form of root.querySelectorAll('form['+attribute+']')){
   if(form.dataset.hmkRollQueue==='v93.913')continue;
-  const spoil=attribute==='data-hmk-wild-spoil',training=attribute==='data-hmk-animal-training';
+  const spoil=attribute==='data-hmk-wild-spoil',training=attribute==='data-hmk-animal-training',nutrition=attribute==='data-malnutrition-course';
   const weatherFields=fields.map(name=>form.elements.namedItem(name));
   if(weatherFields.some(input=>!(input instanceof HTMLInputElement)))continue;
   let count=spoil?Number(form.dataset.hmkWildRollCount):training?Number(form.dataset.hmkDiceCount||0):fields.length;
@@ -30,7 +31,8 @@ export function decorateNoncombatRollQueue93913(root,die){
   const oldDisabled=submit.disabled;
   const temperature=spoil?form.elements.namedItem('temperature'):null;
   const gmCheckbox=spoil?form.elements.namedItem('gmConfirmed'):null;
-  if(spoil||training){weatherFields[0].closest('label').hidden=true;weatherFields[0].type='hidden';
+  if(spoil||training||nutrition){weatherFields[0].closest('label').hidden=true;weatherFields[0].type='hidden';
+   if(nutrition)form.querySelector('[data-malnutrition-die]')?.setAttribute('hidden','');
    if(training)form.querySelector('[data-hmk-followup-roll-all]')?.setAttribute('hidden','');}
   else for(const field of weatherFields){
    const wrapper=field.closest('.hc-trek-shift-control');if(wrapper)wrapper.hidden=true;
@@ -54,7 +56,7 @@ export function decorateNoncombatRollQueue93913(root,die){
   const output=host.querySelector('[data-hmk-one-roll-status]');
   const target=form.querySelector('.hc-trek-weather-actions')||submit;
   target.parentNode.insertBefore(host,target);
-  const getFaces=()=>spoil?({hot:2,warm:4,cool:8,cold:12}[temperature?.value]||null):10;
+  const getFaces=()=>nutrition?100:spoil?({hot:2,warm:4,cool:8,cold:12}[temperature?.value]||null):10;
   const isDone=()=>state.step===count;
   function show(){
    const completed=isDone();const faces=getFaces();
@@ -62,9 +64,9 @@ export function decorateNoncombatRollQueue93913(root,die){
    host.classList.toggle('hmk-one-roll-complete',completed);
    prompt.textContent=completed?'Všechny hody byly jednotlivě potvrzeny. Nyní lze potvrdit celou činnost.':
     'ČERVENÝ AKTIVNÍ KROK '+(state.step+1)+'/'+count+' · '+
-    (spoil?'food-day '+(state.step+1):training?names.trainingD10+' '+(state.step+1):names[fields[state.step]])+' · d'+faces;
-   input.max=String(faces);input.disabled=completed;gen.disabled=completed;
-   accept.disabled=completed||!valid(input.value,faces);
+    (spoil?'food-day '+(state.step+1):training?names.trainingD10+' '+(state.step+1):nutrition?'Výživa – zdravotní d100':names[fields[state.step]])+' · d'+faces;
+   input.max=String(faces);input.disabled=completed||oldDisabled;gen.disabled=completed||oldDisabled;
+   accept.disabled=completed||oldDisabled||!valid(input.value,faces);
    reset.hidden=!state.rolls.length;submit.disabled=oldDisabled||!completed;
    if(gmCheckbox)gmCheckbox.disabled=!completed;
    if(temperature){temperature.disabled=false;temperature.style.pointerEvents=state.rolls.length?'none':'';temperature.tabIndex=state.rolls.length?-1:0;temperature.setAttribute('aria-disabled',state.rolls.length?'true':'false');}
@@ -80,12 +82,12 @@ export function decorateNoncombatRollQueue93913(root,die){
    const faces=getFaces();if(isDone()||!valid(input.value,faces)){output.textContent='Zadejte jedno platné číslo d'+faces+'.';return;}
    const number=Number(input.value),software=state.generated===number;
    state.rolls.push(number);state.origins.push(software?'software':'ručně');
-   if(!spoil&&!training){const field=weatherFields[state.step];field.value=String(number);
+   if(!spoil&&!training&&!nutrition){const field=weatherFields[state.step];field.value=String(number);
     if(software){if(attribute==='data-trek-global-weather')field.dataset.cryptographicValue=field.value;
      else field.dataset.trekGenerated=field.value;}
    }
    state.step++;state.generated=null;input.value='';
-   if(spoil||training)weatherFields[0].value=state.rolls.join(',');
+   if(spoil||training||nutrition)weatherFields[0].value=state.rolls.join(',');
    show();if(!isDone()){input.focus({preventScroll:true});}
   }
   gen.addEventListener('click',()=>{

@@ -1063,3 +1063,24 @@ body{font-family:var(--hmk-font-body);line-height:var(--hmk-line-body)}
 .hmk-one-roll-93913 [data-hmk-one-roll-status]{display:block;min-height:1.2em;font-weight:600}
 .hmk-one-roll-93913.hmk-one-roll-complete{border-color:#397550!important;background:rgba(30,115,64,.08)}
 .hmk-one-roll-93913.hmk-one-roll-complete .hmk-one-roll-prompt{color:#23633d}
+
+/* v93.914 · the Animal Training CF d3 also needs an unmistakable active roll,
+   although it belongs to the legacy Skill Tests follow-up (not to the queue). */
+form[data-skill-critical-form] [data-animal-training-fields]:not([hidden]) .hsk-physical-d3-controls,
+form[data-hmk-animal-training] .hsk-physical-d3-controls {
+  border:2px solid #ad2323;
+  background:rgba(180,24,24,.095);
+  border-radius:9px;
+  padding:10px;
+  margin:8px 0;
+}
+form[data-skill-critical-form] [data-animal-training-fields]:not([hidden]) input[name="trainingD3"],
+form[data-hmk-animal-training] input[name="criticalD3"] {
+  border:2px solid #ad2323;
+  background:#fffafa;
+}
+form[data-skill-critical-form] [data-animal-training-fields]:not([hidden]) [data-animal-training-d3-status],
+form[data-hmk-animal-training] [data-animal-training-d3-status] {
+  color:#a81919;
+  font-weight:700;
+}

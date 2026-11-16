@@ -1,4 +1,5 @@
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
+import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
 import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js';
@@ -44,8 +45,8 @@ import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk
 import {fishingCatchCandidate,resolveFishingCatch} from './src/integration/hmk-fishing-catch-548.js';
 import {FISH_START_V2,fishingStart93910,fishingProgress93910,fishingWork93910,fishingCancel93910,fishingSVLink93910,validateFishingTime93910} from './src/integration/hmk-fishing-time-93910.js?v=93.910';
 import {trappingStart93908,trappingStart93909,trappingProgress93909,trappingWork93909,trappingCancel93909,trappingSVLink93909,trappingResult93908,validateTrappingJournal93908} from './src/integration/hmk-trapping-93908.js?v=93.909';
-import {catchSource93908,createCatchCarry93908,createFreshCatchCarry93912,discardWildCatch93908,validateCatchCarry93908} from './src/integration/hmk-wild-catch-93908.js?v=93.913';
-import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltStart93912,wildSaltFinish93912,validateWildFreshness93912,assertWildDueBeforeAdvance93912} from './src/integration/hmk-wild-freshness-93912.js?v=93.913';
+import {catchSource93908,createCatchCarry93908,createFreshCatchCarry93912,discardWildCatch93908,validateCatchCarry93908} from './src/integration/hmk-wild-catch-93908.js?v=93.914';
+import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltStart93912,wildSaltFinish93912,validateWildFreshness93912,assertWildDueBeforeAdvance93912} from './src/integration/hmk-wild-freshness-93912.js?v=93.914';
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js';
@@ -373,7 +374,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.913';
+const APP_VERSION='93.914';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -562,21 +563,53 @@ if(!storageReadOnly){
  }
 }
 function trainingOpenMinute600(proof,due){return proof?.calendarDayEligibility600===true?calendarDayStart600(due):due;}
+/** Only new training starts use the minute ledger. Legacy 93.913 entries remain on their original proof model. */
+function trainingCalendarDue93914(journal,startRow,requiredMonths=6){
+ const proof=startRow?.calendarAnimalTrainingStart590;
+ if(proof?.trainingWorkPolicy===ANIMAL_WORK_POLICY93914)
+  return trainingLedgerDue93914(journal,startRow,requiredMonths*30);
+ return trainingEffectiveDue93902(journal,startRow,
+  trainingOpenMinute600(proof,proof.startMinute+requiredMonths*30*1440));
+}
+function trainingWorkStableHTML93914(start,animal,clock){
+ if(start.calendarAnimalTrainingStart590.trainingWorkPolicy!==ANIMAL_WORK_POLICY93914)return '';
+ const progress=trainingLedgerDue93914(data.journal,start,180);
+ const minute=clock?.minute||0,defaultFrom=Math.max(start.calendarAnimalTrainingStart590.startMinute,Math.floor(minute/1440)*1440,minute-60);
+ return `<section class="hsk-training-calendar-panel hmk-training-work-93914"><details name="hmk-training-action-${esc(animal.id)}"><summary>Skutečný minutový deník výcviku · HMK 65</summary>
+ <p class="hc-hint">Doloženo <strong>${progress.creditedDays}/180</strong> denních lekcí po cca 60 minutách;
+ celkem ${progress.workedMinutes} minut. Zbývá ${progress.remainingDays} dní, ${progress.partialDays} má dosud kratší lekce.
+ ${progress.paused?'Výcvik je pozastaven.':'Závěrečný Animalcraft SV vyžaduje dokončený deník i šest kalendářních měsíců.'}
+ Intervaly musí být skutečně odpracované; Kalendář se zde sám neposouvá. Pokud CF prodlouží výcvik o d3 měsíců,
+ je nutné doložit i tyto další lekce. Pro úseky po 10 minutách zadávejte jednotlivé části.</p>
+ ${progress.paused?'<p class="hc-hint">Nejprve výcvik potvrzeně obnovte.</p>':`<form data-hmk-training-work-93914>
+ <input type="hidden" name="startId" value="${esc(start.id)}">
+ <label>Začátek skutečně odpracovaného úseku · absolutní minuta kampaně
+ <input name="fromMinute" type="number" min="${start.calendarAnimalTrainingStart590.startMinute}" max="${minute}" step="1" required value="${defaultFrom}"></label>
+ <label>Odpracovaných minut denně (1–180)<input name="durationMinutes" type="number" min="1" max="180" step="1" required value="60"></label>
+ <label>Kolik po sobě jdoucích dní je přesně takto doloženo (1–30)
+ <input name="repeatDays" type="number" min="1" max="30" step="1" required value="1"></label>
+ <p class="hc-hint">Opakování není automatický výcvik: GM potvrzuje skutečnou práci v každém vybraném dni, ve stejnou denní minutu.
+ Doba nesmí zasahovat do jiných činností ani přecházet přes půlnoc.</p>
+ <label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečně odpracované intervaly a nekolidující čas.</label>
+ <button type="submit">Vložit potvrzené minuty výcviku</button>
+ <output role="status" aria-live="polite"></output></form>`}</details></section>`;
+}
+
 function trainingInterruptionStableHTML93902(animal,campaignId){
  const starts=data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===animal.id);
  const done=new Set(data.journal.filter(j=>j.calendarAnimalTraining590?.animalId===animal.id).map(j=>j.calendarAnimalTraining590.startId));
  const start=starts.findLast(j=>!done.has(j.id));if(!start)return '';
- const status=trainingEffectiveDue93902(data.journal,start,trainingOpenMinute600(start.calendarAnimalTrainingStart590,start.calendarAnimalTrainingStart590.dueMinute));
- return `<section class="hsk-training-calendar-panel"><strong>Doklad skutečně přerušeného výcviku · HMK 65</strong>
- <p class="hc-hint">${status.paused?'Pozastaveno od '+esc(displayCampaignMinute(status.pausedAt))+'; závěrečný Animalcraft SV nelze uložit.':'Výcvik aktivní.'} GM již potvrdil ${status.missedDays} skutečně zameškaných dní.
- ${status.due!==null?'Upravený základní termín '+esc(displayCampaignMinute(status.due))+'.':'Nový termín nelze určit před výslovným obnovením.'}
+ const status=trainingCalendarDue93914(data.journal,start,6);
+ return `<section class="hsk-training-calendar-panel"><details name="hmk-training-action-${esc(animal.id)}"><summary>Přerušit / obnovit výcvik · GM</summary><strong>Doklad skutečně přerušeného výcviku · HMK 65</strong>
+ <p class="hc-hint">${status.paused?'Pozastaveno od '+esc(displayCampaignMinute(status.pausedAt))+'; závěrečný Animalcraft SV nelze uložit.':'Výcvik aktivní.'} GM již potvrdil ${status.missedDays??status.attestedMissedDays??0} skutečně zameškaných dní.
+ ${status.due!==null?'Upravený základní termín '+esc(displayCampaignMinute(status.due))+'.':'Závěrečný termín nelze určit před dokončením doložených lekcí a obnovením výcviku.'}
  Potvrzení přestávky není potvrzením jednotlivých lekcí ani novým hodem.</p>
  <form data-hmk-training-interruption-93902><input type="hidden" name="startId" value="${esc(start.id)}">
  <label>Důvod a skutečné okolnosti GM<input name="reason" minlength="3" maxlength="240" required placeholder="Např. trenér 3 dny v bezvědomí"></label>
  ${status.paused?`<label>Skutečně zameškané dny během přestávky<input name="missedDays" type="number" min="0" max="${Math.ceil((data.campaignClock.minute-status.pausedAt)/1440)}" step="1" required placeholder="potvrzuje GM"></label>`:''}
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje, že jde o skutečnou přestávku / obnovení a zameškanou dobu.</label>
  <button type="submit" name="action" value="${status.paused?'resume':'pause'}">${status.paused?'Potvrdit obnovení výcviku':'Pozastavit výcvik · GM'}</button>
- <output role="status" aria-live="polite"></output></form></section>`;
+ <output role="status" aria-live="polite"></output></form></details></section>`;
 }
 
 function validateAnimalTrainingCalendar590(d){
@@ -590,19 +623,19 @@ function validateAnimalTrainingCalendar590(d){
      !Number.isSafeInteger(proof.startMinute)||proof.startMinute<animal.minute||
      row.campaignMinute!==proof.startMinute||proof.requiredDays!==180||
      proof.dueMinute!==proof.startMinute+180*1440||
-     (proof.calendarDayEligibility600!==undefined&&proof.calendarDayEligibility600!==true)||starts.has(row.id))
+     (proof.calendarDayEligibility600!==undefined&&proof.calendarDayEligibility600!==true)||
+     (proof.trainingWorkPolicy!==undefined&&proof.trainingWorkPolicy!==ANIMAL_WORK_POLICY93914)||starts.has(row.id))
    throw Error('Animalcraft: nepřípustná změna kalendářního dokladu zahájení výcviku.');
   starts.set(row.id,{row,proof});
  }
  for(const row of journal){
   const link=row.skillTestProof?.animalTrainingSV590;if(!link)continue;
   const start=starts.get(link.startId),p=row.skillTestProof;
-  const interruptionDue=start?trainingEffectiveDue93902(journal,start.row,
-   trainingOpenMinute600(start.proof,start.proof.dueMinute)):null;
+  const interruptionDue=start?trainingCalendarDue93914(journal,start.row,6):null;
   if(link.format!=='hmk-animal-training-sv-93893-v1'||!start||animalSVs.has(link.startId)||
    link.animalId!==start.proof.animalId||link.ownerId!==start.proof.ownerId||
    row.characterId!==start.proof.ownerId||row.calendarCampaignId!==start.row.calendarCampaignId||
-   p.type!=='secondary-mastery-value-test'||(p.skills?.[0]||p.skill)!=='Animalcraft'||
+   !Number.isSafeInteger(interruptionDue?.due)||p.type!=='secondary-mastery-value-test'||(p.skills?.[0]||p.skill)!=='Animalcraft'||
    !Number.isSafeInteger(row.campaignMinute)||interruptionDue.paused||row.campaignMinute<interruptionDue.due||
    link.dueMinute!==interruptionDue.due)
    throw Error('Animalcraft: SV není svázán s jediným dokončeným výcvikem konkrétního zvířete.');
@@ -610,6 +643,7 @@ function validateAnimalTrainingCalendar590(d){
  }
  validateTrappingJournal93908(journal);
  validateFishingTime93910(journal,d.characters);
+ validateAnimalTrainingWork93914(journal);
  for(const row of journal){
   const link=row.calendarAnimalTraining590;if(!link)continue;
   const start=starts.get(link.startId),animal=animals.get(link.animalId),training=row.skillTestProof;
@@ -617,9 +651,10 @@ function validateAnimalTrainingCalendar590(d){
   // first minute of its due calendar day. Keep the exact original deadline
   // valid too for append-only historical receipts. Unflagged starts are exact.
   const strictDue=start?.proof.startMinute+(training?.months||0)*30*1440;
-  const interruptionDue=start?trainingEffectiveDue93902(journal,start.row,trainingOpenMinute600(start.proof,strictDue)):null;
+  const interruptionDue=start?trainingCalendarDue93914(journal,start.row,training?.months||6):null;
   const eligibleDue=interruptionDue?.due;
-  const dueMatches=link.dueMinute===eligibleDue||(interruptionDue?.missedDays===0&&link.dueMinute===strictDue);
+  const dueMatches=Number.isSafeInteger(eligibleDue)&&(link.dueMinute===eligibleDue||
+   (start?.proof.trainingWorkPolicy!==ANIMAL_WORK_POLICY93914&&interruptionDue?.missedDays===0&&link.dueMinute===strictDue));
   const origin=journal.find(j=>j.id===training?.originId);
   const svLink=origin?.skillTestProof?.animalTrainingSV590;
   if(!start||!animal||link.animalId!==start.proof.animalId||
@@ -1022,7 +1057,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
   for(const old of previous.journal.filter(j=>j.calendarFishingWork93910||j.calendarFishingCancel93910||j.calendarTrappingStart93908||j.calendarTrappingWork93909||j.calendarTrappingCancel93909||j.calendarTrappingSV93908||j.skillTestProof?.type==='trapping-result'||['hmk-wild-catch-carry-93908-v1',WILD_FRESH_CARRY_93912].includes(j.calendarForagingCarry?.format)||j.calendarCatchSpoilage93912||j.calendarCatchSaltStart93912||j.calendarCatchSaltFinish93912||j.calendarForagingCarryDiscard?.format==='hmk-wild-catch-discard-93908-v1')){
    const updated=data.journal.find(j=>j.id===old.id);if(!updated||JSON.stringify(updated)!==JSON.stringify(old))
     throw Error('Trapping / úlovek: potvrzený historický doklad nelze změnit.');
-  }assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTimeEpisodeAppendOnly(previous.journal,data.journal);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertEpisodeEncounterGMAppendOnly93902(previous.journal,data.journal);assertDirectionGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertTrainingInterruptionAppendOnly93902(previous.journal,data.journal);assertSkillTimedAppendOnly591(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);// Temporary Bestiary participants never impose calendar healing obligations;
+  }assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTimeEpisodeAppendOnly(previous.journal,data.journal);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertEpisodeEncounterGMAppendOnly93902(previous.journal,data.journal);assertDirectionGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertTrainingInterruptionAppendOnly93902(previous.journal,data.journal);assertAnimalTrainingWorkAppendOnly93914(previous.journal,data.journal);assertSkillTimedAppendOnly591(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);// Temporary Bestiary participants never impose calendar healing obligations;
   // permanent PC/NPC health deadlines remain enforced by the original agenda.assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});
   assertGlobalActionLedgerAppendOnly(previous,data);assertChroniclePresentationAppendOnly93889(previous,data);
   assertPCShelteredStayAppendOnly(previous.journal,data.journal);
@@ -4055,7 +4090,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   const starts=data.journal.filter(j=>j.calendarCampaignId===cid).flatMap(j=>{
    if(j.calendarAnimalTrainingStart590&&!completedAnimal.has(j.id)){
     const a=j.calendarAnimalTrainingStart590,owner=data.characters.find(c=>c.id===a.ownerId),animal=owner?.hmk?.livestock?.find(x=>x.id===a.animalId);
-    return [{name:'Animal Training · '+(animal?.name||'zvíře'),actor:owner?.name||'Postava',start:a.startMinute,due:trainingEffectiveDue93902(data.journal,j,trainingOpenMinute600(a,a.dueMinute)).due??clock.minute,details:'6 měsíců, asi hodina denně; přerušení vyžaduje potvrzené zameškané dny (HMK 65)'}];
+    return [{name:'Animal Training · '+(animal?.name||'zvíře'),actor:owner?.name||'Postava',start:a.startMinute,due:trainingCalendarDue93914(data.journal,j,6).due??Math.max(clock.minute+1440,a.startMinute+180*1440),details:'6 měsíců, asi hodina denně; nové projekty vyžadují skutečný minutový deník (HMK 65)'}];
    }
    if(j.calendarFishingStart590&&!completedFishing.has(j.id)){
     const f=j.calendarFishingStart590,actor=data.characters.find(c=>c.id===f.actorId);
@@ -7394,7 +7429,7 @@ function stableHubAnimalHTML(a,campaignId){
  <p class="hc-hint">Použití ze skladu vyžaduje dostupný fyzický lot původního majitele. Externí krmení/pití (pastva, potok) zůstává samostatným GM potvrzením bez odpisu skladu.</p>
 <details><summary>Záznamy péče (${p.care.length})</summary>${p.care.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Čas (min)</th><th>Úkon</th><th>Množství</th><th>Doklad</th></tr></thead><tbody>${p.care.map(j=>`<tr><td>${j.minute}</td><td>${esc(j.kind)}</td><td>${j.amount===null?'—':j.amount+' '+j.unit}</td><td>${esc(j.reason)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Dosud není doložena žádná péče.</p>'}</details></section>
  <section class="hmk-stable-block"><h4>Výcvik, cesta, zdravotní historie a kalendář</h4>
- ${!dead?`<div class="hsk-training-calendar-panel"><p class="tiny">Pravidlový postup: nejprve zahájit šestiměsíční výcvik; po skutečném uplynutí doby v kalendáři provést Animalcraft SV a pokračující Training d10. Kalendář se sám neposouvá.</p><button type="button" class="secondary hc-small" data-hmk-training-start-animal="${esc(a.id)}">Zahájit šestiměsíční výcvik · HMK 65</button>${data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).slice(-2).map(j=>`<p class="tiny hsk-training-date">Výcvik začal ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.startMinute))}, základní termín ${esc(displayCampaignMinute(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)))}${j.calendarAnimalTrainingStart590.calendarDayEligibility600?' · od začátku tohoto dne':''}${data.campaignClock.minute<trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)?' · zbývá '+esc(chronicleRemainingTime(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)-data.campaignClock.minute)):' · základní doba uplynula'}</p>`).join('')}</div>${trainingInterruptionStableHTML93902(a,campaignId)}`:''}
+ ${!dead?`<div class="hsk-training-calendar-panel"><p class="tiny">Pravidlový postup: nejprve zahájit šestiměsíční výcvik; po skutečném uplynutí doby v kalendáři provést Animalcraft SV a pokračující Training d10. Kalendář se sám neposouvá.</p><button type="button" class="secondary hc-small" data-hmk-training-start-animal="${esc(a.id)}">Zahájit šestiměsíční výcvik · HMK 65</button>${data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).slice(-2).map(j=>`<p class="tiny hsk-training-date">Výcvik začal ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.startMinute))}, základní termín ${esc(displayCampaignMinute(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)))}${j.calendarAnimalTrainingStart590.calendarDayEligibility600?' · od začátku tohoto dne':''}${data.campaignClock.minute<trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)?' · zbývá '+esc(chronicleRemainingTime(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)-data.campaignClock.minute)):' · základní doba uplynula'}</p>`).join('')}</div>${trainingInterruptionStableHTML93902(a,campaignId)}${(()=>{const open=data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).findLast(j=>!data.journal.some(r=>r.calendarAnimalTraining590?.startId===j.id));return open?trainingWorkStableHTML93914(open,a,data.campaignClock):'';})()}`:''}
  <p>Animalcraft (HMK 65): základní ML zvířete neznamená automaticky získaný MB. Výcvik vyžaduje původní SV, skutečné hody a pravidlový čas. ${training.length?`Potvrzené doklady: ${training.map(t=>esc(t.title)).join(' · ')}`:'Výcvik zatím není pro tuto identitu doložen.'}</p>
  <p><strong>Skutečně aktivovaný výcvik:</strong> ${trainingState.boosts} MB · ${trainingState.sourceId?'ověřený kalendářní doklad':'žádný úplný kalendářní doklad'}. Zvlášť se ověřuje uplynutí alespoň ${training.length?'příslušného počtu':'šesti'} měsíců; až pak se MB používají v bojových náhledech.</p>
  ${!dead&&training.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="training-activate"><label>Dokončený výcvik<select name="trainingProofId">${training.map((t,i)=>`<option value="${esc(t.id)}">Výcvik ${i+1} · ${t.skillTestProof?.finalBoosts??0} MB · ${t.skillTestProof?.months??6} měs.</option>`).join('')}</select></label><p class="hc-hint">Čas se převezme ze skutečného začátku a dokončení výcviku v kalendáři; nelze jej ručně změnit.</p><label>Doložený kalendářní podklad<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Aktivovat již dokončený výcvik v boji</button></form>`:''}
@@ -10683,13 +10718,14 @@ function animalTrainingCalendarEligibility(form){
  const d3Text=form.elements.namedItem('criticalD3')?.value.trim()||'';
  const d3=c?.level==='CF'&&/^[1-3]$/.test(d3Text)?Number(d3Text):0;
  const requiredMonths=6-(shorten?1:0)+(c?.level==='CF'?d3:0);
- const timing=trainingEffectiveDue93902(data.journal,latest,trainingOpenMinute600(start,start.startMinute+requiredMonths*30*1440));
+ const timing=trainingCalendarDue93914(data.journal,latest,requiredMonths);
  const due=timing.due;
  if(timing.paused)return {ready:false,startId:latest.id,reason:'Výcvik je doloženě přerušen. Obnovte jej ve Stáji a potvrďte skutečně zameškané dny.'};
  if(c?.level==='CF'&&!d3)return {ready:false,startId:latest.id,reason:'Po CF musí být nejprve doložen skutečný d3 pro počet dalších měsíců; dokud není znám, termín výcviku není uzavřen.'};
  if(!Number.isSafeInteger(now))return {ready:false,startId:latest.id,reason:'Chybí platný kalendářní čas.'};
+ if(!Number.isSafeInteger(due))return {ready:false,startId:latest.id,reason:timing.reason||'Ještě nebyly doloženy všechny denní lekce výcviku.'};
  if(now<due)return {ready:false,startId:latest.id,due,reason:'Zbývá '+chronicleRemainingTime(due-now)+' do termínu '+displayCampaignMinute(due)+'. Training d10 jsou do té doby zamčené.'};
- if(!Number.isSafeInteger(origin.campaignMinute)||origin.campaignMinute<start.startMinute||origin.campaignMinute<trainingEffectiveDue93902(data.journal,latest,trainingOpenMinute600(start,start.dueMinute-30*1440*(shorten?1:0))).due)
+ if(!Number.isSafeInteger(origin.campaignMinute)||origin.campaignMinute<start.startMinute||origin.campaignMinute<trainingCalendarDue93914(data.journal,latest,6-(shorten?1:0)).due)
   return {ready:false,startId:latest.id,due,reason:'Původní Animalcraft SV nebyl doložen po uplynutí předepsaného výcviku. Proveďte nový SV po termínu.'};
  return {ready:true,startId:latest.id,due,reason:'Kalendář ověřil výcvik od '+displayCampaignMinute(start.startMinute)+' do '+displayCampaignMinute(due)+'.'};
 }
@@ -13126,11 +13162,10 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
      const start=starts.findLast(j=>!completed.has(j.id));
      if(!start)throw Error('Animal Training: chybí aktivní začátek výcviku.');
      if(data.journal.some(j=>j.skillTestProof?.animalTrainingSV590?.startId===start.id))throw Error('Animal Training: SV tohoto výcviku již byl uložen. Pokračujte v navazujících Training Rolls.');
-     const timeline=trainingEffectiveDue93902(data.journal,start,
-      trainingOpenMinute600(start.calendarAnimalTrainingStart590,start.calendarAnimalTrainingStart590.dueMinute));
+     const timeline=trainingCalendarDue93914(data.journal,start,6);
      if(timeline.paused)throw Error('Animal Training: výcvik je přerušen, nejprve jej potvrzeně obnovte.');
      const due=timeline.due;
-     if(data.campaignClock.minute<due)throw Error('Animal Training: skutečný termín včetně zameškaných dnů ještě nenastal.');
+     if(!Number.isSafeInteger(due)||data.campaignClock.minute<due)throw Error('Animal Training: skutečný termín a případné zameškané denní lekce ještě nejsou doloženy.');
      return {format:'hmk-animal-training-sv-93893-v1',startId:start.id,animalId:animal.id,ownerId:selected,dueMinute:due};
     })():null;
   const fishingProgress=fishingStart?.calendarFishingStart590.format===FISH_START_V2?
@@ -13416,11 +13451,10 @@ document.addEventListener('submit',event=>{
    if(reduced&&(!Number.isSafeInteger(old?.sv)||old.sv<7))throw Error('Zkrácení o měsíc vyžaduje doložené původní Animalcraft SV ≥ 7 a obětovaný Training Roll (HMK 65).');
    const startRow=data.journal.find(j=>j.calendarCampaignId===original.calendarCampaignId&&
     j.calendarAnimalTrainingStart590===trainingStart);
-   const timeline=trainingEffectiveDue93902(data.journal,startRow,
-    trainingOpenMinute600(trainingStart,trainingStart.dueMinute-(reduced?30*1440:0)));
+   const timeline=trainingCalendarDue93914(data.journal,startRow,6-reduced);
    if(timeline.paused)throw Error('Animal Training CF: výcvik je stále přerušen.');
    const earliest=timeline.due;
-   if(original.campaignMinute<earliest)throw Error('Animal Training CF: SV proběhl před doloženým koncem výcviku '+displayCampaignMinute(earliest)+'. Bez uplynutí času nelze zapsat d3 prodloužení.');
+   if(!Number.isSafeInteger(earliest)||original.campaignMinute<earliest)throw Error('Animal Training CF: SV proběhl před doloženým koncem výcviku nebo chybí minutový deník lekcí.');
    trainingExtension={format:'hmk-animal-training-cf-delay-p65-v1',animalName:name,animalId:animal.id,ownerId:actor.id,beastId:animal.beastId,dieD3:extra,
     dieOrigin:f.elements.namedItem('trainingD3').dataset.origin||'manual',timeReductionMonths:reduced,baseMonths:6-reduced,
     additionalMonths:extra,totalMonths:6-reduced+extra,requiresCalendarDate:true,sourcePage:65};
@@ -19576,6 +19610,31 @@ document.addEventListener('submit',e=>{
   }))notice=`Do stáje bylo zařazeno ${name} (${beast.name}).`;
  }catch(err){alert('Pořízení zvířete: '+err.message)}
 },true);
+// v93.914: actual minute evidence of daily work; no roll or calendar advance.
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-training-work-93914]'))return;
+ e.preventDefault();e.stopImmediatePropagation();const out=f.querySelector('output');
+ try{
+  const fd=new FormData(f),clock=data.campaignClock,cid=campaignKey(clock),at=clock?.minute;
+  const start=data.journal.find(j=>j.id===fd.get('startId')&&j.calendarCampaignId===cid&&j.calendarAnimalTrainingStart590);
+  if(!start||start.characterId!==selected)throw Error('Aktuální trenér nemá tento výcvik.');
+  if(['INC','UNC','KIA'].includes(persistentStateOf(character(selected)).shock))throw Error('Trenér nemůže nyní odcvičit lekci.');
+  const numeric=(name)=>{const raw=String(fd.get(name)||'').trim();if(!/^\d+$/.test(raw))throw Error('Vyplňte platné celé minuty a počet dní: '+name);return Number(raw);};
+  const params={journal:data.journal,startRow:start,campaignId:cid,actorId:selected,minute:at,
+   fromMinute:numeric('fromMinute'),durationMinutes:numeric('durationMinutes'),repeatDays:numeric('repeatDays'),
+   gmConfirmed:fd.get('gmConfirmed')==='on'};
+  const proof=createAnimalTrainingWork93914(params);
+  if(!uiConfirm('GM potvrzuje '+proof.repeatDays+' skutečně odcvičených denních intervalů po '+proof.durationMinutes+
+   ' minutách, bez časového překryvu a bez automatického posunu Kalendáře?'))return;
+  if(mutate(()=>{
+   createAnimalTrainingWork93914({...params,journal:data.journal});
+   data.journal.push({id:uuid(),createdAt:stamp(),characterId:selected,calendarCampaignId:cid,campaignMinute:at,
+    title:'Animal Training · skutečně odpracovaný čas',
+    body:'HMK 65 · '+proof.repeatDays+' dní, každý '+proof.durationMinutes+' minut; skutečný čas je potvrzen GM.',
+    calendarAnimalTrainingWork93914:proof});
+  }))notice='Výcvikové intervaly byly připsány do deníku, Kalendář zůstává beze změny.';
+ }catch(err){if(out)out.textContent='Animal Training: '+String(err.message||err);}
+},true);
 // v93.590: actual training starts at the current GM campaign clock; no retroactive fake interval.
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-hmk-training-interruption-93902]'))return;
@@ -19622,7 +19681,7 @@ document.addEventListener('click',e=>{
    const dueMinute=minute+6*30*1440;
    data.journal.push({id:uuid(),characterId:animal.ownerId,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
     title:'HMK 65 · Zahájení výcviku · '+animal.name,body:'Doložený počátek: '+displayCampaignMinute(minute)+'; základní konec: '+displayCampaignMinute(dueMinute)+'. Pravidlový Animalcraft SV následuje po uplynutí času. Žádný hod nebyl proveden.',
-    calendarAnimalTrainingStart590:{format:'animal-training-start-590',animalId:animal.id,ownerId:animal.ownerId,startMinute:minute,dueMinute,requiredDays:180,calendarDayEligibility600:true}});
+    calendarAnimalTrainingStart590:{format:'animal-training-start-590',animalId:animal.id,ownerId:animal.ownerId,startMinute:minute,dueMinute,requiredDays:180,calendarDayEligibility600:true,trainingWorkPolicy:ANIMAL_WORK_POLICY93914}});
   });
  }catch(err){alert('Zahájení výcviku: '+err.message);}
 },true);
@@ -19795,14 +19854,12 @@ document.addEventListener('submit',e=>{
      j.calendarCampaignId===campaignId&&j.characterId===animal.ownerId);
    if(!proof?.skillTestProof||!link||!start||proof.calendarCampaignId!==campaignId||
      proof.skillTestProof?.originId===undefined)throw Error('Chybí jednoznačně doložený výcvik, kalendářní začátek nebo originální Animalcraft SV.');
-   const timeline=trainingEffectiveDue93902(data.journal,start,
-     trainingOpenMinute600(start.calendarAnimalTrainingStart590,
-     start.calendarAnimalTrainingStart590.startMinute+proof.skillTestProof.months*30*1440));
+   const timeline=trainingCalendarDue93914(data.journal,start,proof.skillTestProof.months);
    if(timeline.paused)throw Error('Výcvik je přerušen a nesmí být aktivován.');
    const actualDue=timeline.due;
    Object.assign(event,{trainingProofId:proof.id,startMinute:start.calendarAnimalTrainingStart590.startMinute,
      endMinute:proof.campaignMinute,trainingCalendarLink93893:true});
-   if(event.endMinute>minute||event.endMinute<actualDue||proof.skillTestProof.finalBoosts>animal.maxMB)
+   if(!Number.isSafeInteger(actualDue)||event.endMinute>minute||event.endMinute<actualDue||proof.skillTestProof.finalBoosts>animal.maxMB)
     throw Error('Výcvik není kalendářně dokončený nebo překračuje limit MB.');
   }else if(type==='cargo-add'){
    const name=String(raw.name||'').trim(),weightLb=asInt(raw.weightLb,'hmotnost nákladu');
