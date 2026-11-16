@@ -1453,7 +1453,7 @@ export function assertCreationInvariants(character){
     if(!['Aura changed','Parent Invoker changed'].includes(e.reason)||!Number.isSafeInteger(e.previousD20)||e.previousD20<1||e.previousD20>20)throw Error('Poškozené zneplatnění Arcane Talent');
     if(e.previousD20s!==undefined&&(!Array.isArray(e.previousD20s)||e.previousD20s.length!==4||e.previousD20s.some(n=>!Number.isInteger(n)||n<1||n>20)||Math.max(...e.previousD20s)!==e.previousD20))throw Error('Poškozený audit zneplatněných čtyř d20');
   }else if(e.type==='arcane-talent-physical'){
-    const p=e.d20s!==undefined?parentInvokerTalentFromPhysical({aura:e.aura,folk:e.folk,ageGroup:e.ageGroup,d20s:e.d20s,d100s:e.d100s}):arcaneTalentFromPhysical({aura:e.aura,folk:e.folk,ageGroup:e.ageGroup,d20:e.d20,d100s:e.d100s});
+    const p=e.d20s!=null?parentInvokerTalentFromPhysical({aura:e.aura,folk:e.folk,ageGroup:e.ageGroup,d20s:e.d20s,d100s:e.d100s}):arcaneTalentFromPhysical({aura:e.aura,folk:e.folk,ageGroup:e.ageGroup,d20:e.d20,d100s:e.d100s});
     if(e.d20!==p.d20||e.result!==p.result||JSON.stringify(e.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent audit');
   }else if(e.type==='folk-skill-dice'){
     const r=folkSkillsFromDice(e.folk,e.rolls);
@@ -1584,7 +1584,7 @@ export function assertCreationInvariants(character){
    startingCharacter={...character,hmk:{...h,attributes:{...h.attributes,aur:startingAura}}},
    p=parentInvokerLegacy?arcaneTalentFromPhysical({aura:startingAura,folk:h.folk,ageGroup:h.ageGroup,d20:t.d20,d100s:t.d100s}):arcaneProofForCharacter(startingCharacter,{d20:t.d20,d20s:t.d20s,d100s:t.d100s});
   const last=c.auditEvents.filter(e=>e.type==='arcane-talent-physical').at(-1);
-  if(JSON.stringify(t)!==JSON.stringify(p)||JSON.stringify(c.skillDP['Arcane Talent Skills']??{})!==JSON.stringify(p.grants)||!last||last.d20!==p.d20||JSON.stringify(last.d20s)!==JSON.stringify(p.d20s)||JSON.stringify(last.d100s)!==JSON.stringify(p.d100s)||JSON.stringify(last.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent důkaz');
+  if(JSON.stringify(t)!==JSON.stringify(p)||JSON.stringify(c.skillDP['Arcane Talent Skills']??{})!==JSON.stringify(p.grants)||!last||last.d20!==p.d20||JSON.stringify(last.d20s??undefined)!==JSON.stringify(p.d20s??undefined)||JSON.stringify(last.d100s)!==JSON.stringify(p.d100s)||JSON.stringify(last.grants)!==JSON.stringify(p.grants))throw Error('Poškozený fyzický Arcane Talent důkaz');
  }
  if(c.values.arcaneTalentProof&&!parentInvokerLegacy&&Boolean(c.values.arcaneTalentProof.familyInvoker)!==(h.familyOccupation==='Invoker'))throw Error('Arcane Talent Possession neodpovídá rodičovskému Invoker');
  if(c.completed[12]&&c.values.arcaneTalentMode==='yes'&&!c.values.arcaneTalentProof)throw Error('Chybí fyzické Arcane Talent hody');
