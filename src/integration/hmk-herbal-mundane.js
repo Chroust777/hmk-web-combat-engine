@@ -3,6 +3,7 @@
  * inventory mass. Only previously witnessed rolls are consumed.
  */
 import {herbDoseStatus} from './hmk-herbal-concoctions.js';
+import {supplyLots} from './hmk-foraging-supply-ledger.js';
 import {secondaryModifier} from '../rules/tests.js';
 export const MUNDANE_CRAFT_FORMAT='hmk-mundane-herbal-craft-v1';
 export const MUNDANE_CRAFT_SKILLS=Object.freeze(['Brewing','Cookery','Embalming','Perfumery']);
@@ -44,8 +45,10 @@ export function createMundaneHerbalCraft({journal=[],campaignId,minute,actorId,r
  check(reserve?.calendarCampaignId===campaignId&&reserve.characterId===actorId&&reserve.campaignMinute<=minute&&
   p?.unit==='herbDoses'&&p.disposition==='ingredient-reserved'&&p.quantity===1,
   'Nutná jedna dříve rezervovaná skutečná bylinná dávka z této kampaně');
- const source=journal.find(r=>r.id===p.sourceId&&r.calendarCampaignId===campaignId)?.calendarTrekWildernessProof?.results?.[p.resultIndex];
- check(source&&source.herbName===p.herbName,'Rezervace bylin neodpovídá původnímu Foraging nálezu');
+ const source=supplyLots(journal,campaignId).find(l=>l.sourceId===p.sourceId&&
+  l.resultIndex===p.resultIndex&&l.unit==='herbDoses');
+ check(source&&source.herbName===p.herbName&&source.minute<=reserve.campaignMinute,
+  'Rezervace bylin neodpovídá původnímu Foraging nálezu');
  const skill=categoryFor(p.herbName);
  check(skill,'Nález musí být Brewing, Cookery, Embalming nebo Perfumery herbs (HMK 74)');
  check(!journal.some(r=>r.calendarCampaignId===campaignId&&

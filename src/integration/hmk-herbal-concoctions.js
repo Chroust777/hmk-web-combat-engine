@@ -16,16 +16,22 @@ const inCampaign=(journal,c)=>journal.filter(j=>j.calendarCampaignId===c);
 const assessments=(journal,c)=>inCampaign(journal,c).filter(j=>j.calendarHerbPotency);
 const findAssessment=(j,c,id,n)=>assessments(j,c).find(r=>r.calendarHerbPotency.sourceId===id&&r.calendarHerbPotency.resultIndex===n);
 function sourceLot(j,c,sourceId,resultIndex){
- const src=j.find(x=>x.id===sourceId);
- requireTrue(src?.calendarCampaignId===c&&src.calendarTrekWildernessProof,'Chybí pravý Foraging důkaz v kampani');
- const found=src.calendarTrekWildernessProof.results?.[resultIndex];
- requireTrue(found&&integer(found.herbDoses,1,100)&&typeof found.herbName==='string'&&found.herbName.trim(),'Zdroj neobsahuje doložené dávky byliny');
- return {src,found};
+ const src=j.find(x=>x.id===sourceId&&x.calendarCampaignId===c);
+ // One canonical, source-linked supply ledger covers historical Trekking,
+ // moving travel and stationary Foraging. A time episode yields herbs only at
+ // its END, never at the starting minute of the search (HMK pp.74,147).
+ const lot=supplyLots(j,c).find(x=>x.sourceId===sourceId&&
+  x.resultIndex===resultIndex&&x.unit==='herbDoses');
+ requireTrue(src&&lot,'Chybí pravý Foraging důkaz v kampani');
+ const found={herbDoses:lot.quantity,herbName:lot.herbName};
+ requireTrue(integer(found.herbDoses,1,100)&&typeof found.herbName==='string'&&found.herbName.trim(),
+  'Zdroj neobsahuje doložené dávky byliny');
+ return {src,found,sourceMinute:lot.minute};
 }
 export function createHerbPotency({journal=[],campaignId,minute,sourceId,resultIndex,doses,actorId,potencyMode='per-dose'}={}){
  requireTrue(campaignId&&integer(minute,0,1e9)&&actorId,'Chybí kampaň/čas/postava');
- const {src,found}=sourceLot(journal,campaignId,sourceId,resultIndex);
- requireTrue(src.campaignMinute<=minute,'Budoucí bylina není dostupná');
+ const {found,sourceMinute}=sourceLot(journal,campaignId,sourceId,resultIndex);
+ requireTrue(sourceMinute<=minute,'Budoucí bylina není dostupná');
  requireTrue(!findAssessment(journal,campaignId,sourceId,resultIndex),'Potence nálezu je již doložena');
  requireTrue(Array.isArray(doses)&&doses.length===found.herbDoses,'Každá dávka potřebuje doložený d10 a intervaly 2d6');
  requireTrue(['per-dose','single-roll-all'].includes(potencyMode),'Neplatný způsob určení potence');
@@ -41,7 +47,7 @@ export function createHerbPotency({journal=[],campaignId,minute,sourceId,resultI
  });
  if(potencyMode==='single-roll-all')requireTrue(proven.every(x=>x.potencyRoll===proven[0].potencyRoll&&x.potencyOrigin===proven[0].potencyOrigin),'Společný d10 musí být pro všechny dávky totožný');
  return {format:HERB_ASSESSMENT_FORMAT,campaignId,minute,actorId,sourceId,resultIndex,potencyMode,
-  sourceMinute:src.campaignMinute,herbName:found.herbName,doses:proven,sourcePages:[74,147]};
+  sourceMinute,herbName:found.herbName,doses:proven,sourcePages:[74,147]};
 }
 function unpreserved(dose,from,at){let p=dose.initialPotency,elapsed=at-from,threshold=0;
  for(let i=0;i<dose.initialPotency;i++){threshold+=dose.intervalDays[i]*DAY;if(elapsed>=threshold)p--;else break;}
