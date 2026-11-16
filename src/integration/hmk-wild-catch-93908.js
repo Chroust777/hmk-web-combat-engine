@@ -4,7 +4,7 @@
  * spoilage itself remains governed by HMK p.85 and the GM, not an invented die.
  */
 import {foragedCarriedFood} from './hmk-foraging-carried-food.js';
-import {trappingResult93908} from './hmk-trapping-93908.js';
+import {trappingResult93908} from './hmk-trapping-93908.js?v=93.909';
 import {resolveFishingCatch} from './hmk-fishing-catch-548.js';
 const check=(ok,msg)=>{if(!ok)throw Error('Úlovek: '+msg)};
 export const WILD_CARRY_FORMAT='hmk-wild-catch-carry-93908-v1';
@@ -26,7 +26,7 @@ export function catchSource93908(journal=[],campaignId,sourceId){
   check(JSON.stringify(p)===JSON.stringify(reconstructed),'rybí nález neodpovídá původním hodům.');
   return {row,kind:'fishing',foodDays:p.foodDays,weightLb:p.totalFishPounds,sourceMinute:row.campaignMinute};
  }
- if(p?.type==='trapping-result'&&p.format==='hmk-trapping-result-93908-v1'){
+ if(p?.type==='trapping-result'&&['hmk-trapping-result-93908-v1','hmk-trapping-result-93909-v2'].includes(p.format)){
   const expected=trappingResult93908({journal:journal.slice(0,journal.indexOf(row)),campaignId,actorId:row.characterId,
    minute:row.campaignMinute,originId:p.originId,secondary:p.secondary,
    secondaryNotAlreadyCounted:p.secondaryNotAlreadyCounted,periodConfirmed:true});
