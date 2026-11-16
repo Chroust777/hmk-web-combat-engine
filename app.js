@@ -225,7 +225,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,lastNavigationEvidenceBefore,EPISODE_NAVIGATION_EVIDENCE_POLICY_93907,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -368,7 +368,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.906';
+const APP_VERSION='93.907';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -25753,7 +25753,7 @@ function episodePreviewFromForm(form,clock){
   // HMK p148: a Lost party only notices its error after earning a *new*
   // one-time Bearing Mode beyond the ordinary terrain / Tracking requirement.
   // A GM checkbox alone must never erase Lost in the next watch.
-  const priorNavigation=episodeNavigationState(lastEpisodeBefore(
+  const priorNavigation=episodeNavigationState(lastNavigationEvidenceBefore(
    data.journal,campaignKey(clock),clock.minute,members));
   const lostRecoveryBearing=v.navigationRecovered&&priorNavigation==='lost'?1:0;
   // A prior Misdirection is noticed by the guide's real Awareness test,
@@ -26026,11 +26026,12 @@ function episodePreviewFromForm(form,clock){
  if(animalHealth.length)result.animalHealth=animalHealth;
  result.movementRolls={progressD10,directionD10};
  result.movementRollSources={progress:null,direction:null};
- result.navigationState=episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered,lostPriority:true});
+ result.navigationState=episodeNavigationState(lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered,lostPriority:true});
  result.navigationPartyScope='v93.699';
+ result.navigationContinuityPolicy93907=EPISODE_NAVIGATION_EVIDENCE_POLICY_93907;
  result.navigationRecovered=!!v.navigationRecovered;
  result.navigationRecoveryAwarenessProofId=(v.navigationRecovered&&
-  episodeNavigationState(lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members))==='misdirection')?
+  episodeNavigationState(lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members))==='misdirection')?
   String(v.navigationRecoveryAwarenessProofId||'').trim()||null:null;
  result.navigationRecoveryRule='special-bearing-and-awareness-v93.780';
  // Every episode, including Rest/Foraging/Watch, carries an explicit false
@@ -26138,7 +26139,7 @@ function episodePreviewFromForm(form,clock){
   const reoriented=result.hazardDetails.some(h=>h.hazard==='misdirection'&&h.result==='reoriented');
   result.navigationReorientedInWatch=reoriented;
   if(reoriented)result.navigationState=episodeNavigationState(
-   lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members),
+   lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members),
    result.direction,{recovered:!!v.navigationRecovered,redirected:true,lostPriority:true});
  }
   if(kind==='forage'&&result.hazardDetails.some(h=>h.hazard==='complication'&&
@@ -28112,7 +28113,7 @@ function updateEpisodePreview(form){
 
  const autoTrackingLight=form.elements.namedItem('trackingLight');
  if(autoTrackingLight)autoTrackingLight.value=sky?.period||'day';
- const navigationPrev=v.memberIds?.length?lastEpisodeBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds):null;
+ const navigationPrev=v.memberIds?.length?lastNavigationEvidenceBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds):null;
  const navRecoveryRow=form.querySelector('[data-episode-navigation-recovery-awareness]');
  if(navRecoveryRow)navRecoveryRow.hidden=!(episodeNavigationState(navigationPrev)==='misdirection'&&!!v.navigationRecovered);
  const navigationText=form.querySelector('[data-episode-navigation-text]');if(navigationText){

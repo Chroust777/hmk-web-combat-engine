@@ -26,6 +26,8 @@ export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 // They remain replayable; only new receipts opt in to the correct calculation.
 export const EPISODE_TRACKING_BEARING_POLICY_93904='hmk-tracking-cf-free-bearing-v93.904';
 export const EPISODE_TRACKING_BEARING_MARKER_93904='minute-episode-tracking-cf-v93.904';
+// Opt-in: skip legacy/non-navigation episodes which have no confirmed direction state.
+export const EPISODE_NAVIGATION_EVIDENCE_POLICY_93907='hmk-navigation-evidence-only-v93.907';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
 export const EPISODE_KINDS=['travel','rest','sleep','winded','forage','tracking','watch','other'];
@@ -466,6 +468,24 @@ export function lastEpisodeBefore(journal=[],campaignId,minute,memberIds=null){
   (!members||j.calendarTimeEpisode.memberIds?.some(id=>members.has(id))))
   .sort((a,b)=>b.calendarTimeEpisode.endMinute-a.calendarTimeEpisode.endMinute)[0]||null;
 }
+/** A camp, idle task, tracking note or older time episode without an
+ * authoritative navigation witness cannot silently change Lost/Misdirection
+ * to clear. A recorded navigationState (including a legitimately resolved
+ * stationary Awareness) *can* change it. This is only used by new opt-in
+ * receipts; older journal replay keeps its historical rule unchanged.
+ */
+export function lastNavigationEvidenceBefore(journal=[],campaignId,minute,memberIds=null){
+ const party=travelPartySet93763(memberIds);
+ journal=partyHistoryAfterRelease93766(journal,campaignId,minute,party);
+ return journal.filter(j=>{
+  const e=j.calendarTimeEpisode;
+  return j.calendarCampaignId===campaignId&&e&&e.endMinute<=minute&&
+   travelPartyOverlaps93763(e,party)&&
+   ((e.kind==='travel'&&['clear','lost','misdirection'].includes(e.navigationState))||
+    (e.kind!=='travel'&&['lost','misdirection'].includes(e.navigationState))||
+    ['lost','misdirection'].includes(e.direction?.direction)||e.navigationRecovered===true);
+ }).sort((a,b)=>b.calendarTimeEpisode.endMinute-a.calendarTimeEpisode.endMinute)[0]||null;
+}
 export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation',trail='',trackerId=null }={}){
  const old=previous?.calendarTimeEpisode;
  if(!old||old.endMinute!==minute||(kind==='orientation'?old.kind!=='travel':!['tracking','travel'].includes(old.kind)))return false;
@@ -712,7 +732,9 @@ export function validateTimeEpisodes(journal=[]){
      continuousPrecipitation:!!e.precipitation?.slowMode,
      bearingRule:e.trekTerrainPolicy93851==='hmk-v1.2-93851'?'hmk':'legacy'}).requiredBearing;
     const recoveryRule=e.navigationRecoveryRule==='special-bearing-and-awareness-v93.780';
-    const navPrior=recoveryRule?lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,e.memberIds):null;
+    const navPrior=recoveryRule?(e.navigationContinuityPolicy93907===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907?
+     lastNavigationEvidenceBefore(prior,j.calendarCampaignId,e.startMinute,e.memberIds):
+     lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,e.memberIds)):null;
     const specialBearing=recoveryRule&&e.navigationRecovered&&episodeNavigationState(navPrior)==='lost'?1:0;
     const trackingBearing=recoveryRule?pendingTrackingCFBearing(prior,j.calendarCampaignId,e.startMinute,e.memberIds):0;
     const freeTracking=e.trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904;
@@ -1395,13 +1417,20 @@ export function validateTimeEpisodes(journal=[]){
    // or historical episode records as part of an application upgrade.
    must(e.navigationPartyScope===undefined||e.navigationPartyScope==='v93.699',
     'Neznámý formát návaznosti navigace.');
-   const earlier=lastEpisodeBefore(journal,j.calendarCampaignId,e.startMinute,
-    e.navigationPartyScope==='v93.699'?e.memberIds:null);
+   must(e.navigationContinuityPolicy93907===undefined||
+    e.navigationContinuityPolicy93907===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907,
+    'Neznámá verze pokračování orientace.');
+   const modernNavigation=e.navigationContinuityPolicy93907===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907;
+   const navigationMembers=e.navigationPartyScope==='v93.699'?e.memberIds:null;
+   const earlier=modernNavigation?
+    lastNavigationEvidenceBefore(prior,j.calendarCampaignId,e.startMinute,navigationMembers):
+    lastEpisodeBefore(journal,j.calendarCampaignId,e.startMinute,navigationMembers);
    const recoveryRule=e.navigationRecoveryRule;
    must(recoveryRule===undefined||recoveryRule==='special-bearing-and-awareness-v93.780',
     'Neznámý formát pravidlového návratu na trasu.');
-   const scopedEarlier=lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,
-    e.navigationPartyScope==='v93.699'?e.memberIds:null);
+   const scopedEarlier=modernNavigation?
+    lastNavigationEvidenceBefore(prior,j.calendarCampaignId,e.startMinute,navigationMembers):
+    lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,navigationMembers);
    if(recoveryRule){
     const hadLost=episodeNavigationState(scopedEarlier)==='lost';
     if(e.navigationRecovered&&episodeNavigationState(scopedEarlier)==='misdirection'){
