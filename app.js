@@ -1,3 +1,4 @@
+import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
@@ -374,7 +375,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.914';
+const APP_VERSION='93.915';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11276,6 +11277,7 @@ function render(){
  hskHydrateAccidentAgility93864(app);
  enhanceHMKDiceFields();
  decorateNoncombatRollQueue93913(app,secureHMKDie);
+ decorateSimpleNoncombatRolls93915(app,secureHMKDie);
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
  scheduleStableAutoMigration93861();
@@ -11287,9 +11289,16 @@ const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div,fieldset,label,input')||
   node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSimpleNoncombatRolls93915(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
+// Closed noncombat chapters are decorated only when opened, never in Combat.
+document.addEventListener('toggle',event=>{
+ if(event.target instanceof HTMLDetailsElement&&event.target.open){
+  const root=document.getElementById('app');
+  if(root){enhanceHMKDiceFields();decorateSimpleNoncombatRolls93915(root,secureHMKDie);}
+ }
+},true);
 // v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM
 // node (the existing input only changes disabled=true -> false). Revisit ONLY
 // these enable transitions. The general dice helper skips disabled fields during

@@ -1084,3 +1084,9 @@ form[data-hmk-animal-training] [data-animal-training-d3-status] {
   color:#a81919;
   font-weight:700;
 }
+
+/* v93.915 – only the currently required noncombat die is highlighted. */
+.hmk-simple-current-93915{background:rgba(178,34,34,.10)!important;border:2px solid #b52b29!important;border-radius:7px;padding:5px;box-shadow:0 0 0 2px rgba(178,34,34,.08)}
+.hmk-simple-done-93915{border-left:3px solid #377a52;padding-left:6px}
+.hmk-simple-roll-status-93915{color:#a22727;font-weight:700;margin:6px 0;font-size:.92em}
+.hmk-simple-accept-93915[disabled],.hmk-simple-auto-93915[disabled]{opacity:.58}
