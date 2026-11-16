@@ -216,7 +216,7 @@ export function personalNutritionStock(database,campaignId,actorId,start,end,atM
  const food=p.inventoryRations===true||p.gmProvisioned===true?
   reachableFoodLots(database,campaignId,actorId,start,atMinute).filter(l=>l.expiresAt>=end):[];
  const foraged=p.inventoryRations===true||p.foragingOnly===true||p.gmProvisioned===true?
-  foragedCarriedFood(database.journal||[],campaignId,atMinute).filter(l=>l.actorId===actorId&&l.remaining>=0.5):[];
+  foragedCarriedFood(database.journal||[],campaignId,atMinute).filter(l=>l.actorId===actorId&&l.remaining>=0.5&&(!Number.isSafeInteger(l.freshUntilMinute)||l.freshUntilMinute>=end)):[];
  const water=p.inventoryWater===true||p.gmProvisioned===true?
   reachableWaterLots(database,campaignId,actorId,start,atMinute):[];
  for(const l of [...food,...foraged,...water])sourceIds.push(l.sourceId??l.sourceJournalId??l.fillId);
@@ -273,7 +273,7 @@ function requireUnambiguousSharedAllocation(database,campaignId,cohort){
    let leftover=round(required-manual-assured);
    const personal=unit==='foodDays'&&(p.inventoryRations===true||p.gmProvisioned===true)?
      (reachableFoodLots(database,campaignId,actorId,c.start,end).reduce((n,l)=>n+l.remaining,0)+
-     foragedCarriedFood(journal,campaignId,end).filter(l=>l.actorId===actorId).reduce((n,l)=>n+l.remaining,0)):
+     foragedCarriedFood(journal,campaignId,end).filter(l=>l.actorId===actorId&&(!Number.isSafeInteger(l.freshUntilMinute)||l.freshUntilMinute>=end)).reduce((n,l)=>n+l.remaining,0)):
      unit==='waterDays'&&(p.inventoryWater===true||p.gmProvisioned===true)?
      reachableWaterLots(database,campaignId,actorId,c.start,end).reduce((n,l)=>n+l.remaining,0):0;
    leftover=round(Math.max(0,leftover-Math.min(leftover,personal)));
@@ -359,7 +359,7 @@ export function finishDueNutritionDays(database,{idFactory,stamp}={}){
    // pool, and only if this character's real nutrition mode allows supplies.
    if(unit==='foodDays'&&(p.inventoryRations===true||p.gmProvisioned===true||p.foragingOnly===true)){
     while(remaining>0){
-     const lot=foragedCarriedFood(database.journal,campaignId,end).find(x=>x.actorId===actorId&&x.remaining>=0.5);
+     const lot=foragedCarriedFood(database.journal,campaignId,end).find(x=>x.actorId===actorId&&x.remaining>=0.5&&(!Number.isSafeInteger(x.freshUntilMinute)||x.freshUntilMinute>=end));
      if(!lot)break;
      const quantity=Math.min(remaining,lot.remaining);
      const proof=createForagingCarryEat({journal:database.journal,campaignId,minute:end,actorId,

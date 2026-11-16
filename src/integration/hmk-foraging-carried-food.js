@@ -19,6 +19,8 @@ export function foragedCarriedFood(journal=[],campaignId,atMinute=1e9){
   if(p){const lot={...p,sourceJournalId:row.id,remaining:p.quantity};lots.push(lot);byId.set(row.id,lot);}
   const e=row.calendarForagingCarryEat;
   if(e){const lot=byId.get(e.carryId);if(lot)lot.remaining=Math.round((lot.remaining-e.quantity)*2)/2;}
+  const d=row.calendarForagingCarryDiscard;
+  if(d){const lot=byId.get(d.carryId);if(lot)lot.remaining=Math.round((lot.remaining-d.quantity)*2)/2;}
  }
  return lots;
 }
@@ -49,7 +51,8 @@ export function createForagingCarryEat({journal=[],campaignId,minute:at,actorId,
  if(nutritionDayId!==null)check(typeof nutritionDayId==='string'&&nutritionDayId.length>0,
   'Neplatný účetní identifikátor spotřeby v nutričním dni.');
  const lot=foragedCarriedFood(journal,campaignId,at).find(x=>x.sourceJournalId===carryId&&x.actorId===actorId);
- check(lot&&lot.remaining>=quantity,'Potrava není doložena u této postavy nebo již byla snědena.');
+ check(lot&&lot.remaining>=quantity&&(!Number.isSafeInteger(lot.freshUntilMinute)||at<=lot.freshUntilMinute),
+  'Potrava není doložena, je zkažená podle potvrzené trvanlivosti nebo již byla snědena.');
  return {format:FORAGING_CARRY_EAT,campaignId,minute:at,actorId,carryId,quantity,
   itemId:lot.itemId,sourcePages:[147,186],confirmedByGM:true,
   ...(nutritionDayId!==null?{nutritionDayId}: {})};
@@ -73,7 +76,7 @@ export function validateForagingCarriedJournal(journal=[]){
   const p=row.calendarForagingCarry,e=row.calendarForagingCarryEat,s=row.calendarForagingSupplyUse;
   if(s?.disposition==='packed-in-inventory')check(!!p,
    'Výdej nalezené potravy do inventáře musí mít odpovídající fyzický doklad.');
-  if(p){
+  if(p&&p.format!=='hmk-wild-catch-carry-93908-v1'){
    const expected=createForagingCarry({journal:prior,campaignId:row.calendarCampaignId,
     minute:row.campaignMinute,actorId:row.characterId,sourceId:p.sourceId,
     resultIndex:p.resultIndex,quantity:p.quantity,itemName:p.itemName,

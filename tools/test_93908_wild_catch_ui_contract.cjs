@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..');const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+let n=0;const has=(s,tag,msg)=>{assert.ok(s.includes(tag),msg);n++};
+has(app,"const APP_VERSION='93.908'",'application build version');
+has(index,'v93.908','HTML build version');
+for(const key of ['data-hmk-trapping-start-93908','data-hmk-trapping-result','data-hmk-wild-catch-carry','data-hmk-wild-catch-discard','calendarTrappingSV93908','calendarForagingCarryDiscard','validateTrappingJournal93908(d.journal)','validateCatchCarry93908(d.journal)'])has(app,key,key);
+for(const mod of ['hmk-trapping-93908.js','hmk-wild-catch-93908.js','hmk-foraging-carried-food.js','hmk-nutrition-days.js'])has(app,mod,mod);
+has(app,'minutes', 'time labels');
+console.log('PASS 93908 UI and source integration contract:',n,'assertions (static only)');
