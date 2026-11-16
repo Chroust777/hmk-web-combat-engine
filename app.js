@@ -225,7 +225,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -368,7 +368,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.903';
+const APP_VERSION='93.904';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -25775,11 +25775,12 @@ function episodePreviewFromForm(form,clock){
    previous,minute:clock.minute,context,priority:v.orientationPriority||'pace',
    allocationMode:v.orientationAllocation||'auto',lowChoice:v.orientationLowChoice||'slow',
    manualModes:Object.fromEntries(['bearing','progress','foraging','stalking','vigilance'].map(k=>[k,Number(v['mode_'+k])])),
-   requiredBearing:base.requiredBearing+forced+lostRecoveryBearing,continuousPrecipitation:!!precipitation?.slowMode,
+   requiredBearing:base.requiredBearing+lostRecoveryBearing,continuousPrecipitation:!!precipitation?.slowMode,
    familiar:!!v.orientationFamiliar,torchlight:actualPeriod==='night'&&!!v.orientationTorch,fullMoon:actualPeriod==='night'&&!!v.orientationMoon,
    afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow,
-   droverSkill:drover,droverActorId:requirement.actorId,animalsPresent:requirement.present,requiredDroverSkill:requirement.skill});
-  if(lostRecoveryBearing&&orientation.modes.bearing<base.requiredBearing+forced+1)
+   droverSkill:drover,droverActorId:requirement.actorId,animalsPresent:requirement.present,requiredDroverSkill:requirement.skill,
+   forcedTrackingBearing:forced});
+  if(lostRecoveryBearing&&orientation.modes.bearing<base.requiredBearing+1)
    throw Error('Lost (HMK 148): pro návrat na správnou trasu musíte v novém Orienteering skutečně získat a přidělit zvláštní Bearing Mode navíc k povinným Bearing. Pouhé potvrzení GM nestačí.');
   form.dataset.episodeOrientationStars=String(orientation?.stars??0);
   form.dataset.episodeOrientationSv=String(orientation?.adjustment?.adjustedSV??'');
@@ -25969,7 +25970,7 @@ function episodePreviewFromForm(form,clock){
   previousCarry:carry,mapScale:Number(v.mapScale),
   movementMinutes:kind==='travel'?actualGroupMovement93868({minutes,incomingDelay:equipmentDelayIn,atMinute:incidentStop93868}):null,
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
-  encByActor,forcedBearing,
+  encByActor,forcedBearing,trackingBearingPolicy:EPISODE_TRACKING_BEARING_POLICY_93904,
   walkingHandlerIds:mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:mixedFootMemberIds93858,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
@@ -28999,7 +29000,11 @@ document.addEventListener('input',e=>{
   if(witness!==String(e.target.value)){form.elements.namedItem('hazardMinuteOrigin93868').value='manual';
    delete e.target.dataset.hmkEventMinuteGenerated93868;}
  }
- if(episodeHazardInputIsDraft93840(e.target)){episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));return;}
+ if(episodeHazardInputIsDraft93840(e.target)){episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));
+  // v93.904: an earlier task may have masked this die before the current
+  // Direction/Accident subpanel became visible. Refresh its activity lock
+  // without accepting the draft die or confirming the GM decision.
+  episodeLockInactiveHazardFields93863(form);return;}
  if(e.target?.matches?.('[data-episode-medical-key]')){
   episodePersistMedicalInput(e.target,form);
   episodeMarkMedicalInput(e.target);
@@ -29022,7 +29027,11 @@ document.addEventListener('change',e=>{
   if(witness!==String(e.target.value)){form.elements.namedItem('hazardMinuteOrigin93868').value='manual';
    delete e.target.dataset.hmkEventMinuteGenerated93868;}
  }
- if(episodeHazardInputIsDraft93840(e.target)){episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));return;}
+ if(episodeHazardInputIsDraft93840(e.target)){episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));
+  // v93.904: an earlier task may have masked this die before the current
+  // Direction/Accident subpanel became visible. Refresh its activity lock
+  // without accepting the draft die or confirming the GM decision.
+  episodeLockInactiveHazardFields93863(form);return;}
  // Do not rebuild the next input during focus transfer from a health field.
  // Its own change handler persists the value; Evaluate refreshes all results.
  if(e.target?.matches?.('[data-episode-medical-key]'))return;
