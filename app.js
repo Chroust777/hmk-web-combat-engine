@@ -371,7 +371,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.910';
+const APP_VERSION='93.911';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10810,7 +10810,7 @@ function decorateTrappingCalendar93908(root){
      <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje, že postava během uvedených minut skutečně pracovala s pastmi, nikoli cestovala či odpočívala.</label>
      <button type="submit" class="secondary">Započítat odpracované minuty · GM</button><output role="status" aria-live="polite"></output></form>`:
     '<p>480 minut je doloženo; nyní lze provést jediný původní Survival Success Value.</p>')+
-   `<p><button type="button" class="secondary" data-hmk-trapping-cancel-93909="${esc(pending.id)}">Ukončit projekt pastí bez výnosu · GM</button></p>`):
+   `<p><button type="button" class="secondary" data-hmk-trapping-cancel-93909="${esc(pending.id)}">Ukončit projekt pastí bez výnosu · GM</button></p>`:
    pending?`<p>Historický Trapping v93.908: zahájen ${esc(displayCampaignMinute(pending.campaignMinute))}, termín ${esc(displayCampaignMinute(pending.calendarTrappingStart93908.dueMinute))}. ${now<pending.calendarTrappingStart93908.dueMinute?'Survival SV ještě není splatný.':'Lze provést původní Survival SV.'}</p>`:
    '<button type="button" class="secondary" data-hmk-trapping-start-93908>Zahájit Trapping · 480 odpracovaných minut · GM</button>');
  form.before(panel);
