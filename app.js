@@ -41,6 +41,7 @@ import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/
 import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
 import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk-skill-balance-547.js';
 import {fishingCatchCandidate,resolveFishingCatch} from './src/integration/hmk-fishing-catch-548.js';
+import {FISH_START_V2,fishingStart93910,fishingProgress93910,fishingWork93910,fishingCancel93910,fishingSVLink93910,validateFishingTime93910} from './src/integration/hmk-fishing-time-93910.js?v=93.910';
 import {trappingStart93908,trappingStart93909,trappingProgress93909,trappingWork93909,trappingCancel93909,trappingSVLink93909,trappingResult93908,validateTrappingJournal93908} from './src/integration/hmk-trapping-93908.js?v=93.909';
 import {catchSource93908,createCatchCarry93908,discardWildCatch93908,validateCatchCarry93908} from './src/integration/hmk-wild-catch-93908.js?v=93.909';
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
@@ -370,7 +371,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.909';
+const APP_VERSION='93.910';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -606,28 +607,7 @@ function validateAnimalTrainingCalendar590(d){
   animalSVs.add(link.startId);
  }
  validateTrappingJournal93908(journal);
- const fishingStarts=new Map(),fishingUsed=new Set();
- for(const row of journal){
-  const x=row.calendarFishingStart590;if(!x)continue;
-  if(x.format!=='fishing-start-590'||x.actorId!==row.characterId||
-     !d.characters.some(c=>c.id===x.actorId&&!c.archived)||
-     !Number.isSafeInteger(x.startMinute)||x.startMinute<0||
-     row.campaignMinute!==x.startMinute||x.dueMinute!==x.startMinute+240||
-     typeof row.calendarCampaignId!=='string'||!row.calendarCampaignId)
-   throw Error('Fishing: neplatný počáteční kalendářní doklad čtyřhodinové činnosti.');
-  fishingStarts.set(row.id,{row,x});
- }
- for(const row of journal){
-  const link=row.calendarFishingSVStart590;if(!link)continue;
-  const start=fishingStarts.get(link.startId),p=row.skillTestProof;
-  if(!start||fishingUsed.has(link.startId)||row.characterId!==start.row.characterId||
-     row.calendarCampaignId!==start.row.calendarCampaignId||
-     !Number.isSafeInteger(row.campaignMinute)||row.campaignMinute<start.x.dueMinute||
-     link.dueMinute!==start.x.dueMinute||
-     p?.type!=='secondary-mastery-value-test'||(p.skills?.[0]||p.skill)!=='Fishing')
-   throw Error('Fishing: výsledek SV nesouhlasí se čtyřhodinovým dokladem ani s herním časem.');
-  fishingUsed.add(link.startId);
- }
+ validateFishingTime93910(journal,d.characters);
  for(const row of journal){
   const link=row.calendarAnimalTraining590;if(!link)continue;
   const start=starts.get(link.startId),animal=animals.get(link.animalId),training=row.skillTestProof;
@@ -655,7 +635,7 @@ function validateAnimalTrainingCalendar590(d){
  return true;
 }
 function assertAnimalTrainingCalendarAppendOnly590(before,after){
- const next=new Map((after?.journal||[]).filter(j=>j.calendarAnimalTrainingStart590||j.calendarAnimalTraining590||j.calendarFishingStart590||j.calendarFishingSVStart590).map(j=>[j.id,j]));
+ const next=new Map((after?.journal||[]).filter(j=>j.calendarAnimalTrainingStart590||j.calendarAnimalTraining590||j.calendarFishingStart590||j.calendarFishingWork93910||j.calendarFishingCancel93910||j.calendarFishingSVStart590).map(j=>[j.id,j]));
  for(const old of before?.journal||[]){if(!old.calendarAnimalTrainingStart590&&!old.calendarAnimalTraining590&&!old.calendarFishingStart590&&!old.calendarFishingSVStart590)continue;
   if(!next.has(old.id)||JSON.stringify(next.get(old.id))!==JSON.stringify(old))
    throw Error('Animalcraft: kalendářní doklad nelze změnit ani odstranit.');}
@@ -1037,7 +1017,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
  !data.campaignClock.events.some(e=>e.type==='gm-defer'&&e.kind==='malnutrition-course'&&
  e.characterId===t.characterId&&e.dueMinute===t.dueMinute&&
  e.obligationId.startsWith('automatic:malnutrition-course:')));if(missed)throw Error('Starvation/Thirst: nelze přeskočit povinný '+(missed.mode==='healing'?'Healing':missed.mode==='advance'?'Advance':'zdravotní')+' d100 pro '+missed.kind+' splatný v '+displayCampaignMinute(missed.dueMinute)+'. Posuňte čas pouze k nejbližšímu lékařskému termínu.');}validateHMKActivityEvidence(data.journal);assertHMKActivitiesAppendOnly(previous.journal,data.journal);assertSupplyJournalAppendOnly(previous.journal,data.journal);
-  for(const old of previous.journal.filter(j=>j.calendarTrappingStart93908||j.calendarTrappingWork93909||j.calendarTrappingCancel93909||j.calendarTrappingSV93908||j.skillTestProof?.type==='trapping-result'||j.calendarForagingCarry?.format==='hmk-wild-catch-carry-93908-v1'||j.calendarForagingCarryDiscard?.format==='hmk-wild-catch-discard-93908-v1')){
+  for(const old of previous.journal.filter(j=>j.calendarFishingWork93910||j.calendarFishingCancel93910||j.calendarTrappingStart93908||j.calendarTrappingWork93909||j.calendarTrappingCancel93909||j.calendarTrappingSV93908||j.skillTestProof?.type==='trapping-result'||j.calendarForagingCarry?.format==='hmk-wild-catch-carry-93908-v1'||j.calendarForagingCarryDiscard?.format==='hmk-wild-catch-discard-93908-v1')){
    const updated=data.journal.find(j=>j.id===old.id);if(!updated||JSON.stringify(updated)!==JSON.stringify(old))
     throw Error('Trapping / úlovek: potvrzený historický doklad nelze změnit.');
   }assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTimeEpisodeAppendOnly(previous.journal,data.journal);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertEpisodeEncounterGMAppendOnly93902(previous.journal,data.journal);assertDirectionGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertTrainingInterruptionAppendOnly93902(previous.journal,data.journal);assertSkillTimedAppendOnly591(previous,data);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);// Temporary Bestiary participants never impose calendar healing obligations;
@@ -4063,7 +4043,8 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  const suspendedHealingHTML=agenda.suspended?.length?`<section class="panel hc-calendar" data-suspended-healing><h3>Pozastavené zdravotní povinnosti · ${agenda.suspended.length}</h3><p class="hc-hint">Infekce pozastavuje Injury Healing Rolls všech ran (HMK 181); ošetření může čekat na vyřešení akutního krvácení či Shock a některé rány nelze léčit běžně (HMK 354). Žádný d100 ani datum se nedoplňuje bez skutečného dokladu.</p>${agenda.suspended.map(x=>`<p class="hc-hint"><strong>${esc(x.name)}</strong> · rána ${esc(x.woundId)} · ${esc(x.description)} · ${esc(x.reason||'')}</p>`).join('')}</section>`:'';
  const timedSkillPending590=(()=>{
   const cid=campaignKey(clock),completedAnimal=new Set(data.journal.filter(j=>j.calendarAnimalTraining590).map(j=>j.calendarAnimalTraining590.startId));
-  const completedFishing=new Set(data.journal.filter(j=>j.calendarFishingSVStart590).map(j=>j.calendarFishingSVStart590.startId));
+  const completedFishing=new Set(data.journal.flatMap(j=>[
+   j.calendarFishingSVStart590?.startId,j.calendarFishingCancel93910?.startId].filter(Boolean)));
   const starts=data.journal.filter(j=>j.calendarCampaignId===cid).flatMap(j=>{
    if(j.calendarAnimalTrainingStart590&&!completedAnimal.has(j.id)){
     const a=j.calendarAnimalTrainingStart590,owner=data.characters.find(c=>c.id===a.ownerId),animal=owner?.hmk?.livestock?.find(x=>x.id===a.animalId);
@@ -4071,7 +4052,11 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
    }
    if(j.calendarFishingStart590&&!completedFishing.has(j.id)){
     const f=j.calendarFishingStart590,actor=data.characters.find(c=>c.id===f.actorId);
-    return [{name:'Fishing · čtyřhodinová činnost',actor:actor?.name||'Postava',start:f.startMinute,due:f.dueMinute,details:'Fishing Success Value až po čtyřech hodinách (HMK 71)'}];
+    const progress=f.format===FISH_START_V2?fishingProgress93910(data.journal,j.id):null;
+    return [{name:'Fishing · čtyřhodinová činnost',actor:actor?.name||'Postava',start:f.startMinute,
+     due:progress?(progress.completedAtMinute??clock.minute):f.dueMinute,
+     details:progress?`Odpracováno ${progress.workedMinutes}/240 minut, zbývá ${progress.remainingMinutes}. SV až po doložené práci (HMK 71).`:
+      'Historický Fishing Success Value po čtyřech hodinách (HMK 71)'}];
    }
    return [];
   }).sort((a,b)=>a.due-b.due);
@@ -5926,7 +5911,7 @@ function folioChapterParts(body,kind=''){
      }else if(choice.value==='fishing'){
       const known=availableMasteries(actor).some(m=>m.name==='Fishing'&&m.ml>0);
       if(!known)right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
-      right='<section class="hsk-timed-project-591 hsk-critical-next"><h3>Fishing · čtyřhodinová činnost (HMK 71)</h3><p>1. Zapiš zahájení čtyř hodin do kalendáře níže. 2. Po uplynutí doby proveď pouze Fishing d100 Success Value. 3. Následné Catch d10 a volba techniky (síť, ruce, slaná voda, pobřeží) se zobrazí z jeho jediného dokladu. Jde o konkrétní Fishing postup, nikoli obecný Agility test.</p></section>'+
+      right='<section class="hsk-timed-project-591 hsk-critical-next"><h3>Fishing · 240 skutečně odpracovaných minut (HMK 71)</h3><p>1. Založ projekt a potvrzuj odpracované minutové úseky. 2. Teprve po součtu 240 minut proveď původní Fishing d100 Success Value. 3. Catch d10 a technika se zobrazí následně. Přestávky ani jiná činnost se nezapočítávají; čas posouvá výhradně Kalendář.</p></section>'+ 
         (!known?'<p class="notice error">Postava nemá doloženou Fishing ML. Nelze místo něj předvyplnit Agility ani uložit nesprávný hod.</p>':'')+right;
      }else if(choice.value==='animal'){
       right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
@@ -10899,25 +10884,36 @@ document.addEventListener('submit',e=>{
   if(out)out.textContent='Výsledek uložen: '+p.foodDays+' food-days. Převzetí v Kalendáři / Zásobování.';
  }catch(err){if(out)out.textContent='Trapping nebyl uzavřen: '+err.message;}
 },true);
+function pendingFishing93910(actorId,cid){
+ const completed=new Set(data.journal.flatMap(j=>[
+  j.calendarFishingSVStart590?.startId,j.calendarFishingCancel93910?.startId].filter(Boolean)));
+ return data.journal.filter(j=>j.characterId===actorId&&j.calendarCampaignId===cid&&
+  j.calendarFishingStart590&&!completed.has(j.id)).at(-1)||null;
+}
 function decorateFishingCalendarStart590(root){
  if(view!=='skills'||activeSkillTab!=='value'||!root||!character(selected)||!data.campaignClock)return;
  const choice=skillSVChoice595?.actorId===selected?skillSVChoice595:null;
- // Never append the Fishing panel to Animalcraft, Engineering, Writing, or a
- // different Success Value. The Fishing form has its own explicit selection.
  if(!(choice?.kind==='timed'&&choice.value==='fishing'||choice?.kind==='ordinary'&&choice.value==='Fishing'))return;
  const actor=character(selected);
  if(!availableMasteries(actor).some(x=>x.name==='Fishing'&&x.ml>0))return;
  const target=root.querySelector('#skill-value-form');if(!target)return;
- const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
- const starts=data.journal.filter(j=>j.characterId===actor.id&&j.calendarCampaignId===cid&&j.calendarFishingStart590);
- const completed=new Set(data.journal.filter(j=>j.characterId===actor.id&&j.calendarFishingSVStart590).map(j=>j.calendarFishingSVStart590.startId));
- const pending=starts.filter(j=>!completed.has(j.id)).at(-1);
- const panel=document.createElement('div');panel.className='hsk-fishing-calendar hsk-critical-next';
- panel.innerHTML='<h4>Fishing · čtyřhodinová činnost (HMK 71)</h4><p>Po zahájení kalendář eviduje konec čtyřhodinové činnosti. Až potom proveďte Fishing Success Value d100 a následné Catch d10. Čas posouvá GM, nikoliv tlačítko.</p>'+
- (pending?`<p>Začátek ${esc(displayCampaignMinute(pending.calendarFishingStart590.startMinute))} · termín ${esc(displayCampaignMinute(pending.calendarFishingStart590.dueMinute))} · ${minute<pending.calendarFishingStart590.dueMinute?'zbývá '+esc(chronicleRemainingTime(pending.calendarFishingStart590.dueMinute-minute)):'čas uplynul; proveďte SV'}</p>`:
- '<button type="button" class="secondary hc-small" data-hmk-fishing-start-590>Zahájit 4 hodiny rybolovu</button>');
- target.before(panel);
- refreshFishingCalendarGate590(root);
+ const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute;
+ const pending=pendingFishing93910(actor.id,cid);
+ const isNew=pending?.calendarFishingStart590.format===FISH_START_V2;
+ const progress=isNew?fishingProgress93910(data.journal,pending.id):null;
+ const panel=document.createElement('section');panel.className='hsk-fishing-calendar hsk-critical-next';
+ panel.innerHTML='<h4>Fishing · 240 skutečně odpracovaných minut (HMK 71)</h4><p>Potvrzujte konkrétní úseky rybolovu. Přestávky a jiné činnosti se nezapočítávají. Až po součtu 240 minut proveďte jeden původní Fishing Success Value. Čas posouvá jen Kalendář.</p>'+ 
+ (progress?`<p>Odpracováno <strong>${progress.workedMinutes} / 240 min</strong> · zbývá ${progress.remainingMinutes} min. Kalendář: ${esc(displayCampaignMinute(now))}.</p>`+
+  (progress.remainingMinutes>0?`<form data-hmk-fishing-work-93910><input type="hidden" name="startId" value="${esc(pending.id)}">
+    <label>Začátek skutečné práce (minuta kampaně)<input type="number" name="fromMinute" min="${progress.lastEndMinute}" max="${now}" step="1" value="${Math.min(now,Math.max(progress.lastEndMinute,now-progress.remainingMinutes))}" required></label>
+    <label>Konec skutečné práce (minuta kampaně)<input type="number" name="toMinute" min="${progress.lastEndMinute}" max="${now}" step="1" value="${now}" required></label>
+    <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje, že postava skutečně rybařila během uvedených minut, nikoli cestovala, odpočívala či pracovala s pastmi.</label>
+    <button type="submit" class="secondary">Započítat minuty rybolovu · GM</button><output role="status" aria-live="polite"></output></form>`:
+   '<p>240 minut je doloženo. Nyní lze provést jediný Fishing Success Value.</p>')+
+   `<button type="button" class="secondary" data-hmk-fishing-cancel-93910="${esc(pending.id)}">Ukončit projekt bez úlovku · GM</button>`:
+  pending?`<p>Historický Fishing: ${esc(displayCampaignMinute(pending.calendarFishingStart590.startMinute))} → ${esc(displayCampaignMinute(pending.calendarFishingStart590.dueMinute))}. Dřívější doklady zůstávají ve své původní verzi.</p>`:
+  '<button type="button" class="secondary" data-hmk-fishing-start-590>Zahájit nový Fishing · 240 minut práce</button>');
+ target.before(panel);refreshFishingCalendarGate590(root);
 }
 function refreshFishingCalendarGate590(root){
  const form=root.querySelector('#skill-value-form');if(!form||view!=='skills'||!data.campaignClock)return;
@@ -10927,34 +10923,67 @@ function refreshFishingCalendarGate590(root){
  if(!note){note=document.createElement('p');note.dataset.hmkFishingTimeGate='';note.className='hsk-followup-count';form.querySelector('[name="rollA"]')?.closest('label')?.insertAdjacentElement('afterend',note);}
  const enabled=primary.value==='Fishing';if(note)note.hidden=!enabled;
  if(!enabled){if(submit.dataset.hmkFishingGate590==='yes'){submit.disabled=false;delete submit.dataset.hmkFishingGate590;}return;}
- const cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
- const starts=data.journal.filter(j=>j.characterId===selected&&j.calendarCampaignId===cid&&j.calendarFishingStart590);
- const completed=new Set(data.journal.filter(j=>j.calendarFishingSVStart590&&j.characterId===selected).map(j=>j.calendarFishingSVStart590.startId));
- const pending=starts.filter(j=>!completed.has(j.id)).at(-1);
+ const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute;
+ const pending=pendingFishing93910(selected,cid);
+ const progress=pending?.calendarFishingStart590.format===FISH_START_V2?fishingProgress93910(data.journal,pending.id):null;
+ const notDue=!!pending&&(progress?progress.remainingMinutes>0:now<pending.calendarFishingStart590.dueMinute);
  const timedChoice=skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='fishing';
- const notDue=!!pending&&minute<pending.calendarFishingStart590.dueMinute;
  const blocked=notDue||timedChoice&&!pending;
  if(submit.dataset.hmkFishingGate590==='yes'||blocked){submit.disabled=blocked;if(blocked)submit.dataset.hmkFishingGate590='yes';else delete submit.dataset.hmkFishingGate590;}
- if(note)note.textContent=notDue?`Fishing SV až v ${displayCampaignMinute(pending.calendarFishingStart590.dueMinute)} – zbývá ${chronicleRemainingTime(pending.calendarFishingStart590.dueMinute-minute)}. Dříve hod není povolen.`:
-  pending?'Kalendář potvrzuje nejméně 4 hodiny od zahájení. Následující Fishing SV bude navázán na tento záznam.':'Pro pravidlový čtyřhodinový Fishing SV nejprve zahajte činnost záznamem nahoře; bez něj lze test provést jen pro jiné GM doložené použití dovednosti.';
+ if(note)note.textContent=progress?(progress.remainingMinutes>0?
+  `Fishing: potvrzeno ${progress.workedMinutes}/240 minut skutečné práce, zbývá ${progress.remainingMinutes}. Hod ještě není povolen.`:
+  '240 minut skutečné práce potvrzeno. Následující Fishing SV bude navázán na tento projekt.'):
+  notDue?`Historický Fishing SV až v ${displayCampaignMinute(pending.calendarFishingStart590.dueMinute)}; zbývá ${chronicleRemainingTime(pending.calendarFishingStart590.dueMinute-now)}.`:
+  pending?'Historický čtyřhodinový Fishing je splatný.':'Pro časovaný Fishing nejprve zahajte potvrzenou práci; jinak jde pouze o jiný samostatný test dovednosti.';
 }
 document.addEventListener('change',e=>{if(e.target.matches?.('#skill-value-form [name="primary"]')){const root=document.getElementById('app');refreshFishingCalendarGate590(root);refreshStableAnimalcraftSVGate590(root);}},true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-hmk-fishing-start-590]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
  try{
-  if(view!=='skills'||!character(selected)||!data.campaignClock||combatInitiativeSequence)throw Error('Rybolov vyžaduje aktivní postavu, kampaň a klid mimo Initiative.');
-  const actor=character(selected),cid=campaignKey(data.campaignClock),minute=data.campaignClock.minute;
-  if(!availableMasteries(actor).some(x=>x.name==='Fishing'&&x.ml>0))throw Error('Postava nemá ověřenou dovednost Fishing.');
-  const pending=data.journal.filter(j=>j.characterId===actor.id&&j.calendarCampaignId===cid&&j.calendarFishingStart590).filter(j=>!data.journal.some(x=>x.calendarFishingSVStart590?.startId===j.id));
-  if(pending.length)throw Error('Již běží nezakončená čtyřhodinová činnost.');
-  if(!ask('Zapsat začátek skutečného čtyřhodinového rybolovu do kalendáře? Čas se neposune.'))return;
-  mutate(()=>{if(campaignKey(data.campaignClock)!==cid||data.campaignClock.minute!==minute)throw Error('Herní čas se změnil.');
-   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
-    title:'HMK 71 · Začátek rybolovu · '+actor.name,body:'Čtyři hodiny rybolovu od '+displayCampaignMinute(minute)+' do '+displayCampaignMinute(minute+240)+'. Fishing SV se má provést až po uplynutí doby.',
-    calendarFishingStart590:{format:'fishing-start-590',actorId:actor.id,startMinute:minute,dueMinute:minute+240}});
-  });
- }catch(err){alert('Časovaný Fishing: '+err.message);}
+  if(view!=='skills'||!character(selected)||!data.campaignClock||combatInitiativeSequence)throw Error('Rybolov vyžaduje aktivní kampaň a postavu mimo boj.');
+  const actor=character(selected),cid=campaignKey(data.campaignClock),now=data.campaignClock.minute;
+  if(!availableMasteries(actor).some(x=>x.name==='Fishing'&&x.ml>0))throw Error('Postava nemá Fishing ML.');
+  if(!ask('GM potvrzuje zahájení rybolovu? Je potřeba doložit 240 SKUTEČNĚ odpracovaných minut v libovolných úsecích. Čas se neposune.'))return;
+  const proof=fishingStart93910({journal:data.journal,campaignId:cid,actorId:actor.id,minute:now,gmConfirmed:true});
+  mutate(()=>data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
+   title:'HMK 71 · Fishing · zahájení',body:'240 minut skutečné práce před původním Fishing SV; kalendář se neposunul.',
+   calendarFishingStart590:proof}));
+ }catch(err){alert('Fishing: '+err.message);}
+},true);
+document.addEventListener('submit',e=>{
+ const f=e.target;if(!f?.matches?.('[data-hmk-fishing-work-93910]'))return;
+ e.preventDefault();e.stopImmediatePropagation();const out=f.querySelector('output');
+ try{
+  if(combatInitiativeSequence||!data.campaignClock||view!=='skills'||skillSVChoice595?.actorId!==selected||
+   !(skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='fishing'||
+    skillSVChoice595.kind==='ordinary'&&skillSVChoice595.value==='Fishing'))throw Error('Potvrzení rybolovu vyžaduje aktivní projekt mimo boj.');
+  const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute;
+  const proof=fishingWork93910({journal:data.journal,campaignId:cid,actorId:selected,minute:now,
+   startId:f.elements.namedItem('startId').value,fromMinute:Number(f.elements.namedItem('fromMinute').value),
+   toMinute:Number(f.elements.namedItem('toMinute').value),gmConfirmed:f.elements.namedItem('gmConfirmed').checked});
+  if(!mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
+   title:'HMK 71 · Fishing · odpracované minuty',
+   body:`Fishing ${proof.fromMinute}–${proof.toMinute}; započítáno ${proof.totalMinutes}/240 min, bez posunu Kalendáře.`,
+   calendarFishingWork93910:proof})))return;
+  if(out)out.textContent='Doloženo '+proof.workedMinutes+' min; zbývá '+proof.remainingMinutes+' min.';
+ }catch(err){if(out)out.textContent='Fishing: '+err.message;}
+},true);
+document.addEventListener('click',e=>{
+ const b=e.target.closest?.('[data-hmk-fishing-cancel-93910]');if(!b)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{
+  if(combatInitiativeSequence||!data.campaignClock||view!=='skills'||skillSVChoice595?.actorId!==selected||
+   !(skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='fishing'||
+    skillSVChoice595.kind==='ordinary'&&skillSVChoice595.value==='Fishing'))throw Error('Ukončení vyžaduje projekt rybolovu mimo boj.');
+  if(!ask('GM potvrzuje ukončení tohoto rybolovu BEZ úlovku? Dosavadní minuty se nepřevádějí do nového projektu.'))return;
+  const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute;
+  const proof=fishingCancel93910({journal:data.journal,campaignId:cid,actorId:selected,minute:now,
+   startId:b.dataset.hmkFishingCancel93910,gmConfirmed:true});
+  mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,
+   createdAt:stamp(),title:'HMK 71 · Fishing · ukončeno bez úlovku',
+   body:`Projekt bez úlovku ukončen po ${proof.abandonedWorkedMinutes} minutách práce.`,calendarFishingCancel93910:proof}));
+ }catch(err){alert('Fishing: '+err.message);}
 },true);
 function decorateSkillContinuationHelp(root){
  if(!root)return;
@@ -11629,9 +11658,14 @@ document.addEventListener('submit',event=>{
   const fishingStart=original.calendarFishingSVStart590?data.journal.find(j=>j.id===original.calendarFishingSVStart590.startId):null;
   if(original.calendarFishingSVStart590&&(!fishingStart||
     fishingStart.calendarFishingStart590?.actorId!==actor.id||
-    original.calendarFishingSVStart590.dueMinute!==fishingStart.calendarFishingStart590.dueMinute||
-    data.campaignClock?.minute<fishingStart.calendarFishingStart590.dueMinute))
-   throw Error('Fishing: čtyřhodinový časový interval není dokončen nebo je poškozen jeho doklad.');
+    (fishingStart.calendarFishingStart590.format===FISH_START_V2?
+     JSON.stringify(original.calendarFishingSVStart590)!==JSON.stringify(
+      fishingSVLink93910({journal:data.journal.filter(j=>j.id!==original.id&&
+       data.journal.indexOf(j)<data.journal.indexOf(original)),campaignId:campaignKey(data.campaignClock),
+       actorId:actor.id,minute:original.campaignMinute,startId:fishingStart.id})):
+     original.calendarFishingSVStart590.dueMinute!==fishingStart.calendarFishingStart590.dueMinute||
+      data.campaignClock?.minute<fishingStart.calendarFishingStart590.dueMinute)))
+   throw Error('Fishing: čtyřhodinová práce není dokončená nebo je poškozen její doklad.');
   const result=resolveFishingCatch({proof,originId,actorId:actor.id,
    technique:fields.namedItem('technique').value,
    conditionsMode:fields.namedItem('conditionsMode').value,
@@ -13089,10 +13123,16 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
      if(data.campaignClock.minute<due)throw Error('Animal Training: skutečný termín včetně zameškaných dnů ještě nenastal.');
      return {format:'hmk-animal-training-sv-93893-v1',startId:start.id,animalId:animal.id,ownerId:selected,dueMinute:due};
     })():null;
-  if(fishingStart&&data.campaignClock.minute<fishingStart.calendarFishingStart590.dueMinute)
-   throw Error('Fishing: čtyřhodinový interval zatím neskončil; další Success Value hod nelze uložit.');
+  const fishingProgress=fishingStart?.calendarFishingStart590.format===FISH_START_V2?
+   fishingProgress93910(data.journal,fishingStart.id):null;
+  if(fishingStart&&(fishingProgress?fishingProgress.remainingMinutes>0:
+   data.campaignClock.minute<fishingStart.calendarFishingStart590.dueMinute))
+   throw Error('Fishing: je nutné doložit všech 240 skutečně odpracovaných minut; další Success Value nelze uložit.');
   if(view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='fishing'&&!fishingStart)throw Error('Časovaný Fishing: před SV nejprve založte skutečné 4 hodiny rybolovu v kalendáři.');
-  const fishingLink=fishingStart?{startId:fishingStart.id,dueMinute:fishingStart.calendarFishingStart590.dueMinute}:null;
+  const fishingLink=fishingStart?(fishingProgress?
+   fishingSVLink93910({journal:data.journal,campaignId:fishingCampaign,actorId:selected,
+    minute:data.campaignClock.minute,startId:fishingStart.id}):
+   {startId:fishingStart.id,dueMinute:fishingStart.calendarFishingStart590.dueMinute}):null;
   const trackingOrigin=pendingTrackingAwarenessId&&data.journal.find(j=>j.id===pendingTrackingAwarenessId);
   const trackingAwareness=trackingOrigin?trackingAwarenessFromSkill({trackingRow:trackingOrigin,
    skillProof:proof,actorId:selected,campaignId:campaignKey(data.campaignClock),

@@ -64,8 +64,10 @@ export function trappingWork93909({journal=[],campaignId,actorId,minute,startId,
  const conflict=journal.some(j=>j.calendarCampaignId===campaignId&&(
    (j.calendarTimeEpisode?.memberIds?.includes(actorId)&&
     j.calendarTimeEpisode.startMinute<toMinute&&j.calendarTimeEpisode.endMinute>fromMinute)||
-   (j.characterId===actorId&&j.calendarFishingStart590&&
-    j.calendarFishingStart590.startMinute<toMinute&&j.calendarFishingStart590.dueMinute>fromMinute)))||
+   (j.characterId===actorId&&j.calendarFishingStart590?.format==='fishing-start-590'&&
+    j.calendarFishingStart590.startMinute<toMinute&&j.calendarFishingStart590.dueMinute>fromMinute)||
+   (j.characterId===actorId&&j.calendarFishingWork93910&&
+    j.calendarFishingWork93910.fromMinute<toMinute&&j.calendarFishingWork93910.toMinute>fromMinute)))||
   actorActivities.some(j=>{
    const a=j.calendarActivityProof;
    const stops=journal.filter(r=>r.calendarCampaignId===campaignId&&r.calendarActivityInterruptProof?.activityId===j.id);
