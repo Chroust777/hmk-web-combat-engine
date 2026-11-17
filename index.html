@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HMK Keeper’s Ledger · v93.917</title>
-<link rel="stylesheet" href="./styles.css?v=93.917-special-secondary">
+<title>HMK Keeper’s Ledger · v93.918</title>
+<link rel="stylesheet" href="./styles.css?v=93.918-noncombat-chains">
 <link rel="stylesheet" href="./skill-workbench.css?v=93.799-library-weekly">
 <link rel="stylesheet" href="./library.css?v=93.799-library-weekly">
-<link rel="stylesheet" href="./book-templates.css?v=93.917-special-secondary">
+<link rel="stylesheet" href="./book-templates.css?v=93.918-noncombat-chains">
 <link rel="stylesheet" href="./hmk-global-ui-93741.css?v=93.805-ranged-filter">
 <style>.hmk-boot-note{max-width:760px;margin:5rem auto;padding:1.5rem;border:1px solid #8f7652;border-radius:10px;background:#f3eddf;color:#332817;font:16px/1.6 system-ui,sans-serif}.hmk-boot-note code{font-size:90%;overflow-wrap:anywhere}</style>
 
@@ -23,10 +23,18 @@ label.hmk-care-current{background:rgba(176,31,31,.08);border:1px solid rgba(176,
 label.hmk-care-complete{background:rgba(34,102,52,.06);border:1px solid rgba(34,102,52,.18);border-radius:8px;padding:.35rem .45rem}
 label.hmk-care-pending{opacity:.9}
 .hmk-weather-care .field-grid{align-items:start}
+
+/* v93.918: the one currently due die remains visibly red until accepted. */
+.hmk-noncombat-chain-93918{margin:.85rem 0;padding:.85rem 1rem;border:2px solid #a52626;border-radius:9px;background:rgba(184,30,30,.085);box-shadow:0 0 0 1px rgba(150,18,18,.12)}
+.hmk-noncombat-chain-93918:not(.hmk-chain-complete-93918) .hmk-chain-prompt-93918{font-weight:750;color:#a52626;border-left:4px solid #ac2626;padding:.35rem .6rem;margin:.6rem 0;background:rgba(200,36,36,.095)}
+.hmk-noncombat-chain-93918.hmk-chain-complete-93918{border-color:#38834a;background:rgba(27,126,59,.055);box-shadow:none}
+.hmk-noncombat-chain-93918 .hmk-chain-actions-93918{display:flex;flex-wrap:wrap;gap:.45rem;margin:.65rem 0}
+.hmk-noncombat-chain-93918 [data-hmk-chain-value-93918]{display:block;max-width:10rem;margin-top:.3rem}
+.hmk-noncombat-chain-93918 [data-hmk-chain-receipt-93918]{display:block;margin:.4rem 0;font-size:.88rem;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
-<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.917…</main></div>
+<div id="app"><main class="hmk-boot-note" role="status">Načítání HMK Keeper’s Ledger v93.918…</main></div>
 <script>
 (function(){
  var app=document.getElementById('app');
@@ -36,14 +44,14 @@ label.hmk-care-pending{opacity:.9}
   if(reported||document.querySelector('#app .shell'))return;
   reported=true;
   var msg=String(detail||'Neznámá chyba načítání.');
-  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.917 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>app.js</code> a podsložku <code>src/</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
+  app.innerHTML='<main class="hmk-boot-note" role="alert"><h1>HMK Keeper’s Ledger se nenačetl</h1><p>Verze 93.918 nemohla spustit aplikaci. <strong>Vaše uložené postavy tím nebyly smazány.</strong></p><p><strong>Diagnostika:</strong> <code>'+esc(msg)+'</code></p><p>Zkontrolujte, že je v kořenové složce publikovaného GitHub Pages webu soubor <code>app.js</code> a podsložku <code>src/</code> společně s <code>index.html</code>. Poté obnovte stránku pomocí Ctrl+F5. V případě trvající chyby pošlete URL webu a obsah konzole prohlížeče (F12).</p></main>';
  };
  window.addEventListener('error',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.message||('Nelze načíst '+(event.filename||'skript')));});
  window.addEventListener('unhandledrejection',function(event){if(!document.querySelector('#app .shell'))window.__hmkBootFailure(event.reason?.message||String(event.reason));});
  window.addEventListener('load',function(){setTimeout(function(){if(!document.querySelector('#app .shell'))window.__hmkBootFailure('Produkční aplikace se nespustila nebo nebyl načten její JavaScript.');},4000);});
 })();
 </script>
-<script type="module" src="./app.js?v=93.917-special-secondary" onerror="window.__hmkBootFailure('HTTP chyba: chybí app.js nebo některý z importovaných modulů není dostupný na GitHub Pages.')"></script>
+<script type="module" src="./app.js?v=93.918-noncombat-chains" onerror="window.__hmkBootFailure('HTTP chyba: chybí app.js nebo některý z importovaných modulů není dostupný na GitHub Pages.')"></script>
 
 <script>
 (function(){

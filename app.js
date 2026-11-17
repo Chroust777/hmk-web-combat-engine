@@ -1,4 +1,5 @@
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -376,7 +377,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.917';
+const APP_VERSION='93.918';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11281,6 +11282,7 @@ function render(){
  decorateSkillWorkbenchRolls93916(app,secureHMKDie);
  decorateSpecialSecondaryRolls93917(app,secureHMKDie,hskSpecialPreviewPrimary93917);
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
+ decorateConfirmedNoncombatChains93918(app,secureHMKDie);
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
  scheduleStableAutoMigration93861();
@@ -11292,14 +11294,14 @@ const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div,fieldset,label,input')||
   node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // Closed noncombat chapters are decorated only when opened, never in Combat.
 document.addEventListener('toggle',event=>{
  if(event.target instanceof HTMLDetailsElement&&event.target.open){
   const root=document.getElementById('app');
-  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);}
+  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);}
  }
 },true);
 // v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM
@@ -12787,7 +12789,7 @@ function hskWeatherBleedingCarePanel(actorId){
     'bez zahájeného ošetření'}.
    Každých 5 minut jeden Blood Loss na každého Bleedera; po skutečném Blood Stoppage výsledku CF/F/S ještě Blood Loss, po CS nikoliv (HMK 178).</p>`;
   if(start){return `<article class="hc-calendar-linked-row">${head}
-   <form data-weather-blood-start class="hc-fields"><input type="hidden" name="woundId" value="${esc(w.id)}">
+   <form data-weather-blood-start data-hmk-blood-bp="${state.bloodLoss.bp}" class="hc-fields"><input type="hidden" name="woundId" value="${esc(w.id)}">
    <div class="field-grid"><label>${helpTerm('Skutečný léčitel','Vyberte živého, schopného Physician z aktuální kampaně. Tato volba zaznamená začátek skutečného pětiminutového úkonu, ne provedený hod.')}
    <select name="healerId" required><option value="">Vyberte léčitele…</option>${healerOptions.map(h=>`<option value="${esc(h.id)}">${esc(h.name)} · Physician ML ${h.ml}${h.self?' · self':''}</option>`).join('')}</select></label>
    <label>${helpTerm('Treatment','Staunch (sta) se provádí tlakem s obvazem a vodou; Cauterisation (cau) vyžaduje rozžhavený kov a dává +30 EML, ale ovlivňuje následné hojení.')}

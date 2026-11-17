@@ -1,0 +1,209 @@
+/** HMK v93.918: confirm every due die of the noncombat multi-die chains.
+ * Presentation-only: the existing authoritative submission handlers calculate,
+ * check chronology/identity, and record evidence. No new RNG on render.
+ * Scope deliberately excludes Combat and every autonomous Skill Workbench queue.
+ */
+const SELECTOR='form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
+ 'form[data-weather-shock-followup],form[data-alchemy-finish]';
+const SELECTIONS={
+ fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
+ herbs:['singlePotencyRoll','actorId'],
+ blood:['method','healerId','hasWater','hasNeedleThread','hasHeatedTool','tourniquet'],
+ shock:[],
+ alchemy:[]
+};
+const title={fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
+ blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',alchemy:'Alchemy · povinné navazující hody'};
+const value=(form,name)=>form.elements.namedItem(name)?.value||'';
+const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n))&&Number(n)>=1&&Number(n)<=max;
+const stageKey=(step)=>step.key;
+function kindOf(form){return form.matches('[data-hmk-fishing-catch]')?'fishing':
+ form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
+ form.matches('[data-weather-shock-followup]')?'shock':'alchemy';}
+function fieldsOf(form,kind){
+ if(kind==='fishing')return ['conditionsD100','catchD10'];
+ if(kind==='herbs')return [...form.querySelectorAll('input[name^="dice_"]')].map(n=>n.name);
+ if(kind==='blood')return ['bandageD6Rolls'];
+ if(kind==='shock')return ['roll',...(form.elements.namedItem('initialComaD10')?['initialComaD10']:[])];
+ return ['cfWillD10','dissolutionD100','crucialShockD100',
+  ...[...form.querySelectorAll('input[name^="aug"]')].map(x=>x.name)].filter(name=>form.elements.namedItem(name));
+}
+function stepsFor(form,kind){
+ const result=[];
+ const add=(key,faces,label,fieldName=key,seq=null)=>result.push({key,faces,label,fieldName,seq});
+ if(kind==='fishing'){
+  if(value(form,'conditionsMode')==='roll')add('conditionsD100',100,'Conditions d100');
+  const origin=form.querySelector('h4')?.textContent||'';
+  const sourceSV=Number((origin.match(/\bSV\s*(-?\d+)/i)||[])[1]);
+  const adjusted=sourceSV+(value(form,'technique')==='bare'?-2:0)+
+   (form.elements.namedItem('saltWater')?.checked&&/\bCS\b/.test(origin)?1:0);
+  // The proof-linked v93.916 guide gives the authoritative expected dice.
+  const fromGuide=form.dataset.hmkDiceCount;
+  const count=/^(?:0|2|4)$/.test(fromGuide)?Number(fromGuide):
+   Number.isFinite(adjusted)?adjusted<=0?0:adjusted<=2?2:4:0;
+  for(let i=0;i<count;i++)add('catch'+i,10,'Catch d10 '+(i+1)+'/'+count,'catchD10',i);
+ }else if(kind==='herbs'){
+  const inputs=[...form.querySelectorAll('input[name^="dice_"]')];
+  const doses=inputs.length/7;
+  if(!Number.isSafeInteger(doses)||doses<1||doses>500)return [];
+  const shared=form.elements.namedItem('singlePotencyRoll')?.checked;
+  for(let i=0;i<doses;i++)for(let k=0;k<7;k++){
+   if(shared&&k===0&&i!==0)continue;
+   add(`dice_${i}_${k}`,k===0?10:6,
+    `Dávka ${i+1}/${doses} · `+(k===0?(shared?'společná potence d10':'potence d10'):
+      'rozpad '+Math.ceil(k/2)+' · d6 '+(k%2?'A':'B')));
+  }
+ }else if(kind==='blood'){
+  const bp=Number(form.dataset.hmkBloodBp);
+  if(value(form,'method')==='sta'&&Number.isInteger(bp)&&bp>0&&bp<=4)
+   for(let i=0;i<bp;i++)add('bandage'+i,6,`Staunch · Blood Loss Point ${i+1}/${bp} · d6`,'bandageD6Rolls',i);
+ }else if(kind==='shock'){
+  const primary=form.elements.namedItem('roll');
+  if(primary&&!primary.disabled){
+   add('roll',100,'Shock Reroll d100');
+   const roll=Number(value(form,'roll')),eml=Number(form.dataset.shockEml);
+   if(form.dataset.shockComaReady==='yes'&&die(value(form,'roll'),100)&&
+    Number.isFinite(eml)&&roll>eml&&roll%5===0)
+    add('initialComaD10',10,'UNC + CF · první Coma Course d10');
+  }
+ }else if(kind==='alchemy'){
+  if(form.elements.namedItem('cfWillD10')){
+   add('cfWillD10',10,'CF · Will Secondary Roll d10');
+   const will=Number(value(form,'cfWillD10')),index=Number(form.dataset.alchemyWillIndex);
+   if(die(value(form,'cfWillD10'),10)){
+    if(will>index){
+     add('dissolutionD100',100,'Neúspěšný Will · Dissolution d100');
+     const dissolution=Number(value(form,'dissolutionD100'));
+     if(die(value(form,'dissolutionD100'),100)&&dissolution%5===0)
+      add('crucialShockD100',100,'Crucial Dissolution · Shock d100');
+    }else for(const f of form.querySelectorAll('input[name^="aug"]'))
+     add(f.name,10,'Úspěšný Will · Augmentation d10 · '+f.name);
+   }
+  }else for(const f of form.querySelectorAll('input[name^="aug"]'))
+    add(f.name,10,'Augmentation d10 · '+f.name);
+ }
+ return result;
+}
+/** Add one UI queue per source form. Returns the number of new queues. */
+export function decorateConfirmedNoncombatChains93918(root,rollDie){
+ if(!root||typeof rollDie!=='function')return 0;
+ let decorated=0;
+ for(const form of root.querySelectorAll(SELECTOR)){
+  if(form.dataset.hmkConfirmedChain93918)continue;
+  const kind=kindOf(form),allNames=fieldsOf(form,kind);
+  const sources=new Map(allNames.map(name=>[name,form.elements.namedItem(name)]));
+  if([...sources.values()].some(el=>!(el instanceof HTMLInputElement)))continue;
+  // Don't stage an inapplicable Staunch form (BP0 already needs one real bandage,
+  // but not a dice roll); the original rules remain the only validator.
+  form.dataset.hmkConfirmedChain93918=kind;
+  const submit=form.querySelector('button[type=submit]');if(!submit)continue;
+  // Hide obsolete bulk rollers and original raw fields, retaining FormData.
+  for(const field of sources.values()){
+   const label=field.closest('label');if(label)label.hidden=true;
+   field.type='hidden';field.tabIndex=-1;
+  }
+  const legacy={
+   fishing:'[data-hmk-followup-roll-all]',
+   herbs:'[data-herb-auto],[data-herb-shared]',
+   blood:'',shock:'[data-weather-coma-d10]',
+   alchemy:'[data-alchemy-roll-will],[data-alchemy-roll-dissolution],[data-alchemy-roll-shock],[data-alchemy-roll-augment]'};
+  if(legacy[kind])for(const b of form.querySelectorAll(legacy[kind])){b.hidden=true;b.disabled=true;}
+  const wrapper=document.createElement('fieldset');
+  wrapper.className='hmk-noncombat-chain-93918';wrapper.dataset.hmkChain93918=kind;
+  wrapper.innerHTML='<legend></legend><p class="hmk-chain-prompt-93918" role="status" aria-live="polite"></p>'+
+   '<label>Skutečný výsledek <input data-hmk-chain-value-93918 type="number" min="1" step="1" inputmode="numeric" autocomplete="off"></label>'+
+   '<div class="hmk-chain-actions-93918"><button type="button" data-hmk-chain-generate-93918>⚄ Generovat hod</button> '+
+   '<button type="button" data-hmk-chain-accept-93918>Vložit hodnotu</button> '+
+   '<button type="button" class="secondary" data-hmk-chain-reset-93918>Změnit potvrzené hody</button></div>'+
+   '<output data-hmk-chain-receipt-93918 role="status" aria-live="polite"></output>';
+  wrapper.querySelector('legend').textContent=title[kind];
+  const prompt=wrapper.querySelector('[data-hmk-chain-prompt-93918]')||wrapper.querySelector('.hmk-chain-prompt-93918');
+  const input=wrapper.querySelector('[data-hmk-chain-value-93918]');
+  const gen=wrapper.querySelector('[data-hmk-chain-generate-93918]');
+  const accept=wrapper.querySelector('[data-hmk-chain-accept-93918]');
+  const reset=wrapper.querySelector('[data-hmk-chain-reset-93918]');
+  const receipt=wrapper.querySelector('[data-hmk-chain-receipt-93918]');
+  submit.before(wrapper);
+  const accepted=new Map();let generated=null;
+  function syncUnderlying(){
+   const steps=stepsFor(form,kind),activeKeys=new Set(steps.map(stageKey));
+   for(const name of allNames){
+    const field=sources.get(name);if(!field)continue;
+    let literal='';
+    const group=steps.filter(x=>x.fieldName===name&&accepted.has(x.key));
+    if(group.length){literal=group.some(x=>x.seq!==null)?group.map(x=>accepted.get(x.key).value).join(','):
+     String(accepted.get(group[0].key).value);}
+    if(kind==='herbs'&&name.startsWith('dice_')){
+     const p=Number(name.split('_')[1]);if(p>0&&name.endsWith('_0')&&
+       form.elements.namedItem('singlePotencyRoll')?.checked&&accepted.has('dice_0_0')){
+      literal=String(accepted.get('dice_0_0').value);
+      group.length=0;
+      group.push({key:'dice_0_0'});
+     }
+    }
+    if(field.value!==literal){field.value=literal;
+     if(kind==='shock'&&name==='roll')field.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+    const software=group.length&&group.every(x=>accepted.get(x.key)?.origin==='software');
+    for(const property of ['herbGenerated','alchemyGenerated','hmkAutoDice'])delete field.dataset[property];
+    if(software){if(kind==='herbs')field.dataset.herbGenerated=literal;
+     if(kind==='alchemy')field.dataset.alchemyGenerated=literal;
+     field.dataset.hmkAutoDice=literal;}
+   }
+  }
+  function pending(){return stepsFor(form,kind).find(step=>!accepted.has(step.key)||
+   !die(accepted.get(step.key).value,step.faces));}
+  function repaint(){
+   const steps=stepsFor(form,kind),next=pending(),done=!next;
+   wrapper.hidden=!steps.length;wrapper.classList.toggle('hmk-chain-complete-93918',done);
+   const position=next?steps.findIndex(x=>x.key===next.key):steps.length;
+   prompt.textContent=next?'ČERVENÝ AKTIVNÍ KROK '+(position+1)+'/'+steps.length+
+    ' · '+next.label+' · potvrďte každou kostku samostatně.':
+    'Všechny právě požadované kostky jsou jednotlivě potvrzeny.';
+   input.max=String(next?.faces||100);input.disabled=done;gen.disabled=done;
+   accept.disabled=done||!die(input.value,next?.faces||0);
+   reset.hidden=!accepted.size;submit.disabled=!done||submit.dataset.hmkExternalDisabled93918==='yes';
+   receipt.textContent=accepted.size?'Potvrzené skutečné hody: '+steps.filter(x=>accepted.has(x.key)).map(x=>
+    x.label+' = '+accepted.get(x.key).value+' ('+(accepted.get(x.key).origin==='software'?'generátor':'ručně')+')').join('; '):
+    'Žádný hod zatím nebyl potvrzen.';
+   if(done){input.value='';generated=null;}
+  }
+  function clear(){accepted.clear();generated=null;input.value='';syncUnderlying();repaint();}
+  function acceptNext(){const step=pending();if(!step||!die(input.value,step.faces)){
+    receipt.textContent='Nejprve zadejte platný skutečný d'+(step?.faces||'?')+'.';return;
+   }
+   const n=Number(input.value);accepted.set(step.key,{value:n,origin:generated===n?'software':'manual'});
+   generated=null;input.value='';syncUnderlying();repaint();if(pending())input.focus({preventScroll:true});
+  }
+  gen.addEventListener('click',()=>{const step=pending();if(!step)return;
+   try{const n=rollDie(step.faces);if(!die(n,step.faces))throw Error('neplatný výsledek');
+    input.value=String(n);generated=n;repaint();input.focus({preventScroll:true});}
+   catch(e){receipt.textContent='Generátor: '+String(e?.message||e);}
+  });
+  input.addEventListener('input',()=>{generated=null;repaint();});
+  accept.addEventListener('click',acceptNext);
+  reset.addEventListener('click',()=>{clear();if(pending())input.focus({preventScroll:true});});
+  form.addEventListener('change',event=>{if(SELECTIONS[kind].includes(event.target?.name)){
+    // The source rule/number of dice has changed: never reuse old proofs.
+    clear();
+    if(kind==='fishing')queueMicrotask(()=>{syncUnderlying();repaint();});
+  }},true);
+  // Window capture precedes preexisting document-level rule submission.
+  const guard=event=>{
+   if(event.target!==form)return;
+   syncUnderlying();const step=pending();
+   if(!step&&!(kind==='fishing'&&value(form,'conditionsMode')==='gm'&&!value(form,'gmCondition')))return;
+   event.preventDefault();event.stopImmediatePropagation();
+   receipt.textContent='Uložení zablokováno: '+(step?'nejprve jednotlivě potvrďte červený hod '+step.label+'.':
+    'GM musí zvolit skutečné Fishing Conditions.');
+   if(step)input.focus({preventScroll:true});
+  };
+  window.addEventListener('submit',guard,true);
+  const observer=new MutationObserver(()=>{if(!form.isConnected){window.removeEventListener('submit',guard,true);observer.disconnect();}});
+  observer.observe(root,{subtree:true,childList:true});
+  // Prevent submitting externally disabled forms from being unlocked by UI decoration.
+  if(submit.disabled)submit.dataset.hmkExternalDisabled93918='yes';
+  syncUnderlying();repaint();decorated++;
+ }
+ return decorated;
+}
