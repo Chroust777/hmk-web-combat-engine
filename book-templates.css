@@ -8289,3 +8289,20 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .hc-chronicle-editor form textarea{width:100%;max-width:100%;box-sizing:border-box;min-height:68px;line-height:1.45}
 .hc-chronicle-editor .hc-chronicle-edit-beat{min-width:0;display:grid;gap:7px;padding:10px;border:1px solid rgba(125,87,47,.32)}
 .hc-chronicle-editor .hc-chronicle-edit-beat legend{font-weight:700}
+
+/* v93.926 — narrow visible warnings to inputs; no overlay over the controls. */
+#app .content-sheet .hsk-required-invalid-label,#app .editor-dialog .hsk-required-invalid-label{background:transparent!important;box-shadow:none!important;outline:none!important;}
+#app .hmk-inline-die-controls{display:flex;gap:.45rem;align-items:center;min-width:0;width:100%;flex-wrap:wrap;}
+#app .hmk-inline-die-controls input{flex:1 1 135px;min-width:0;width:auto!important;}
+#app .hmk-inline-die-controls button{flex:0 0 auto;position:relative;z-index:2;width:auto!important;max-width:100%;margin:.3rem 0!important;}
+#app form[data-skill-swimming-aftermath] [data-swimming-stage][hidden]{display:none!important;}
+#app .hc-episode-spread-left .hc-weather-hazard-control{min-width:0;grid-column:1/-1;display:block;}
+#app .hc-episode-spread-left .hc-weather-hazard-control>label{display:block;margin-bottom:.35rem;}
+#app .hc-episode-spread-left .hc-weather-hazard-control>.hc-episode-die{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;}
+#app .hc-episode-spread-left .hc-weather-hazard-control>.hc-episode-die input{flex:1 1 110px;min-width:90px;max-width:100%;}
+#app .hc-episode-spread-left .hc-weather-hazard-control>.hc-episode-die button{flex:0 0 auto;width:auto!important;max-width:100%;position:relative;z-index:2;}
+#app .hc-episode-spread-left .hc-episode-needs-input{background:transparent!important;box-shadow:none!important;}
+#app .hc-episode-spread-left .hc-episode-needs-input .hc-episode-die :is(input,button){position:relative;z-index:2;}
+/* Body data is readable normal weight, including selected and risky rows. */
+#app .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-current td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-hazard td:nth-child(6){font-weight:400!important;color:#38291a!important;}
+#app .hc-episode-weather-timeline tbody td strong,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td strong{font-weight:400!important;}

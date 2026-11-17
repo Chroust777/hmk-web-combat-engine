@@ -59,7 +59,9 @@ import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingF
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
 import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgilityStage93864,ACCIDENT_AGILITY_STAGE_FORMAT_93864} from './src/integration/hmk-accident-agility-gate-93864.js';
-import {prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
+import {previewSwimmingDanger,prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
+import {asphyxiaCapacity,asphyxiaDeathCountdown} from './src/rules/ailments.js';
+import {successValue as swimmingWillSuccessValue} from './src/rules/tests.js';
 import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure} from './src/integration/hmk-weather-hazard-aftermath.js';
 import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures} from './src/integration/hmk-concurrent-procedures.js';
@@ -378,7 +380,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.925';
+const APP_VERSION='93.926';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -995,7 +997,8 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
     witnessed.set(input,entries);
     b.textContent='⚄ d10 = '+entries.map(x=>x.value).join(', ');
    });
-   input.insertAdjacentElement('afterend',b);
+   const row=document.createElement('span');row.className='hmk-inline-die-controls';
+  input.before(row);row.append(input,b);
   }
   return;
  }
@@ -3395,7 +3398,7 @@ function timeEpisodePageHTML(clock,participants){
  </div></section>
  <section class="hc-weather-step"><h5>2 · Samostatný Hazard Roll</h5>
  <p class="hc-hint">Velikost kostky se mění podle skutečných podmínek. Hazard Roll vyhodnoťte pro každou postavu zvlášť.</p>
- <div class="hmk-trek-grid hc-weather-step-grid"><label>Skutečný Hazard hod<span class="hc-episode-die"><input name="whRoll_${h}_${esc(c.id)}" type="number" min="1" max="${h==='cold'?6:4}" placeholder="1–${h==='cold'?6:4}"><button type="button" data-episode-die="whRoll_${h}_${esc(c.id)}" data-episode-faces="${h==='cold'?6:4}">⚄ d${h==='cold'?6:4}</button></span></label></div>
+ <div class="hmk-trek-grid hc-weather-step-grid"><div class="hc-weather-hazard-control"><label for="whRoll_${h}_${esc(c.id)}">Skutečný Hazard hod</label><span class="hc-episode-die"><input id="whRoll_${h}_${esc(c.id)}" name="whRoll_${h}_${esc(c.id)}" type="number" min="1" max="${h==='cold'?6:4}" placeholder="1–${h==='cold'?6:4}" inputmode="numeric"><button type="button" data-episode-die="whRoll_${h}_${esc(c.id)}" data-episode-faces="${h==='cold'?6:4}">⚄ d${h==='cold'?6:4}</button></span></div></div>
  </section>
  <section class="hc-weather-step"><h5>3 · Endurance (Survival) · jen při expozici</h5>
  ${['INC','UNC'].includes(persistentStateOf(c)?.shock)?`<div class="notice warning" data-episode-passive-weather="${h}_${esc(c.id)}"><strong>Shock ${esc(persistentStateOf(c).shock)} · pasivní Endurance (Survival)</strong><p>Nepohyblivý pacient nevykonává žádnou akci. Je-li skutečně exponován, zadejte jediný pasivní odporový hod d100. Aplikace vypočte výsledek z ověřené Endurance, sekundárního Survival a Fatigue; následky se potvrdí až po Pochodu v původním zdravotním modulu.</p>
@@ -12125,11 +12128,12 @@ function hskSkillEnvironmentFollowup(entry){
  <label>Voda / vzdálenost od pobřeží<select name="water"><option value="inland">Vnitrozemí nebo do 1 league</option><option value="near">Otevřené moře 1–5 league</option><option value="mid">Otevřené moře 6–19 league</option><option value="far">Otevřené moře 20+ league</option></select></label>
  <label>Wind Force (0–4)<input type="number" name="windForce" min="0" max="4" value="0" required></label>
  <label>Mokrý oděv – Swimming ENC<select name="soakedClothingENC"><option value="">— GM musí potvrdit —</option><option value="0">0 · bez uvedeného oděvního kompletu</option><option value="10">10 · Clothing Suit</option><option value="20">20 · Heavy Clothing Suit</option></select></label>
- <label>Doba bez vzduchu (pětisekundová kola)<input type="number" name="roundsWithoutAir" min="0" max="20000" value="0" required></label>
- <label>Postava se vynořila / je zachráněna<select name="rescued"><option value="yes">Ano</option><option value="no">Ne, vynuceně až po smrtelné lhůtě</option></select></label>
- <label>Will SV d100 (jen při potopení)<input type="number" name="willD100" min="1" max="100"></label>
- <label>d10 smrtelné lhůty (po vyčerpání dechu)<input type="number" name="deathD10" min="1" max="10"></label>
- <label>Endurance d100 (záchrana po bezvědomí)<input type="number" name="enduranceD100" min="1" max="100"></label></div>
+ <label data-swimming-stage="rounds" hidden>Doba bez vzduchu (pětisekundová kola)<input type="number" name="roundsWithoutAir" min="0" max="20000" value="0" disabled></label>
+ <label data-swimming-stage="rescued" hidden>Postava se vynořila / je zachráněna<select name="rescued" disabled><option value="yes">Ano</option><option value="no">Ne, vynuceně až po smrtelné lhůtě</option></select></label>
+ <label data-swimming-stage="willD100" hidden>Will SV d100 (pouze při skutečném potopení)<span class="hmk-inline-die-controls"><input type="number" name="willD100" min="1" max="100" disabled inputmode="numeric"><button type="button" class="hc-small hc-provision-generate" data-swimming-die="willD100" data-swimming-faces="100" disabled>⚄ d100</button></span></label>
+ <label data-swimming-stage="deathD10" hidden>d10 smrtelné lhůty (po vyčerpání dechu)<span class="hmk-inline-die-controls"><input type="number" name="deathD10" min="1" max="10" disabled inputmode="numeric"><button type="button" class="hc-small hc-provision-generate" data-swimming-die="deathD10" data-swimming-faces="10" disabled>⚄ d10</button></span></label>
+ <label data-swimming-stage="enduranceD100" hidden>Endurance d100 (záchrana po bezvědomí)<span class="hmk-inline-die-controls"><input type="number" name="enduranceD100" min="1" max="100" disabled inputmode="numeric"><button type="button" class="hc-small hc-provision-generate" data-swimming-die="enduranceD100" data-swimming-faces="100" disabled>⚄ d100</button></span></label></div>
+ <p class="hc-hint" data-swimming-required-guide role="status" aria-live="polite">Nejprve vyberte skutečný mokrý oděv a podmínky vody. Aplikace potom nabídne jen právě nutné hody.</p>
  <label><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné podmínky plavání, oděv, dobu bez vzduchu a uvedené fyzické hody</label>
  <button type="submit">Vyhodnotit Swimming a zapsat stav postavy</button><output role="status" aria-live="polite"></output></form>`;
 }
@@ -13970,9 +13974,64 @@ document.addEventListener('submit',async event=>{
   form.replaceWith(Object.assign(document.createElement('p'),{textContent:'Následek byl potvrzen a uložen do historie a příslušného stavu.'}));
  }catch(e){if(out)out.textContent='Následek nebyl zapsán: '+e.message;}
 },true);
+/** Progressive Swimming evidence. Display-only: original d100 is never rerolled. */
+function hmkGuideSwimmingAftermath(form){
+ const guide=form.querySelector('[data-swimming-required-guide]');if(!guide)return;
+ const journalEntry=data.journal.find(j=>j.id===form.elements.namedItem('sourceId')?.value);
+ const proof=journalEntry?.skillTestProof,actor=character(proof?.actorId),original=proof?.a||proof?.result;
+ const val=n=>form.elements.namedItem(n)?.value||'';
+ const stage=(name,needed)=>{
+  const row=form.querySelector('[data-swimming-stage="'+name+'"]');if(!row)return;
+  const field=row.querySelector('input,select');row.hidden=!needed;
+  if(field){field.disabled=!needed;field.required=needed;
+   if(!needed){field.value=name==='rounds'?'0':name==='rescued'?'yes':'';delete field.dataset.hmkAutoDice;}}
+  for(const b of row.querySelectorAll('[data-swimming-die]'))b.disabled=!needed;
+ };
+ const allOff=()=>{for(const key of ['rounds','rescued','willD100','deathD10','enduranceD100'])stage(key,false);};
+ try{
+  if(!val('soakedClothingENC')){allOff();guide.textContent='1. Vyberte skutečný mokrý oděv. Bez něj nelze určit, zda se postava potápí.';return;}
+  const swim=previewSwimmingDanger({actor,inventory:data.inventory,original,water:val('water'),
+    windForce:Number(val('windForce')),soakedClothingENC:Number(val('soakedClothingENC'))});
+  if(!swim.sinks){allOff();guide.textContent='Postava se nepotápí: nehází se nový Will, smrtelný d10 ani Endurance; doba bez vzduchu je 0.';return;}
+  stage('rounds',true);stage('rescued',true);stage('willD100',true);
+  const willDie=Number(val('willD100'));
+  if(!Number.isInteger(willDie)||willDie<1||willDie>100){stage('deathD10',false);stage('enduranceD100',false);
+   guide.textContent='2. Potopení: nyní je povinný pouze skutečný Will SV d100.';return;}
+  const state=persistentStateOf(actor),ml=Number(actor.hmk.attributes.wil)*5;
+  const fatigue=(state.fatigue?.windedness||0)+(state.fatigue?.weariness||0)+(state.fatigue?.otherWeakness||0)+(state.bloodLoss?.weaknessFatigue||0);
+  const willSV=swimmingWillSuccessValue({ml,sl:successLevel(willDie,ml-fatigue)});
+  const end=Number(actor.hmk.attributes.end),swimML=Number(actor.hmk.skills?.find(x=>x.name==='Swimming')?.ml);
+  const capacity=asphyxiaCapacity({endurance:end,willSV,swimmingML:swimML}).maximumRounds;
+  const rounds=Number(val('roundsWithoutAir'));
+  if(!Number.isInteger(rounds)||rounds<0){stage('deathD10',false);stage('enduranceD100',false);
+   guide.textContent='3. Zadejte skutečný počet pětisekundových kol bez vzduchu.';return;}
+  if(rounds<=capacity){stage('deathD10',false);stage('enduranceD100',false);
+   guide.textContent='Dech '+rounds+' / '+capacity+' kol; smrtelný d10 ani Endurance nenastávají. K uzavření je nutné vynoření.';return;}
+  stage('deathD10',true);
+  const deathDie=Number(val('deathD10'));
+  if(!Number.isInteger(deathDie)||deathDie<1||deathDie>10){stage('enduranceD100',false);
+   guide.textContent='4. Dech vyčerpán po '+capacity+' kolech: zadejte skutečný smrtelný d10.';return;}
+  const deadline=capacity+asphyxiaDeathCountdown({endurance:end,d10:deathDie});
+  stage('enduranceD100',rounds<deadline);
+  guide.textContent=rounds<deadline?'5. Postava ještě žije, smrtelná lhůta '+deadline+' kol. Pro záchranu je nutný Endurance d100.':
+    'Smrtelná lhůta '+deadline+' kol uplynula; následuje smrtelný následek, nikoliv Endurance d100.';
+ }catch(err){allOff();guide.textContent='Opravte podklady před dalšími hody: '+err.message;}
+}
+for(const type of ['input','change'])document.addEventListener(type,e=>{
+ const form=e.target.closest?.('form[data-skill-swimming-aftermath]');if(form)hmkGuideSwimmingAftermath(form);
+},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-swimming-die]');if(!button||button.disabled)return;
+ const form=button.closest('form[data-skill-swimming-aftermath]');if(!form)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const input=form.elements.namedItem(button.dataset.swimmingDie),faces=Number(button.dataset.swimmingFaces);
+ if(!input||input.disabled||![10,100].includes(faces))return;
+ input.value=String(secureHMKDie(faces));input.dataset.hmkAutoDice=input.value;
+ input.dispatchEvent(new Event('input',{bubbles:true}));
+},true);
 document.addEventListener('submit',event=>{
  const form=event.target;if(!form?.matches?.('[data-skill-swimming-aftermath]'))return;
- event.preventDefault();event.stopImmediatePropagation();const out=form.querySelector('output');
+ event.preventDefault();event.stopImmediatePropagation();hmkGuideSwimmingAftermath(form);const out=form.querySelector('output');
  try{
   const sourceId=form.elements.namedItem('sourceId').value;
   const saved=data.journal.find(x=>x.id===sourceId),proof=saved?.skillTestProof;
@@ -15582,8 +15641,6 @@ function hskOrienteeringSVHelpers93818(form,primary){
  const context=hskOrienteeringAssistanceContext93818();
  if(!context||primary!=='Survival')throw Error('Pomoc při Orienteeringu lze doložit pouze ve vyžádaném Survival SV testu právě této cestovní skupiny (HMK 145).');
  if(new Set(ids).size!==ids.length)throw Error('Stejný pomocník při Orienteeringu nesmí být vybrán dvakrát.');
- if(!form.elements.namedItem('orientAssistConfirmed')?.checked)
-  throw Error('Než provedete Orienteering d100, potvrďte skutečnou pomoc vybraných členů skupiny (HMK 145).');
  const guide=skillActorMastery(character(selected),'Survival');
  return ids.map(id=>{
   if(id===selected||!context.plan.memberIds.includes(id))
@@ -15965,7 +16022,7 @@ document.addEventListener('submit',async event=>{
     orienteeringAssistance:{sourcePage:145,groupId:sharedPlanCurrent93771()?.groupId||'',
      guideId:selected,helperIds:a.helpers.map(x=>x.actor.id),
      helperIndices:a.helpers.map(x=>x.mastery.index),emlBonus:a.result.assistance,
-     gmConfirmed:a.helpers.length?!!form.elements.namedItem('orientAssistConfirmed')?.checked:false}
+     gmConfirmed:a.helpers.length>0}
    }:{}),
    a:a.result,b:b?.result||null,fate:fateA,fateB,result:opposed?comparison:a.result,
    comparison:comparison??null,gmNarrative:narrative,scene,opposedAction:actionName,rollOrigins:b?[a.die.origin,b.die.origin]:[a.die.origin],
