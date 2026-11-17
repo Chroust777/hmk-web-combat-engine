@@ -378,7 +378,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.920';
+const APP_VERSION='93.921';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -18171,6 +18171,21 @@ function applyDeterministicCalendarOnsets(){
 /** Step 7.3 is a physical AV roll BEFORE Endurance/Survival (HMK 149).
  * The page asks for only undocumented environmental facts and a die; no GM
  * confirmation checkbox can substitute for the source-linked witness. */
+// v93.921: inline weather changes keep their OWN d10 buttons instead of
+// the unrelated staged multi-roll wizard. Preserve the original provenance.
+document.addEventListener('click',e=>{
+ const btn=e.target.closest?.('[data-trek-shift-die]');if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const form=btn.closest('form[data-trek-global-shift]');
+ const field=form?.elements.namedItem(btn.dataset.trekShiftDie);
+ if(!(field instanceof HTMLInputElement)||field.disabled)return;
+ field.value=String(secureHMKDie(10));field.dataset.trekGenerated=field.value;
+ field.dispatchEvent(new Event('change',{bubbles:true}));
+},true);
+document.addEventListener('input',e=>{
+ if(e.isTrusted&&e.target?.matches?.('form[data-trek-global-shift] input[type="number"]'))
+  delete e.target.dataset.trekGenerated;
+},true);
 document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-trek-global-die]');if(!btn)return;
  e.preventDefault();const form=btn.closest('form'),field=form?.elements.namedItem(btn.dataset.trekGlobalDie);
