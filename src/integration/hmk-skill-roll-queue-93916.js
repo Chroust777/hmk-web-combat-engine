@@ -1,3 +1,4 @@
+import {specialSecondaryById} from './hmk-special-secondary-routines.js';
 /** HMK v93.916 · rule-aware, noncombat Skill Workbench roll confirmation.
  * Only decorates Skill Tests. Never calculates an HMK result, writes a receipt,
  * advances time, or changes Combat state. The original submit handler remains
@@ -186,4 +187,172 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie){
   },80);
  }
  return {forms,fields};
+}
+
+/** v93.917 · guided physical evidence for situational Special SR. The HMK
+ * resolver and atomic save remain exclusively in app.js. No new game action.
+ * Raw d10 list is an output of individually confirmed dice, never an input
+ * by which a pending primary, conditional Will, or second Spirit roll can be skipped.
+ */
+const specialWhole=(field,faces)=>/^(?:[1-9]|[1-9][0-9]|100)$/.test(String(field.value).trim())&&
+ Number.isSafeInteger(Number(field.value))&&Number(field.value)>=1&&Number(field.value)<=faces;
+export function decorateSpecialSecondaryRolls93917(root,secureDie,previewPrimary){
+ const form=root?.querySelector('#hsk-special-sr-form');
+ if(!form||form.dataset.hmkSpecialStage93917)return;
+ form.dataset.hmkSpecialStage93917='yes';
+ const primary=form.elements.namedItem('specialPrimaryRoll'),will=form.elements.namedItem('specialWillRoll'),
+  raw=form.elements.namedItem('specialDice'),submit=form.querySelector('button[type="submit"]');
+ if(!primary||!will||!raw||!submit)return;
+ raw.closest('label').hidden=true;raw.tabIndex=-1;
+ const stage=document.createElement('section');stage.className='hmk-special-stage-93917';
+ const heading=document.createElement('p');heading.className='hmk-simple-roll-status-93915';
+ heading.setAttribute('role','status');heading.setAttribute('aria-live','polite');
+ const diceHolder=document.createElement('div');diceHolder.className='hsk-form-grid';
+ diceHolder.dataset.hmkSpecialDice93917='';
+ const reset=document.createElement('button');reset.type='button';reset.className='secondary hc-small';
+ reset.textContent='Změnit potvrzené hody';reset.dataset.hmkSpecialReset93917='';
+ stage.append(heading,diceHolder,reset);submit.before(stage);
+ const state={primary:null,will:null,dice:[],preview:null,previewError:'',complete:false};
+ form.__hmkSpecialStage93917=state;
+ const valid=(field,faces)=>specialWhole(field,faces);
+ const source=field=>field?.dataset.hmkAutoDice===String(field?.value)?'cryptographic-software-die':'entered-number';
+ const routine=()=>specialSecondaryById(form.elements.namedItem('specialRoutine')?.value);
+ const needsPrimary=r=>r&&(r.family==='divine'||r.id==='astral-rite-member');
+ const resetAll=()=>{
+  state.primary=null;state.will=null;state.dice=[];state.preview=null;state.previewError='';
+  primary.value='';will.value='';delete primary.dataset.hmkAutoDice;delete will.dataset.hmkAutoDice;
+  raw.value='';delete raw.dataset.hmkAutoDice;
+  form.__hmkSpecialDieSources93917=[];
+ };
+ const wipeDice=()=>{state.dice=[];raw.value='';delete raw.dataset.hmkAutoDice;form.__hmkSpecialDieSources93917=[];};
+ const addDie=(i)=>{
+  const label=document.createElement('label');label.setAttribute('data-hmk-special-die-93917',String(i+1));
+  label.append(document.createTextNode('Povinný Secondary Roll d10 · '+(i+1)+'. kostka'));
+  const input=document.createElement('input');input.type='number';input.min='1';input.max='10';input.step='1';
+  input.name='specialDieStep'+(i+1);input.setAttribute('aria-label','Secondary d10 '+(i+1));
+  const generate=document.createElement('button');generate.type='button';generate.className='secondary hc-small';
+  generate.textContent='⚄ Generovat d10';generate.setAttribute('data-hmk-special-generate-93917','');
+  const accept=document.createElement('button');accept.type='button';accept.className='secondary hc-small';
+  accept.textContent='Vložit hodnotu';accept.setAttribute('data-hmk-special-accept-93917','');
+  label.append(input,generate,accept);diceHolder.append(label);
+  const entry={input,label,generate,accept,accepted:null,source:null};
+  state.dice.push(entry);
+  input.addEventListener('input',()=>{if(entry.accepted!==input.value){entry.accepted=null;entry.source=null;}refresh();});
+  generate.addEventListener('click',()=>{
+   if(generate.disabled)return;
+   try{input.value=String(secureDie(10));input.dataset.hmkAutoDice=input.value;
+    input.dispatchEvent(new Event('input',{bubbles:true}));refresh();}
+   catch(err){heading.textContent='Generátor d10 selhal: '+String(err?.message||err);}
+  });
+  accept.addEventListener('click',()=>{
+   if(accept.disabled||!valid(input,10))return;
+   entry.accepted=input.value;entry.source=source(input);refresh();
+   const next=stage.querySelector('.hmk-simple-current-93915 input');if(next)next.focus({preventScroll:true});
+  });
+ };
+ function preview(){
+  const r=routine();state.previewError='';state.preview=null;
+  if(!needsPrimary(r))return null;
+  if(!valid(primary,100)||state.primary!==primary.value)return null;
+  try{
+   const result=previewPrimary(form);
+   if(!result||!['CF','F','S','CS'].includes(result.level)||!Number.isSafeInteger(result.stars))
+    throw Error('Chybí ověřený výsledek původního Ritual/Trance.');
+   state.preview=result;return result;
+  }catch(err){state.previewError=String(err?.message||err);return null;}
+ }
+ function refresh(){
+  const r=routine();if(!r)return;
+  const primaryNeeded=!!needsPrimary(r),p=preview();
+  const willNeeded=r.family==='divine'&&p?.level==='CF';
+  let count=null;
+  if(!primaryNeeded||p){
+   if(r.family==='divine'){
+    const val=form.elements.namedItem('moralityDifference')?.value?.trim();
+    if(r.id==='festival-style'&&val==='')count=null;
+    else {const delta=r.id==='festival-style'?Number(val):0;
+     count=Number.isSafeInteger(delta)&&delta>=0&&delta<=20?
+      (r.id==='festival-style'?Math.max(0,p.stars-delta):p.stars):null;}
+   }else if(r.id==='astral-rite-member'&&!['S','CS'].includes(p?.level))count=0;
+   else count=(form.elements.namedItem('specialOutsider')?.checked&&['astral-rite-member','astral-talisman'].includes(r.id))?2:1;
+  }
+  const pendingPrimary=primaryNeeded&&(state.primary!==primary.value||!valid(primary,100)||!p);
+  const pendingWill=willNeeded&&!pendingPrimary&&(state.will!==will.value||!valid(will,100));
+  if(count===null||pendingPrimary||pendingWill){
+   // Do not keep previous SR confirmation across an incomplete primary / Will.
+   if(state.dice.length)wipeDice();diceHolder.replaceChildren();
+  }else if(state.dice.length!==count){wipeDice();diceHolder.replaceChildren();for(let i=0;i<count;i++)addDie(i);}
+  const pendingDie=!pendingPrimary&&!pendingWill&&count!==null?state.dice.find(x=>x.accepted!==x.input.value||!valid(x.input,10)):null;
+  const active= pendingPrimary?primary:pendingWill?will:pendingDie?.input||null;
+  for(const [field,needed,accepted] of [[primary,primaryNeeded,state.primary],[will,willNeeded,state.will]]){
+   const label=field.closest('label');const current=field===active,done=needed&&accepted===field.value&&valid(field,100);
+   label.hidden=!needed;label.classList.toggle('hmk-simple-current-93915',current);
+   label.classList.toggle('hmk-simple-done-93915',done);
+   field.readOnly=!current;field.disabled=!needed;
+   const generate=field.nextElementSibling;
+   if(generate?.dataset?.hmkGeneralAutoDie)generate.disabled=!current;
+   const accept=label.querySelector('[data-hmk-special-accept-93917]');
+   if(accept){accept.hidden=!needed;accept.disabled=!current||!valid(field,100);}
+  }
+  for(const die of state.dice){const current=die.input===active,done=die.accepted===die.input.value&&valid(die.input,10);
+   die.label.classList.toggle('hmk-simple-current-93915',current);die.label.classList.toggle('hmk-simple-done-93915',done);
+   die.input.readOnly=!current;die.generate.disabled=!current;die.accept.disabled=!current||!valid(die.input,10);
+  }
+  const ready=!active&&count!==null&&(!primaryNeeded||!!p)&&(!willNeeded||state.will===will.value);
+  state.complete=ready;submit.disabled=!ready;
+  if(ready){raw.value=state.dice.map(d=>d.accepted).join(', ');
+   const generated=state.dice.length>0&&state.dice.every(d=>d.source==='cryptographic-software-die');
+   if(generated)raw.dataset.hmkAutoDice=raw.value;else delete raw.dataset.hmkAutoDice;
+   form.__hmkSpecialDieSources93917=state.dice.map(d=>({faces:10,value:Number(d.accepted),source:d.source}));
+  }else {raw.value='';delete raw.dataset.hmkAutoDice;form.__hmkSpecialDieSources93917=[];}
+  reset.hidden=!(state.primary||state.will||state.dice.some(d=>d.accepted!==null));
+  heading.textContent=active?'ČERVENÝ AKTIVNÍ HOD · '+
+   (active===primary?'primární Ritual / Trance d100':active===will?'následný Will d100':
+    ('Secondary d10 '+(state.dice.indexOf(pendingDie)+1)+'/'+state.dice.length))+
+   ' · Generovat nebo zadat hodnotu → Vložit hodnotu.':
+   state.previewError?'Primární hod není pravidlově ověřitelný: '+state.previewError:
+   count===null?'Nejdřív potvrďte primární hod / odchylku MOR; počet d10 nelze odhadnout.':
+   ready?(count?'Všechny povinné kostky jsou jednotlivě potvrzeny.':'Výsledek primárního hodu nevyžaduje žádné další d10.'):
+   'Potvrďte předepsané hody před uložením.';
+  if(state.previewError&&active===primary)heading.textContent+=' Ověření: '+state.previewError;
+ }
+ function addAccept(field){
+  const label=field.closest('label');const button=document.createElement('button');button.type='button';
+  button.className='secondary hc-small';button.setAttribute('data-hmk-special-accept-93917',field.name);
+  button.textContent='Vložit hodnotu';label.append(button);
+  button.addEventListener('click',()=>{
+   if(button.disabled||!valid(field,100))return;
+   if(field===primary){state.primary=field.value;state.will=null;wipeDice();}
+   else {state.will=field.value;wipeDice();}
+   refresh();const next=form.querySelector('.hmk-simple-current-93915 input');
+   if(next)next.focus({preventScroll:true});
+  });
+  field.addEventListener('input',()=>{
+   if(field===primary&&state.primary!==field.value){state.primary=null;state.will=null;wipeDice();}
+   if(field===will&&state.will!==field.value){state.will=null;wipeDice();}
+   refresh();
+  });
+ }
+ addAccept(primary);addAccept(will);
+ reset.addEventListener('click',()=>{resetAll();refresh();const first=form.querySelector('.hmk-simple-current-93915 input');first?.focus({preventScroll:true});});
+ form.addEventListener('change',event=>{
+  if(event.target===primary||event.target===will||event.target.matches('[data-hmk-special-dice-93917]')||
+   event.target.name?.startsWith('specialDieStep'))return;
+  if(['specialRoutine','specialPriest','specialRitual'].includes(event.target.name))resetAll();
+  else if(['specialStyle','specialOutsider','moralityDifference'].includes(event.target.name))wipeDice();
+  queueMicrotask(refresh);
+ });
+ const submitGate=event=>{
+  if(event.target!==form)return;
+  refresh();
+  if(!state.complete){event.preventDefault();event.stopImmediatePropagation();
+   heading.textContent='Uložení pozastaveno: nejprve potvrďte červený povinný hod.';
+   form.querySelector('.hmk-simple-current-93915 input')?.focus({preventScroll:true});}
+ };
+ window.addEventListener('submit',submitGate,true);
+ const observer=new MutationObserver(()=>{
+  if(!form.isConnected){window.removeEventListener('submit',submitGate,true);observer.disconnect();}
+ });
+ observer.observe(root,{childList:true,subtree:true});
+ refresh();
 }

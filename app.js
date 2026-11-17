@@ -1,4 +1,4 @@
-import {decorateSkillWorkbenchRolls93916} from './src/integration/hmk-skill-roll-queue-93916.js';
+import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -376,7 +376,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.916';
+const APP_VERSION='93.917';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10425,7 +10425,7 @@ function enhanceHMKDiceFields(){
  const app=document.getElementById('app');if(!app)return;
  const legal=new Set([4,6,8,10,12,20,30,100]);
  for(const input of app.querySelectorAll('form input[type="number"]')){
-  if(input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||(input.disabled&&!input.dataset.hmkDiceWhenEnabled)||input.readOnly||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die')||input.closest('[data-episode-medical-rolls]'))continue;
+  if(input.closest('.hmk-special-stage-93917')||input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||(input.disabled&&!input.dataset.hmkDiceWhenEnabled)||input.readOnly||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die')||input.closest('[data-episode-medical-rolls]'))continue;
   const label=input.closest('label');if(!label)continue;
   if(label.querySelector('[data-episode-die],[data-hmk-skill-auto-die-93916]'))continue; // A dedicated episode dX generator is already present.
   // Existing dedicated generators already know each rule's roll provenance.
@@ -11279,6 +11279,7 @@ function render(){
  enhanceHMKDiceFields();
  decorateNoncombatRollQueue93913(app,secureHMKDie);
  decorateSkillWorkbenchRolls93916(app,secureHMKDie);
+ decorateSpecialSecondaryRolls93917(app,secureHMKDie,hskSpecialPreviewPrimary93917);
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
@@ -11291,14 +11292,14 @@ const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div,fieldset,label,input')||
   node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSimpleNoncombatRolls93915(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // Closed noncombat chapters are decorated only when opened, never in Combat.
 document.addEventListener('toggle',event=>{
  if(event.target instanceof HTMLDetailsElement&&event.target.open){
   const root=document.getElementById('app');
-  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSimpleNoncombatRolls93915(root,secureHMKDie);}
+  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);}
  }
 },true);
 // v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM
@@ -15052,6 +15053,17 @@ function hskSpecialSelectedInfo(form){
  if(!routine)throw Error('Vyberte existující zvláštní činnost HMK');
  return routine;
 }
+function hskSpecialPreviewPrimary93917(form){
+ const routine=hskSpecialSelectedInfo(form),priest=character(form.elements.namedItem('specialPriest')?.value);
+ if(!priest)throw Error('Vyberte vedoucího kněze nebo šamana.');
+ const name=form.elements.namedItem('specialRitual')?.value;
+ if(!name)throw Error('Vedoucí postava nemá doložený Ritual nebo Trance.');
+ const mastery=skillActorMastery(priest,name),ctx=skillAutoFor(priest,name);
+ if(ctx.armourIsProvisional||ctx.condition?.applicability?.kind==='provisional-unresolved'||ctx.trauma?.unresolved)
+  throw Error('Nejprve ověřte EML vedoucí postavy.');
+ const result=skillResolvedResult({mastery,form,dieKey:'specialPrimaryRoll',condition:ctx.condition,trauma:ctx.trauma}).result;
+ return {level:result.level,stars:routine.family==='divine'?result.svTier.stars:0};
+}
 function hskSpecialRefresh(form){
  const routine=hskSpecialSelectedInfo(form),kind=routine.family;
  const row=(selector,on)=>{const el=form.querySelector(selector);if(el)el.hidden=!on;};
@@ -15071,7 +15083,7 @@ function hskSpecialNumericDice(form,count){
  const raw=form.elements.namedItem('specialDice')?.value?.trim()||'';
  if(!raw){
   if(count===0)return [];
-  throw Error('Zadejte všech '+count+' skutečných fyzických hodů d10. Aplikace je negeneruje.');
+  throw Error('Potvrďte jednotlivě všech '+count+' povinných hodů d10.');
  }
  if(!/^(?:10|[1-9])(?:\s*,\s*(?:10|[1-9]))*$/.test(raw))throw Error('Hody d10 zadejte oddělené čárkou, každý od 1 do 10');
  const parts=raw.split(',').map(x=>Number(x.trim()));
@@ -15137,7 +15149,12 @@ function hskSpecialRun(form){
    fatigue=Number(raw);
   }else fatigue=routine.base;
  }
+ if(form.__hmkSpecialStage93917&&!form.__hmkSpecialStage93917.complete)
+  throw Error('Každý předepsaný hod musí být samostatně potvrzen v červeném kroku.');
  const rolls=hskSpecialNumericDice(form,count);
+ const confirmed=form.__hmkSpecialDieSources93917;
+ if(form.__hmkSpecialStage93917&&(!Array.isArray(confirmed)||confirmed.length!==rolls.length||
+   confirmed.some((d,i)=>d.value!==rolls[i])))throw Error('Původní potvrzené kostky se změnily.');
  const outcome= count===0&&routine.id==='astral-rite-member'?{kind:'astral',tn:Math.floor(secondaryML/10)+tnAdjustment,index:Math.floor(secondaryML/10),rolls:[],successes:0,success:false,requiresPriestSuccess:true,priestSuccessLevel:primaryResult.level}:
   resolveSpecialSR({routine,secondaryML,rolls,stars,baseFatigue:fatigue,styleTNAdjust:tnAdjustment,outsider,moralityDifference,priestSuccessLevel:primaryResult?.level,criticalBenedictionPenalty});
  let explanation=routine.description||'Úspěch Endurance SR sníží přírůstek o 5.';
@@ -15147,7 +15164,7 @@ function hskSpecialRun(form){
  if(criticalWill)explanation+=' Ritual CF: následný Will d100 '+criticalWill.roll+' → '+criticalWill.level+'; úprava Benediction Modifier '+criticalBenedictionPenalty+'.';
  if(routine.id==='astral-rite-member')explanation+=' '+modifierDetails+'; bonus +2 TN pouze při Trance CS.';
  const body=routine.name+' · HMK '+routine.page+'\nSR '+routine.skill+' ML '+secondaryML+' → TN '+outcome.tn+'; hody '+(outcome.rolls.join(', ')||'žádné')+'; úspěchy '+outcome.successes+'\n'+explanation;
- return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,physicalDice:rolls.map(value=>({faces:10,value,source:form.elements.namedItem('specialDice')?.value?.trim()?(form.elements.namedItem('specialDice')?.dataset.hmkAutoDice===form.elements.namedItem('specialDice')?.value?'cryptographic-software-die':'entered-number'):'internal-software-die'})),campaignMinute:data.campaignClock?.minute??null,sourcePages:[62,routine.page]}};
+ return {body,proof:{type:'special-secondary-roll',actorId:actor.id,priestId:priest?.id??null,routineId:routine.id,routineName:routine.name,page:routine.page,skill:routine.skill,secondaryML,stars,style:styleInfo?.name??null,primaryResult,criticalWill,outcome,explanation,physicalDice:rolls.map((value,i)=>({faces:10,value,source:confirmed?.[i]?.source||'entered-number'})),campaignMinute:data.campaignClock?.minute??null,sourcePages:[62,routine.page]}};
 }
 function hskFields(form,side){return {
   secondary1:form.elements.namedItem(side==='A'?'secondary1':'defSecondary1')?.value||'',
