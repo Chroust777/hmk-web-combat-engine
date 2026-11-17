@@ -1,15 +1,16 @@
 /** HMK GM non-combat staged dice entry, v93.913.
  * Presentation-only: never mutates calendar, game state, receipts or RNG until
  * an explicit user click. Original rule submit handlers remain authoritative.
- * Only the identified weather and wild-food forms are decorated. Combat and
- * unrelated Skill Workbench forms are deliberately outside this module.
+ * Only the identified multi-die wild-food and animal-training forms are decorated.
+ * Daily weather, GM weather changes, and simple one-die tests remain native.
+ * Combat and Skill Workbench forms are deliberately outside this module.
  */
+// Only genuine sequences of several conditional dice need a staged wizard.
+// Daily weather (including a GM change) and the single malnutrition d100
+// retain their original inline dice buttons and one final submit.
 const SPEC = Object.freeze({
- 'data-trek-global-weather': ['temperature', 'precipitation'],
- 'data-trek-global-shift': ['trekWeatherShiftTemperature', 'trekWeatherShiftPrecipitation'],
  'data-hmk-wild-spoil': ['rolls'],
  'data-hmk-animal-training': ['trainingD10'],
- 'data-malnutrition-course': ['roll'],
 });
 const names={temperature:'Denní teplota',precipitation:'Denní srážky',
  trekWeatherShiftTemperature:'Nová teplota',trekWeatherShiftPrecipitation:'Nové srážky',
