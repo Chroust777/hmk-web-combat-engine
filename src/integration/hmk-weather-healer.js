@@ -3,13 +3,15 @@
  */
 import {availableMasteries} from './hmk-skill-test-engine.js';
 import {secondaryModifier} from '../rules/tests.js';
-export function weatherPhysicianCandidates({patient,wound,party=[]}={}){
+export function weatherPhysicianCandidates({patient,wound,party=[],requireHigherTreatmentIndex=true}={}){
  if(!patient||!wound||!Array.isArray(party))return [];
  const prior=(wound.healing?.treatments??[]).map(x=>x.physicianIndex).filter(Number.isFinite);
- const minimum=prior.length?Math.max(...prior):-1;
+ const minimum=requireHigherTreatmentIndex&&prior.length?Math.max(...prior):-1;
  return party.flatMap(actor=>{
   if(!actor?.id||!actor?.hmk)return [];
   const state=actor.hmk.healthState??{};
+  // Only an explicit Blood Stoppage call bypasses the index rule for a
+  // repeated Treatment. The patient may still not self-treat a G wound.
   // A self-treatment is permitted only for Minor/Serious wounds and only
   // when the actual circumstances allow it (GM chooses the option).
   const self=actor.id===patient.id;

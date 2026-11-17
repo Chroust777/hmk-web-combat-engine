@@ -378,7 +378,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.922';
+const APP_VERSION='93.923';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12781,7 +12781,7 @@ function hskWeatherBleedingCarePanel(actorId){
   const due=clock.minute===term.dueMinute,remaining=term.dueMinute-clock.minute;
   const plan=term.plan;
   const who=plan?party.find(c=>c.id===plan.healerId):null;
-  const healerOptions=weatherPhysicianCandidates({patient:actor,wound:w,party});
+  const healerOptions=weatherPhysicianCandidates({patient:actor,wound:w,party,requireHigherTreatmentIndex:false});
   const start=remaining===5&&!plan;
   const title=`${esc(w.location)} ${esc(w.severity+w.level)} · ${esc(w.id)}`;
   const head=`<h4>Blood Stoppage · ${title}</h4><p class="hc-hint">Původ ${esc(displayCampaignMinute(term.anchorMinute))} ·

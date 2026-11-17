@@ -40,21 +40,44 @@ export function travelBleedingTerm({clock,actorId,wound,state}={}){
   'Pětiminutový Bleeder musí mít automatickou kotvu původní potvrzené zdravotní události');
  check(anchor&&integer(anchor.minute,0,1e9)&&anchor.minute<=clock.minute,
   'Cestovní Bleeder nemá původní doloženou minutu vzniku');
- const prior=wound.travelBlood;
+ // A failed SUR/Grievous EXT creates a NEW bleeder at the actual completion
+ // of the timed procedure, not at the much earlier time of the original wound.
+ // Its end-minute and source event are immutable evidence; do not guess five
+ // minutes from the original injury or from combat rounds (HMK p.178).
+ const surgeryBleeders=(wound.healing?.treatments||[]).filter(t=>t.surgeryBleeder===true);
+ let bleedingAnchorMinute=anchor.minute;
+ if(surgeryBleeders.length){
+  const last=surgeryBleeders.at(-1),end=last.procedureTime?.endMinute;
+  check(integer(end,anchor.minute,clock.minute)&&last.procedureTime?.gmConfirmed===true&&
+    state?.events?.some(e=>e.type==='injury-treatment'&&e.details?.woundId===wound.id&&
+      e.details?.surgeryBleeder===true&&e.details?.bleedingAfterTreatment===true&&
+      e.details?.roll===last.physicianRoll&&e.details?.physicianIndex===last.physicianIndex&&
+      e.details?.procedureTime?.endMinute===end&&e.details?.procedureTime?.gmConfirmed===true),
+   'Chybí doložený okamžik vzniku krvácení po Surgery/Extraction; nelze jej odvodit z času původní rány');
+  bleedingAnchorMinute=end;
+ }
+ // A previous completed bleed has an archived nextDueMinute. A later failed
+ // operation may reopen the very same wound as a fresh bleeder; the old plan
+ // must not silently become the next appointment of this new episode.
+ const saved=wound.travelBlood;
+ const stalePrior=!!surgeryBleeders.length&&saved?.nextDueMinute<bleedingAnchorMinute+5;
+ if(stalePrior)check(saved.campaignId===campaignId(clock)&&saved.plan===null,
+  'Předchozí krvácení musí být úplně uzavřené ve stejné kampani');
+ const prior=stalePrior?null:saved;
  if(prior){
-  check(prior.campaignId===campaignId(clock)&&integer(prior.nextDueMinute,anchor.minute+5,1e9)&&
-    prior.nextDueMinute>=anchor.minute+5&&(prior.nextDueMinute-anchor.minute)%5===0,
+  check(prior.campaignId===campaignId(clock)&&integer(prior.nextDueMinute,bleedingAnchorMinute+5,1e9)&&
+    prior.nextDueMinute>=bleedingAnchorMinute+5&&(prior.nextDueMinute-bleedingAnchorMinute)%5===0,
    'Blood Stoppage: nekonzistentní časový plán nebo cizí kampaň');
-  if(prior.plan)check(integer(prior.plan.startMinute,anchor.minute,1e9)&&
+  if(prior.plan)check(integer(prior.plan.startMinute,bleedingAnchorMinute,1e9)&&
     prior.plan.dueMinute===prior.nextDueMinute&&prior.plan.startMinute+5===prior.plan.dueMinute,
    'Doba skutečného ošetření není přesně 5 minut');
  }
- return {anchorMinute:anchor.minute,dueMinute:prior?.nextDueMinute??anchor.minute+5,
+ return {anchorMinute:bleedingAnchorMinute,dueMinute:prior?.nextDueMinute??bleedingAnchorMinute+5,
   plan:prior?.plan??null,periodMinutes:5};
 }
 function availableHealer({patient,wound,healer,party}){
  check(healer?.id,'Léčitel nebyl vybrán');
- const candidate=weatherPhysicianCandidates({patient,wound,party}).find(x=>x.id===healer.id);
+ const candidate=weatherPhysicianCandidates({patient,wound,party,requireHigherTreatmentIndex:false}).find(x=>x.id===healer.id);
  check(candidate,'Léčitel musí být živá a způsobilá postava aktuální kampaně s Physician ML');
  return candidate;
 }
