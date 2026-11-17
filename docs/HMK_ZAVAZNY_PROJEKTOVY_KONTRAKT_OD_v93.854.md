@@ -65,3 +65,10 @@ Tento soupis obsahuje **doložené, explicitní projektové odchylky a jejich oc
 **[ZÁVAZNÝ REGRESNÍ INVARIANT]** Omezování opakovaného **Treatment** na vyšší Physician Index se **nesmí přenášet do Blood Stoppage**. Staunch a Cauterisation mohou provést skutečně způsobilí léčitelé dle této procedury, včetně předchozího operatéra, pokud tomu nebrání jejich aktuální zdravotní stav a další skutečné povinnosti. Při výběru léčitele pro další samostatný Treatment omezení vyššího Indexu nadále platí.
 
 **[OVĚŘIT V DALŠÍCH REGRESÍCH]** Celý řetězec SUR/EXT → nové krvácení → zahájení Blood Stoppage → přesně 5 minut kalendáře → skutečný Physician d100 → podmíněný Blood Loss d100 → případný Shock; žádné další samovolné posuny času. Zachovat globální pravidlo z části 6 o jednoduchých a složitých hodech a zákaz zásahů do Combatu bez výslovného pokynu.
+
+
+## 8. Jednoduchý okamžitý Shock Reroll a podmíněná Coma (v93.924, 17. 11. 2026)
+
+**[SCHVÁLENÁ UI ZÁSADA – konkrétní aplikace sekce 6]** Jediný d100 pro **STN/INC Shock Reroll po zastavení všech Bleederů** a jediný d100 **Extended Shock Course** musí zachovat původní viditelné pole, původní tlačítko generátoru a jediné závěrečné potvrzení. Obecný průvodce nesmí schovat vstup za červený meziformulář. Podmíněný **UNC + CF → skutečný Coma d10** a **Coma Course → nový d10 intervalu pouze při pokračujícím kómatu** zůstávají řízenými řetězci; veškeré potvrzení nesmí být přeskočitelné. Nepřidávat automatický čas, Combat události ani duplicitní hody.
+
+**[REGRESNÍ INVARIANT]** Prokázaný řetězec Surgery F → nově vzniklý Bleeder → Staunch 5 minut → Physician S → Blood Loss F → INC → okamžitý Shock S → STN → Shock CS po potvrzené následující akci → NONE. Všechny zdravotní zápisy v jedné časové ose, opětovné načtení a nulový další minutový posun při obou Shock hodech.

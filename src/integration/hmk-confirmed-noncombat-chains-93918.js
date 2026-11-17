@@ -107,6 +107,12 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
  for(const form of root.querySelectorAll(SELECTOR)){
   if(form.dataset.hmkConfirmedChain93918)continue;
   const kind=kindOf(form),allNames=fieldsOf(form,kind);
+  // Owner's approved UI contract: a lone immediate INC/STN Shock d100 and
+  // an Extended Shock Course d100 retain the ORIGINAL field, die button and
+  // one final submit. Only UNC can branch into a mandatory Coma d10; only
+  // Coma Course can require a second conditional interval d10.
+  if(kind==='shock'&&!form.elements.namedItem('initialComaD10'))continue;
+  if(kind==='trauma'&&value(form,'kind')!=='coma')continue;
   const sources=new Map(allNames.map(name=>[name,form.elements.namedItem(name)]));
   if([...sources.values()].some(el=>!(el instanceof HTMLInputElement)))continue;
   // Don't stage an inapplicable Staunch form (BP0 already needs one real bandage,
