@@ -9,7 +9,7 @@ const OPT_OUT='[data-hmk-roll-queue],[data-hmk-one-roll-input],[data-hmk-one-rol
  '[data-hmk-critical-roll-confirm]';
 // The 14-step Character Creation already verifies physical dice itself.
 // A second generic confirmation gate blocks its automatic Age step.
-const SKIP_FORM='#creation-step-form,#skill-secondary-form,#skill-value-form,#skill-assistance-form,#skill-tiebreak-form,#hsk-special-sr-form,'+
+const SKIP_FORM='#hsk-talisman-bestowal,#creation-step-form,#skill-secondary-form,#skill-value-form,#skill-assistance-form,#skill-tiebreak-form,#hsk-special-sr-form,'+
  '[data-hmk-wild-spoil],[data-hmk-animal-training],'+
  '[data-hmk-fishing-catch],[data-herb-assess],[data-weather-blood-start],'+
  '[data-weather-shock-followup],'+

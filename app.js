@@ -1,3 +1,4 @@
+import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js';
 import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
@@ -377,7 +378,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.918';
+const APP_VERSION='93.919';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11282,7 +11283,7 @@ function render(){
  decorateSkillWorkbenchRolls93916(app,secureHMKDie);
  decorateSpecialSecondaryRolls93917(app,secureHMKDie,hskSpecialPreviewPrimary93917);
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
- decorateConfirmedNoncombatChains93918(app,secureHMKDie);
+ decorateConfirmedNoncombatChains93918(app,secureHMKDie);decorateTalismanDice93919(app,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
  scheduleStableAutoMigration93861();
@@ -11294,14 +11295,14 @@ const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div,fieldset,label,input')||
   node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);decorateTalismanDice93919(root,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // Closed noncombat chapters are decorated only when opened, never in Combat.
 document.addEventListener('toggle',event=>{
  if(event.target instanceof HTMLDetailsElement&&event.target.open){
   const root=document.getElementById('app');
-  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);}
+  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);decorateTalismanDice93919(root,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});}
  }
 },true);
 // v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM
