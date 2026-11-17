@@ -380,7 +380,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.926';
+const APP_VERSION='93.927';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -29542,13 +29542,24 @@ document.addEventListener('click',e=>{
  if(!field||field.disabled)return;
  const sides=Number(b.dataset.episodeFaces)||
   (b.dataset.episodeDie==='precipitationD6'?6:b.dataset.episodeDie==='encounterD100'?100:10);
- try{const hourly=b.dataset.episodeDie.startsWith('end_')&&form.elements.namedItem('doubleTime')?.checked;
-  const elapsed=Number(form.elements.namedItem('minutes')?.value||0),
-   incoming=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
-    (episodeFormSnapshot(form).memberIds||[]).length?episodeFormSnapshot(form).memberIds:null,true),
-   movement=actualGroupMovement93868({minutes:elapsed,incomingDelay:incoming,atMinute:episodeConfirmedMovementStop93868(form,elapsed)});
-  const count=hourly?Math.ceil(movement/60):(movement===0?0:1);
-  if(!Number.isSafeInteger(count)||count<0||count>168||!Number.isSafeInteger(elapsed)||elapsed<1)throw Error('Nejprve zadejte platnou délku cesty.');
+ try{
+  // Only Endurance exertion dice depend on movement length. A standalone
+  // Weather Hazard / Direction / event / foraging die is genuinely independent
+  // and MUST work even if this interval has no movement or is not yet set.
+  let count=1;
+  if(b.dataset.episodeDie.startsWith('end_')){
+   const hourly=!!form.elements.namedItem('doubleTime')?.checked;
+   const elapsed=Number(form.elements.namedItem('minutes')?.value||0);
+   if(!Number.isSafeInteger(elapsed)||elapsed<1||elapsed>10080)
+    throw Error('Nejprve zadejte platnou délku cesty pro Endurance.');
+   const snapshot=episodeFormSnapshot(form);
+   const incoming=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
+    (snapshot.memberIds||[]).length?snapshot.memberIds:null,true);
+   const movement=actualGroupMovement93868({minutes:elapsed,incomingDelay:incoming,
+    atMinute:episodeConfirmedMovementStop93868(form,elapsed)});
+   count=movement===0?0:hourly?Math.ceil(movement/60):1;
+  }
+  if(!Number.isSafeInteger(count)||count<0||count>168)throw Error('Neplatný počet povinných kostek.');
   if(count===0){field.value='';field.dataset.episodeGenerated='';episodeDicePending93849(form,field);return;}
   field.value=Array.from({length:count},()=>secureHMKDie(sides)).join(',');field.dataset.episodeGenerated=field.value;
   episodeDicePending93849(form,field);

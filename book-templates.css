@@ -8306,3 +8306,37 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 /* Body data is readable normal weight, including selected and risky rows. */
 #app .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-current td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-hazard td:nth-child(6){font-weight:400!important;color:#38291a!important;}
 #app .hc-episode-weather-timeline tbody td strong,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td strong{font-weight:400!important;}
+
+/* v93.927 — fix physically overlapping Generate/Vložit controls in the
+   Skill Workbench grid. v93.554 placed BOTH in grid row 3. Never layer
+   independent buttons in a single grid cell or stretch an active red cue
+   across its neighbours. The buttons remain in their original form. */
+#app .content-sheet .journal-book--skills #skill-secondary-form > .hsk-form-grid > label:has(> button[data-hmk-skill-accept-93916]){
+ grid-template-rows:minmax(2.65em,auto) auto auto auto!important;
+ align-self:start!important; min-height:0!important; height:auto!important;
+}
+#app .content-sheet .journal-book--skills #skill-secondary-form > .hsk-form-grid > label > button[data-hmk-skill-accept-93916]{
+ grid-row:4!important;grid-column:1!important;position:static!important;
+ justify-self:start!important;width:max-content!important;max-width:100%!important;
+ margin:6px 0 5px!important;
+}
+#app .content-sheet .journal-book--skills #skill-secondary-form > .hsk-form-grid > label > :is(button[data-hmk-general-auto-die],button[data-hmk-skill-auto-die-93916]){
+ grid-row:3!important;grid-column:1!important;position:static!important;
+ justify-self:start!important;width:max-content!important;max-width:100%!important;
+ margin:8px 0 3px!important;
+}
+/* Other workbench tabs and other skill chains: never float or absolutely
+   position a dice generator and its independent explicit accept button. */
+#app .content-sheet .journal-book--skills :is(#skill-value-form,#skill-assistance-form,#skill-tiebreak-form) label > button[data-hmk-skill-accept-93916]{
+ position:static!important;display:block!important;clear:both!important;
+ width:max-content!important;max-width:100%!important;margin:6px 0 5px!important;
+}
+#app .content-sheet .journal-book--skills :is(#skill-value-form,#skill-assistance-form,#skill-tiebreak-form) label > :is(button[data-hmk-general-auto-die],button[data-hmk-skill-auto-die-93916]){
+ position:static!important;display:block!important;clear:both!important;
+ width:max-content!important;max-width:100%!important;margin:8px 0 3px!important;
+}
+@media(max-width:550px){
+ #app .content-sheet .journal-book--skills #skill-secondary-form > .hsk-form-grid > label:has(> button[data-hmk-skill-accept-93916]){
+  grid-template-rows:auto auto auto auto!important;
+ }
+}
