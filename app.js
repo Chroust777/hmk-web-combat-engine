@@ -378,7 +378,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.919';
+const APP_VERSION='93.920';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12941,7 +12941,7 @@ function hskWeatherTraumaCourseForm(actorId){
  <p class="hc-hint">Samostatné zdravotní vyhodnocení z počasí · HMK str.179. Původní zdroj ${esc(course.sourceId)}.
  Doložený termín ${esc(displayCampaignMinute(expected))}; Kalendář se tímto hodem neposouvá.</p>
  <p>Healing Base ${hb} · aktuální HR ${course.hr} · skutečná minuta ${esc(String(clock.minute))}.</p>
- <form data-weather-trauma-course><input type="hidden" name="kind" value="${kind}">
+ <form data-weather-trauma-course data-hmk-trauma-hr="${esc(String(course.hr))}" data-hmk-trauma-hb="${esc(String(hb))}" data-hmk-trauma-fatigue="${esc(String(combatFatigueTotals(state).total))}"><input type="hidden" name="kind" value="${kind}">
  <input type="hidden" name="sourceId" value="${esc(course.sourceId)}">
  <label>Skutečný Course d100<input name="roll" type="number" min="1" max="100" required></label>
  ${kind==='extended-shock'?'<label>Skutečný Physician SV – počet hvězd (0 bez ošetření)<input name="physicianStars" type="number" min="0" max="10" value="0" required></label>':

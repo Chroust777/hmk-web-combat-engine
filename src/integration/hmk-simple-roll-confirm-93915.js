@@ -12,7 +12,7 @@ const OPT_OUT='[data-hmk-roll-queue],[data-hmk-one-roll-input],[data-hmk-one-rol
 const SKIP_FORM='#hsk-talisman-bestowal,#creation-step-form,#skill-secondary-form,#skill-value-form,#skill-assistance-form,#skill-tiebreak-form,#hsk-special-sr-form,'+
  '[data-hmk-wild-spoil],[data-hmk-animal-training],'+
  '[data-hmk-fishing-catch],[data-herb-assess],[data-weather-blood-start],'+
- '[data-weather-shock-followup],'+
+ '[data-weather-shock-followup],[data-weather-trauma-course],'+
  '[data-trek-global-weather],[data-trek-global-shift],'+
  '[data-malnutrition-course],#hmk-time-episode-form,'+
  '#hmk-g04-mounted-move-start,#hmk-g04-area-commit,'+

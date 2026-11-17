@@ -3,28 +3,31 @@
  * check chronology/identity, and record evidence. No new RNG on render.
  * Scope deliberately excludes Combat and every autonomous Skill Workbench queue.
  */
+import {successLevel} from '../rules/tests.js';
 const SELECTOR='form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
- 'form[data-weather-shock-followup],form[data-alchemy-finish]';
+ 'form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course]';
 const SELECTIONS={
  fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
  herbs:['singlePotencyRoll','actorId'],
  blood:['method','healerId','hasWater','hasNeedleThread','hasHeatedTool','tourniquet'],
  shock:[],
+ trauma:['restfulShelter','arcaneBonus','physicianStars'],
  alchemy:[]
 };
 const title={fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
- blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',alchemy:'Alchemy · povinné navazující hody'};
+ blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
 const value=(form,name)=>form.elements.namedItem(name)?.value||'';
 const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n))&&Number(n)>=1&&Number(n)<=max;
 const stageKey=(step)=>step.key;
 function kindOf(form){return form.matches('[data-hmk-fishing-catch]')?'fishing':
  form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
- form.matches('[data-weather-shock-followup]')?'shock':'alchemy';}
+ form.matches('[data-weather-shock-followup]')?'shock':form.matches('[data-weather-trauma-course]')?'trauma':'alchemy';}
 function fieldsOf(form,kind){
  if(kind==='fishing')return ['conditionsD100','catchD10'];
  if(kind==='herbs')return [...form.querySelectorAll('input[name^="dice_"]')].map(n=>n.name);
  if(kind==='blood')return ['bandageD6Rolls'];
  if(kind==='shock')return ['roll',...(form.elements.namedItem('initialComaD10')?['initialComaD10']:[])];
+ if(kind==='trauma')return ['roll',...(value(form,'kind')==='coma'?['periodD10']:[])];
  return ['cfWillD10','dissolutionD100','crucialShockD100',
   ...[...form.querySelectorAll('input[name^="aug"]')].map(x=>x.name)].filter(name=>form.elements.namedItem(name));
 }
@@ -65,6 +68,19 @@ function stepsFor(form,kind){
    if(form.dataset.shockComaReady==='yes'&&die(value(form,'roll'),100)&&
     Number.isFinite(eml)&&roll>eml&&roll%5===0)
     add('initialComaD10',10,'UNC + CF · první Coma Course d10');
+  }
+ }else if(kind==='trauma'){
+  add('roll',100,(value(form,'kind')==='coma'?'Coma':'Extended Shock')+' Course d100');
+  if(value(form,'kind')==='coma'&&die(value(form,'roll'),100)){
+   const hr=Number(form.dataset.hmkTraumaHr),hb=Number(form.dataset.hmkTraumaHb),
+    fatigue=Number(form.dataset.hmkTraumaFatigue),arcane=Number(value(form,'arcaneBonus'));
+   if(Number.isSafeInteger(hr)&&hr>=1&&hr<=5&&Number.isSafeInteger(hb)&&hb>=1&&
+    Number.isSafeInteger(fatigue)&&Number.isSafeInteger(arcane)&&arcane>=0&&arcane<=100){
+    const eml=hb*hr-fatigue+(value(form,'restfulShelter')==='yes'?0:-20)+arcane;
+    const sl=successLevel(Number(value(form,'roll')),eml);
+    const nextHR=hr+[-2,-1,1,2][sl];
+    if(nextHR>0&&nextHR<6)add('periodD10',10,'Coma pokračuje · nový d10 do dalšího Course');
+   }
   }
  }else if(kind==='alchemy'){
   if(form.elements.namedItem('cfWillD10')){
