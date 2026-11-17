@@ -1,3 +1,4 @@
+import {decorateSkillWorkbenchRolls93916} from './src/integration/hmk-skill-roll-queue-93916.js';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -375,7 +376,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.915';
+const APP_VERSION='93.916';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10426,7 +10427,7 @@ function enhanceHMKDiceFields(){
  for(const input of app.querySelectorAll('form input[type="number"]')){
   if(input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||(input.disabled&&!input.dataset.hmkDiceWhenEnabled)||input.readOnly||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die')||input.closest('[data-episode-medical-rolls]'))continue;
   const label=input.closest('label');if(!label)continue;
-  if(label.querySelector('[data-episode-die]'))continue; // A dedicated episode dX generator is already present.
+  if(label.querySelector('[data-episode-die],[data-hmk-skill-auto-die-93916]'))continue; // A dedicated episode dX generator is already present.
   // Existing dedicated generators already know each rule's roll provenance.
   // Never put a second general button next to them.
   const sibling=label.nextElementSibling;
@@ -11277,6 +11278,7 @@ function render(){
  hskHydrateAccidentAgility93864(app);
  enhanceHMKDiceFields();
  decorateNoncombatRollQueue93913(app,secureHMKDie);
+ decorateSkillWorkbenchRolls93916(app,secureHMKDie);
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
@@ -11289,14 +11291,14 @@ const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div,fieldset,label,input')||
   node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSimpleNoncombatRolls93915(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSimpleNoncombatRolls93915(root,secureHMKDie);syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // Closed noncombat chapters are decorated only when opened, never in Combat.
 document.addEventListener('toggle',event=>{
  if(event.target instanceof HTMLDetailsElement&&event.target.open){
   const root=document.getElementById('app');
-  if(root){enhanceHMKDiceFields();decorateSimpleNoncombatRolls93915(root,secureHMKDie);}
+  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie);decorateSimpleNoncombatRolls93915(root,secureHMKDie);}
  }
 },true);
 // v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM

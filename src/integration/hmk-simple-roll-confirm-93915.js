@@ -7,7 +7,8 @@ const FACES=new Set([2,3,4,6,8,10,12,20,30,100]);
 const OPT_OUT='[data-hmk-roll-queue],[data-hmk-one-roll-input],[data-hmk-one-roll-confirm],'+
  '[data-episode-roll-confirm],[data-episode-roll-field],[data-creation-roll],'+
  '[data-hmk-critical-roll-confirm]';
-const SKIP_FORM='[data-hmk-wild-spoil],[data-hmk-animal-training],'+
+const SKIP_FORM='#skill-secondary-form,#skill-value-form,#skill-assistance-form,#skill-tiebreak-form,'+
+ '[data-hmk-wild-spoil],[data-hmk-animal-training],'+
  '[data-trek-global-weather],[data-trek-global-shift],'+
  '[data-malnutrition-course],#hmk-time-episode-form,'+
  '#hmk-g04-mounted-move-start,#hmk-g04-area-commit,'+
