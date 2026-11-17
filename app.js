@@ -378,7 +378,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.924';
+const APP_VERSION='93.925';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -29010,7 +29010,16 @@ function updateEpisodePreview(form){
   const low=form.querySelector('[data-episode-low-choice]');if(low)low.hidden=true;
   const needed=episodeIssue(err.message,form).field;
   if(needed==='progressD10'){const row=form.querySelector('[data-episode-progress-row]');if(row)row.hidden=false;}
-  if(needed==='directionD10'){const row=form.querySelector('[data-episode-direction-row]');if(row)row.hidden=false;}
+  if(needed==='directionD10'){
+   const row=form.querySelector('[data-episode-direction-row]');if(row)row.hidden=false;
+   // The preview may throw while validating missing Bearing, before it can
+   // compute `result.motion` and publish the dice count. Without this fallback,
+   // the visible Direction d10 confirmation remains disabled at stale count 0.
+   // The rule validator supplies the total required (not number still missing).
+   const count=err.message.match(/Chybí (\d+) platný Direction Hazard d10/i);
+   const input=form.elements.namedItem('directionD10');
+   if(count&&input)input.dataset.episodeExpectedRolls=count[1];
+  }
   const budget=form.querySelector('[data-episode-manual-budget]');
   const modeError=err.message.match(/Orienteering SV ([-\d]+) dovoluje (\d+) Progress\/Bearing Modes, ale bylo použito (\d+)/);
   if(budget&&modeError)budget.textContent='Upravené Orienteering SV '+modeError[1]+' dovoluje '+modeError[2]+' ★. Přiděleno '+modeError[3]+' ★; upravte ruční rozdělení a zkuste znovu.';

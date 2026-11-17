@@ -40,27 +40,36 @@ export function travelBleedingTerm({clock,actorId,wound,state}={}){
   'Pětiminutový Bleeder musí mít automatickou kotvu původní potvrzené zdravotní události');
  check(anchor&&integer(anchor.minute,0,1e9)&&anchor.minute<=clock.minute,
   'Cestovní Bleeder nemá původní doloženou minutu vzniku');
- // A failed SUR/Grievous EXT creates a NEW bleeder at the actual completion
- // of the timed procedure, not at the much earlier time of the original wound.
- // Its end-minute and source event are immutable evidence; do not guess five
- // minutes from the original injury or from combat rounds (HMK p.178).
- const surgeryBleeders=(wound.healing?.treatments||[]).filter(t=>t.surgeryBleeder===true);
+ // HMK pp.178,180: whenever a *confirmed* Treatment actually generates
+ // bleeding on a previously nonbleeding wound, a fresh 5-minute interval starts
+ // at that Treatment's attested end, not at the original injury or an archived
+ // Staunch. This includes F/CF SUR/Grievous EXT, but also a treatment-table
+ // bleeding result such as G5 Edge SUR CS with low Physician Index. Do not
+ // infer an onset from an unconfirmed or untimed Treatment record.
+ const treatmentBleeders=(wound.healing?.treatments||[]).filter(t=>
+  state?.events?.some(e=>e.type==='injury-treatment'&&e.details?.woundId===wound.id&&
+   e.details?.bleedingAfterTreatment===true&&
+   e.details?.roll===t.physicianRoll&&e.details?.physicianIndex===t.physicianIndex&&
+   e.details?.procedureTime?.endMinute===t.procedureTime?.endMinute&&
+   e.details?.procedureTime?.startMinute===t.procedureTime?.startMinute&&
+   e.details?.procedureTime?.gmConfirmed===true&&t.procedureTime?.gmConfirmed===true));
  let bleedingAnchorMinute=anchor.minute;
- if(surgeryBleeders.length){
-  const last=surgeryBleeders.at(-1),end=last.procedureTime?.endMinute;
-  check(integer(end,anchor.minute,clock.minute)&&last.procedureTime?.gmConfirmed===true&&
-    state?.events?.some(e=>e.type==='injury-treatment'&&e.details?.woundId===wound.id&&
-      e.details?.surgeryBleeder===true&&e.details?.bleedingAfterTreatment===true&&
-      e.details?.roll===last.physicianRoll&&e.details?.physicianIndex===last.physicianIndex&&
-      e.details?.procedureTime?.endMinute===end&&e.details?.procedureTime?.gmConfirmed===true),
-   'Chybí doložený okamžik vzniku krvácení po Surgery/Extraction; nelze jej odvodit z času původní rány');
+ if(treatmentBleeders.length){
+  const last=treatmentBleeders.at(-1),end=last.procedureTime?.endMinute;
+  check(integer(end,anchor.minute,clock.minute)&&
+   integer(last.procedureTime?.startMinute,anchor.minute,end-1),
+   'Chybí doložený okamžik nového krvácení po Treatment; nelze použít původní úraz');
   bleedingAnchorMinute=end;
+ }else if((wound.healing?.treatments||[]).some(t=>t.surgeryBleeder===true||t.result?.bleeding===true)){
+  // An old or damaged record that asserts a surgical Bleeder but lacks the
+  // linked immutable event must never reuse the original injury as its onset.
+  throw Error('Chybí potvrzený Treatment doklad pro nové krvácení');
  }
- // A previous completed bleed has an archived nextDueMinute. A later failed
- // operation may reopen the very same wound as a fresh bleeder; the old plan
- // must not silently become the next appointment of this new episode.
+ // A previous completed bleed may retain its archived nextDueMinute. Only
+ // replace that plan when a *later verified* Treatment made the wound bleed
+ // again and the old treatment has no in-progress five-minute Staunch.
  const saved=wound.travelBlood;
- const stalePrior=!!surgeryBleeders.length&&saved?.nextDueMinute<bleedingAnchorMinute+5;
+ const stalePrior=!!treatmentBleeders.length&&saved?.nextDueMinute<bleedingAnchorMinute+5;
  if(stalePrior)check(saved.campaignId===campaignId(clock)&&saved.plan===null,
   'Předchozí krvácení musí být úplně uzavřené ve stejné kampani');
  const prior=stalePrior?null:saved;
