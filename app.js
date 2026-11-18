@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.933';
+const APP_VERSION='93.934';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -25437,12 +25437,22 @@ function episodeFormSnapshot(form){
  // project the same physical animal into the new episode twice.
  if(o.stableAnimalIds?.length&&o.animalIds?.length)
   o.animalIds=o.animalIds.filter(id=>!o.stableAnimalIds.includes(id));
+ // The route-derived Tracking surface is a RULE INPUT, not a separate GM
+ // decision. Capture its actual value before freezing the episode identity;
+ // otherwise the next render sets the road from terrain *after* Evaluate and
+ // falsely blocks the subsequent Awareness test. Explicit GM overrides stay.
+ const roadControl=form.elements.namedItem('trackingRoad');
+ if(['travel','tracking'].includes(o.kind)&&roadControl?.dataset.episodeAutoSource!=='gm')
+  o.trackingRoad=episodeAutomaticTrackingRoad93934(o.terrain);
  // Stable identity is compared as a deterministic transport-role witness.
  // The selectors remain actual per-animal inputs; old campaign receipts need
  // neither migration nor retroactive assignments.
  o.packHandlers93859=JSON.stringify(Object.fromEntries((o.stableAnimalIds||[]).slice().sort()
   .map(id=>[id,String(o['packHandler_'+id]||'')])));
  return o;
+}
+function episodeAutomaticTrackingRoad93934(terrain){
+ return terrain==='paved-road'?'paved':terrain==='unpaved-road'?'unpaved':'none';
 }
 
 document.addEventListener('change',event=>{
@@ -25491,6 +25501,24 @@ function episodeIdentityMismatch(form){
  // Internal confirmation metadata is not a form identity field. Compare
  // only the immutable identity properties, even while the trail is editable.
  const {trackingConfirmed:confirmationMeta,...lockedIdentity}=episodeEvaluatedIdentity;
+ // Compatibility with v93.933's real saved Tracking -> Awareness state:
+ // Evaluate froze the default road='none' BEFORE the existing auto-derivation
+ // correctly applied a paved-road penalty (-4 SV). The already completed
+ // Tracking SV subsequently required Awareness. Do not delete that proof or
+ // recalculate it. Ignore ONLY this proven, auto-derived UI drift; any GM
+ // override or any other identity difference remains strictly forbidden.
+ const roadControl=form.elements.namedItem('trackingRoad');
+ if(lockedIdentity.kind==='tracking'&&lockedIdentity.trackingRoad==='none'&&
+    actual.trackingRoad==='paved'&&snapshot.terrain==='paved-road'&&
+    roadControl?.dataset.episodeAutoSource!=='gm'&&
+    episodePinnedSkillFields.has('trackingProofId')&&
+    !!form.elements.namedItem('trackingProofId')?.value&&
+    ((episodeCurrentGuidedStep?.field==='trackingAwarenessProofId'&&
+      episodeOutstandingSkillTasks.some(t=>t.action==='trackingAwarenessProofId'))||
+     (episodePinnedSkillFields.has('trackingAwarenessProofId')&&
+      !!form.elements.namedItem('trackingAwarenessProofId')?.value))){
+  actual.trackingRoad=lockedIdentity.trackingRoad;
+ }
  // v93.877: precipitation d6 can resolve continuous rain AFTER the episode
  // identity was locked. These three disabled checkboxes are derived from the
  // same weather and terrain; no GM choice or recorded Tracking test changes.
@@ -25526,6 +25554,15 @@ function episodeLockIdentityControls(form){
    if(locked&&!deferred)node.title='Aktivní epizoda: změna je povolena až po dokončení nebo nouzovém zrušení.';
    else if(node.title.startsWith('Aktivní epizoda:'))node.title='';
   }
+ }
+ // Tracking is resolved against the selected ground surface. Once its
+ // rolls start, changing that surface would reinterpret the same receipt.
+ const terrain=form.elements.namedItem('terrain');
+ if(terrain&&locked&&episodeEvaluatedIdentity.kind==='tracking'){
+  terrain.disabled=true;
+  terrain.title='Aktivní Tracking: terén nelze změnit po zahájení hodů.';
+ }else if(terrain?.title==='Aktivní Tracking: terén nelze změnit po zahájení hodů.'){
+  terrain.disabled=false;terrain.title='';
  }
  const status=form.querySelector('[data-episode-trail-status]');
  if(status)status.textContent=locked&&!episodeDeferredTrackingTrailAllowed(form)?
@@ -28791,7 +28828,7 @@ function updateEpisodePreview(form){
  // atmospheric roll and calendar. GM supplies only facts we cannot infer:
  // identity/size of the pursued group, and any unusual surface override.
  if(['travel','tracking'].includes(v.kind)){
-  const autoRoad=v.terrain==='paved-road'?'paved':v.terrain==='unpaved-road'?'unpaved':'none';
+  const autoRoad=episodeAutomaticTrackingRoad93934(v.terrain);
   const road=form.elements.namedItem('trackingRoad');
   if(road&&road.dataset.episodeAutoSource!=='gm')road.value=autoRoad;
   const alpine=form.elements.namedItem('trackingAlpine');
