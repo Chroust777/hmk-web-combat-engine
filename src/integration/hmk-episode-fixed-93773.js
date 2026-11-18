@@ -20,9 +20,6 @@ export function planFixedEpisode93773(window, rows=[], weatherIds=[]){
      !members.includes(row.actorId)){
    errors.push({id,message:'Vyberte členy skupiny a právě jednoho průvodce z jejích členů.'});continue;
   }
-  if(row.kind!=='travel'&&members.length!==1){
-   errors.push({id,message:'Vícečlenná skupina je možná jen při Pochodu; jiná činnost je individuální.'});continue;
-  }
   if(members.some(m=>actors.has(m))){errors.push({id,message:'Postava již vykonává činnost v jiné skupině stejného intervalu.'});continue;}
   if(!Number.isSafeInteger(row.minutes)||row.minutes!==window.minutes){errors.push({id,message:'Činnost musí trvat přesně celý společný interval ('+window.minutes+' min).'});continue;}
   if(typeof row.kind!=='string'||!row.kind){errors.push({id,message:'Vyberte činnost.'});continue;}
