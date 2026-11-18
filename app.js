@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.930';
+const APP_VERSION='93.931';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -28017,7 +28017,7 @@ function sharedEpisodeRowsHTML93772(){
   <td>${sharedFixedMode93773()?`<strong>${sharedTimeWindowDraft.minutes} min</strong><small>Celý interval</small>`:`<input aria-label="Délka činnosti ${index+1}" type="number" min="1" max="${max}" value="${r.minutes||''}" data-shared-plan-minutes="${esc(r.id)}" ${locked?'disabled':''}>`}</td>
   <td><select aria-label="Počasí skupiny ${groupNumber}" data-shared-row-weather="${esc(r.id)}" ${!r.weatherId?'aria-invalid="true"':''} ${locked?'disabled':''}><option value="">— Počasí —</option>${weather.map(w=>`<option value="${esc(w.id)}" ${r.weatherId===w.id?'selected':''}>${esc(w.calendarTrekDayWeather.area)}</option>`).join('')}</select></td>
   <td class="hc-episode-row-state">${slot?`<strong>${esc(displayCampaignMinute(slot.startMinute))}–${esc(displayCampaignMinute(slot.endMinute))}</strong>`:'—'}<small>${esc(status)}${r.actorId&&!sharedFixedMode93773()?' · zbývá '+remaining+' min':''}${error?' · '+esc(error):''}</small></td>
-  <td>${active?`<button type="button" class="secondary" data-shared-plan-revise="${esc(r.id)}" title="Vrátí pouze neuložené testy této skupiny do plánu; ostatní skupiny a uložené doklady se nemění.">Upravit počasí a krajinu</button>`:''}<button type="button" class="secondary" data-shared-plan-remove="${esc(r.id)}" ${locked?'disabled':''} aria-label="Zrušit skupinu ${groupNumber}">Zrušit</button></td></tr>`;
+  <td>${active?`<button type="button" class="secondary" data-shared-plan-revise="${esc(r.id)}" title="Bezpečně vrátí tuto rozpracovanou skupinu do plánu. Až potom lze změnit její globální počasí; krajinu a dopravu nastavíte při novém otevření. Připravené ostatní skupiny zůstanou beze změny.">Vrátit skupinu do plánu</button>`:''}<button type="button" class="secondary" data-shared-plan-remove="${esc(r.id)}" ${locked?'disabled':''} aria-label="Zrušit skupinu ${groupNumber}">Zrušit</button></td></tr>`;
  }).join('')}</tbody></table></div>
  ${!weather.length?'<p class="hc-shared-plan-error" role="alert">Pro dnešní den není potvrzené žádné globální počasí. Zrušte návrh a nejdříve založte denní počasí v kalendáři. Žádný hod v této epizodě nelze provést.</p>':''}
  <p class="hc-hint">Pochod: jedna skupina (jeden či více členů), právě jeden průvodce a jeden společný Orienteering. Skupina 1 a skupina 2 se mohou vyhodnotit samostatně během stejného intervalu; postava nesmí být v obou. Jiné činnosti: jeden řádek na postavu. Sběr a sledování během pochodu se nastavují až rozdělením hvězd. Žádný řádek nevytváří nové počasí.</p>`;
@@ -28945,7 +28945,9 @@ function updateEpisodePreview(form){
  const quick=form.querySelector('[data-episode-transport-quick-status]');if(quick){
   const name=({foot:'Pěšky',mount:'Jízda na zvířeti',cart:'Kára',wagon:'Vůz'})[v.conveyance]||'Bez určení';
   const selected=(v.stableAnimalIds||[]).length;
-  quick.textContent=name+(v.conveyance==='foot'?' · bez povinného jízdního zvířete':
+  quick.textContent=name+(v.conveyance==='foot'?
+   (episodeEvaluationRequested?' · způsob dopravy již uzamčen vyhodnocením.':
+    ' · výchozí volba; před vyhodnocením ji lze změnit na jízdu, káru nebo vůz v nabídce „Způsob dopravy“.'):
    ' · '+selected+' zvířat ve skupině; výběr a nosnost ověří pravidlový postup.');
  }
  const forage=form.querySelector('[data-episode-foraging-fields]');if(forage)forage.hidden=kind!=='forage';
@@ -30545,7 +30547,7 @@ document.addEventListener('click',e=>{
  e.preventDefault();const id=b.dataset.sharedPlanRevise;
  const active=sharedTimeWindowPlans.find(x=>x.id===id);
  if(!active||active.done||id!==sharedTimeWindowActivePlanId||!sharedTimeWindowDraft)return;
- if(!confirm('Změnit počasí nebo krajinu této skupiny? Dosud nerozhodnuté hody a rozpracované testy POUZE této skupiny se zruší a bude nutné je provést znovu. Dokončené skupiny i jejich doklady zůstanou zachované.'))return;
+ if(!confirm('Vrátit právě rozpracovanou skupinu do plánu? Neuložené hody a rozpracované testy POUZE této skupiny se zruší a bude nutné je provést znovu. Potom lze změnit její globální počasí a po opětovném otevření krajinu i dopravu. Dokončené skupiny a jejich doklady zůstanou zachované.'))return;
  try{
   const priorEpoch=episodeDraftEpoch;
   data.journal=data.journal.filter(j=>j.calendarEpisodeSkillLink?.episodeEpoch!==priorEpoch);
@@ -30557,7 +30559,7 @@ document.addEventListener('click',e=>{
   episodeGroupStartingReceiptIds93810=[];episodeQueueAction=false;
   sharedPrepareGroupScratch93769(null);sharedTimeWindowSelectedGroupId=null;
   timeEpisodeDraft=episodeFreshDraft();episodeDraftEpoch=uuid();
-  persistEpisodeDraftSidecar();notice='Právě rozpracovaná skupina byla bezpečně vrácena do plánu. Změňte její počasí; po otevření nastavte krajinu. Dřívější skupiny zůstaly hotové.';render();
+  persistEpisodeDraftSidecar();notice='Rozpracovaná skupina byla vrácena do plánu. Její počasí můžete změnit přímo v plánovacím řádku; po opětovném otevření zvolte krajinu i způsob dopravy. Dřívější skupiny zůstaly hotové.';render();
  }catch(err){alert('Skupinu nelze bezpečně upravit: '+err.message);}
 },true);
 document.addEventListener('click',e=>{
