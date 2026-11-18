@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.937';
+const APP_VERSION='93.938';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -26414,11 +26414,15 @@ function episodePreviewFromForm(form,clock){
    afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow,
    droverSkill:drover,droverActorId:requirement.actorId,animalsPresent:requirement.present,requiredDroverSkill:requirement.skill,
    forcedTrackingBearing:forced});
-  if(lostRecoveryBearing&&orientation.modes.bearing<base.requiredBearing+1)
-   throw Error('Lost (HMK 148): pro návrat na správnou trasu musíte v novém Orienteering skutečně získat a přidělit zvláštní Bearing Mode navíc k povinným Bearing. Pouhé potvrzení GM nestačí.');
+  // Expose the already verified Survival stars before checking Lost recovery.
+  // Otherwise a still-unassigned manual Bearing throws before the one
+  // authoritative allocation chooser can appear, trapping the GM in a
+  // validation error with every mode input/confirmation disabled.
   form.dataset.episodeOrientationStars=String(orientation?.stars??0);
   form.dataset.episodeOrientationSv=String(orientation?.adjustment?.adjustedSV??'');
   form.dataset.episodeOrientationModes=JSON.stringify(orientation?.modes||{});
+  if(lostRecoveryBearing&&orientation.modes.bearing<base.requiredBearing+1)
+   throw Error('Lost (HMK 148): pro návrat na správnou trasu musíte v novém Orienteering skutečně získat a přidělit zvláštní Bearing Mode navíc k povinným Bearing. Pouhé potvrzení GM nestačí.');
  }
  // Tracking light penalty varies (-1 twilight / -3 night). Re-evaluate
  // ONLY when actual Tracking is performed, never block ordinary movement.
