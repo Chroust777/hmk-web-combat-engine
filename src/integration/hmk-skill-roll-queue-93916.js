@@ -1,4 +1,5 @@
 import {specialSecondaryById} from './hmk-special-secondary-routines.js';
+import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 /** HMK v93.916 · rule-aware, noncombat Skill Workbench roll confirmation.
  * Only decorates Skill Tests. Never calculates an HMK result, writes a receipt,
  * advances time, or changes Combat state. The original submit handler remains
@@ -91,6 +92,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie){
    accept.setAttribute('data-hmk-skill-accept-93916',field.name);accept.textContent='Vložit hodnotu';
    accept.setAttribute('aria-label','Vložit hodnotu '+field.name+' d'+faces);
    generator.after(accept);
+   groupConfirmedDieControls93928(field,generator,accept);
    state.set(field.name,{field,generator,accept,accepted:null});fields++;
    accept.addEventListener('click',()=>{
     if(accept.disabled||!inRange(field))return;
@@ -235,6 +237,7 @@ export function decorateSpecialSecondaryRolls93917(root,secureDie,previewPrimary
   const accept=document.createElement('button');accept.type='button';accept.className='secondary hc-small';
   accept.textContent='Vložit hodnotu';accept.setAttribute('data-hmk-special-accept-93917','');
   label.append(input,generate,accept);diceHolder.append(label);
+  groupConfirmedDieControls93928(input,generate,accept);
   const entry={input,label,generate,accept,accepted:null,source:null};
   state.dice.push(entry);
   input.addEventListener('input',()=>{if(entry.accepted!==input.value){entry.accepted=null;entry.source=null;}refresh();});
@@ -320,6 +323,9 @@ export function decorateSpecialSecondaryRolls93917(root,secureDie,previewPrimary
   const label=field.closest('label');const button=document.createElement('button');button.type='button';
   button.className='secondary hc-small';button.setAttribute('data-hmk-special-accept-93917',field.name);
   button.textContent='Vložit hodnotu';label.append(button);
+  const generator=field.nextElementSibling;
+  if(generator?.matches?.('button[data-hmk-general-auto-die],button[data-hmk-skill-auto-die-93916]'))
+   groupConfirmedDieControls93928(field,generator,button);
   button.addEventListener('click',()=>{
    if(button.disabled||!valid(field,100))return;
    if(field===primary){state.primary=field.value;state.will=null;wipeDice();}
