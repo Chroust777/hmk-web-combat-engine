@@ -239,7 +239,7 @@ import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/int
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
 import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,lastNavigationEvidenceBefore,EPISODE_NAVIGATION_EVIDENCE_POLICY_93907,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {episodeEncounterGMReceipt93902,validateEpisodeEncounterGM93902,assertEpisodeEncounterGMAppendOnly93902} from './src/integration/hmk-episode-encounter-gm-93902.js';
@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.935';
+const APP_VERSION='93.936';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2226,7 +2226,7 @@ let episodeCurrentGuidedStep=null;
 // after Evaluate locks the actual episode (and can deadlock the calendar).
 const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','conveyance','travelRideAnimalId','travelRideRiderId','droverActorId','packHandlers93859','memberIds','animalIds','stableAnimalIds',
  'trackingUse','trackingActorId','trackingTrail','trackingRoad','trackingPartyTracked',
- 'trackingSnow','trackingRain','trackingAlpine'];
+ 'trackingSnow','trackingRain','trackingAlpine','trackingScentAnimalId'];
 let skillCompletion93928=null; // UI only: a saved Skill Test must never silently start another d100.
 let episodePendingSkillRequest=null;
 // Only a request initiated by the episode may capture a newly saved Skill Test.
@@ -2765,7 +2765,7 @@ function episodeSetupIssue(form){
 
  if(['travel','tracking'].includes(v.kind)&&!v.memberIds.includes(v.guideId))
   return {field:'guideId',message:'Průvodce musí být vybrán z účastníků epizody.'};
- if(['travel','tracking'].includes(v.kind)){
+ if(v.kind==='travel'){
   // v93.877: never lock an unrepairable riding setup before its first skill.
   // The checked Stable animal and the actual rider are explicit GM choices.
   if(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
@@ -3152,7 +3152,7 @@ function timeEpisodePageHTML(clock,participants){
  <label>Celkový plán cestování (min) <input type="number" min="1" max="10080" value="60" data-shared-window-minutes></label>
 <button type="button" class="secondary" data-shared-window-create>Založit společný interval (bez hodu)</button>
 <button type="button" class="secondary" data-shared-window-cancel hidden>Zrušit návrh společného intervalu</button>
-<div class="hc-shared-planner" data-shared-window-planner hidden><h4>Tabulka činností a skupin</h4><p class="hc-hint">Při Pochodu jeden řádek = jedna skupina (i jednočlenná). Vyberte číslo skupiny, členy a jednoho průvodce. Skupina získá právě jeden společný Orienteering; hvězdy se přidělí až v pravidlovém formuláři. Ostatní činnosti zůstávají individuální. Nikdo nesmí být současně ve dvou skupinách. Všechny hody se připraví před jediným posunem kalendáře.</p><div data-shared-plan-cards></div><button type="button" class="secondary" data-shared-plan-add>+ Přidat řádek činnosti</button><p data-shared-plan-feedback role="alert"></p><button type="button" data-shared-row-run disabled>Vyhodnotit naplánovanou epizodu →</button><p data-shared-row-run-status role="status"></p></div>
+<div class="hc-shared-planner" data-shared-window-planner hidden><h4>Tabulka činností a skupin</h4><p class="hc-hint">Při Pochodu jeden řádek = jedna skupina (i jednočlenná). Vyberte číslo skupiny, členy a jednoho průvodce. Skupina získá právě jeden společný Orienteering; hvězdy se přidělí až v pravidlovém formuláři. Také jiné činnosti může vykonávat vícečlenná skupina bez automatické Assistance. Nikdo nesmí být současně ve dvou skupinách. Všechny hody se připraví před jediným posunem kalendáře.</p><div data-shared-plan-cards></div><button type="button" class="secondary" data-shared-plan-add>+ Přidat řádek činnosti</button><p data-shared-plan-feedback role="alert"></p><button type="button" data-shared-row-run disabled>Vyhodnotit naplánovanou epizodu →</button><p data-shared-row-run-status role="status"></p></div>
 <p data-shared-window-summary role="status"></p>
 </section>
 <form id="hmk-time-episode-form" novalidate>
@@ -3289,6 +3289,16 @@ function timeEpisodePageHTML(clock,participants){
  <label class="hc-check"><input name="trackingRain" type="checkbox"> Nepřetržitý déšť (−1 SV)</label>
  <label class="hc-check"><input name="trackingAlpine" type="checkbox"> Alpská vegetace (−1 SV)</label>
  </div><p class="hc-hint">Sníh, déšť, denní světlo, alpský terén a běžný povrch stopy se určují automaticky z Kalendáře, počasí a trasy. GM zadává pouze počet skutečně sledovaných osob a případnou doloženou výjimku povrchu. Při souvislých srážkách musí být doložen také aktuální srážkový d6.</p></fieldset>
+ <section data-episode-scent-panel class="hc-episode-patient-guide panel">
+ <strong>Zvíře se schopností Scent · vlastní stopovací SV (HMK 353)</strong>
+ <p class="hc-hint">Zvíře se skutečně doloženým Awareness a Scent Indexem může sledovat pach vlastním Success Value testem. Scent se nepřičítá lidskému Tracking SV ani se automaticky nepovažuje za Assistance. GM potvrzuje, zda je použití čichu pro konkrétní zvíře a situaci možné.</p>
+ <label>Konkrétní zvíře se Scent ze Stáje<select name="trackingScentAnimalId"><option value="">— Bez zvířecího Scent testu —</option>${bestiaryKnownAnimals().filter(a=>Number.isSafeInteger(a.spec.aware)&&a.spec.aware>0&&Number.isSafeInteger(a.spec.scent)&&a.spec.scent>0&&typeof a.spec.bestiaryId==='string'&&a.spec.bestiaryId).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)} · Awareness ML ${a.spec.aware} · Scent +${a.spec.scent}</option>`).join('')}</select></label>
+ <div data-episode-scent-details hidden>
+  <label class="hc-check"><input type="checkbox" name="trackingScentPresent"> GM potvrzuje, že toto konkrétní zvíře je se skupinou a může v této situaci sledovat pach</label>
+  <label>Awareness zvířete · skutečný d100<span class="hc-episode-die"><input name="trackingScentD100" type="number" min="1" max="100" placeholder="1–100"><button type="button" data-episode-die="trackingScentD100" data-episode-faces="100">⚄ d100</button></span></label>
+  <p class="hc-hint" data-episode-scent-status role="status">Nejprve vyberte skutečné zvíře. D100 musí být výslovně potvrzen.</p>
+ </div>
+ </section>
  <label data-episode-tracking-new>Doložený Tracking SV (aktuální minuta)<select name="trackingProofId"><option value="">— Vyberte skutečný uložený test —</option>${skillOptions('Tracking')}</select></label></div>
  <div data-episode-tracking-followup hidden><h4>Tracking · výsledek a stopové hvězdy</h4><div class="hmk-trek-grid">
  <label>Awareness při Tracking SV 3–4 ${episodeRuleHelp('Tracking Awareness','HMK 147: pouze skutečný uložený Awareness test postavy v současné minutě může dát 1 Spoor.')}<select name="trackingAwarenessProofId"><option value="">— Vyberte skutečný Awareness test —</option>${skillOptions('Awareness')}</select></label>
@@ -25501,6 +25511,12 @@ function episodeIdentityMismatch(form){
  // Internal confirmation metadata is not a form identity field. Compare
  // only the immutable identity properties, even while the trail is editable.
  const {trackingConfirmed:confirmationMeta,...lockedIdentity}=episodeEvaluatedIdentity;
+ // Existing v93.935-and-earlier episodes have no animal Scent selection.
+ // Preserve the old immutable identity by defaulting ONLY this newly added
+ // optional field to absent; a newly selected animal must not be backfilled
+ // into already evaluated or committed Tracking evidence.
+ if(!Object.prototype.hasOwnProperty.call(lockedIdentity,'trackingScentAnimalId'))
+  lockedIdentity.trackingScentAnimalId='';
  // Compatibility with v93.933's real saved Tracking -> Awareness state:
  // Evaluate froze the default road='none' BEFORE the existing auto-derivation
  // correctly applied a paved-road penalty (-4 SV). The already completed
@@ -25672,6 +25688,12 @@ function episodeSkillReturnBannerHTML(){
 function episodeIssue(message,form){
  // Show the exact missing input, not merely the first member of the party.
  const missing=(names)=>names.find(n=>{const field=form?.elements.namedItem(n);return field&&!String(field.value||'').trim();});
+ // Animal Scent has its own confirmed d100 and GM presence. A blocker
+ // must open that exact control, not the human Tracking Skill Test.
+ if(/^Scent:/i.test(message))return {field:
+  /d100|hod/i.test(message)?'trackingScentD100':
+  /naložen|evidován|evidováno|registrován/i.test(message)?'trackingScentAnimalId':'trackingScentPresent',
+  skill:null,actorId:null};
  if(/dvě denní d10|teplota a srážky/i.test(message)){
   return {field:missing(['temperatureD10','precipitationD10'])||'temperatureD10',skill:null,actorId:null};
  }
@@ -26083,7 +26105,7 @@ function episodePartyLoad(memberIds,conveyance,v=null){
  * ignored even when the horse was once marked as occupied there.
  */
 function episodeHealthyMountRide93823(v,memberIds,clock){
- if(!['travel','tracking'].includes(v.kind)||v.conveyance!=='mount'||(v.transportedMemberIds||[]).length)return null;
+ if(v.kind!=='travel'||v.conveyance!=='mount'||(v.transportedMemberIds||[]).length)return null;
  const cid=campaignKey(clock),choices=(v.stableAnimalIds||[]);
  if(!choices.length)return null;
  const mount=resolveTravelMount93837(verifiedLivestock(data,cid),choices,v.travelRideAnimalId||'');
@@ -26126,7 +26148,7 @@ function episodeHealthyMountRide93823(v,memberIds,clock){
 function episodeDroverRequirement93851(v){
  const stable=[...new Set(v.stableAnimalIds||[])],legacy=[...new Set(v.animalIds||[])];
  const animals=[...new Set([...stable,...legacy])];
- const present=['travel','tracking'].includes(v.kind)&&(v.conveyance!=='foot'||animals.length>0);
+ const present=v.kind==='travel'&&(v.conveyance!=='foot'||animals.length>0);
  const mixed=v.conveyance==='mount'&&animals.length>1;
  const actorId=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length?
   (mixed?(v.droverActorId||v.travelRideRiderId||v.guideId):
@@ -26282,9 +26304,9 @@ function episodePreviewFromForm(form,clock){
     Number.isSafeInteger(minutes)&&minutes>0&&
     Math.floor((clock.minute+minutes-1)/1440)!==Math.floor(clock.minute/1440))
   throw Error('Počasí HMK platí pouze pro daný kalendářní den. Zvolený interval zasahuje za půlnoc; pro další den jsou povinné nové denní d10. Uzavřete nynější úsek do 24:00 a po potvrzení GM pokračujte zvolenou činností s novým denním počasím.');
- // Tracking may lead/ride actual animals without creating fictitious Trek
- // distance. Stationary work ignores stale hidden transport selectors.
- const animalActivity=['travel','tracking'].includes(kind);
+ // Animal conveyance is Trek-only. Standalone activities have no movement
+ // or animal transport; an optional dog's Scent is an independent skill test.
+ const animalActivity=kind==='travel';
  const animals=animalActivity?(v.animalIds||[]).map(id=>character(id)):[];
  const stableAnimals=animalActivity?episodeStableAnimals(v.stableAnimalIds||[],clock):[];
  // v93.812: a mounted journey cannot silently assume tack or a real mount.
@@ -26403,16 +26425,7 @@ function episodePreviewFromForm(form,clock){
   trackerId:v.trackingActorId||guideId,trail:v.trackingTrail,conditions:episodeTrackingConditionsFromContext({
     weatherWatch:precipitation,period:actualPeriod,terrain:v.terrain,
     partyTracked:Number(v.trackingPartyTracked),road:v.trackingRoad||'none'})});
-  if(kind==='tracking'){
-  const need=episodeDroverRequirement93851(v);
-  if(need.present){
-   const original=data.journal.find(j=>j.id===v.droverProofId);
-   const witness=episodeSkillProof(original,need.skill,need.actorId,campaignKey(clock),clock.minute);
-   if(!witness)throw Error('Drover Test: sledování stop se zvířetem vyžaduje '+need.skill+
-     ' Skill Test postavy '+(character(need.actorId)?.name||'Drover')+' (HMK 141).');
-  }
- }
- if(kind==='forage'){
+   if(kind==='forage'){
    // Standalone stationary Foraging is a full HMK 145 Orienteering, not a
    // free d10. No movement, no reused travel SV, +2 SV in the source rule.
    orientation=computeEpisodeOrientation({mode:'new',currentSkill:skillAtMinute(v.orientationProofId,'Survival'),
@@ -26625,6 +26638,19 @@ function episodePreviewFromForm(form,clock){
  // HMK p.150: actual Stalking/Vigilance changes Watchfulness; no invented prey.
  result.trekWatchfulness=['travel','forage'].includes(kind)&&orientation?trekWatchfulness({modes:orientation.modes,conveyance:kind==='forage'?'foot':v.conveyance,
   drovingAnimals:v.conveyance==='foot'&&!!((v.stableAnimalIds||[]).length+(v.animalIds||[]).length)}):null;
+ // Scent is a distinct, GM-confirmed animal Awareness SV, not human Assistance.
+ // A registered scent-capable animal can be selected independently of Trek-only transport.
+ if(v.trackingScentAnimalId&&(kind==='tracking'||trackingMemory)){
+  const a=bestiaryKnownAnimals().find(x=>x.id===v.trackingScentAnimalId);
+  if(!a||!a.spec?.bestiaryId||!Number.isSafeInteger(a.spec.aware)||a.spec.aware<1||!Number.isSafeInteger(a.spec.scent)||a.spec.scent<1)throw Error('Scent: vybrané zvíře s doloženým čichem již není řádně evidováno ve Stáji.');
+  if(loadedStableAnimalIds93879(data,campaignKey(clock)).includes(a.id))throw Error('Scent: zvíře je fyzicky naloženo jako náklad a nemůže současně volně sledovat stopu.');
+  const raw=String(v.trackingScentD100||'').trim();
+  if(!raw||!Number.isSafeInteger(Number(raw))||Number(raw)<1||Number(raw)>100)
+   throw Error('Scent: pro '+a.name+' potvrďte skutečný Awareness d100 (1–100) v části Sledování stop.');
+  result.trackingScent=episodeAnimalScentTracking93936({animalId:a.id,name:a.name,breed:a.spec.bestiaryId,
+   awarenessML:a.spec.aware,scentIndex:a.spec.scent,roll:Number(raw),
+   trackingModifier:trackingMemory?.modifier?.delta||0,gmPresent:v.trackingScentPresent===true});
+ }
  result.trackingMemory=trackingMemory;
  result.daylight=autoLight;
  if(trackingMemory){
@@ -27443,6 +27469,12 @@ function episodePlannedTasks(form){
   add('Tracking · '+(character(v.guideId)?.name||'průvodce'),
    'Vykonejte samostatný Tracking Success Value pro aktuální stopu.',
    'trackingProofId','Tracking',v.trackingActorId||v.guideId);
+ if(v.trackingScentAnimalId&&(['tracking','travel'].includes(v.kind))){
+  const animal=bestiaryKnownAnimals().find(a=>a.id===v.trackingScentAnimalId);
+  add('Zvíře · Scent d100 · '+(animal?.name||'zvíře'),
+   'Samostatný Awareness d100 vybraného zvířete. Potvrďte skutečnou přítomnost zvířete a potom klikněte na „Vložit číslo“. Lidský Tracking SV se nemění.',
+   'trackingScentD100');
+ }
  const incap=new Map((episodeTimedMedical(form)?.incapacitations||[]).map(x=>[x.actorId,x]));
  // The orientation evidence must first establish the episode's actual
  // movement. A prospective travel setup is not proof that an END roll is due.
@@ -28574,7 +28606,7 @@ function updateEpisodePreview(form){
  // Drover is a separate role. Prefer a party member with a relevant, learned
  // mastery only while the episode is still a draft. Do not change a selected
  // actor or replace their witnessed Skill Test after Evaluate.
- if((travel||kind==='tracking')&&!episodeEvaluationRequested){
+ if(travel&&!episodeEvaluationRequested){
   const droverField=form.elements.namedItem('droverActorId');
   if(droverField){
    const current=episodeFormSnapshot(form);const need=episodeDroverRequirement93851(current);
@@ -28661,10 +28693,10 @@ function updateEpisodePreview(form){
  const show=(selector,yes)=>{for(const node of form.querySelectorAll(selector))node.hidden=!yes;};
  show('[data-episode-section="environment"]',true);
  show('[data-episode-travel-geography]',travel);
- // Tracking may be performed with a ridden/led animal or an actual vehicle.
- // Its separate procedure does not automatically credit Trek distance.
+ // Only a Trek moves on the map and assigns animal transport. Standalone Tracking
+ // may use an animal Scent skill but never assumes it is a mount/vehicle.
  const transportSelect=form.querySelector('[data-hmk-transport-conveyance]');
- if(transportSelect?.closest('label'))transportSelect.closest('label').hidden=!(travel||kind==='tracking');
+ if(transportSelect?.closest('label'))transportSelect.closest('label').hidden=!travel;
  show('[data-episode-weather-topography]',true);
  show('[data-episode-landscape-terrain]',outdoor);
  show('[data-episode-weather-geography]',true);
@@ -28767,10 +28799,24 @@ function updateEpisodePreview(form){
   v.trackingUse==='reuse'?'Pouze bezprostřední pokračování téže už potvrzené stopy. Původní Tracking SV musí aplikace skutečně ověřit; nový hod se nekoná.':
   'Zvolte stopaře s Tracking ML nad 0 a napište identitu stopy. Tlačítko „Potvrdit stopu“ následně otevře skutečný Tracking Skill Test.';
  for(const node of form.querySelectorAll('[data-episode-tracking-new]'))node.hidden=!episodeEvaluationRequested||v.trackingUse!=='new';
+ const scentPanel=form.querySelector('[data-episode-scent-panel]');
+ if(scentPanel){
+  scentPanel.hidden=!trackChosen;
+  const dogSelect=form.elements.namedItem('trackingScentAnimalId');
+  if(dogSelect)dogSelect.disabled=!!episodeEvaluationRequested;
+  const dog=bestiaryKnownAnimals().find(a=>a.id===v.trackingScentAnimalId&&!!a.spec?.bestiaryId&&Number.isSafeInteger(a.spec.aware)&&a.spec.aware>0&&Number.isSafeInteger(a.spec.scent)&&a.spec.scent>0);
+  const details=form.querySelector('[data-episode-scent-details]');if(details)details.hidden=!dog;
+  const die=form.elements.namedItem('trackingScentD100'),button=form.querySelector('[data-episode-die="trackingScentD100"]');
+  if(die)die.disabled=!dog||!episodeEvaluationRequested;
+  if(button)button.disabled=!dog||!episodeEvaluationRequested;
+  const present=form.elements.namedItem('trackingScentPresent');if(present)present.disabled=!dog;
+  const note=form.querySelector('[data-episode-scent-status]');
+  if(note)note.textContent=dog?`Potvrzené údaje: ${dog.name} · Awareness ML ${dog.spec.aware} · Scent Index +${dog.spec.scent}. Potvrďte skutečný d100. Výsledkem je samostatné zvířecí SV.`:'Bez evidovaného zvířete se schopností Scent není čichový test.';
+ }
  const droverNeed=episodeDroverRequirement93851(v);
- for(const node of form.querySelectorAll('[data-episode-drover],[data-episode-drover-proof]'))node.hidden=!(travel||kind==='tracking')||!droverNeed.present;
+ for(const node of form.querySelectorAll('[data-episode-drover],[data-episode-drover-proof]'))node.hidden=!travel||!droverNeed.present;
  const droverProofField=form.elements.namedItem('droverProofId');
- if(droverProofField){const active=(travel||kind==='tracking')&&droverNeed.present&&episodeEvaluationRequested;droverProofField.disabled=!active;droverProofField.closest('label')?.classList.toggle('hc-episode-inactive',!active);}
+ if(droverProofField){const active=travel&&droverNeed.present&&episodeEvaluationRequested;droverProofField.disabled=!active;droverProofField.closest('label')?.classList.toggle('hc-episode-inactive',!active);}
  const droverStatus=form.querySelector('[data-episode-drover-requirement]');
  if(droverStatus)droverStatus.textContent=!droverNeed.present?'Bez zvířat se Drover Test neprovádí.':
   'Doložte '+droverNeed.skill+' Skill Test postavy '+(character(droverNeed.actorId)?.name||'vybraný Drover')+
@@ -28880,7 +28926,10 @@ function updateEpisodePreview(form){
    if(b){b.textContent=covered?'Vyložit '+patients.map(c=>c.name).join(', '):'Naložit '+patients.map(c=>c.name).join(', ');b.disabled=!!episodeEvaluationRequested;b.title=episodeEvaluationRequested?'Po vyhodnocení jsou účastníci a přeprava zamčeni. Změna vyžaduje zrušit pouze rozpracovaný postup této skupiny.':'';}
   }
  }
- const transportActivity=travel||kind==='tracking';
+ const transportActivity=travel;
+ // Keep the Stable and the entire travel-animal roster only in Trek.  Non-Trek
+ // members still exist in their groups; no mount/vehicle is assigned to them.
+ show('[data-episode-stable-sync],[data-episode-stable-roster],[data-episode-unmatched-animal]',travel);
  const possibleTransport=transportActivity&&['cart','wagon','mount'].includes(v.conveyance);
  const wheeledTransport=transportActivity&&['cart','wagon'].includes(v.conveyance);
  const transportPanel=form.querySelector('[data-episode-transport-panel]');
@@ -28982,7 +29031,7 @@ function updateEpisodePreview(form){
  }catch(err){loadInfo.textContent=err.message;loadInfo.classList.add('hc-episode-needs-input');}}
  const stableInfo=form.querySelector('[data-episode-stable-load-info]');
  let selectedStable=[];let stableLoadError=null;
- try{selectedStable=episodeStableAnimals(v.stableAnimalIds||[],data.campaignClock);}catch(err){stableLoadError=err.message;}
+ try{selectedStable=travel?episodeStableAnimals(v.stableAnimalIds||[],data.campaignClock):[];}catch(err){stableLoadError=err.message;}
  if(stableInfo)stableInfo.textContent=stableLoadError||(!selectedStable.length?'Ze Stáje není zatím vybrané žádné zvíře.':
   selectedStable.map(a=>a.name+' · ENC '+a.enc+(a.loaded?' · Loaded':' · bez Loaded')).join(' · '));
  const animalLoaded=form.querySelector('[data-episode-animal-loaded]');if(animalLoaded){animalLoaded.hidden=!travel;if(animalLoaded.hidden)form.elements.namedItem('loaded').checked=false;}
@@ -28998,8 +29047,8 @@ function updateEpisodePreview(form){
   const name=({foot:'Pěšky',mount:'Jízda na zvířeti',cart:'Kára',wagon:'Vůz'})[v.conveyance]||'Bez určení';
   const selected=(v.stableAnimalIds||[]).length;
   quick.textContent=!transportActivity?
-   'Tato činnost se provádí bez cestovního transportu. Přítomnost zvířete v jiné činnosti neznamená připsaný pohyb.':
-   name+(kind==='tracking'?' · zvolené skutečné zvíře/vozidlo je evidováno, ale samostatný Tracking NEPŘIPISUJE ušlou vzdálenost ani Trek END. Pro pohyb po mapě použijte Pochod s navázaným Tracking.':'')+
+   'Tato činnost neumožňuje výběr jízdních či tažných zvířat: vzdálenost a doprava se evidují pouze při Pochodu.'+(kind==='tracking'?' Zvíře s ověřeným Scent je možné samostatně použít při stopování v části Dovednosti (HMK 353).':''):
+   name+
     (v.conveyance==='foot'?' · '+selected+' doprovodných zvířat.':' · '+selected+' zvířat; nosnost a role se musí doložit.');
  }
  const forage=form.querySelector('[data-episode-foraging-fields]');if(forage)forage.hidden=kind!=='forage';
@@ -29296,6 +29345,7 @@ function updateEpisodePreview(form){
     ${result.movementRollSources?.progress?`<p>Progress (d10) převzaty z předchozího uloženého výsledku; nevzniká nový hod.</p>`:''}
     ${result.survivalHazard?`<p><b>Survival Hazard (HMK 148)</b> · d10 ${esc(String(v.survivalD10))} → ${esc(({equipment:'Equipment · výstroj',accident:'Accident · nehoda',complication:'Complication · komplikace'})[result.survivalHazard])}. GM musí následně vyřešit konkrétní dopady podle tabulky.</p>`:''}
     ${result.encounterDetails?.length?`<p><b>Encounter · GM:</b> ${result.encounterDetails.filter(e=>!e.pending).length}/${result.encounter.count} doloženo; pevná epizoda oznamuje Encounter až na konci, bez automatického Combatu.</p>`:''}
+    ${result.trackingScent?`<p><b>Zvíře · Scent HMK 353:</b> ${esc(result.trackingScent.name)} · Awareness ML ${result.trackingScent.awarenessML}, d100 ${result.trackingScent.roll} (${result.trackingScent.level}), základ SV ${result.trackingScent.rawSV} + Scent ${result.trackingScent.scentIndex} + prostředí ${result.trackingScent.trackingModifier} = ${result.trackingScent.adjustedSV}, vlastní Spoor ${result.trackingScent.spoorStars} ★. Lidský Tracking SV se nemění.</p>`:''}
     ${result.trackingFollowup?`<p><b>Tracking:</b> ${result.trackingFollowup.spoorStars} Spoor ★; Awareness ${result.trackingFollowup.needsAwareness?'potřebný':'nepotřebný'}; CF Bearing příště ${result.trackingFollowup.forcedBearingNextEpisode?'ANO':'NE'}.</p>`:''}
     ${result.hazardDetails?.length?`<p><b>Navazující Hazards:</b> ${result.hazardDetails.map(h=>esc(h.hazard)+' · '+esc(JSON.stringify(h.result))).join(' | ')}.</p>`:''}
     ${result.weatherSafeShelter?`<p><b>Počasí · skutečné následky:</b> GM doložil bezpečný klimatický úkryt.</p>`:''}
@@ -29416,16 +29466,16 @@ function episodeCarrySettingsFromLast(){
  // Carrying terrain and the party is safe; carrying a Tracking target is not.
  if(settings.kind!=='tracking'){
   for(const k of ['trackingTrail','trackingLight','trackingRoad','trackingPartyTracked',
-   'trackingSnow','trackingRain','trackingAlpine'])delete draft[k];
+   'trackingSnow','trackingRain','trackingAlpine','trackingScentAnimalId'])delete draft[k];
  }
  return {...draft,rememberSettings:true,orientationUse:'new',trackingUse:'none',confirmed:false,
   navigationRecovered:false,checkEncounter:true};
 }
 function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'none',confirmed:false,hazardComplicationRouteChanged:false,
- memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportExtraLb:'0',transportMountAnimalId:'',transportMountHandlerId:'',transportMountHandlerPosition:'leading',travelRideAnimalId:'',travelRideRiderId:'',transportMountConfirmed:false,transportCoLocated:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
+ memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportExtraLb:'0',transportMountAnimalId:'',transportMountHandlerId:'',transportMountHandlerPosition:'leading',travelRideAnimalId:'',travelRideRiderId:'',transportMountConfirmed:false,transportCoLocated:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',trackingScentAnimalId:'',trackingScentD100:'',trackingScentPresent:false,progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
  const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',droverProofId:'',encounterD100Sub:'',
-  progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',
+  progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',trackingScentD100:'',trackingScentPresent:false,trackingScentAnimalId:'',
   temperatureD10:'',precipitationD10:'',
   checkEncounter:true,encounterResolution:'',encounterRollContext:'',navigationRecovered:false,orientationUse:'new',trackingUse:'none',
   hazardComplicationRouteChanged:false,hazardAtMinute:'',hazardMinuteOrigin93868:'manual',hazardDelayNow:'0',
