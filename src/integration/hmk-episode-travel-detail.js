@@ -2,7 +2,7 @@
  * Pure/append-only data. Never fabricates a Skill Test, injury or weather roll.
  */
 import {trekWatchfulness,trekSurpriseProcedure} from './hmk-trekking-wilderness-tasks.js';
-import {successLevel} from '../rules/tests.js';
+import {successLevel,successValue} from '../rules/tests.js';
 const requireTrue=(v,message)=>{if(!v)throw Error(message)};
 const die=(n,s)=>Number.isSafeInteger(n)&&n>=1&&n<=s;
 const levels=['CF','F','S','CS'];
@@ -222,6 +222,27 @@ export function episodeTrackingFollowup({adjustedSV,criticalFailure=false,awaren
   trailCapacity:stars-spoorSpent,
   hasOneSpoor:needsAwareness&&['S','CS'].includes(awarenessLevel),
   forcedBearingNextEpisode:criticalFailure,sourcePage:147};
+}
+/** HMK 353 + 147: a creature tracks with its own Awareness SV + its Scent Index.
+ * This is NOT an assistance modifier on a human Tracking test.  The bestiary
+ * supplies the values; each additional point of SV above 9 grants one Spoor star.
+ * A GM-confirmed presence and d100 are indispensable; no automatic or fabricated roll.
+ */
+export function episodeAnimalScentTracking93936({animalId,name,breed,awarenessML,scentIndex,roll,trackingModifier=0,gmPresent=false}={}){
+ requireTrue(typeof animalId==='string'&&!!animalId&&typeof name==='string'&&!!name&&
+  typeof breed==='string'&&breed.length>0&&
+  Number.isSafeInteger(awarenessML)&&awarenessML>=1&&awarenessML<=100&&
+  Number.isSafeInteger(scentIndex)&&scentIndex>=1&&scentIndex<=20&&
+  Number.isSafeInteger(trackingModifier)&&trackingModifier>=-100&&trackingModifier<=100&&
+  gmPresent===true,'Scent: vyberte skutečně evidované přítomné zvíře s ověřeným Awareness a Scent Index.');
+ requireTrue(die(roll,100),'Scent: doložte a potvrďte skutečný Awareness d100 (1–100) zvířete.');
+ const sl=successLevel(roll,awarenessML),level=['CF','F','S','CS'][sl];
+ const rawSV=successValue({ml:awarenessML,sl});
+ const adjustedSV=rawSV+scentIndex+trackingModifier;
+ return Object.freeze({format:'hmk-animal-scent-tracking-v1',animalId,name,breed,awarenessML,scentIndex,
+  roll,level,rawSV,trackingModifier,adjustedSV,spoorStars:Math.max(0,adjustedSV-4),
+  needsAwareness:adjustedSV>=3&&adjustedSV<=4,sourcePages:[147,353,355],
+  independentAnimalTest:true,humanTrackingBonus:0});
 }
 /** Printed p.149 Cold/Heat Hazard Rolls; the GM supplies actual Area AV,
  * protective shelter and genuine dice. Exposure must be committed in the
