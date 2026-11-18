@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.938';
+const APP_VERSION='93.939';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -25229,7 +25229,9 @@ function episodeHazardSelectionUI93840(form,required){
   const state=episodeHazardState93840(form);
   const minuteAccepted=state.confirmed&&state.context===episodeHazardContext93840(form)&&
    String(state.values.hazardAtMinute??'')===String(minute?.value??'');
-  const minuteDue=required&&roll>=4&&roll<=10&&!minuteAccepted;
+  const failedObstacle=roll>=7&&roll<=10&&form.elements.namedItem('hazardComplicationDecision')?.value==='test'&&
+   (episodeCurrentGuidedStep?.field==='hazardAtMinute'||['F','CF'].includes(form.elements.namedItem('hazardSkillLevel')?.value));
+  const minuteDue=required&&(accident||failedObstacle)&&!minuteAccepted;
   minuteConfirm.hidden=!minuteDue;
   minuteConfirm.disabled=!minuteDue||!pending;
   minuteConfirm.textContent=accident?'Potvrdit minutu nehody':'Potvrdit minutu překážky';
@@ -25313,6 +25315,12 @@ function episodeConfirmedMovementStop93868(form,minutes){
  return Number.isSafeInteger(at)&&at>=1&&at<=minutes?at:null;
 }
 function episodeDieCount93849(form,name){
+ if(/^forageD10(?:_[1-4])?$/.test(name)){
+  const index=Number(name.split('_')[1]||0);
+  return episodeEvaluationRequested&&form.elements.namedItem('kind')?.value==='forage'&&
+   index<Number(form.dataset.episodeStationaryForagingModes||0)&&
+   document.querySelector('.hc-episode-spread-right [data-episode-checklist] [data-episode-jump]')?.dataset.episodeJump===name?1:0;
+ }
  if(/^end_/.test(name)){
   const elapsed=Number(form.elements.namedItem('minutes')?.value||0);
   if(!Number.isSafeInteger(elapsed)||elapsed<1||elapsed>10080)return 0;
@@ -25385,7 +25393,7 @@ function episodeUpdateDiceGuides93849(form){
   const raw=String(input.value||'').trim();
   const label=input.closest('label');
   if(label?.classList.contains('hmk-confirmed-dice-label')){
-   const current=episodeEvaluationRequested&&episodeFocusedTaskField===name&&raw!==accepted;
+   const current=episodeEvaluationRequested&&(episodeCurrentGuidedStep?.field||episodeFocusedTaskField)===name&&(!accepted||raw!==accepted);
    label.classList.toggle('hmk-simple-current-93915',current);
    label.classList.toggle('hmk-simple-done-93915',!!accepted&&raw===accepted);
   }
@@ -25399,6 +25407,11 @@ function episodeUpdateDiceGuides93849(form){
    (count>1?`Zadejte ${count} celé hody d${faces} oddělené čárkami (např. 1,10${count>2?',5':''}).`:
     `Zadejte ${count===0?'žádný hod':`jedno celé číslo 1–${faces}`}.`)+
    (pending?' · Rozpracováno – potvrďte „Vložit číslo“.':accepted?' · Potvrzeno: '+accepted:'');
+  if(/^forageD10(?:_[1-4])?$/.test(name)){
+   input.disabled=count===0;
+   const generator=form.querySelector('[data-episode-die="'+name+'"]');
+   if(generator)generator.disabled=input.disabled;
+  }
   b.disabled=!!input.disabled||count===0||excessEndDice>0;
   b.hidden=!!input.disabled;
   b.setAttribute('aria-label','Potvrdit '+name+': '+(count>1?`${count} hodnot oddělených čárkami`:'jedno celé číslo'));
@@ -25592,7 +25605,7 @@ function episodeLockIdentityControls(form){
  const status=form.querySelector('[data-episode-trail-status]');
  if(status)status.textContent=locked&&!episodeDeferredTrackingTrailAllowed(form)?
   'Identita stopy je uzamčená pro skutečný Tracking doklad.':
-  'Zapište celý název; potvrzení probíhá pouze tlačítkem „Vyhodnotit epizodu“.';
+  'Zapište celý název stopy a vyberte stopaře. V požadovaném kroku použijte „Otevřít Tracking Skill Test“.';
 }
 function episodeNextSkillStep(form){
  const first=episodeCurrentGuidedStep;
@@ -25830,6 +25843,8 @@ function episodeIssue(message,form){
   [/GM potvr|Potvrzení GM/i,'confirmed']
  ];
  const found=rules.find(([pattern])=>pattern.test(message));
+ if(found?.[1]==='trackingProofId'&&!form?.elements.namedItem('trackingActorId')?.value)
+  return {field:'trackingActorId',skill:null,actorId:null};
  if(found){const isTrackingProof=found[1]==='trackingProofId'||found[1]==='trackingAwarenessProofId';const isDrover=found[1]==='droverProofId';return {field:found[1],skill:found[2]||null,actorId:isDrover?droverRule.actorId:form?.elements.namedItem(isTrackingProof?'trackingActorId':'guideId')?.value||null};}
  const explicit=message.match(/(?:whProof|whSkinRows|hazardCompProof|evD4|end)_[\w-]+/);
  return {field:explicit?.[0]||null,skill:null,actorId:null};
@@ -27742,7 +27757,7 @@ function updateEpisodeTaskFocus(form){
   encounter:section.querySelectorAll('.hc-episode-encounter'),
   hazard:section.querySelectorAll('[data-episode-hazard-details]'),
   weather:section.querySelectorAll('[data-episode-weather-details]'),
-  foraging:section.querySelectorAll('[data-episode-trek-foraging]')
+  foraging:section.querySelectorAll('[data-episode-trek-foraging],[data-episode-foraging-fields]')
  };
  // The mandatory-step focus belongs to EVERY evaluated outdoor activity,
  // not just Pochod. Tracking also requires the precipitation d6 stored
@@ -27869,7 +27884,8 @@ function updateEpisodeTaskFocus(form){
     while(row&&row.parentElement!==grid)row=row.parentElement;
     // A proof can live outside the main grid. In that case none of the
     // grid's unrelated input choices should remain available.
-    for(const other of grid.children)if(other!==row)other.classList.add('hc-episode-step-suppressed');
+    for(const other of grid.children)if(other!==row&&!(field==='hazardComplicationSkill'&&
+     other.querySelector('[name="hazardComplicationDecision"],[name="hazardComplicationScope"],[name="hazardWorkerId"]')))other.classList.add('hc-episode-step-suppressed');
     if(row){
      if(row.hidden)row.hidden=false;
      for(let ancestor=target.parentElement;ancestor&&ancestor!==row;ancestor=ancestor.parentElement)
@@ -28328,7 +28344,7 @@ function updateSharedTimeWindowControls(form){
  const summary=document.querySelector('[data-shared-window-summary]');
  if(summary)summary.textContent=active?`GM založil ${sharedTimeWindowDraft.minutes}min okno. ${sharedFixedMode93773()?'Každá postava vykonává právě jednu činnost po celou dobu.':'Starší návrh může obsahovat kratší činnosti.'}`:'Nejprve zvolte dobu a založte interval. Každé skupině pak vyberte potvrzené denní počasí.';
  const cancel=document.querySelector('[data-shared-window-cancel]');if(cancel)cancel.hidden=!active;
- const total=document.querySelector('[data-shared-window-minutes]');if(total){total.disabled=active;total.title=active?'Společný interval je uzamčen. Pro změnu zrušte celý návrh před hody.':'';}
+ const total=document.querySelector('[data-shared-window-minutes]');if(total){if(active)total.value=String(sharedTimeWindowDraft.minutes);total.disabled=active;total.title=active?'Společný interval je uzamčen. Pro změnu zrušte celý návrh před hody.':'';}
  // Show the limiting treatment/medical/day boundary exactly where minutes
  // are chosen. After starting the interval this warning is not repeated.
  const capLine=document.querySelector('[data-shared-window-cap]');
@@ -28806,7 +28822,7 @@ function updateEpisodePreview(form){
  const guidance=form.querySelector('[data-episode-tracking-choice-help]');
  if(guidance)guidance.textContent=v.trackingUse==='none'?'Pouze Stalking: žádný Tracking test, Spoor ani nová identifikace stopy.':
   v.trackingUse==='reuse'?'Pouze bezprostřední pokračování téže už potvrzené stopy. Původní Tracking SV musí aplikace skutečně ověřit; nový hod se nekoná.':
-  'Zvolte stopaře s Tracking ML nad 0 a napište identitu stopy. Tlačítko „Potvrdit stopu“ následně otevře skutečný Tracking Skill Test.';
+  'Zvolte stopaře s Tracking ML nad 0 a napište identitu stopy. Potom klikněte na „Otevřít Tracking Skill Test“.';
  for(const node of form.querySelectorAll('[data-episode-tracking-new]'))node.hidden=!episodeEvaluationRequested||v.trackingUse!=='new';
  const scentPanel=form.querySelector('[data-episode-scent-panel]');
  if(scentPanel){
