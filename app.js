@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.939';
+const APP_VERSION='93.940';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3352,7 +3352,6 @@ function timeEpisodePageHTML(clock,participants){
  <label data-hazard-complication><span class="hc-help-term" tabindex="0" data-hmk-help="HMK 149 · Který test odpovídá skutečné překážce? Agility: úzká stezka na srázu, nerovný sestup nebo brod. Animalcraft: panika zvířat nebo uváznutí v terénu. Climbing: náročný výstup nebo nebezpečný zřícený most. Timbercraft: cesta vyžadující prosekání či odstranění překážejícího porostu. Swimming: hluboký nebo prudký potok či řeka. GM také určí, zda hází jeden řešitel nebo každý účastník zvlášť.">Dovednost komplikace</span><select name="hazardComplicationSkill"><option value="">— není vybrána —</option>${['Agility','Animalcraft','Climbing','Timbercraft','Swimming'].map(x=>option(x,x)).join('')}</select><button type="button" class="secondary hc-small hc-complication-confirm-inline" data-hazard-complication-confirm>Potvrdit dovednost a postup</button></label>
  <label data-hazard-worker>Postava, která provede opravu / vyřeší překážku<select name="hazardWorkerId"><option value="">— vyberte účastníka —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
  <label data-hazard-complication>Koho překážka ovlivňuje<select name="hazardComplicationScope"><option value="single">Jeden vybraný řešitel</option><option value="party">Každý člen družiny zvlášť</option></select></label>
- <label data-hazard-complication class="hc-check"><input name="hazardComplicationRouteChanged" type="checkbox"> Complication CF: Trasa skutečně změněna po CF (HMK 149)</label>
  <div data-hazard-complication-party>${participants.map(c=>`<label data-episode-complication-actor="${esc(c.id)}">${esc(c.name)} · skutečný doklad Skill Testu<select name="hazardCompProof_${esc(c.id)}"><option value="">— dosud nevyhodnoceno —</option>${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute===clock.minute&&j.characterId===c.id&&j.skillTestProof).map(j=>option(j.id,j.title||j.id)).join('')}</select></label>`).join('')}</div>
  <div class="hc-episode-delay-fields" data-episode-delay-fields hidden>
  <h4>Zdržení · skutečné minuty GM (HMK 148–149)</h4>
@@ -12112,7 +12111,8 @@ function hskSkillPhysicalImpactForm(entry){
   try{mlText='Agility ML '+accidentAgilityML93864(x)}catch{}
   return '<option value="'+esc(x.id)+'">'+esc(x.name)+' · '+esc(mlText)+'</option>';
  }).join('');
- const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric"></label>';
+ const accidentStep=(name,label)=>survival?'<button type="button" class="hc-small" data-accident-accept="'+name+'" disabled>Potvrdit '+label+'</button>':'';
+ const dieInput=(name,faces,label)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" inputmode="numeric" data-hmk-dice-when-enabled="true">'+(['impactDie','zoneD10','locationD10'].includes(name)?accidentStep(name,label.split(' –')[0]):'')+'</label>';
  return `<form class="hsk-climb-fall" data-skill-physical-impact>
  <input type="hidden" name="sourceId" value="${esc(entry.id)}"><input type="hidden" name="kind" value="${id}">
  <h4>${survival?'Survival Hazard · HMK str. 148':'Fishing · náhodné zranění d10e · HMK str. 71'}</h4>
@@ -12135,9 +12135,9 @@ function hskSkillPhysicalImpactForm(entry){
  ${dieInput('impactDie',survival?6:10,survival?'Impact d6':'Impact d10e')}
  ${dieInput('zoneD10',10,'ZD d10 – náhodná anatomická zóna')}
  ${dieInput('locationD10',10,'LD d10 – náhodná anatomická lokalita')}
- <label>Skutečný směr dopadu<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select></label>
- <label data-hmk-help="HMK str. 167–169: Shock d100 se odemkne pouze po doloženém kladném účinném Impactu po odečtení skutečné zbroje. Pokud je Impact 0 nebo záporný, tento hod neexistuje." tabindex="0">Shock d100 · po účinném Impactu<input type="number" name="shockD100" min="1" max="100" data-hmk-dice-when-enabled="true" disabled></label>
- <label data-hmk-help="HMK str. 168: Compound d10 se odemkne jen při nové skutečné ráně a již existující kompatibilní nezhojené ráně TÉŽE anatomické lokace a strany. Nejde o nový hod při samotném CF." tabindex="0">Compound d10 · jen při slučování ran<input type="number" name="compoundD10" min="1" max="10" data-hmk-dice-when-enabled="true" disabled></label>
+ <label>Skutečný směr dopadu<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select>${accidentStep('direction','směr')}</label>
+ <label data-hmk-help="HMK str. 167–169: Shock d100 se odemkne pouze po doloženém kladném účinném Impactu po odečtení skutečné zbroje. Pokud je Impact 0 nebo záporný, tento hod neexistuje." tabindex="0">Shock d100 · po účinném Impactu<input type="number" name="shockD100" min="1" max="100" data-hmk-dice-when-enabled="true" disabled>${accidentStep('shockD100','Shock')}</label>
+ <label data-hmk-help="HMK str. 168: Compound d10 se odemkne jen při nové skutečné ráně a již existující kompatibilní nezhojené ráně TÉŽE anatomické lokace a strany. Nejde o nový hod při samotném CF." tabindex="0">Compound d10 · jen při slučování ran<input type="number" name="compoundD10" min="1" max="10" data-hmk-dice-when-enabled="true" disabled>${accidentStep('compoundD10','Compound')}</label>
  </div><p class="tiny" data-hsk-physical-dice-status role="status">Shock a Compound jsou zamčené až do doložení skutečného účinného Impactu a starších ran.</p></div>
  ${survival?'':'<label><input type="checkbox" name="gmConfirmed" required> GM potvrdil skutečné dopady a ochranu zbroje</label>'}
  <button type="button" class="secondary hc-small" data-action="export-working-state">Stáhnout diagnostiku tohoto Hazardu (JSON)</button>
@@ -13756,6 +13756,37 @@ function refreshSkillPhysicalImpactDice(form,{victim=null,failed=false,level=nul
  }
  const status=form.querySelector('[data-hsk-physical-dice-status]');if(status)status.textContent=explanation;
 }
+// Rules decide whether Shock and Compound exist. The form then exposes
+// exactly one of the applicable rolls until its proposed value is accepted.
+function syncTravelAccidentSteps(form,failed){
+ let next=null;
+ for(const button of form.querySelectorAll('[data-accident-accept]')){
+  const name=button.dataset.accidentAccept,field=form.elements.namedItem(name);
+  const optional=name==='shockD100'||name==='compoundD10';
+  const applies=failed&&(!optional||field.required);
+  const accepted=applies&&field.dataset.accidentAccepted===field.value&&field.value!=='';
+  if(!applies)delete field.dataset.accidentAccepted;
+  if(applies&&!accepted&&!next)next=field;
+  const current=field===next;
+  field.disabled=!current;
+  field.classList.toggle('hmk-accident-current',current);
+  const generator=field.nextElementSibling;
+  if(generator?.dataset.hmkGeneralAutoDie==='true')generator.disabled=!current;
+  button.disabled=!current;
+ }
+ return next;
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-accident-accept]');if(!button)return;
+ const form=button.closest('form[data-skill-physical-impact]');
+ const field=form?.elements.namedItem(button.dataset.accidentAccept);
+ if(!field||field.disabled||button.disabled)return;
+ if(!field.value||!field.checkValidity()){field.focus();field.reportValidity();return;}
+ field.dataset.accidentAccepted=field.value;
+ refreshSurvivalHazardFields(form);
+ const next=form.querySelector('.hmk-accident-current')||form.querySelector('[data-hsk-physical-final]');
+ next?.focus();
+});
 function refreshSurvivalHazardFields(form){
  if(!form?.matches?.('[data-skill-physical-impact]')||form.elements.namedItem('kind')?.value!=='survival-accident')return;
  const d=Number(form.elements.namedItem('hazardD10')?.value),isAccident=d>=4&&d<=6;
@@ -13791,12 +13822,30 @@ function refreshSurvivalHazardFields(form){
    rollField.title='⛔ Zamčeno: Agility již bylo výslovně potvrzeno GM.';}
   const random=form.querySelector('[data-hsk-random-victim]');if(random)random.disabled=true;
  }
+ const target=form.elements.namedItem('targetId'),pending=form.dataset.hskAgilityPending==='true';
+ if(rollField){
+  const usable=isAccident&&!!victim&&!error;
+  if(!stageForCampaign&&(!usable||rollField.dataset.accidentVictim!==victim?.id)){
+   rollField.value='';delete rollField.dataset.hmkAutoDice;
+  }
+  rollField.dataset.accidentVictim=victim?.id||'';
+  rollField.disabled=!usable||pending||!!stageForCampaign;
+  rollField.classList.toggle('hmk-accident-current',!rollField.disabled);
+  const generator=rollField.nextElementSibling;
+  if(generator?.dataset.hmkGeneralAutoDie==='true')generator.disabled=rollField.disabled;
+ }
+ if(target){
+  target.classList.toggle('hmk-accident-current',isAccident&&!victim&&!target.disabled);
+  if(target.options.length>1)target.disabled=pending||!!stageForCampaign;
+ }
+ const lottery=form.querySelector('[data-hsk-random-victim]');
+ if(lottery&&target)lottery.disabled=target.disabled;
  if(mlDisplay)mlDisplay.textContent=victim?(
   inspection?'Agility '+victim.name+' · základní ML '+inspection.ml+' · aktuální EML '+inspection.eml+
    ' · výsledný CF/F/S/CS se zobrazí po potvrzení':
    'Agility '+victim.name+' · vyhodnocení EML zablokováno: '+(error||'neověřené podmínky')):
   'Vyberte účastníka; u jmen jsou uvedeny skutečné základní Agility ML.';
- if(confirm){confirm.disabled=!isAccident||!!stageForCampaign||form.dataset.hskAgilityPending==='true'||!victim||!!error||!hasRoll||!inspection?.level;
+ if(confirm){confirm.disabled=!isAccident||!!stageForCampaign||form.dataset.hskAgilityPending==='true'||!victim||!!error||!rollField?.value||!inspection?.level;
   confirm.textContent=accepted?'✓ Agility GM potvrzeno':'✓ Potvrdit Agility d100 a výsledek';}
  const acceptedLevel=accepted&&saved?.fateAgilityProof?
   ['CF','F','S','CS'][Math.min(3,['CF','F','S','CS'].indexOf(inspection.level)+saved.fateAgilityProof.increase)]:inspection?.level;
@@ -13818,8 +13867,9 @@ function refreshSurvivalHazardFields(form){
  }
  const direction=form.elements.namedItem('direction');if(direction)direction.disabled=!failed;
  refreshSkillPhysicalImpactDice(form,{victim,failed,level:acceptedLevel});
- if(final){final.disabled=isAccident&&!accepted;
-  final.title=final.disabled?'Nejprve potvrďte výsledek Agility d100.':'';}
+ const next=syncTravelAccidentSteps(form,failed);
+ if(final){final.disabled=isAccident&&(!accepted||!!next);
+  final.title=next?'Nejprve potvrďte zvýrazněný vstup.':final.disabled?'Nejprve potvrďte výsledek Agility d100.':'';}
  const hint=form.querySelector('[data-hsk-hazard-guidance]');
  if(hint)hint.textContent=!Number.isInteger(d)||d<1||d>10?'Vyplňte skutečný Hazard d10 (1–10).':
   d<=3?'Equipment (1–3): není Agility. Doložte rozhodnutí GM o výstroji.':
@@ -13910,6 +13960,10 @@ document.addEventListener('submit',async event=>{
    j.calendarCampaignId===campaignKey(data.campaignClock)&&j.calendarTimeEpisode.hazardDetails?.some(h=>h.hazard==='accident'&&h.externalMedicalPending)):null;
   const fixedAccident=originalTrek?.calendarTimeEpisode.hazardDetails.find(h=>h.hazard==='accident'&&h.externalMedicalPending);
   if(directAccident&&!fixedAccident)throw Error('Nehoda nemá potvrzený cestovní původ s původním hazard d10.');
+  if(kind==='survival-accident'&&hazardD10>=4&&hazardD10<=6){
+   refreshSurvivalHazardFields(form);
+   if(form.querySelector('[data-hsk-physical-final]')?.disabled)throw Error('Nejprve dokončete zvýrazněný krok nehody.');
+  }
   if(fixedAccident){
    if(!Number.isSafeInteger(fixedAccident.hazardD10)||fixedAccident.hazardD10<4||fixedAccident.hazardD10>6||
     hazardD10!==fixedAccident.hazardD10||data.campaignClock.minute!==originalTrek.calendarTimeEpisode.endMinute)
@@ -14011,7 +14065,15 @@ document.addEventListener('submit',async event=>{
       agilityGMConfirmation:accident?acceptedAgilityProof:null,report:{...report,state:undefined}}});
    }))throw Error('Zranění nebylo uloženo');
   }
-  if(accident)hskFinishAgilityStage93864(sourceId);
+  if(accident){
+   hskFinishAgilityStage93864(sourceId);
+   if(originalTrek){
+    const back=document.createElement('button');
+    back.type='button';back.dataset.hmkExclusiveReturn='';back.textContent='← Vrátit se do Cestování';
+    document.querySelector('main')?.prepend(back);
+    back.focus();
+   }
+  }
   form.replaceWith(Object.assign(document.createElement('p'),{textContent:'Následek byl potvrzen a uložen do historie a příslušného stavu.'}));
  }catch(e){if(out)out.textContent='Následek nebyl zapsán: '+e.message;}
 },true);
@@ -26815,11 +26877,9 @@ function episodePreviewFromForm(form,clock){
    const at=Number(v.hazardAtMinute);
    if(severe&&(!/^[1-9]\d*$/.test(String(v.hazardAtMinute||''))||at>minutes))
     throw Error('Complication při Foraging F/CF: zadejte skutečnou minutu překážky 1–'+minutes+'. Potvrďte ji samostatně.');
-   if(comp.result==='irreparable'&&!v.hazardComplicationRouteChanged)
-    throw Error('Complication CF: GM musí potvrdit změnu trasy.');
    if(severe&&episodeHazardPending93840(form))
     throw Error('Complication: nejdříve potvrďte minutu překážky i její postup tlačítkem Potvrdit postup.');
-   if(severe){comp.hazardAtMinute=at;comp.routeChangeConfirmed=comp.result==='irreparable'&&v.hazardComplicationRouteChanged===true;}
+   if(severe){comp.hazardAtMinute=at;comp.routeChangeConfirmed=comp.result==='irreparable';}
    const worked=severe?Math.min(actualActivityMinutes93869,at):actualActivityMinutes93869;
    result.foragingComplication93875={level:comp.complicationLevel||v.hazardSkillLevel||null,
     result:comp.result,atMinute:severe?at:null,workedMinutes:worked,
@@ -26827,22 +26887,7 @@ function episodePreviewFromForm(form,clock){
     sourcePage:149};
    if(severe)result.movementMinutes=worked;
    result.foragingTimePolicy93869='complication-worked-minutes-v93.875';
-   // Recompute only the yield for minutes actually worked, with the same
-   // already-confirmed d10 and same per-target fractional carry.
-   if(severe&&worked<stationForageMinutes93869){
-    const source=weather.sourceId?data.journal.find(j=>j.id===weather.sourceId):null;
-    const season=source?.calendarTrekDayWeather?.season||source?.calendarTrekWeatherShift?.season||weather.weather?.season||v.season;
-    const partial=new Map();result.standaloneForaging=[];
-    for(let n=0;n<modes.foraging;n++){
-     const target=n===0?v.forageTarget:v['forageTarget'+n],herbName=String(n===0?v.herbName:v['forageHerb'+n]||'').trim();
-     const key=JSON.stringify([target,target==='herbs'?herbName:'']);
-     const carryIn=partial.has(key)?partial.get(key):lastForagingCarry(data.journal,campaignKey(clock),guideId,target,herbName);
-     const die=Number(n===0?v.forageD10:v['forageD10_'+n]);
-     const f=calculateEpisodeForaging({minutes:worked,habitat:v.habitat,season,roll:die,target,herbName,carryIn});
-     result.standaloneForaging.push(f);partial.set(key,f.carryOut);
-    }
-    result.foraging=result.standaloneForaging[0]||null;
-   }
+
   }
  if(kind==='travel'){
    const incoming=equipmentDelayIn;
@@ -26853,8 +26898,6 @@ function episodePreviewFromForm(form,clock){
    const obstacleMinute=Number(v.hazardAtMinute);
    if(failedComplication&&(!/^[1-9]\d*$/.test(String(v.hazardAtMinute||''))||
       obstacleMinute>minutes))throw Error('Complication F/CF: GM musí doložit přesnou minutu překážky v aktuální hlídce.');
-   if(relevant?.hazard==='complication'&&outcome==='irreparable'&&!v.hazardComplicationRouteChanged)
-    throw Error('Complication CF: GM musí potvrdit změnu trasy.');
    // Equipment repair work is independent of Travel; only actual Complication blocks travel.
    if(generalStop93869&&result.hazardDetails.some(h=>h.hazard==='accident'||h.hazard==='complication'&&['F','CF','long-delay','irreparable'].includes(h.result)))
     throw Error('Přerušení: Survival Accident nebo Complication má vlastní potvrzenou minutu. Nedoplňujte druhé zastavení stejné činnosti.');

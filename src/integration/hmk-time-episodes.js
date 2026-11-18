@@ -1489,7 +1489,8 @@ export function validateTimeEpisodes(journal=[]){
     must(JSON.stringify(f)===JSON.stringify(expected),'Samostatný Foraging: změněný d10, cíl nebo přenos.');
     local.set(key,f.carryOut);
    }
-   must(e.foraging===undefined||JSON.stringify(e.foraging)===JSON.stringify(e.standaloneForaging[0]),
+   must(e.foraging===undefined||(e.foraging===null&&e.standaloneForaging.length===0)||
+    JSON.stringify(e.foraging)===JSON.stringify(e.standaloneForaging[0]),
     'Foraging: souhrnný nález neodpovídá doloženým hodům.');
   }
   if(e.foraging&&e.stationaryForagingPolicy!=='hmk-stationary-v93.835'){

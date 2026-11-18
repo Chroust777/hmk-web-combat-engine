@@ -48,3 +48,5 @@
 }
 #app .hc-episode-spread-left .hmk-confirmed-dice-row > button:disabled,
 #app [data-skill-swimming-aftermath] .hmk-confirmed-dice-row > button:disabled{cursor:not-allowed;opacity:.55}
+
+#app [data-skill-physical-impact] .hmk-accident-current { outline: 2px solid #a52c32; background-color: #ffe6e6; }
