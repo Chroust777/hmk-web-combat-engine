@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.940';
+const APP_VERSION='93.941';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7517,6 +7517,7 @@ function characterStableView(owner){
  <div class="folio-chapter-content hmk-stable-owner-column">${folioLeft}</div>
  </section><section class="journal-book-page journal-book-page--right folio-chapter-page hmk-owner-stable-page" aria-label="Pravá stránka: kompletní péče o ${esc(selectedAnimal.name)}">
  <header class="folio-chapter-heading"><h3>${esc(selectedAnimal.name)} · správa</h3><p>Výstroj, náklad, zásoby, výcvik, cestování a historie.</p></header>
+ ${sharedTimeWindowActivePlanId?'<button type="button" class="secondary hc-small" data-hmk-stable-go-travel>← Vrátit se do rozpracovaného Pochodu</button>':''}
  <div class="folio-chapter-content hmk-stable-owner-column">${folioRight}${secondary}</div>
  </section></div>`;
  return journalShell(spread,'journal-book--chapter journal-book--personal-stable',true);
@@ -12136,8 +12137,8 @@ function hskSkillPhysicalImpactForm(entry){
  ${dieInput('zoneD10',10,'ZD d10 – náhodná anatomická zóna')}
  ${dieInput('locationD10',10,'LD d10 – náhodná anatomická lokalita')}
  <label>Skutečný směr dopadu<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select>${accidentStep('direction','směr')}</label>
- <label data-hmk-help="HMK str. 167–169: Shock d100 se odemkne pouze po doloženém kladném účinném Impactu po odečtení skutečné zbroje. Pokud je Impact 0 nebo záporný, tento hod neexistuje." tabindex="0">Shock d100 · po účinném Impactu<input type="number" name="shockD100" min="1" max="100" data-hmk-dice-when-enabled="true" disabled>${accidentStep('shockD100','Shock')}</label>
  <label data-hmk-help="HMK str. 168: Compound d10 se odemkne jen při nové skutečné ráně a již existující kompatibilní nezhojené ráně TÉŽE anatomické lokace a strany. Nejde o nový hod při samotném CF." tabindex="0">Compound d10 · jen při slučování ran<input type="number" name="compoundD10" min="1" max="10" data-hmk-dice-when-enabled="true" disabled>${accidentStep('compoundD10','Compound')}</label>
+ <label data-hmk-help="HMK str. 167–169: Shock d100 se odemkne pouze po doloženém kladném účinném Impactu po odečtení skutečné zbroje. Pokud je Impact 0 nebo záporný, tento hod neexistuje." tabindex="0">Shock d100 · po účinném Impactu<input type="number" name="shockD100" min="1" max="100" data-hmk-dice-when-enabled="true" disabled>${accidentStep('shockD100','Shock')}</label>
  </div><p class="tiny" data-hsk-physical-dice-status role="status">Shock a Compound jsou zamčené až do doložení skutečného účinného Impactu a starších ran.</p></div>
  ${survival?'':'<label><input type="checkbox" name="gmConfirmed" required> GM potvrdil skutečné dopady a ochranu zbroje</label>'}
  <button type="button" class="secondary hc-small" data-action="export-working-state">Stáhnout diagnostiku tohoto Hazardu (JSON)</button>
@@ -13758,12 +13759,12 @@ function refreshSkillPhysicalImpactDice(form,{victim=null,failed=false,level=nul
 }
 // Rules decide whether Shock and Compound exist. The form then exposes
 // exactly one of the applicable rolls until its proposed value is accepted.
-function syncTravelAccidentSteps(form,failed){
+function syncTravelAccidentSteps(form,failed,{animal=false}={}){
  let next=null;
  for(const button of form.querySelectorAll('[data-accident-accept]')){
   const name=button.dataset.accidentAccept,field=form.elements.namedItem(name);
   const optional=name==='shockD100'||name==='compoundD10';
-  const applies=failed&&(!optional||field.required);
+  const applies=failed&&(!optional||field.required)&&!(animal&&name==='direction');
   const accepted=applies&&field.dataset.accidentAccepted===field.value&&field.value!=='';
   if(!applies)delete field.dataset.accidentAccepted;
   if(applies&&!accepted&&!next)next=field;
@@ -13865,9 +13866,14 @@ function refreshSurvivalHazardFields(form){
  for(const name of ['impactDie','zoneD10','locationD10']){
   const control=form.elements.namedItem(name);if(control)hmkSyncConditionalRollField(control,failed);
  }
- const direction=form.elements.namedItem('direction');if(direction)direction.disabled=!failed;
+ const animal=!!victim?.hmk?.verifiedMountedBreed;
+ const direction=form.elements.namedItem('direction');
+ if(direction){
+  direction.disabled=!failed||animal;
+  const label=direction.closest('label');if(label)label.hidden=animal;
+ }
  refreshSkillPhysicalImpactDice(form,{victim,failed,level:acceptedLevel});
- const next=syncTravelAccidentSteps(form,failed);
+ const next=syncTravelAccidentSteps(form,failed,{animal});
  if(final){final.disabled=isAccident&&(!accepted||!!next);
   final.title=next?'Nejprve potvrďte zvýrazněný vstup.':final.disabled?'Nejprve potvrďte výsledek Agility d100.':'';}
  const hint=form.querySelector('[data-hsk-hazard-guidance]');
@@ -25802,8 +25808,10 @@ function episodeIssue(message,form){
   return {field:'navigationRecoveryAwarenessProofId',skill:'Awareness',actorId:form?.elements.namedItem('guideId')?.value||null};
  if(/Upravený Orienteering SV .*dovoluje .*Modes, ale bylo použito/i.test(message))
   return {field:'orientationAllocation',skill:null,actorId:null};
+ if(message.startsWith('Lost (HMK 148): tento test nedal dost ★'))
+  return {field:'navigationRecovered',skill:null,actorId:null};
  if(/Lost \(HMK 148\):.*zvláštní Bearing Mode|Lost vyžaduje zvláštní Bearing/i.test(message))
-  return {field:'mode_bearing',skill:null,actorId:null};
+  return {field:'orientationAllocation',skill:null,actorId:null};
  // Every completion blocker must lead to a named step. v93.688.
  if(/Equipment Hazard.*zdržení|Equipment Hazard.*následující hlídku|Úspěch CS nezpůsobuje zdržení/i.test(message))
   return {field:'hazardDelayNow',skill:null,actorId:null};
@@ -26498,6 +26506,8 @@ function episodePreviewFromForm(form,clock){
   form.dataset.episodeOrientationStars=String(orientation?.stars??0);
   form.dataset.episodeOrientationSv=String(orientation?.adjustment?.adjustedSV??'');
   form.dataset.episodeOrientationModes=JSON.stringify(orientation?.modes||{});
+  if(lostRecoveryBearing&&orientation.stars+forced<base.requiredBearing+1)
+   throw Error('Lost (HMK 148): tento test nedal dost ★ na zvláštní Bearing. Zrušte pokus o návrat na trasu a pokračujte ve stavu Lost se stejným hodem.');
   if(lostRecoveryBearing&&orientation.modes.bearing<base.requiredBearing+1)
    throw Error('Lost (HMK 148): pro návrat na správnou trasu musíte v novém Orienteering skutečně získat a přidělit zvláštní Bearing Mode navíc k povinným Bearing. Pouhé potvrzení GM nestačí.');
  }
@@ -28403,6 +28413,15 @@ function updateSharedTimeWindowControls(form){
     maximum===0?'Nyní nelze zahájit nový interval: splatná '+(reason||'povinná událost')+'. Nejprve ji dokončete v Kalendáři.':
     'Maximální délka nového intervalu: '+maximum+' minut (do '+displayCampaignMinute(data.campaignClock.minute+maximum)+').'+
     (reason&&cap.maxAllowed<=dayLimit?' Poté: '+reason+'.':dayLimit<=cap?.maxAllowed?' Hranice kalendářního dne; pro další den se potvrzuje nové počasí.':'');
+   if(maximum===0&&source?.kind==='weather-skin'&&character(source.characterId)){
+    const open=document.createElement('button');
+    open.type='button';
+    open.className='secondary';
+    open.textContent='Otevřít kožní následek · '+character(source.characterId).name;
+    open.addEventListener('click',()=>focusCalendarRuleAction(
+     character(source.characterId),source.kind,source.sourceId));
+    capLine.append(' ',open);
+   }
   }
  }
  const create=document.querySelector('[data-shared-window-create]');if(create){create.disabled=active||episodeUnresolvedGeneralStops93869(data.campaignClock).length>0;create.hidden=active;}

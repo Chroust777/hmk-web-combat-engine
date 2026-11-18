@@ -1,0 +1,106 @@
+/** HMK 1.2 pp.71,148,167-170: skill-generated physical injuries.
+ * Pure preview: no storage, invented dice or character mutations.
+ * The caller commits the returned state and proof in one verified transaction.
+ */
+import {prepareAnimalSurvivalAccident} from './hmk-skill-animal-survival-539.js';
+import {fateEligibility93866,fateEML93866,fateRoll93866} from './hmk-fate-routine-93866.js';
+import {humanLocation,woundFromFall} from './hmk-mounted-fall-injury-join.js';
+import {resolveLiveCombatArmour} from './live-combat-armour.js';
+import {resolveCombatantLoad} from './combatant-load.js';
+import {projectLiveInjuries} from './live-injury-impairment.js';
+import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
+import {successLevel} from '../rules/tests.js';
+import {availableMasteries} from './hmk-skill-test-engine.js';
+const must=(ok,msg)=>{if(!ok)throw Error(msg)};
+const die=(v,max)=>Number.isSafeInteger(v)&&v>=1&&v<=max;
+function rollProof(...rows){return rows.map(([faces,value,source])=>({faces,value,source:source==='cryptographic-software-die'?'cryptographic-software-die':'GM-entered-physical-die'}));}
+const mastery=(actor,name)=>{
+ // HMK p.61: attributes are legitimate primary test masteries (score × 5).
+ // Character Creation stores Agility as hmk.attributes.agl, NOT as a Skill.
+ const a=availableMasteries(actor).filter(x=>x.name.toLowerCase()===name.toLowerCase());
+ must(a.length===1&&Number.isSafeInteger(a[0].ml)&&a[0].ml>0,`Není doloženo ML ${name} cílové postavy`);
+ return a[0].ml;
+};
+export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,round=1,gmConfirmed=false,
+ impactDie,zoneD10,locationD10,direction='front',shockD100=null,compoundD10=null,
+ hazardD10=null,agilityD100=null,randomVictimConfirmed=false,autoDieValues={},originMinute=null,fateShockProof=null,fateAgilityProof=null}={}){
+ must(['fishing-cf','survival-accident'].includes(kind),'Neznámý typ zranění Skill Tests');
+ must(gmConfirmed===true&&actor?.id&&Array.isArray(inventory)&&state&&typeof sourceId==='string'&&sourceId&&
+  die(round,9999),'Nutné potvrzení GM, cílová postava, aktuální Combat State a zdroj události');
+ validateCombatState(state);
+ if(actor.kind==='Animal'&&!actor.hmk?.verifiedMountedBreed)
+  throw Error('Neověřené zvíře nemůže použít lidskou anatomii; je nutný registr s plemenem HMK 355');
+ if(kind==='fishing-cf'&&actor.hmk?.verifiedMountedBreed)
+  throw Error('Rybářské CF fyzické následky nepatří na zvířecí profil');
+ if(kind==='survival-accident'&&actor.hmk?.verifiedMountedBreed)
+  return prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,round,gmConfirmed,
+   impactDie,zoneD10,locationD10,shockD100,compoundD10,hazardD10,agilityD100,randomVictimConfirmed,originMinute,autoDieValues});
+ const evt='skill-injury:'+kind+':'+sourceId;
+ must(!state.events.some(x=>x.id===evt||x.id===evt+':complete'),'Tento následek už je trvale zapsán');
+ const limit=kind==='fishing-cf'?10:6;
+ // A generated roll is witnessed only when the exact form value still equals
+ // its cryptographic button result. All others remain physical/GM entries.
+ const dieEvidence=(name,faces,value)=>[faces,value,autoDieValues?.[name]===value?'cryptographic-software-die':'GM-entered-physical-die'];
+ let sl=null,eml=null;
+ if(kind==='survival-accident'){
+  must(randomVictimConfirmed===true,'GM musí doložit náhodný výběr postiženého člena družiny');
+  must(die(hazardD10,10)&&hazardD10>=4&&hazardD10<=6,
+   'Survival Accident vzniká jen při Survival Hazard d10 v rozsahu 4–6');
+  must(die(agilityD100,100),'Survival Accident vyžaduje fyzický Agility d100');
+  const load=resolveCombatantLoad({character:actor,inventory});
+  must(load.ready&&load.encReady&&load.bulkReady,'Agility test nemá doložené ENC a Bulk');
+  const injury=projectLiveInjuries({state,round,test:'agility',usedArms:['left','right'],timelineId:'skill:'+sourceId});
+  must(injury.ready&&!injury.unusable&&!injury.stunned&&state.shock==='NONE',
+   'Nelze doložit Agility test při aktuálním Shock / zraněních');
+  eml=mastery(actor,'Agility')-combatFatigueTotals(state).total+load.agilityAndMeleePenalty+injury.modifier;
+  sl=['CF','F','S','CS'][successLevel(agilityD100,eml)];
+  const originalSL=sl;
+  if(fateAgilityProof){
+   must(actor.kind==='PC'&&fateAgilityProof.actorId===actor.id&&fateAgilityProof.skill==='Agility'&&
+    fateAgilityProof.originalD100===agilityD100&&fateAgilityProof.originalLevel===originalSL,
+    'Fate Agility musí navazovat na původní test a identitu PC.');
+   const check=fateEligibility93866(actor,{skillGroup:'Physical'});
+   must(check.ok,check.reason||'Fate Agility není dovolen.');
+   const fateEML=fateEML93866(actor,{skillGroup:'Physical',attributeTest:true,bonus:fateAgilityProof.emlProof?.bonus||0});
+   const result=fateRoll93866({originalLevel:originalSL,eml:fateEML.eml,roll:fateAgilityProof.roll,
+    csChoice:fateAgilityProof.csChoice??1});
+   must(result.cost===fateAgilityProof.cost&&result.increase===fateAgilityProof.increase&&
+    fateAgilityProof.eml===fateEML.eml,'Fate Agility má nedoložený výsledek.');
+   sl=result.afterLevel;
+  }
+  if(['S','CS'].includes(sl)){
+   must(impactDie==null&&zoneD10==null&&locationD10==null&&shockD100==null&&compoundD10==null,
+    'Při úspěšném Agility nejsou fyzické Injury hody přípustné');
+   const next=structuredClone(state);next.events.push({id:evt,type:'skill-survival-accident-avoided',round,
+    details:{sourceId,agilityD100,eml,sl,hazardD10,rulePage:148,randomVictimConfirmed:true}});
+   next.lastRound=Math.max(next.lastRound,round);validateCombatState(next);
+   return {state:next,kind,sourceId,sl,eml,fateAgilityProof,injury:null,avoided:true,physicalDice:rollProof(dieEvidence('hazardD10',10,hazardD10),dieEvidence('agilityD100',100,agilityD100))};
+  }
+ }
+ must(die(impactDie,limit)&&die(zoneD10,10)&&die(locationD10,10),
+  'Chybí fyzický Impact d'+limit+', ZD d10 nebo LD d10');
+ must(['front','rear','side'].includes(direction),'Chybí skutečný směr dopadu');
+ const load=resolveCombatantLoad({character:actor,inventory});
+ must(load.ready&&load.encReady&&load.bulkReady,'Ochrana zbroje není potvrzena: opravte vrstvení');
+ const loc=humanLocation(zoneD10,locationD10),aspect=kind==='fishing-cf'?'e':'b';
+ const armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:loc.location,aspect,direction,mode:'auto',rigidStatus:'unknown'});
+ must(armour.ready,'Neznámá skutečná ochrana zbroje pro '+loc.location+': '+(armour.reason||'neověřeno'));
+ const impact=impactDie+(kind==='survival-accident'?4+(sl==='CF'?5:0):0);
+ const dice=rollProof(...(kind==='survival-accident'?[dieEvidence('hazardD10',10,hazardD10),dieEvidence('agilityD100',100,agilityD100)]:[]),
+  dieEvidence('impactDie',limit,impactDie),dieEvidence('zoneD10',10,zoneD10),dieEvidence('locationD10',10,locationD10),
+  ...((shockD100==null)?[]:[dieEvidence('shockD100',100,shockD100)]),
+  ...((compoundD10==null)?[]:[dieEvidence('compoundD10',10,compoundD10)]));
+ const applied=woundFromFall({state,character:actor,round,timelineId:'skill:'+sourceId,eventId:evt,
+  bodyKind:'human',aspect,location:loc.location,side:loc.side,locationShock:loc.locationShock,
+  strikeImpact:impact,AV:armour.armourValue,shockRoll:shockD100,compoundD10,physicalDice:dice,fateShockProof,
+  ...(kind==='survival-accident'?{injuryOrigin:'travel-accident',originMinute,medicalSourceId:sourceId}:{})});
+ const next=structuredClone(applied.state);
+ next.events.push({id:evt+':complete',type:'skill-physical-consequence',round,details:{kind,sourceId,
+  impact,aspect,location:loc.location,side:loc.side,armourValue:armour.armourValue,
+  effectiveImpact:applied.effectiveImpact,injury:applied.injury,sl,eml,physicalDice:dice,
+  rulePage:kind==='fishing-cf'?71:148}});
+ next.lastRound=Math.max(next.lastRound,round);validateCombatState(next);
+ return {state:next,kind,sourceId,sl,eml,impact,aspect,location:loc.location,
+  armourValue:armour.armourValue,effectiveImpact:applied.effectiveImpact,
+  injury:applied.injury,shock:applied.shockSL,fateAgilityProof,fateShockProof:applied.fateShockProof||fateShockProof,physicalDice:dice,avoided:false};
+}

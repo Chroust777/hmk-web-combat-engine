@@ -34,7 +34,7 @@ export function prepareSkillPhysicalInjury({kind,actor,inventory,state,sourceId,
   throw Error('Rybářské CF fyzické následky nepatří na zvířecí profil');
  if(kind==='survival-accident'&&actor.hmk?.verifiedMountedBreed)
   return prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,round,gmConfirmed,
-   impactDie,zoneD10,locationD10,shockD100,compoundD10,hazardD10,agilityD100,randomVictimConfirmed,originMinute});
+   impactDie,zoneD10,locationD10,shockD100,compoundD10,hazardD10,agilityD100,randomVictimConfirmed,originMinute,autoDieValues});
  const evt='skill-injury:'+kind+':'+sourceId;
  must(!state.events.some(x=>x.id===evt||x.id===evt+':complete'),'Tento následek už je trvale zapsán');
  const limit=kind==='fishing-cf'?10:6;

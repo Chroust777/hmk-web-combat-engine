@@ -10,10 +10,11 @@ import {combatFatigueTotals,validateCombatState} from './persistent-combat-state
 import {successLevel} from '../rules/tests.js';
 const requireFact=(ok,message)=>{if(!ok)throw Error(message)};
 const isDie=(value,faces)=>Number.isSafeInteger(value)&&value>=1&&value<=faces;
-const roll=(faces,value)=>({faces,value,source:'GM-entered-physical-die'});
 export function prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,round=1,gmConfirmed=false,
  hazardD10,agilityD100,randomVictimConfirmed=false,impactDie=null,zoneD10=null,locationD10=null,
- shockD100=null,compoundD10=null,originMinute=null}={}){
+ shockD100=null,compoundD10=null,originMinute=null,autoDieValues={}}={}){
+ const roll=(name,faces,value)=>({faces,value,source:autoDieValues?.[name]===value?
+  'cryptographic-software-die':'GM-entered-physical-die'});
  requireFact(gmConfirmed===true&&actor?.id&&state&&Array.isArray(inventory)&&typeof sourceId==='string'&&sourceId&&isDie(round,9999),
   'Survival Accident zvířete vyžaduje původní postavu, Combat State, událost a souhlas GM');
  const breed=actor.hmk?.verifiedMountedBreed;
@@ -36,7 +37,7 @@ export function prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,ro
   'Agility zvířete nelze doložit při současných zraněních: '+(impairment.reason||'nepoužitelné končetiny'));
  const eml=agl*5-combatFatigueTotals(state).total+impairment.modifier;
  const sl=['CF','F','S','CS'][successLevel(agilityD100,eml)];
- const dice=[roll(10,hazardD10),roll(100,agilityD100)];
+ const dice=[roll('hazardD10',10,hazardD10),roll('agilityD100',100,agilityD100)];
  if(sl==='S'||sl==='CS'){
   requireFact([impactDie,zoneD10,locationD10,shockD100,compoundD10].every(x=>x===null),
    'Při úspěšné Agility nejsou potřeba Impact, ZD, LD, Shock ani Compound');
@@ -54,9 +55,9 @@ export function prepareAnimalSurvivalAccident({actor,state,inventory,sourceId,ro
  const impact=probe.strikeImpact,av=probe.naturalBluntAV;
  if(shockD100!==null)requireFact(isDie(shockD100,100),'Shock potřebuje skutečný d100');
  if(compoundD10!==null)requireFact(isDie(compoundD10,10),'Compound potřebuje skutečný d10');
- dice.push(roll(6,impactDie),roll(10,zoneD10),roll(10,locationD10));
- if(shockD100!==null)dice.push(roll(100,shockD100));
- if(compoundD10!==null)dice.push(roll(10,compoundD10));
+ dice.push(roll('impactDie',6,impactDie),roll('zoneD10',10,zoneD10),roll('locationD10',10,locationD10));
+ if(shockD100!==null)dice.push(roll('shockD100',100,shockD100));
+ if(compoundD10!==null)dice.push(roll('compoundD10',10,compoundD10));
  if(probe.miss){
   requireFact(shockD100===null&&compoundD10===null,
    'ZD minulo tělo zvířete: nesmí vzniknout neexistující Shock ani Compound');

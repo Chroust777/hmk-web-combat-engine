@@ -50,3 +50,13 @@
 #app [data-skill-swimming-aftermath] .hmk-confirmed-dice-row > button:disabled{cursor:not-allowed;opacity:.55}
 
 #app [data-skill-physical-impact] .hmk-accident-current { outline: 2px solid #a52c32; background-color: #ffe6e6; }
+
+#app input[name^="whRoll_"].hc-episode-needs-input {
+  border-color: #a4251e !important;
+  outline: 2px solid #a4251e !important;
+  background: #ffe6e6 !important;
+}
+
+#app [data-skill-physical-impact] label[hidden]:has(> select[name="direction"]) {
+  display: none !important;
+}
