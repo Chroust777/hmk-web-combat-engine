@@ -105,3 +105,14 @@ Tento soupis obsahuje **doložené, explicitní projektové odchylky a jejich oc
 **10.9 Způsob předávání a zachování dat.** Předat jen skutečně změněné produkční soubory se správnými relativními cestami; soubory určené k odstranění **explicitně vyjmenovat**, protože nahrání ZIPu na GitHub staré soubory samo nesmaže. Nové globální pravidlo nemá samo o sobě povolení měnit pravidlové výpočty, stávající funkční grafiku, schválené GM výjimky ani uložené kampaně. **Tento kontrakt je jedním autoritativním projektovým dokumentem**: neodvozovat pro tutéž zásadu druhý konkurenční dokument s odlišným zněním.
 
 **10.10 Přednost a převzetí do dalších chatů.** Toto výslovné rozhodnutí z 18. 11. 2026 má pro metodiku budoucích oprav přednost před starším obecným doporučením „přidej CSS přepis“ či jinou technickou zkratkou. Nelze z něj však odvozovat změnu pravidel HMK v1.2 nebo předchozí výslovně schválené UI výjimky. Při každém dalším zadání načíst aktuální tento kontrakt z **nejnovějšího uživatelem dodaného FULL ZIPu / přiloženého projektového souboru**; pouhá existence v GitHubu nezaručuje, že jej jiný chat automaticky načte.
+
+
+## 11. Společný časový interval a samostatné počasí skupin (18. 11. 2026, v93.933)
+
+**[NOVÉ VÝSLOVNÉ ROZHODNUTÍ VLASTNÍKA – ZÁVAZNÉ]** Společný časový interval slouží jen ke stanovení **celkové plánované délky v minutách** a k jedinému závěrečnému potvrzení času. Při založení intervalu **nevybírat ani nevynucovat výchozí globální počasí**, nepřenášet je automaticky do nových skupin.
+
+Každá plánovaná skupina/činnost si před svým vyhodnocením **samostatně vybere platné, již v Kalendáři GM potvrzené denní počasí**. Výběr se ukládá jako vlastnost daného řádku skupiny a zůstává nezávislý na ostatních skupinách; bez platného výběru se pravidlové testy skupiny nespustí. Žádné nové počasí ani nové kostky se tím nevytvářejí.
+
+Odstranit dosavadní tlačítko **„Vrátit skupinu do plánu“**, které bylo přidáno kvůli opravě počasí již rozpracované skupiny, a jeho nevyužitou obsluhu; zachovat běžné možnosti změny plánu **před zahájením testů** i možnost bezpečně zrušit celý neuzavřený interval. Z bezpečnostních důvodů nedovolit nepřiznanou změnu počasí skupiny po zahájení jejích testů ani přepočítání již potvrzených dokladů.
+
+**Kompatibilita:** starší rozpracovaná okna mohou mít v původním sidecaru pole `sharedDefaultWeatherId`; při jejich obnově se ignoruje, ale explicitní `weatherId` již připravených řádků skupin zůstává beze změny. Neměnit autoritu času Kalendáře ani historii kampaně.
