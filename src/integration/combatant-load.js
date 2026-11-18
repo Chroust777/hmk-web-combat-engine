@@ -182,7 +182,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   let physicalWeight=p?.weightLb;
   if(Number.isFinite(physicalWeight)&&Number.isFinite(item.waterContentsLb))physicalWeight+=item.waterContentsLb/item.quantity;
   if(item.snapshot?.category==='armor'&&typeof item.sourceItemId==='string'&&item.sourceItemId.startsWith('hmk:armour:p118:')){
-   const verified=resolveOwnedArmourArticle(item,{allowCarried:true});
+   const verified=resolveOwnedArmourArticle(item,{allowCarried:true,weightOnly:true});
    if(!verified.ready){issues.push(`${item.id}: stowed HMK armour is not source-verified: ${verified.reason}`);continue;}
    physicalWeight=verified.article.weightLb;
   }

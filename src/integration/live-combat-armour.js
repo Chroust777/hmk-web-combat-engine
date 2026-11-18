@@ -36,8 +36,10 @@ const sameArray=(a,b)=>Array.isArray(a)&&a.length===b.length&&[...a].sort().ever
 /** Strictly establish that an inventory snapshot still expresses the audited p118
  * article. We don't silently replace the owned snapshot with a newer definition.
  */
-export function resolveOwnedArmourArticle(item,{allowCarried=false}={}){
- if(equipmentUnusable(item))return fail('Poškozená nebo neopravitelná zbroj neposkytuje použitelnou ochranu');
+export function resolveOwnedArmourArticle(item,{allowCarried=false,weightOnly=false}={}){
+ // Broken armour still has its verified mass in Gear ENC. It cannot be worn
+ // or become a candidate for any protection or outfit calculation.
+ if(equipmentUnusable(item)&&!(weightOnly&&allowCarried&&item?.slot==='carried'))return fail('Poškozená nebo neopravitelná zbroj neposkytuje použitelnou ochranu');
  const rightSlot=allowCarried?item?.slot==='carried':item?.slot==='worn';
  const rightQuantity=allowCarried?Number.isSafeInteger(item?.quantity)&&item.quantity>=1:item?.quantity===1;
  if(!item||!rightSlot||!rightQuantity||item.snapshot?.category!=='armor')return fail('Invalid worn or carried armour article');
