@@ -1,3 +1,4 @@
+import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 /** HMK GM non-combat staged dice entry, v93.913.
  * Presentation-only: never mutates calendar, game state, receipts or RNG until
  * an explicit user click. Original rule submit handlers remain authoritative.
@@ -43,10 +44,11 @@ export function decorateNoncombatRollQueue93913(root,die){
   host.setAttribute('aria-live','polite');host.innerHTML=
    '<legend>Aktuální povinný hod – jeden krok po druhém</legend>'+
    '<p data-hmk-one-roll-prompt class="hmk-one-roll-prompt"></p>'+
-   '<label>Skutečný výsledek <input data-hmk-one-roll-input type="number" min="1" step="1" inputmode="numeric" autocomplete="off"></label>'+
-   '<div class="hmk-one-roll-actions">'+
+   '<label>Skutečný výsledek <span class="hmk-inline-die-controls">'+
+   '<input data-hmk-one-roll-input type="number" min="1" step="1" inputmode="numeric" autocomplete="off">'+
    '<button type="button" data-hmk-one-roll-generate>⚄ Generovat hod</button>'+
-   '<button type="button" data-hmk-one-roll-confirm>Vložit hodnotu</button>'+
+   '<button type="button" data-hmk-one-roll-confirm>Vložit hodnotu</button></span></label>'+
+   '<div class="hmk-one-roll-actions">'+
    '<button type="button" class="secondary" data-hmk-one-roll-reset>Změnit potvrzené hody</button></div>'+
    '<output data-hmk-one-roll-status role="status" aria-live="polite"></output>';
   const prompt=host.querySelector('[data-hmk-one-roll-prompt]');
@@ -55,6 +57,7 @@ export function decorateNoncombatRollQueue93913(root,die){
   const accept=host.querySelector('[data-hmk-one-roll-confirm]');
   const reset=host.querySelector('[data-hmk-one-roll-reset]');
   const output=host.querySelector('[data-hmk-one-roll-status]');
+  groupConfirmedDieControls93928(input,gen,accept);
   const target=form.querySelector('.hc-trek-weather-actions')||submit;
   target.parentNode.insertBefore(host,target);
   const getFaces=()=>nutrition?100:spoil?({hot:2,warm:4,cool:8,cold:12}[temperature?.value]||null):10;

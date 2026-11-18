@@ -7,13 +7,16 @@ export function groupConfirmedDieControls93928(field,generator,accept){
  const label=field.closest('label');
  if(!label||generator.closest('label')!==label||accept.closest('label')!==label)return false;
  if(field.closest('.hmk-confirmed-dice-row'))return true;
- const row=document.createElement('span');
- row.className='hmk-confirmed-dice-row';
- // Keep all three controls beside one another when the form column permits it.
- // Accessible name retains the die/field identity even with a shorter button label.
- accept.textContent='Vložit';
+ // Preserve the original container and its event handlers. In particular, Travel
+ // already has a dedicated .hc-episode-die, while Swimming uses an inline row.
+ // Never insert a second nested row or duplicate a generator/accept control.
+ const existing=field.closest('.hc-episode-die,.hmk-inline-die-controls');
+ const row=existing&&existing.contains(generator)&&existing.contains(accept)?existing:document.createElement('span');
+ if(!existing||row!==existing){field.before(row);row.append(field,generator,accept);}
+ row.classList.add('hmk-confirmed-dice-row');
  row.setAttribute('data-hmk-confirmed-dice-row','');
- field.before(row);row.append(field,generator,accept);
+ // The original label and all three controls remain in place.
+ if(!existing)accept.textContent='Vložit';
  label.classList.add('hmk-confirmed-dice-label');
  return true;
 }

@@ -4,6 +4,7 @@
  * Scope deliberately excludes Combat and every autonomous Skill Workbench queue.
  */
 import {successLevel} from '../rules/tests.js';
+import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 const SELECTOR='form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
  'form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course]';
 const SELECTIONS={
@@ -133,10 +134,11 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   const wrapper=document.createElement('fieldset');
   wrapper.className='hmk-noncombat-chain-93918';wrapper.dataset.hmkChain93918=kind;
   wrapper.innerHTML='<legend></legend><p class="hmk-chain-prompt-93918" role="status" aria-live="polite"></p>'+
-   '<label>Skutečný výsledek <input data-hmk-chain-value-93918 type="number" min="1" step="1" inputmode="numeric" autocomplete="off"></label>'+
-   '<div class="hmk-chain-actions-93918"><button type="button" data-hmk-chain-generate-93918>⚄ Generovat hod</button> '+
-   '<button type="button" data-hmk-chain-accept-93918>Vložit hodnotu</button> '+
-   '<button type="button" class="secondary" data-hmk-chain-reset-93918>Změnit potvrzené hody</button></div>'+
+   '<label>Skutečný výsledek <span class="hmk-inline-die-controls">'+
+   '<input data-hmk-chain-value-93918 type="number" min="1" step="1" inputmode="numeric" autocomplete="off">'+
+   '<button type="button" data-hmk-chain-generate-93918>⚄ Generovat hod</button> '+
+   '<button type="button" data-hmk-chain-accept-93918>Vložit hodnotu</button></span></label>'+
+   '<div class="hmk-chain-actions-93918"><button type="button" class="secondary" data-hmk-chain-reset-93918>Změnit potvrzené hody</button></div>'+
    '<output data-hmk-chain-receipt-93918 role="status" aria-live="polite"></output>';
   wrapper.querySelector('legend').textContent=title[kind];
   const prompt=wrapper.querySelector('[data-hmk-chain-prompt-93918]')||wrapper.querySelector('.hmk-chain-prompt-93918');
@@ -145,6 +147,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   const accept=wrapper.querySelector('[data-hmk-chain-accept-93918]');
   const reset=wrapper.querySelector('[data-hmk-chain-reset-93918]');
   const receipt=wrapper.querySelector('[data-hmk-chain-receipt-93918]');
+  groupConfirmedDieControls93928(input,gen,accept);
   submit.before(wrapper);
   const accepted=new Map();let generated=null;
   function syncUnderlying(){
