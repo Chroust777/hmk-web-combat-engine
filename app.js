@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.936';
+const APP_VERSION='93.937';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -25269,6 +25269,11 @@ function episodeHazardChoicesRequired93840(form){
  if(!form||!episodeEvaluationRequested)return false;
  const hz=form.querySelector('[data-episode-hazard-details]');
  if(!hz)return false;
+ // The preview owns which hazard types require a GM decision. Lost Time
+ // (Direction d10 1-4) produces an automatic Slow, not a second choice.
+ // A generic combined-hazard heading must never create a fictitious pending
+ // confirmation after all real dice have been accepted.
+ if(hz.dataset.episodeHazardActionRequired==='false')return false;
  const legend=hz.querySelector('[data-episode-hazard-legend]')?.textContent||'';
  // v93.847: after a Complication Skill Test the result can momentarily
  // disappear from the derived-task list. Its already-confirmed choices and
@@ -27612,7 +27617,7 @@ function episodeDirectionConfirmationTask93850(form){
  // the unrelated HMK Hazard decision still requires its own GM confirmation.
  const accepted=episodeDiceAccepted93849.get('hazardDirectionD10');
  if(!accepted||!episodeHazardChoicesRequired93840(form)||!episodeHazardPending93840(form))return false;
- const button=form.querySelector('[data-hazard-choices-confirm]');
+ const button=form.querySelector('[data-hazard-confirmation] [data-hazard-choices-confirm]');
  if(!button||button.disabled||button.hidden)return false;
  const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
  if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · potvrzení Direction Hazardu</p>'+ 
@@ -27633,7 +27638,7 @@ function episodeAccidentMinuteConfirmationTask93873(form){
  const raw=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
  if(!/^[1-9]\d*$/.test(raw)||!Number.isSafeInteger(Number(raw))||Number(raw)>minutes)return false;
  episodeHazardSelectionUI93840(form,true);
- const confirm=form.querySelector('[data-hazard-choices-confirm]');
+ const confirm=form.querySelector('[data-episode-minute-confirm-inline]');
  if(!confirm||confirm.hidden||confirm.disabled)return false;
  const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
  if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · výslovné potvrzení minuty nehody</p>'+ 
@@ -29255,7 +29260,9 @@ function updateEpisodePreview(form){
    // Leaving it clickable beside the GM minute invites an unrelated document.
    const unrelatedEvidence=hz.querySelector('.hc-episode-hazard-proof');
    if(unrelatedEvidence)unrelatedEvidence.hidden=types.includes('accident');
-   episodeHazardSelectionUI93840(form,types.some(x=>['equipment','accident','complication','misdirection','lost'].includes(x)));
+   const needsHazardAction=types.some(x=>['equipment','accident','complication','misdirection','lost'].includes(x));
+   hz.dataset.episodeHazardActionRequired=String(needsHazardAction);
+   episodeHazardSelectionUI93840(form,needsHazardAction);
    episodeLockInactiveHazardFields93863(form);
    const sum=hz.querySelector('[data-episode-hazard-summary]');if(sum&&kind)sum.textContent=types.includes('equipment')?'Equipment Hazard · přidělen družině při Survival CF. Vyberte předmět a další postup; nic není poškozeno až do potvrzení celé epizody.':result.hazardDetails.map(x=>'Doložený '+x.hazard+' · '+JSON.stringify(x.result)).join(' | ');
    for(const n of hz.querySelectorAll('[data-hazard-injury]'))n.hidden=!types.includes('accident');
@@ -30032,7 +30039,7 @@ document.addEventListener('click',e=>{
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-hazard-complication-confirm]');if(!b)return;
  e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
- const confirm=form.querySelector('[data-hazard-choices-confirm]');if(confirm&&!confirm.disabled){confirm.click();return;}
+ const confirm=form.querySelector('[data-hazard-confirmation] [data-hazard-choices-confirm]');if(confirm&&!confirm.disabled&&!confirm.hidden){confirm.click();return;}
  const field=form.elements.namedItem('hazardComplicationSkill');if(field){field.focus({preventScroll:true});field.scrollIntoView({block:'center'});}
 },true);
 document.addEventListener('click',e=>{
@@ -30073,8 +30080,9 @@ document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-episode-jump]');if(!b)return;
  e.preventDefault();const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
  if(b.hasAttribute('data-episode-hazard-confirm-next')){
-  const confirm=form.querySelector('[data-hazard-choices-confirm]');
-  if(confirm&&!confirm.disabled&&!confirm.hidden){confirm.click();return;}
+  const confirm=form.querySelector('[data-episode-minute-confirm-inline]:not([hidden]):not([disabled])')||
+   form.querySelector('[data-hazard-confirmation] [data-hazard-choices-confirm]:not([hidden]):not([disabled])');
+  if(confirm){confirm.click();return;}
  }
  if(b.dataset.episodeJump==='orientationAllocation'){
   const chooser=form.querySelector('[data-episode-allocation-choice]');
