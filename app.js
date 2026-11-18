@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.931';
+const APP_VERSION='93.932';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -27642,9 +27642,11 @@ function updateEpisodeTaskFocus(form){
  const section=form.querySelector('[data-episode-section="rolls"]');
  const note=section?.querySelector('[data-episode-task-focus]');
  if(!section||!note)return;
- const travel=form.elements.namedItem('kind')?.value==='travel';
+ const kind=form.elements.namedItem('kind')?.value;
+ const travel=kind==='travel';
  // First the setup, then only the concrete mandatory rule step.
- section.hidden=!!(travel&&!episodeEvaluationRequested);
+ // Indoor actions must not inherit a visible roll panel from the previous group.
+ section.hidden=!(episodeEvaluationRequested&&['travel','tracking','forage','watch'].includes(kind));
  const groups={
   motion:section.querySelectorAll('[data-episode-travel-rolls] > .hc-episode-roll-group:first-child'),
   fatigue:section.querySelectorAll('[data-episode-travel-rolls] > .hc-episode-roll-group:nth-child(2)'),
@@ -27653,7 +27655,10 @@ function updateEpisodeTaskFocus(form){
   weather:section.querySelectorAll('[data-episode-weather-details]'),
   foraging:section.querySelectorAll('[data-episode-trek-foraging]')
  };
- if(!episodeEvaluationRequested||!travel){
+ // The mandatory-step focus belongs to EVERY evaluated outdoor activity,
+ // not just Pochod. Tracking also requires the precipitation d6 stored
+ // in this panel; do not hide the only actionable field.
+ if(!episodeEvaluationRequested){
   note.hidden=true;
   for(const [key,nodes] of Object.entries(groups))for(const node of nodes){
    if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}
@@ -27737,6 +27742,12 @@ function updateEpisodeTaskFocus(form){
   'Aktuální úkol: '+(task?.title||labels[active])+'. Zobrazena jsou pouze pole k tomuto kroku. Další pravidlový krok se nabídne automaticky po dokončení aktuálního; již vyplněné výsledky zůstávají zachovány.';
  if(active==='none')episodeFocusedTaskField='';
  section.open=true;
+ // A not-yet-requested GM interruption must not be a second active input
+ // beside the mandatory one-step checklist. Preserve an interruption that
+ // the GM has already explicitly opened, including its unfinished inputs.
+ const otherEvent=form.querySelector('.hc-episode-other-event');
+ if(otherEvent&&active!=='none'&&!form.elements.namedItem('generalStopActive93875')?.checked)
+  otherEvent.classList.add('hc-episode-step-suppressed');
  const visibleRequiredAreas=new Set([active]);
  if(issue)visibleRequiredAreas.add(episodeTaskArea(issue));
  if(accidentMinuteOpen)visibleRequiredAreas.add('hazard');
@@ -27781,8 +27792,6 @@ function updateEpisodeTaskFocus(form){
     nonCurrentProof.classList.add('hc-episode-step-suppressed');
    const rollOnly=form.querySelector('[data-episode-survival-hazard]');
    if(rollOnly&&rollOnly!==target)rollOnly.classList.add('hc-episode-step-suppressed');
-   const otherStop=form.querySelector('.hc-episode-other-event');
-   if(otherStop)otherStop.classList.add('hc-episode-step-suppressed');
    episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));
    // Paint precisely the required control (checkboxes included).
    const owner=target.closest('label')||target;
@@ -28626,10 +28635,12 @@ function updateEpisodePreview(form){
  show('[data-episode-section="rolls"]',episodeEvaluationRequested&&(isTravel||isTracking||kind==='forage'||kind==='watch'));
  const rollsSummary=form.querySelector('[data-episode-section="rolls"]>summary');
  if(rollsSummary){
-  const title=travel?'5 · Pohyb, únava a náhodná setkání':kind==='forage'?'5 · Foraging a volitelná setkání':'5 · Volitelná kontrola setkání';
+  const title=travel?'5 · Pohyb, únava a náhodná setkání':kind==='tracking'?'5 · Srážky, sledování stop a případná setkání':kind==='forage'?'5 · Foraging a volitelná setkání':'5 · Volitelná kontrola setkání';
   rollsSummary.innerHTML=esc(title)+' <span class="hc-episode-section-party" data-episode-section-party="rolls"></span>';
  }
- show('[data-episode-travel-rolls]',isTravel);
+ // The shared precipitation d6 is also required during stand-alone Tracking.
+ // The one-step focus below suppresses non-applicable movement and END inputs.
+ show('[data-episode-travel-rolls]',isTravel||(isTracking&&episodeEvaluationRequested));
  show('[data-episode-orientation-use]',isTravel);
  show('[data-episode-travel-priority]',isTravel);
  show('[data-episode-orientation-new]',(isTravel&&v.orientationUse==='new')||kind==='forage');
@@ -28945,10 +28956,14 @@ function updateEpisodePreview(form){
  const quick=form.querySelector('[data-episode-transport-quick-status]');if(quick){
   const name=({foot:'Pěšky',mount:'Jízda na zvířeti',cart:'Kára',wagon:'Vůz'})[v.conveyance]||'Bez určení';
   const selected=(v.stableAnimalIds||[]).length;
-  quick.textContent=name+(v.conveyance==='foot'?
-   (episodeEvaluationRequested?' · způsob dopravy již uzamčen vyhodnocením.':
-    ' · výchozí volba; před vyhodnocením ji lze změnit na jízdu, káru nebo vůz v nabídce „Způsob dopravy“.'):
-   ' · '+selected+' zvířat ve skupině; výběr a nosnost ověří pravidlový postup.');
+  quick.textContent=!travel?
+   (kind==='tracking'?
+    'Sledování stop je samostatná činnost, ne pochod: způsob dopravy se zde nevyhodnocuje. Pro přesun pěšky, na zvířeti, károu či vozem zvolte v plánu „Cestování / pochod“; případné Tracking při pochodu podléhá svým pravidlovým podmínkám.':
+    'U této činnosti není cestovní způsob dopravy součástí vyhodnocení. V plánu zvolte „Cestování / pochod“, pokud má skupina skutečně cestovat.'):
+   name+(v.conveyance==='foot'?
+    (episodeEvaluationRequested?' · způsob dopravy již uzamčen vyhodnocením.':
+     ' · výchozí volba; před vyhodnocením ji lze změnit na jízdu, káru nebo vůz v nabídce „Způsob dopravy“.'):
+    ' · '+selected+' zvířat ve skupině; výběr a nosnost ověří pravidlový postup.');
  }
  const forage=form.querySelector('[data-episode-foraging-fields]');if(forage)forage.hidden=kind!=='forage';
  if(kind==='forage'){
