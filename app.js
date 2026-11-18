@@ -1,5 +1,5 @@
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
-import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js';
+import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.928';
 import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
@@ -380,7 +380,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.927';
+const APP_VERSION='93.928';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2226,6 +2226,7 @@ let episodeCurrentGuidedStep=null;
 const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','conveyance','travelRideAnimalId','travelRideRiderId','droverActorId','packHandlers93859','memberIds','animalIds','stableAnimalIds',
  'trackingUse','trackingActorId','trackingTrail','trackingRoad','trackingPartyTracked',
  'trackingSnow','trackingRain','trackingAlpine'];
+let skillCompletion93928=null; // UI only: a saved Skill Test must never silently start another d100.
 let episodePendingSkillRequest=null;
 // Only a request initiated by the episode may capture a newly saved Skill Test.
 // Every request is single-use; another test, including the same skill later,
@@ -11192,6 +11193,26 @@ function scheduleStableAutoMigration93861(){
   if(!ok){notice='Automatické doplnění zdravotních profilů starších zvířat nebylo možné bezpečně uložit. '+notice;render();}
  });
 }
+function showSavedSkillGate93928(){
+ const done=skillCompletion93928;
+ if(!done||view!=='skills'||selected!==done.actorId||activeSkillTab!==done.tab)return;
+ const form=document.getElementById(done.formId);
+ if(!form)return;
+ form.setAttribute('data-hmk-skill-saved-93928',done.receiptId);
+ form.hidden=true;
+ const gate=document.createElement('div');gate.className='hmk-skill-saved-gate-93928';
+ gate.setAttribute('role','status');gate.setAttribute('data-hmk-skill-saved-gate-93928',done.receiptId);
+ const info=document.createElement('strong');info.textContent='✓ Skill Test byl uložen.';
+ const p=document.createElement('div');p.textContent='Stejný test se neopakuje automaticky. Výsledek a skutečné navazující následky jsou zobrazené níže.';
+ const btn=document.createElement('button');btn.type='button';btn.className='secondary hc-small';
+ btn.setAttribute('data-hmk-skill-start-new-93928','');btn.textContent='Začít nový samostatný test';
+ gate.append(info,p,btn);form.before(gate);
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-hmk-skill-start-new-93928]');if(!button)return;
+ event.preventDefault();event.stopImmediatePropagation();
+ skillCompletion93928=null;render();
+},true);
 function render(){
  // v93.831: rendering is read-only; NPC defaults require an explicit GM commit.
  if(episodeActiveSkillRequestId){
@@ -11285,6 +11306,7 @@ function render(){
  decorateNoncombatRollQueue93913(app,secureHMKDie);
  decorateSkillWorkbenchRolls93916(app,secureHMKDie);
  decorateSpecialSecondaryRolls93917(app,secureHMKDie,hskSpecialPreviewPrimary93917);
+ showSavedSkillGate93928();
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
  decorateConfirmedNoncombatChains93918(app,secureHMKDie);decorateTalismanDice93919(app,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});
  syncWeatherCarePanel();
@@ -13295,6 +13317,17 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
    }
    notice='Z původního Trekking je doložený '+sourceLink.skill+' test. Otevřen navazující formulář bez nového primárního hodu.';
   }
+ }
+ // Explicitly end this UI attempt after the original immutable Skill receipt was saved.
+ // A fresh independent test requires a new click, not a new render or Enter.
+ if(view==='skills'&&['secondary-mastery-test','secondary-mastery-value-test',
+   'opposed-success-test','assistance-success-test','special-secondary-roll','opposed-tiebreak'].includes(proof?.type)){
+  const formId=proof.type==='special-secondary-roll'?'hsk-special-sr-form':
+   proof.type==='opposed-tiebreak'?'skill-tiebreak-form':
+   proof.type==='assistance-success-test'?'skill-assistance-form':
+   proof.type==='secondary-mastery-value-test'?'skill-value-form':'skill-secondary-form';
+  skillCompletion93928={actorId:selected,tab:activeSkillTab,formId,receiptId:savedId};
+  showSavedSkillGate93928();
  }
  const slot=slotId||((proof?.type==='success-value-specific'||proof?.type==='secondary-mastery-value-test')?'hsk-result-value':proof?.type==='assistance-success-test'?'hsk-result-assistance':'hsk-result-secondary');
  const output=document.getElementById(slot);if(output){
@@ -15583,6 +15616,7 @@ document.addEventListener('click',e=>{
  const animal=verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===b.getAttribute('data-hmk-sv-training-animal')&&a.ownerId===selected);
  if(!animal)return;
  pendingStableAnimalcraftId=animal.id;
+ skillCompletion93928=null; // explicit new Animalcraft SV request
  skillSVChoice595={actorId:selected,kind:'ordinary',value:'Animalcraft'};
  render();
 },true);
@@ -15592,6 +15626,7 @@ document.addEventListener('click',e=>{
  const kind=button.getAttribute('data-hmk-sv-open-595');
  const select=button.closest('.hsk-sv-picker-595')?.querySelector(`[data-hmk-sv-choice-type="${kind}"]`);
  if(view!=='skills'||activeSkillTab!=='value'||!select?.value)return;
+ skillCompletion93928=null; // clicking Open begins a fresh test; neither form change nor rerender does
  skillSVChoice595={actorId:selected,kind,value:select.value};
  render();
  // v93.783: the SV picker sets the selected Primary Skill programmatically.
@@ -25779,6 +25814,7 @@ function episodeStartSkillRequest(field,skill,actorId){
  if(previous?.status==='waiting'&&previous.episodeEpoch===episodeDraftEpoch){
   if(previous.field===field&&previous.skill===skill&&previous.actorId===actorId){
    episodeActiveSkillRequestId=previous.id;episodeSkillReturnPending=true;
+   skillCompletion93928=null; // this is an explicit travel Skill request, not an automatic repeat
    selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
    skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;render();episodeSelectRequestedDroverSkill93816(field,skill);episodeConfigureOrienteeringAssist93818(field);return true;
   }
@@ -25788,6 +25824,7 @@ function episodeStartSkillRequest(field,skill,actorId){
  if(episodePinnedSkillFields.has(field))return false;
  const request={id:uuid(),episodeEpoch:episodeDraftEpoch,field,skill,actorId,campaignId:campaignKey(clock),minute:clock.minute,status:'waiting',completedId:null};
  episodePendingSkillRequest=request;episodeActiveSkillRequestId=request.id;episodeSkillReturnPending=true;
+ skillCompletion93928=null; // a fresh explicit travel request must be visible
  timeEpisodeDraft={...timeEpisodeDraft,[field]:''};
  selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
  skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;
