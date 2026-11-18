@@ -381,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.929';
+const APP_VERSION='93.930';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3354,7 +3354,7 @@ function timeEpisodePageHTML(clock,participants){
  </div>
  <p class="hc-hint" data-episode-delay-hint>Vyberte skutečný výsledek hazardu; podle něj aplikace určí povinné doklady.</p></div>
  <label data-hazard-skill-level>Výsledek testu (pouze u Complication)<select name="hazardSkillLevel"><option value="">— nutno doložit —</option>${['CF','F','S','CS'].map(x=>option(x,x)).join('')}</select></label>
- <label data-hazard-minute>Minuta nehody / překážky od začátku epizody · určuje GM<span class="hc-episode-die"><input name="hazardAtMinute" type="number" min="1" max="10080" step="1" placeholder="1–délka intervalu" inputmode="numeric"><button type="button" data-episode-random-event-minute>⚄ Vygenerovat minutu</button></span></label><input name="hazardMinuteOrigin93868" type="hidden" value="manual">
+ <label data-hazard-minute>Minuta nehody / překážky od začátku epizody · určuje GM<span class="hc-episode-die"><input name="hazardAtMinute" type="number" min="1" max="10080" step="1" placeholder="1–délka intervalu" inputmode="numeric"><button type="button" data-episode-random-event-minute>⚄ Vygenerovat minutu</button><button type="button" data-hazard-choices-confirm data-episode-minute-confirm-inline hidden>Potvrdit minutu</button></span></label><input name="hazardMinuteOrigin93868" type="hidden" value="manual">
  <p data-hazard-minute class="hc-hint">GM potvrdí skutečnou minutu nehody/překážky. Délka původního společného intervalu se nikdy nepřepisuje. U Accident se pohyb zastaví od minuty nehody; Kalendář přesto uběhne celý interval. U Complication F/CF se uplatní skutečná ztráta pohybu.</p>
  <div data-hazard-accident class="hc-episode-accident-step"><h4>Accident · nehoda v doložené minutě (HMK 148)</h4>
  <p class="hc-hint">Nehoda nastane v GM potvrzené minutě. U Pochodu se další metry nepočítají; kalendářové okno se nikdy nezkrátí. Výběr oběti, Agility a Injury Sequence se vyhodnotí samostatně po jediném potvrzení GM; Cestování samo nikdy nespouští Combat.</p>
@@ -25212,6 +25212,22 @@ function episodeHazardSelectionUI93840(form,required){
   status.dataset.state=equipmentRepair?'neutral':pending?'pending':'confirmed';}
  const button=box.querySelector('[data-hazard-choices-confirm]');if(button){button.hidden=equipmentRepair;button.disabled=!required||!pending;
   button.textContent=accident?'Potvrdit minutu nehody':'Potvrdit postup';}
+ // The minute is a separate GM decision (not a die). Put its existing
+ // confirmation action next to the minute input, not several subpanels away.
+ // Both controls call the SAME confirmed hazard transaction.
+ const minuteConfirm=form.querySelector('[data-episode-minute-confirm-inline]');
+ if(minuteConfirm){
+  const roll=Number(form.elements.namedItem('survivalD10')?.value||0);
+  const minute=form.elements.namedItem('hazardAtMinute');
+  const state=episodeHazardState93840(form);
+  const minuteAccepted=state.confirmed&&state.context===episodeHazardContext93840(form)&&
+   String(state.values.hazardAtMinute??'')===String(minute?.value??'');
+  const minuteDue=required&&roll>=4&&roll<=10&&!minuteAccepted;
+  minuteConfirm.hidden=!minuteDue;
+  minuteConfirm.disabled=!minuteDue||!pending;
+  minuteConfirm.textContent=accident?'Potvrdit minutu nehody':'Potvrdit minutu překážky';
+  if(button&&!equipmentRepair)button.hidden=minuteDue;
+ }
  episodeEquipmentSync93843(form);
 }
 function episodeLockInactiveHazardFields93863(form){
@@ -25755,6 +25771,27 @@ function episodeIssue(message,form){
 }
 function episodeMarkField(form,name,{focus=false}={}){
  for(const node of form.querySelectorAll('.hc-episode-needs-input'))node.classList.remove('hc-episode-needs-input');
+ // v93.930: a validator can fail BEFORE the preview derives hazardDetails.
+ // The real required control must remain reachable even if the old preview
+ // left the entire fieldset hidden (Complication CF route / event minute).
+ if(name?.startsWith('hazard')||name==='survivalD10'){
+  const field=form.elements.namedItem(name);
+  const hz=field?.closest?.('[data-episode-hazard-details]');
+  if(hz){
+   const rolls=form.querySelector('[data-episode-section="rolls"]');
+   if(rolls){rolls.hidden=false;rolls.open=true;}
+   hz.hidden=false;
+   hz.closest('details')?.setAttribute('open','');
+   for(let ancestor=field.parentElement;ancestor&&ancestor!==hz;ancestor=ancestor.parentElement){
+    if(ancestor.hidden&&ancestor.hasAttribute('data-hazard-minute')||
+       ancestor.hidden&&ancestor.hasAttribute('data-hazard-complication')||
+       ancestor.hidden&&ancestor.hasAttribute('data-hazard-direction')||
+       ancestor.hidden&&ancestor.hasAttribute('data-episode-complication-actor'))ancestor.hidden=false;
+   }
+   episodeLockInactiveHazardFields93863(form);
+   episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));
+  }
+ }
  if(name==='orientationAllocation'&&form.elements.namedItem(name)?.disabled){
   const box=form.querySelector('[data-episode-allocation-choice]');
   const target=box&&!box.hidden?[...box.querySelectorAll('button')].find(b=>!b.hidden&&!b.disabled):null;
@@ -27597,6 +27634,11 @@ function updateEpisodeParticipantHeadings93850(form){
  for(const node of form.querySelectorAll('[data-episode-section-party]'))node.textContent=label;
 }
 function updateEpisodeTaskFocus(form){
+ // Only the current validator's task can be operated on. This class is a
+ // presentation filter: no form values, accepted dice, proofs or records change.
+ // Clear it on each update so a newly required step can reappear immediately.
+ for(const node of form.querySelectorAll('.hc-episode-step-suppressed'))
+  node.classList.remove('hc-episode-step-suppressed');
  const section=form.querySelector('[data-episode-section="rolls"]');
  const note=section?.querySelector('[data-episode-task-focus]');
  if(!section||!note)return;
@@ -27708,6 +27750,53 @@ function updateEpisodeTaskFocus(form){
  for(const node of section.querySelectorAll('[data-episode-route-actions],[data-episode-skill-links]')){
   if(active==='none'||active==='other'||active==='hazard'||active==='weather'||active==='fatigue'||active==='motion'||active==='foraging'||active==='encounter'){
    if(!node.hidden){node.dataset.episodeFocusHidden='true';node.hidden=true;}
+  }
+ }
+ // v93.930: an unresolved hazard must show the EXACT required control,
+ // even when preview aborted before it could rebuild the hazard panel.
+ // Hide irrelevant options instead of presenting the entire editable hazard
+ // worksheet beside the one-step checklist. The underlying records and
+ // previously confirmed values are never reset or overwritten.
+ const focusedHazard=active==='hazard'&&field&&form.elements.namedItem(field);
+ if(focusedHazard){
+  const hz=form.querySelector('[data-episode-hazard-details]');
+  const target=form.elements.namedItem(field);
+  if(hz&&hz.contains(target)){
+   hz.hidden=false;hz.closest('details')?.setAttribute('open','');
+   const grid=hz.querySelector('.hmk-trek-grid');
+   if(grid){
+    let row=target;
+    while(row&&row.parentElement!==grid)row=row.parentElement;
+    // A proof can live outside the main grid. In that case none of the
+    // grid's unrelated input choices should remain available.
+    for(const other of grid.children)if(other!==row)other.classList.add('hc-episode-step-suppressed');
+    if(row){
+     if(row.hidden)row.hidden=false;
+     for(let ancestor=target.parentElement;ancestor&&ancestor!==row;ancestor=ancestor.parentElement)
+      if(ancestor.hidden)ancestor.hidden=false;
+    }
+   }
+   const nonCurrentProof=hz.querySelector('.hc-episode-hazard-proof');
+   if(nonCurrentProof&&!nonCurrentProof.contains(target))
+    nonCurrentProof.classList.add('hc-episode-step-suppressed');
+   const rollOnly=form.querySelector('[data-episode-survival-hazard]');
+   if(rollOnly&&rollOnly!==target)rollOnly.classList.add('hc-episode-step-suppressed');
+   const otherStop=form.querySelector('.hc-episode-other-event');
+   if(otherStop)otherStop.classList.add('hc-episode-step-suppressed');
+   episodeHazardSelectionUI93840(form,episodeHazardChoicesRequired93840(form));
+   // Paint precisely the required control (checkboxes included).
+   const owner=target.closest('label')||target;
+   owner.classList.add('hc-episode-needs-input');
+  }
+ }else if(active==='fatigue'&&field){
+  const target=form.elements.namedItem(field);
+  const group=target?.closest('.hc-episode-roll-group');
+  if(group&&/^end_|^precipitationD6$/.test(field)){
+   const owner=target.closest('label');
+   const direct=owner&&[...group.children].find(ch=>ch===owner||ch.contains(owner));
+   for(const node of group.children)if(node!==direct&&node.tagName!=='SUMMARY')node.classList.add('hc-episode-step-suppressed');
+   if(direct)direct.classList.remove('hc-episode-step-suppressed');
+   owner?.classList.add('hc-episode-needs-input');
   }
  }
  // Focus changes visibility AFTER preview derives the selected hazard.

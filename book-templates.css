@@ -7120,6 +7120,13 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-spread-left label.hc-episode-needs-input :is(input:not([type=checkbox]),select,textarea){
   border:2px solid #a4251e!important;outline:2px solid rgba(164,37,30,.65)!important;
   outline-offset:1px;box-shadow:0 0 0 2px rgba(164,37,30,.1)!important}
+/* v93.930: a required route/GM checkbox is an input, not a red box
+   around a whole label with neighbouring buttons. */
+.hc-episode-spread-left label.hc-episode-needs-input input[type=checkbox]{
+  outline:3px solid #a4251e!important;outline-offset:3px;
+  box-shadow:0 0 0 4px rgba(164,37,30,.14)!important}
+/* One-step required-input presentation: no extra wrapper or overlay. */
+.hc-episode-spread-left .hc-episode-step-suppressed{display:none!important}
 
 .hc-episode-spread-left .hc-episode-suboptions{grid-column:1/-1;border:1px solid rgba(111,79,47,.24);border-radius:7px;padding:.55rem .68rem;margin:.4rem 0;background:rgba(250,242,223,.34)}
 .hc-episode-spread-left .hc-episode-suboptions>summary{font-size:.82rem;cursor:pointer;color:#63452d;font-weight:650}
