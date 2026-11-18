@@ -1,5 +1,6 @@
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
-import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.928';
+import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.929';
+import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
 import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
@@ -380,7 +381,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.928';
+const APP_VERSION='93.929';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12150,7 +12151,7 @@ function hskSkillEnvironmentFollowup(entry){
  <label>Voda / vzdálenost od pobřeží<select name="water"><option value="inland">Vnitrozemí nebo do 1 league</option><option value="near">Otevřené moře 1–5 league</option><option value="mid">Otevřené moře 6–19 league</option><option value="far">Otevřené moře 20+ league</option></select></label>
  <label>Wind Force (0–4)<input type="number" name="windForce" min="0" max="4" value="0" required></label>
  <label>Mokrý oděv – Swimming ENC<select name="soakedClothingENC"><option value="">— GM musí potvrdit —</option><option value="0">0 · bez uvedeného oděvního kompletu</option><option value="10">10 · Clothing Suit</option><option value="20">20 · Heavy Clothing Suit</option></select></label>
- <label data-swimming-stage="rounds" hidden>Doba bez vzduchu (pětisekundová kola)<input type="number" name="roundsWithoutAir" min="0" max="20000" value="0" disabled></label>
+ <label data-swimming-stage="rounds" hidden>Doba bez vzduchu (pětisekundová kola)<input type="number" name="roundsWithoutAir" min="0" max="20000" value="" placeholder="0 nebo více" disabled></label>
  <label data-swimming-stage="rescued" hidden>Postava se vynořila / je zachráněna<select name="rescued" disabled><option value="yes">Ano</option><option value="no">Ne, vynuceně až po smrtelné lhůtě</option></select></label>
  <label data-swimming-stage="willD100" hidden>Will SV d100 (pouze při skutečném potopení)<span class="hmk-inline-die-controls"><input type="number" name="willD100" min="1" max="100" disabled inputmode="numeric"><button type="button" class="hc-small hc-provision-generate" data-swimming-die="willD100" data-swimming-faces="100" disabled>⚄ d100</button></span></label>
  <label data-swimming-stage="deathD10" hidden>d10 smrtelné lhůty (po vyčerpání dechu)<span class="hmk-inline-die-controls"><input type="number" name="deathD10" min="1" max="10" disabled inputmode="numeric"><button type="button" class="hc-small hc-provision-generate" data-swimming-die="deathD10" data-swimming-faces="10" disabled>⚄ d10</button></span></label>
@@ -14007,9 +14008,39 @@ document.addEventListener('submit',async event=>{
   form.replaceWith(Object.assign(document.createElement('p'),{textContent:'Následek byl potvrzen a uložen do historie a příslušného stavu.'}));
  }catch(e){if(out)out.textContent='Následek nebyl zapsán: '+e.message;}
 },true);
-/** Progressive Swimming evidence. Display-only: original d100 is never rerolled. */
+/** Sequential Swimming evidence: original Swimming d100 is never rerolled.
+ * All later physical rolls are explicit drafts until Vložit is clicked. */
+const swimmingAccepted93929=new WeakMap();
+function swimmingDiceState93929(form){
+ let state=swimmingAccepted93929.get(form);
+ if(state)return state;
+ state=new Map();swimmingAccepted93929.set(form,state);
+ for(const name of ['willD100','deathD10','enduranceD100']){
+  const field=form.elements.namedItem(name),generator=form.querySelector('[data-swimming-die="'+name+'"]');
+  if(!(field instanceof HTMLInputElement)||!generator)continue;
+  const accept=document.createElement('button');accept.type='button';accept.className='secondary hc-small';
+  accept.setAttribute('data-swimming-accept-93929',name);accept.textContent='Vložit hodnotu';
+  generator.after(accept);
+  groupConfirmedDieControls93928(field,generator,accept);
+  accept.addEventListener('click',()=>{
+   const faces=Number(generator.dataset.swimmingFaces),raw=String(field.value||'').trim();
+   if(field.disabled||!/^[1-9][0-9]*$/.test(raw)||Number(raw)>faces){field.focus();return;}
+   state.set(name,raw);hmkGuideSwimmingAftermath(form);
+  });
+  field.addEventListener('input',()=>{
+   if(state.get(name)!==String(field.value||''))state.delete(name);
+  });
+ }
+ return state;
+}
+function swimmingRollAccepted93929(form,name){
+ const state=swimmingDiceState93929(form),field=form.elements.namedItem(name);
+ return !!field&&!field.disabled&&state.has(name)&&state.get(name)===String(field.value||'');
+}
+
 function hmkGuideSwimmingAftermath(form){
  const guide=form.querySelector('[data-swimming-required-guide]');if(!guide)return;
+ const diceState=swimmingDiceState93929(form);
  const journalEntry=data.journal.find(j=>j.id===form.elements.namedItem('sourceId')?.value);
  const proof=journalEntry?.skillTestProof,actor=character(proof?.actorId),original=proof?.a||proof?.result;
  const val=n=>form.elements.namedItem(n)?.value||'';
@@ -14017,8 +14048,14 @@ function hmkGuideSwimmingAftermath(form){
   const row=form.querySelector('[data-swimming-stage="'+name+'"]');if(!row)return;
   const field=row.querySelector('input,select');row.hidden=!needed;
   if(field){field.disabled=!needed;field.required=needed;
-   if(!needed){field.value=name==='rounds'?'0':name==='rescued'?'yes':'';delete field.dataset.hmkAutoDice;}}
-  for(const b of row.querySelectorAll('[data-swimming-die]'))b.disabled=!needed;
+   if(!needed){field.value=name==='rounds'?'':name==='rescued'?'yes':'';delete field.dataset.hmkAutoDice;diceState.delete(name);}}
+  const confirmed=!['rounds','rescued'].includes(name)&&swimmingRollAccepted93929(form,name);
+  row.classList.toggle('hmk-simple-current-93915',needed&&!confirmed&&name!=='rounds'&&name!=='rescued');
+  row.classList.toggle('hmk-simple-done-93915',needed&&confirmed);
+  for(const b of row.querySelectorAll('[data-swimming-die]'))b.disabled=!needed||confirmed;
+  for(const b of row.querySelectorAll('[data-swimming-accept-93929]')){
+   b.disabled=!needed||confirmed||!/^[1-9][0-9]*$/.test(String(field?.value||''))||Number(field.value)>Number(b.previousElementSibling?.dataset.swimmingFaces||100);
+  }
  };
  const allOff=()=>{for(const key of ['rounds','rescued','willD100','deathD10','enduranceD100'])stage(key,false);};
  try{
@@ -14026,10 +14063,15 @@ function hmkGuideSwimmingAftermath(form){
   const swim=previewSwimmingDanger({actor,inventory:data.inventory,original,water:val('water'),
     windForce:Number(val('windForce')),soakedClothingENC:Number(val('soakedClothingENC'))});
   if(!swim.sinks){allOff();guide.textContent='Postava se nepotápí: nehází se nový Will, smrtelný d10 ani Endurance; doba bez vzduchu je 0.';return;}
-  stage('rounds',true);stage('rescued',true);stage('willD100',true);
+  stage('rounds',true);stage('rescued',true);
+  if(val('roundsWithoutAir')===''){
+   stage('willD100',false);stage('deathD10',false);stage('enduranceD100',false);
+   guide.textContent='2. Potopení: doložte skutečný počet pětisekundových kol bez vzduchu (i 0 je platná hodnota).';return;
+  }
+  stage('willD100',true);
+  if(!swimmingRollAccepted93929(form,'willD100')){stage('deathD10',false);stage('enduranceD100',false);
+   guide.textContent='3. Potopení: zadejte nebo vygenerujte Will SV d100 a potvrďte tlačítkem „Vložit hodnotu“.';return;}
   const willDie=Number(val('willD100'));
-  if(!Number.isInteger(willDie)||willDie<1||willDie>100){stage('deathD10',false);stage('enduranceD100',false);
-   guide.textContent='2. Potopení: nyní je povinný pouze skutečný Will SV d100.';return;}
   const state=persistentStateOf(actor),ml=Number(actor.hmk.attributes.wil)*5;
   const fatigue=(state.fatigue?.windedness||0)+(state.fatigue?.weariness||0)+(state.fatigue?.otherWeakness||0)+(state.bloodLoss?.weaknessFatigue||0);
   const willSV=swimmingWillSuccessValue({ml,sl:successLevel(willDie,ml-fatigue)});
@@ -14041,12 +14083,14 @@ function hmkGuideSwimmingAftermath(form){
   if(rounds<=capacity){stage('deathD10',false);stage('enduranceD100',false);
    guide.textContent='Dech '+rounds+' / '+capacity+' kol; smrtelný d10 ani Endurance nenastávají. K uzavření je nutné vynoření.';return;}
   stage('deathD10',true);
+  if(!swimmingRollAccepted93929(form,'deathD10')){stage('enduranceD100',false);
+   guide.textContent='4. Dech vyčerpán po '+capacity+' kolech: potvrďte skutečný smrtelný d10 tlačítkem „Vložit hodnotu“.';return;}
   const deathDie=Number(val('deathD10'));
-  if(!Number.isInteger(deathDie)||deathDie<1||deathDie>10){stage('enduranceD100',false);
-   guide.textContent='4. Dech vyčerpán po '+capacity+' kolech: zadejte skutečný smrtelný d10.';return;}
   const deadline=capacity+asphyxiaDeathCountdown({endurance:end,d10:deathDie});
   stage('enduranceD100',rounds<deadline);
-  guide.textContent=rounds<deadline?'5. Postava ještě žije, smrtelná lhůta '+deadline+' kol. Pro záchranu je nutný Endurance d100.':
+  guide.textContent=rounds<deadline?(swimmingRollAccepted93929(form,'enduranceD100')?
+   'Endurance d100 potvrzen; připraveno k závěrečnému vyhodnocení.':
+   '5. Postava ještě žije, smrtelná lhůta '+deadline+' kol. Potvrďte Endurance d100 tlačítkem „Vložit hodnotu“.'):
     'Smrtelná lhůta '+deadline+' kol uplynula; následuje smrtelný následek, nikoliv Endurance d100.';
  }catch(err){allOff();guide.textContent='Opravte podklady před dalšími hody: '+err.message;}
 }
@@ -14073,6 +14117,15 @@ document.addEventListener('submit',event=>{
    !original||!Number.isInteger(original.roll))throw Error('Chybí ověřený původní Swimming d100');
   if(data.journal.some(x=>x.skillTestProof?.type==='skill-swimming-aftermath'&&x.skillTestProof.sourceId===sourceId))throw Error('Následek již byl zapsán');
   if(combatActorLocked93725(actor.id))throw Error('Stav účastníka boje patří do Combat pořadí');
+  // Never evaluate a typed/generated but unconfirmed downstream die.
+  for(const name of ['willD100','deathD10','enduranceD100']){
+   const input=form.elements.namedItem(name);
+   if(input&&!input.disabled&&!input.closest('[hidden]')&&!swimmingRollAccepted93929(form,name)){
+    input.closest('label')?.classList.add('hmk-simple-current-93915');
+    input.focus({preventScroll:true});
+    throw Error('Nejprve potvrďte aktivní '+name+' tlačítkem „Vložit hodnotu“.');
+   }
+  }
   const field=n=>form.elements.namedItem(n)?.value?.trim()??'';
   const opt=n=>field(n)===''?null:Number(field(n));
   if(field('soakedClothingENC')==='')throw Error('Doložte typ skutečně mokrého oděvu');
@@ -25282,6 +25335,13 @@ function episodeEnsureDiceControls93849(form){
    const hint=document.createElement('small');hint.dataset.episodeRollHint=name;
    hint.className='hc-episode-roll-hint';box.after(hint);
   }
+  // Complex travel chains use the same existing three-control layout as
+  // Skill Tests. Daily weather is intentionally left in its approved simple
+  // form; the travel engine remains the only owner of roll acceptance.
+  if(!['temperatureD10','precipitationD10'].includes(name)){
+   const confirm=box.querySelector('[data-episode-roll-confirm]');
+   if(confirm)groupConfirmedDieControls93928(input,b,confirm);
+  }
   if(!episodeDiceAccepted93849.has(name)&&String(timeEpisodeDraft[name]??'').trim()){
    // Values restored from an earlier *accepted* draft, never the currently typed DOM.
    episodeDiceAccepted93849.set(name,String(timeEpisodeDraft[name]));
@@ -25295,6 +25355,12 @@ function episodeUpdateDiceGuides93849(form){
   if(!input)continue;
   const accepted=episodeDiceAccepted93849.get(name)||'';
   const raw=String(input.value||'').trim();
+  const label=input.closest('label');
+  if(label?.classList.contains('hmk-confirmed-dice-label')){
+   const current=episodeEvaluationRequested&&episodeFocusedTaskField===name&&raw!==accepted;
+   label.classList.toggle('hmk-simple-current-93915',current);
+   label.classList.toggle('hmk-simple-done-93915',!!accepted&&raw===accepted);
+  }
   const hint=form.querySelector('[data-episode-roll-hint="'+name+'"]');
   const pending=raw!==accepted;
   const confirmedEndDice=name.startsWith('end_')&&!pending&&accepted?

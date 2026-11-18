@@ -7106,16 +7106,21 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-spread-left legend.hc-episode-hover-help{cursor:help;text-decoration:underline dotted rgba(98,66,34,.5)}
 
 /* v93.638 · travel episode: focused validation and one accountable task trail. */
-.hc-episode-spread-left .hc-episode-needs-input{
+.hc-episode-spread-left .hc-episode-needs-input:not(label){
   border:2px solid #a4251e!important;border-radius:6px!important;
   box-shadow:0 0 0 3px rgba(164,37,30,.14)!important;
   background:rgba(254,228,220,.65)!important;
   padding:.3rem!important;
   scroll-margin-block:6.5rem;
 }
-.hc-episode-spread-left .hc-episode-needs-input input:not([type=checkbox]),
-.hc-episode-spread-left .hc-episode-needs-input select,
-.hc-episode-spread-left .hc-episode-needs-input textarea{border-color:#a4251e!important;outline-color:#a4251e!important}
+/* A label may contain the generator and accept button. Mark only the
+   missing input itself, never draw a floating red box over its controls. */
+.hc-episode-spread-left label.hc-episode-needs-input{border:0!important;outline:0!important;
+  box-shadow:none!important;background:transparent!important;padding:0!important;scroll-margin-block:6.5rem}
+.hc-episode-spread-left label.hc-episode-needs-input :is(input:not([type=checkbox]),select,textarea){
+  border:2px solid #a4251e!important;outline:2px solid rgba(164,37,30,.65)!important;
+  outline-offset:1px;box-shadow:0 0 0 2px rgba(164,37,30,.1)!important}
+
 .hc-episode-spread-left .hc-episode-suboptions{grid-column:1/-1;border:1px solid rgba(111,79,47,.24);border-radius:7px;padding:.55rem .68rem;margin:.4rem 0;background:rgba(250,242,223,.34)}
 .hc-episode-spread-left .hc-episode-suboptions>summary{font-size:.82rem;cursor:pointer;color:#63452d;font-weight:650}
 .hc-episode-spread-left .hc-episode-suboptions>.hmk-trek-grid{padding-top:.65rem}
@@ -7131,7 +7136,7 @@ main.content :is(.hc-provision-quiet,.hc-provision-actions-caption,
 .hc-episode-skill-lock strong{font-size:.9rem;display:block;margin-bottom:.25rem}
 .hc-episode-skill-lock p{margin:.2rem 0 0}
 .hc-episode-spread-right .hc-episode-task button{line-height:1.3}
-.hc-episode-spread-left .hc-episode-needs-input{outline:2px solid #ae4734;outline-offset:3px;border-radius:3px;background:rgba(194,57,41,.09)}
+/* v93.929: removed duplicate red outline rule; one authoritative selector above. */
 
 /* v93.644: time-specific medical checks and GM acknowledgements in Travel. */
 .hc-episode-spread-right .hc-episode-medical-missing,
@@ -8301,8 +8306,7 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 #app .hc-episode-spread-left .hc-weather-hazard-control>.hc-episode-die{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;}
 #app .hc-episode-spread-left .hc-weather-hazard-control>.hc-episode-die input{flex:1 1 110px;min-width:90px;max-width:100%;}
 #app .hc-episode-spread-left .hc-weather-hazard-control>.hc-episode-die button{flex:0 0 auto;width:auto!important;max-width:100%;position:relative;z-index:2;}
-#app .hc-episode-spread-left .hc-episode-needs-input{background:transparent!important;box-shadow:none!important;}
-#app .hc-episode-spread-left .hc-episode-needs-input .hc-episode-die :is(input,button){position:relative;z-index:2;}
+/* v93.929: no high-z-index button or blanket background override on required fields. */
 /* Body data is readable normal weight, including selected and risky rows. */
 #app .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-current td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-hazard td:nth-child(6){font-weight:400!important;color:#38291a!important;}
 #app .hc-episode-weather-timeline tbody td strong,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td strong{font-weight:400!important;}
