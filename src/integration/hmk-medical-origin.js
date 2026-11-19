@@ -35,6 +35,21 @@ export function medicalOriginOfWound(wound,events=[]){
   original?.details?.weatherTrauma?.sourceId)return MEDICAL_ORIGIN.WEATHER;
  return MEDICAL_ORIGIN.COMBAT;
 }
+// Recover legacy daily Shock from the recorded procedure, not the wound onset.
+export function projectLegacyGrimShock(state,clock,characterId){
+ const pending=state?.shockFollowup;
+ if(!pending||pending.domain||pending.timelineId||state.coma?.active||state.extendedShock||!clock)return state;
+ const event=state.events?.findLast(e=>e.type!=='injury-healing-roll');
+ if(event?.type!=='grim-wound-shock'||event.round!==pending.originRound||event.details?.newShock!==pending.kind)return state;
+ const wound=state.wounds.find(w=>w.id===event.details.woundId);
+ const domain=medicalOriginOfWound(wound,state.events);
+ if(!isNoncombatMedicalOrigin(domain))return state;
+ const receipt=clock.events?.find(e=>e.type==='resolution'&&e.sourceEventId===event.id&&
+  e.characterId===characterId&&e.kind==='hmk-grim-shock-form');
+ if(!Number.isSafeInteger(receipt?.minute)||receipt.minute<0||receipt.minute>clock.minute)return state;
+ return {...state,shockFollowup:{...pending,domain:domain===MEDICAL_ORIGIN.GM?'gm-health':domain,
+  sourceId:event.id,originMinute:receipt.minute,woundId:wound.id}};
+}
 export function medicalWounds(state,origin){
  if(!state||!Array.isArray(state.wounds)||!Array.isArray(state.events))throw Error('Chybí doložený zdravotní stav');
  if(!Object.values(MEDICAL_ORIGIN).includes(origin))throw Error('Neznámý původ lékařské procedury');

@@ -7,8 +7,18 @@ import {verifiedMountedAnimalAnatomy} from './hmk-mounted-live-animal-falling.js
 const unavailable=reason=>({ready:false,reason});
 export function verifiedNoncombatComaCause({actor,state,shockFollowup}={}){
  const q=shockFollowup;
- if(!actor?.id||!state||!q||!['travel-accident','travel-weather'].includes(q.domain)||typeof q.sourceId!=='string'||!q.sourceId)
+ if(!actor?.id||!state||!q||!['travel-accident','travel-weather','gm-health'].includes(q.domain)||typeof q.sourceId!=='string'||!q.sourceId)
   return unavailable('Chybí doložený nevojenský původ Shock a původní zdroj.');
+ const grim=state.events?.find(e=>e.id===q.sourceId&&e.type==='grim-wound-shock'&&e.details?.woundId===q.woundId);
+ if(grim){
+  const {locationShock,injuryShock:injuryLevel,woundId}=grim.details;
+  const initialHR=12-locationShock-injuryLevel;
+  if(Number.isSafeInteger(locationShock)&&locationShock>=0&&locationShock<=10&&
+     Number.isSafeInteger(injuryLevel)&&injuryLevel>=4&&injuryLevel<=5&&initialHR>0&&
+     state.wounds?.some(w=>w.id===woundId))
+   return {ready:true,locationShock,injuryLevel,woundId,sourceEventId:grim.id,initialHR};
+  return unavailable('Grim Wound nemá doložený Location Shock nebo IL pro Coma.');
+ }
  if(q.domain!=='travel-accident')
   return unavailable('Původní klimatický Shock nemá doložené vyvolávající anatomické zranění: Location Shock a IL nelze odhadovat.');
  const matches=(state.events||[]).filter(e=>e?.type==='travel-accident-injury'&&e.details?.sourceId===q.sourceId&&e.details?.domain===q.domain&&e.details?.targetId===actor.id&&typeof e.details.woundId==='string');

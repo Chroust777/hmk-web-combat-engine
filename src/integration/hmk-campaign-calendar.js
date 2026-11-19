@@ -1,4 +1,4 @@
-import {medicalOriginOfWound,isNoncombatMedicalOrigin} from './hmk-medical-origin.js';
+import {medicalOriginOfWound,isNoncombatMedicalOrigin,projectLegacyGrimShock} from './hmk-medical-origin.js';
 import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentProceduresAppendOnly,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './hmk-concurrent-procedures.js';
 /**
  * HMK v1.2 p.178–182: absolute campaign-time *evidence*, not an alternative
@@ -193,6 +193,10 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  validateCampaignCalendar(clock);
  characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
  journal=projectedCalendarJournal(clock,journal);
+ characters=characters.map(c=>{
+  const state=c.hmk?.healthState,projected=projectLegacyGrimShock(state,clock,c.id);
+  return projected===state?c:{...c,hmk:{...c.hmk,healthState:projected}};
+ });
  const all=[],unknown=[],suspended=[];
  const add=(c,kind,description,daysOrHours,woundId=null,unit='days',extra={})=>{
   const anchor=getCampaignAnchor(clock,kind==='healing'||kind==='infection'||kind==='grim'?'wound':kind,c.id,woundId);

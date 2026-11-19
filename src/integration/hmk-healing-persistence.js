@@ -12,6 +12,7 @@ import {hmkHumanLocationSymbols,hmkAmputationAssessment,hmkInjuryMishaps} from '
 import {calculateShockState,applyShockState,SHOCK_STATE} from '../rules/shock.js';
 import {treatmentDurationMinutes} from '../rules/healing.js';
 import {curativeHealingEvidence} from './hmk-herbal-healing-bridge.js';
+import {medicalOriginOfWound,isNoncombatMedicalOrigin,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const requireRule=(ok,message)=>{if(!ok)throw Error(message);};
 const copy=x=>structuredClone(x);
@@ -283,7 +284,7 @@ export function applyConfirmedBloodLossHealing({state,round,eventId,daySinceBloo
  return {state:s,bpBefore:prior,bpAfter:s.bloodLoss.bp,nextHealingDay:s.bloodLoss.healingNextDay};
 }
 /** Grim G/CF wound: daily Location Shock Roll until no longer G or CF-treated (p180). */
-export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySinceInjury,locationShock,shockML,roll,gmConfirmed=false}={}){
+export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySinceInjury,locationShock,shockML,roll,originMinute=null,gmConfirmed=false}={}){
  const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId);verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&w.severity==='G'&&w.healing?.grimWound===true,'Rána není aktivní Grim Wound (G/CF-treatment)');
  const due=w.healing.nextGrimShockDay??Math.max(1,(w.healing.treatments?.at(-1)?.day??0)+1);
@@ -301,9 +302,13 @@ export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySin
  else if(rank[incoming]>rank[s.shock])s.shock=incoming;
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.shockFollowup=null;for(const x of s.wounds)x.nextAdvanceRound=null;}
  else if(s.coma?.active||s.extendedShock)s.shockFollowup=null;
- else if(s.shock!=='NONE'){
+ else if(s.shock!=='NONE'&&(s.shock!==state.shock||!s.shockFollowup)){
   if(['INC','UNC'].includes(s.shock))s.posture.prone=true;
-  s.shockFollowup={kind:s.shock,originRound:round,dueRound:round+(s.shock==='UNC'?120:1),phase:s.shock==='UNC'?'after-ten-minutes':'end-next-turn',timelineId:s.encounterTimelineId??null};
+  const domain=medicalOriginOfWound(w,s.events);
+  const calendarShock=int(originMinute,0,1000000000)&&isNoncombatMedicalOrigin(domain);
+  s.shockFollowup={kind:s.shock,originRound:round,dueRound:round+(s.shock==='UNC'?120:1),
+   phase:s.shock==='UNC'?'after-ten-minutes':'end-next-turn',timelineId:calendarShock?null:s.encounterTimelineId??null,
+   ...(calendarShock?{domain:domain===MEDICAL_ORIGIN.GM?'gm-health':domain,sourceId:eventId,originMinute,woundId}:{})};
  }
  w.healing.nextGrimShockDay=daySinceInjury+1;
  track(s,{eventId,round,type:'grim-wound-shock',details:{woundId,daySinceInjury,locationShock,injuryShock,shockML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),index,newShock:s.shock}});

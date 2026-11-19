@@ -123,7 +123,7 @@ export function episodeTimedCourseStep(database,event,{rolls={},idFactory,stamp}
       dueMinute:event.minute,reason,fields,values}};
     }
    }
-   outcome=applyConfirmedGrimWoundShock({state,round,eventId,woundId:event.woundId,daySinceInjury,locationShock:input.locationShock,shockML:input.shockML,roll:input.roll,gmConfirmed:true});break;}
+   outcome=applyConfirmedGrimWoundShock({state,round,eventId,woundId:event.woundId,daySinceInjury,locationShock:input.locationShock,shockML:input.shockML,roll:input.roll,originMinute:event.minute,gmConfirmed:true});break;}
  case 'extended-shock':outcome=applyExtendedShockCourse({state,round,eventId,healingBase:healingBase({endurance:end,will:wil}),
    roll:input.roll,physicianStars:input.physicianStars,arcaneBonus:input.arcaneBonus,
    elapsedHoursSinceOnset:(event.minute-event.anchorMinute)/60,gmConfirmed:true});break;
