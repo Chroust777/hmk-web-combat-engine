@@ -8432,3 +8432,17 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 
 .hc-book-filter { margin-block: .65rem 1rem; max-width: 24rem; }
 .hc-book-filter select { width: 100%; min-width: 0; }
+
+.hmk-treatment-equipment {
+ margin-block: 1rem;
+ padding: .7rem 1rem;
+ border: 1px solid #aa8c5e;
+ min-inline-size: 0;
+}
+.hmk-treatment-equipment label { display: block; padding: .3rem .5rem; }
+#app .hmk-treatment-equipment[hidden], #app .hmk-treatment-equipment [hidden] { display: none !important; }
+#app .hmk-treatment-equipment label[data-missing="yes"] {
+ outline: 2px solid #a4251e;
+ outline-offset: -2px;
+ color: #7b271d;
+}
