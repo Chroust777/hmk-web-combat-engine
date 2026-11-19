@@ -6,36 +6,42 @@
 import {successLevel} from '../rules/tests.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 const SELECTOR='form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
- 'form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
+ 'form[data-skill-cold-shock],form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
  '.hmk-weather-care form#hmk-frost-amputation-form';
 const SELECTIONS={
  fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
  herbs:['singlePotencyRoll','actorId'],
  blood:['method','healerId','hasWater','hasNeedleThread','hasHeatedTool','tourniquet'],
- shock:[],
+ shock:[], immersion:['condition'],
  frost:['wound','healerId'],
  bloodComplete:[],
  trauma:['restfulShelter','arcaneBonus','physicianStars'],
  alchemy:[]
 };
 const title={fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
- frost:'Frost Amputation · hody v pořadí',bloodComplete:'Blood Stoppage a případný Blood Loss',blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
+ frost:'Frost Amputation · hody v pořadí',bloodComplete:'Blood Stoppage a případný Blood Loss',blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',immersion:'Cold Water Shock',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
 const value=(form,name)=>form.elements.namedItem(name)?.value||'';
 const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n))&&Number(n)>=1&&Number(n)<=max;
 const stageKey=(step)=>step.key;
 function kindOf(form){return form.id==='hmk-frost-amputation-form'?'frost':form.matches('[data-weather-blood-complete]')?'bloodComplete':form.matches('[data-hmk-fishing-catch]')?'fishing':
  form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
- form.matches('[data-weather-shock-followup]')?'shock':form.matches('[data-weather-trauma-course]')?'trauma':'alchemy';}
+ form.matches('[data-skill-cold-shock]')?'immersion':form.matches('[data-weather-shock-followup]')?'shock':form.matches('[data-weather-trauma-course]')?'trauma':'alchemy';}
 function fieldsOf(form,kind){
  if(kind==='frost')return ['physicianRoll','amputationRoll','shockRoll'];
  if(kind==='bloodComplete')return ['physicianRoll','strengthRoll'].filter(name=>form.elements.namedItem(name));
  if(kind==='fishing')return ['conditionsD100','catchD10'];
  if(kind==='herbs')return [...form.querySelectorAll('input[name^="dice_"]')].map(n=>n.name);
  if(kind==='blood')return ['bandageD6Rolls'];
+ if(kind==='immersion')return ['d6_1','d6_2','d6_3','enduranceD100'];
  if(kind==='shock')return ['roll',...(form.elements.namedItem('initialComaD10')?['initialComaD10']:[])];
  if(kind==='trauma')return ['roll',...(value(form,'kind')==='coma'?['periodD10']:[])];
  return ['cfWillD10','dissolutionD100','crucialShockD100',
   ...[...form.querySelectorAll('input[name^="aug"]')].map(x=>x.name)].filter(name=>form.elements.namedItem(name));
+}
+function needsImmersionComaHR(form){
+ const eml=Number(form.dataset.shockEml);
+ return form.dataset.shockComaMode==='immersion'&&form.dataset.shockComaReady==='yes'&&
+  die(value(form,'roll'),100)&&Number.isFinite(eml)&&successLevel(Number(value(form,'roll')),eml)===0;
 }
 function stepsFor(form,kind){
  const result=[];
@@ -85,13 +91,17 @@ function stepsFor(form,kind){
   const bp=Number(form.dataset.hmkBloodBp);
   if(value(form,'method')==='sta'&&Number.isInteger(bp)&&bp>0&&bp<=4)
    for(let i=0;i<bp;i++)add('bandage'+i,6,`Staunch · Blood Loss Point ${i+1}/${bp} · d6`,'bandageD6Rolls',i);
+ }else if(kind==='immersion'){
+  for(let n=1;n<=3;n++)add('d6_'+n,6,'Doba ponoření · d6 '+n+'/3');
+  add('enduranceD100',100,'Cold Shock · Endurance d100');
  }else if(kind==='shock'){
   const primary=form.elements.namedItem('roll');
   if(primary&&!primary.disabled){
    add('roll',100,'Shock Reroll d100');
    const roll=Number(value(form,'roll')),eml=Number(form.dataset.shockEml);
    if(form.dataset.shockComaReady==='yes'&&die(value(form,'roll'),100)&&
-    Number.isFinite(eml)&&roll>eml&&roll%5===0)
+    Number.isFinite(eml)&&successLevel(roll,eml)===0&&
+    (!needsImmersionComaHR(form)||die(value(form,'immersionComaHR'),20)))
     add('initialComaD10',10,'UNC + CF · první Coma Course d10');
   }
  }else if(kind==='trauma'){
@@ -99,7 +109,7 @@ function stepsFor(form,kind){
   if(value(form,'kind')==='coma'&&die(value(form,'roll'),100)){
    const hr=Number(form.dataset.hmkTraumaHr),hb=Number(form.dataset.hmkTraumaHb),
     fatigue=Number(form.dataset.hmkTraumaFatigue),arcane=Number(value(form,'arcaneBonus'));
-   if(Number.isSafeInteger(hr)&&hr>=1&&hr<=5&&Number.isSafeInteger(hb)&&hb>=1&&
+   if(Number.isSafeInteger(hr)&&hr>=1&&hr<=20&&Number.isSafeInteger(hb)&&hb>=1&&
     Number.isSafeInteger(fatigue)&&Number.isSafeInteger(arcane)&&arcane>=0&&arcane<=100){
     const eml=hb*hr-fatigue+(value(form,'restfulShelter')==='yes'?0:-20)+arcane;
     const sl=successLevel(Number(value(form,'roll')),eml);
@@ -175,6 +185,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   submit.before(wrapper);
   const accepted=new Map();let generated=null;
   const mustHaveSteps=kind==='frost'||kind==='bloodComplete';
+  const comaHR=kind==='shock'?form.elements.namedItem('immersionComaHR'):null;
   function syncUnderlying(){
    const steps=stepsFor(form,kind),activeKeys=new Set(steps.map(stageKey));
    for(const name of allNames){
@@ -204,7 +215,16 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   function pending(){return stepsFor(form,kind).find(step=>!accepted.has(step.key)||
    !die(accepted.get(step.key).value,step.faces));}
   function repaint(){
-   const steps=stepsFor(form,kind),next=pending(),done=!next;
+   const steps=stepsFor(form,kind),next=pending();
+   const showHR=!!comaHR&&needsImmersionComaHR(form),waitHR=showHR&&!die(comaHR.value,20);
+   const done=!next&&!waitHR;
+   if(comaHR){
+    comaHR.closest('label').hidden=!showHR;
+    comaHR.disabled=!showHR;
+    comaHR.required=showHR;
+    if(!showHR)comaHR.value='';
+    comaHR.closest('label').classList.toggle('hc-medical-validation-error',waitHR);
+   }
    if(kind==='frost'){
     const strength=form.elements.namedItem('amputationStrengthML');
     const needsStrength=steps.some(step=>step.key==='amputationRoll');
@@ -215,11 +235,11 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
    }
    wrapper.hidden=!steps.length;wrapper.classList.toggle('hmk-chain-complete-93918',done);
    const position=next?steps.findIndex(x=>x.key===next.key):steps.length;
-   prompt.textContent=next?'ČERVENÝ AKTIVNÍ KROK '+(position+1)+'/'+steps.length+
+   prompt.textContent=waitHR?'ČERVENÝ AKTIVNÍ KROK · Nejprve určete počáteční Coma HR podle rozhodnutí GM.':next?'ČERVENÝ AKTIVNÍ KROK '+(position+1)+'/'+steps.length+
     ' · '+next.label+' · potvrďte každou kostku samostatně.':
     'Všechny právě požadované kostky jsou jednotlivě potvrzeny.';
-   input.max=String(next?.faces||100);input.disabled=done;gen.disabled=done;
-   accept.disabled=done||!die(input.value,next?.faces||0);
+   input.max=String(next?.faces||100);input.disabled=!next;gen.disabled=!next;
+   accept.disabled=!next||!die(input.value,next?.faces||0);
    reset.hidden=!accepted.size;submit.disabled=!done||(mustHaveSteps&&!steps.length)||submit.dataset.hmkExternalDisabled93918==='yes';
    receipt.textContent=accepted.size?'Potvrzené skutečné hody: '+steps.filter(x=>accepted.has(x.key)).map(x=>
     x.label+' = '+accepted.get(x.key).value+' ('+(accepted.get(x.key).origin==='software'?'generátor':'ručně')+')').join('; '):
@@ -232,6 +252,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
    }
    const n=Number(input.value);accepted.set(step.key,{value:n,origin:generated===n?'software':'manual'});
    generated=null;input.value='';syncUnderlying();repaint();if(pending())input.focus({preventScroll:true});
+   else if(comaHR&&!comaHR.disabled&&!die(comaHR.value,20))comaHR.focus({preventScroll:true});
   }
   gen.addEventListener('click',()=>{const step=pending();if(!step)return;
    try{const n=rollDie(step.faces);if(!die(n,step.faces))throw Error('neplatný výsledek');
@@ -240,6 +261,9 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   });
   input.addEventListener('input',()=>{generated=null;repaint();});
   accept.addEventListener('click',acceptNext);
+  comaHR?.addEventListener('input',()=>{
+   accepted.delete('initialComaD10');generated=null;input.value='';syncUnderlying();repaint();
+  });
   reset.addEventListener('click',()=>{clear();if(pending())input.focus({preventScroll:true});});
   form.addEventListener('change',event=>{if(SELECTIONS[kind].includes(event.target?.name)){
     // The source rule/number of dice has changed: never reuse old proofs.
@@ -252,6 +276,9 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
    syncUnderlying();const step=pending();
    if(!step&&mustHaveSteps&&!stepsFor(form,kind).length){
     event.preventDefault();event.stopImmediatePropagation();return;
+   }
+   if(comaHR&&needsImmersionComaHR(form)&&!die(comaHR.value,20)){
+    event.preventDefault();event.stopImmediatePropagation();comaHR.focus();return;
    }
    if(!step&&!(kind==='fishing'&&value(form,'conditionsMode')==='gm'&&!value(form,'gmCondition')))return;
    event.preventDefault();event.stopImmediatePropagation();

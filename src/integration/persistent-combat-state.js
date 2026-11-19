@@ -703,7 +703,12 @@ export function shockFollowupReadiness({state,round,characterId=null,actorId=nul
  if(!characterId||actorId!==characterId||turnEnded!==true)return {due:false,reason:'actor-end-turn-not-confirmed'};
  return {due:true,kind:q.kind,requirement:'end-next-turn'};
 }
-export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfirmed=false,characterId=null,actorId=null,turnEnded=false,timelineId=null,elapsedMinutesSinceOriginal=null,comaLocationShock=null,comaInjuryLevel=null,initialComaD10=null,shockML=null,roll=null,herbalBonus=0,herbalProof=null}={}){
+export function verifiedImmersionComa952(state,q=state?.shockFollowup){
+ return q?.domain==='travel-weather'&&q.kind==='UNC'&&!q.woundId&&(state?.events||[]).some(e=>
+  e.id==='skill-cold-shock:'+q.sourceId&&e.type==='skill-cold-water-shock'&&
+  e.details?.gmConfirmed===true&&e.details.report?.carryoverShock==='UNC');
+}
+export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfirmed=false,characterId=null,actorId=null,turnEnded=false,timelineId=null,elapsedMinutesSinceOriginal=null,comaLocationShock=null,comaInjuryLevel=null,initialComaD10=null,immersionComaHR=null,shockML=null,roll=null,herbalBonus=0,herbalProof=null}={}){
  const s=ready(state,round,eventId);
  requireCond(timingConfirmed===true,'GM musí potvrdit přípustný čas Shock recovery / reroll');
  sl=parsedSL(sl);
@@ -728,13 +733,19 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
   requireCond(due.due,'Není doložen správný okamžik Shock testu: '+due.reason);
  }else requireCond(s.shockOriginRound===null||round>s.shockOriginRound,'Starší Shock nelze potvrdit ve stejném kole jako jeho vznik');
  const before=s.shock;
+ const requireComa=before==='UNC'&&sl===SL.CF;
+ if(immersionComaHR!==null){
+  requireCond(requireComa&&verifiedImmersionComa952(s,q)&&verifiedRoll&&
+   whole(immersionComaHR,1,20)&&comaLocationShock===null&&comaInjuryLevel===null,
+   'Počáteční Coma HR od GM platí jen pro doložené ponoření a skutečný UNC + CF');
+ }
  if(before==='STN'){
   s.shock=REVERSE[resolveStunnedRecovery(sl)];
   s.shockFollowup=s.shock==='STN'?pendingShock('STN',round,timelineId):null;
  }else{
-  const requireComa=before==='UNC'&&sl===SL.CF;
-  if(requireComa)requireCond(whole(initialComaD10,1,10)&&whole(comaLocationShock,0,15)&&whole(comaInjuryLevel,1,5)&&12-comaLocationShock-comaInjuryLevel>0,
-   'UNC+CF: doložte Location Shock a Injury Level zranění, které vyvolalo Coma');
+  if(requireComa)requireCond(whole(initialComaD10,1,10)&&(immersionComaHR!==null||
+   whole(comaLocationShock,0,15)&&whole(comaInjuryLevel,1,5)&&12-comaLocationShock-comaInjuryLevel>0),
+   'UNC+CF: doložte příčinu Coma a skutečný první interval d10');
   const result=resolveShockReroll({state:SHOCK[before],sl,locationShock:comaLocationShock,injuryLevel:comaInjuryLevel});
   s.shock=REVERSE[result.state];applyShockProne(s);
   s.shockFollowup=s.shock==='STN'?pendingShock('STN',round,timelineId):null;
@@ -744,7 +755,8 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
    const medicalSource=['travel-weather','travel-accident','gm-health'].includes(q?.domain)?{domain:q.domain,sourceId:q.sourceId}:{};
    s.extendedShock={originState:before,hr:result.extendedShock.hr,elapsedHours:0,...medicalSource,
     ...(q?.woundId?{woundId:q.woundId}:{})};
-   if(requireComa)s.coma={active:true,hr:result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10,...medicalSource,
+   if(requireComa)s.coma={active:true,hr:immersionComaHR??result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10,...medicalSource,
+    ...(immersionComaHR!==null?{gmInitialHRAttested:true}:{}),
     ...(q?.woundId?{woundId:q.woundId}:{})};
   }
  }
@@ -759,6 +771,7 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
  if(s.shock!==before)s.shockOriginRound=round;
  record(s,eventId,'shock-recovery',round,{domain:q?.domain??'combat',sourceId:q?.sourceId??null,before,after:s.shock,sl:Object.keys(SL).find(k=>SL[k]===sl),
   extendedShockHR:s.extendedShock?.hr??null,comaHR:s.coma?.hr??null,
+  ...(immersionComaHR!==null?{immersionComaHR,initialComaD10}:{}),
   verifiedRoll,evidence:q?{dueRound:q.dueRound,phase:q.phase,timelineId:q.timelineId,actorId,turnEnded,elapsedMinutesSinceOriginal}:'legacy GM timing confirmed'});
  return {state:s};
 }
