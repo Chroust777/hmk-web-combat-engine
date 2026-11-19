@@ -4,6 +4,8 @@
  */
 import {episodeEncounterDistance,episodeEncounterSurprise} from './hmk-episode-travel-detail.js';
 
+import {trekWatchfulness} from './hmk-trekking-wilderness-tasks.js';
+
 export const EPISODE_ENCOUNTER_GM_FORMAT_93902='hmk-episode-encounter-gm-93902-v1';
 const fail=message=>{throw Error(message)};
 const integer=(raw,min,max,label)=>{
@@ -21,7 +23,15 @@ const owned=(journal,campaignId,sourceId,index)=>{
   fail('Encounter GM: neexistuje doložené neuzavřené setkání tohoto čísla.');
  return {source,episode};
 };
-export function episodeEncounterGMReceipt93902({journal=[],campaignId,sourceId,index,minute,input={}}={}){
+const partyWatchfulnessInput=episode=>({
+ modes:episode.orientation?.modes||{},conveyance:episode.conveyance,
+ drovingAnimals:episode.conveyance==='foot'&&!!((episode.stableAnimalLoad?.length||0)+(episode.animals?.length||0)),
+});
+export const episodeEncounterPartyWatchfulness=episode=>trekWatchfulness(partyWatchfulnessInput(episode));
+
+const SLEEP_ALERTNESS_FORMAT='hmk-episode-encounter-gm-93902-v2';
+export function episodeEncounterGMReceipt93902({journal=[],campaignId,sourceId,index,minute,input={},format=SLEEP_ALERTNESS_FORMAT}={}){
+ if(![SLEEP_ALERTNESS_FORMAT,EPISODE_ENCOUNTER_GM_FORMAT_93902].includes(format))fail('Encounter GM: neznámý formát záznamu.');
  if(!campaignId||!sourceId)return fail('Encounter GM: chybí kampaň nebo původní událost.');
  const i=integer(index,0,100,'číslo setkání'),{source,episode}=owned(journal,campaignId,sourceId,i);
  if(!Number.isSafeInteger(minute)||minute<episode.endMinute)fail('Encounter GM: rozhodnutí nesmí předcházet původnímu setkání.');
@@ -45,18 +55,20 @@ export function episodeEncounterGMReceipt93902({journal=[],campaignId,sourceId,i
   const partyRoll=optionalInteger(input.partyRoll,1,100,'d100 družiny'),foeRoll=optionalInteger(input.foeRoll,1,100,'d100 protistrany');
   const partyEML=optionalInteger(input.partyEML,-200,200,'EML družiny'),foeEML=optionalInteger(input.foeEML,-200,200,'EML protistrany');
   const decision=clean(input.decision)||null;
-  surprise=episodeEncounterSurprise({partyModes:episode.orientation?.modes||{},conveyance:episode.conveyance,
-   drovingAnimals:episode.conveyance==='foot'&&!!((episode.stableAnimalLoad?.length||0)+(episode.animals?.length||0)),
+  const {modes,conveyance,drovingAnimals}=partyWatchfulnessInput(episode);
+  surprise=episodeEncounterSurprise({partyModes:modes,conveyance,drovingAnimals,
    foeWatchfulness:beast?'alert':foeWatchfulness,foeIsBeast:beast,partySkill,foeSkill,partyRoll,partyEML,foeRoll,foeEML,decision,requireWitness:true});
   if(!surprise.verified)fail('Encounter GM: Surprise vyžaduje skutečný d100 a EML povinných stran; automatická varianta nesmí mít další hody.');
   if(!decision)fail('Encounter GM: potvrďte rozhodnutí po Surprise.');
+  if(format===SLEEP_ALERTNESS_FORMAT&&episode.kind==='sleep'&&decision==='ambush'&&surprise.winner==='foe')
+   surprise.alertness='party-unaware';
   if(decision==='ambush'&&(offset!==episode.minutes-1||!surprise.winner))
    fail('Encounter GM: zpětný ambush nelze zapsat uprostřed již dokončené cesty nebo bez vítěze překvapení. Oddělte čas a rozhodněte s GM.');
  }else if(clean(input.decision)||clean(input.foeWatchfulness)||clean(input.partySkill)||clean(input.foeSkill)||
    clean(input.partyRoll)||clean(input.foeRoll)||clean(input.partyEML)||clean(input.foeEML)||input.foeIsBeast){
   fail('Encounter GM: klidné setkání nesmí obsahovat fingované Surprise hody nebo rozhodnutí.');
  }
- return {format:EPISODE_ENCOUNTER_GM_FORMAT_93902,sourceId,index:i,minute,eventMinute,offset,
+ return {format,sourceId,index:i,minute,eventMinute,offset,
   input:{offset,d4,terrain,moon:period==='night'?moon:'dark',hearingD10,nonhostile,
    ...(nonhostile?{}:{foeIsBeast:!!input.foeIsBeast,foeWatchfulness:clean(input.foeWatchfulness),
     partySkill:clean(input.partySkill),partyRoll:optionalInteger(input.partyRoll,1,100,'d100 družiny'),
@@ -71,7 +83,7 @@ export function validateEpisodeEncounterGM93902(journal=[]){
   if(!row.calendarEpisodeEncounterGM93902)continue;
   const p=row.calendarEpisodeEncounterGM93902;
   const receipt=episodeEncounterGMReceipt93902({journal:known.concat(journal.filter(x=>x!==row&&!x.calendarEpisodeEncounterGM93902)),
-   campaignId:row.calendarCampaignId,sourceId:p.sourceId,index:p.index,minute:row.campaignMinute,input:p.input});
+   campaignId:row.calendarCampaignId,sourceId:p.sourceId,index:p.index,minute:row.campaignMinute,input:p.input,format:p.format});
   if(row.characterId!==journal.find(x=>x.id===p.sourceId)?.characterId||JSON.stringify(p)!==JSON.stringify(receipt))
    fail('Encounter GM: uložená položka se liší od původních hodů a odvozených výsledků.');
   known.push(row);
