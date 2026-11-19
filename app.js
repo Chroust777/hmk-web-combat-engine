@@ -42,8 +42,8 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
-import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.954';
-import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.958';
+import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.959';
+import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.959';
 import {CHRONICLE_TRAVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.955';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
@@ -385,7 +385,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.958';
+const APP_VERSION='93.959';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3619,7 +3619,8 @@ function chronicleParagraphs951(clock,entry,presentation,source,{gm=false}={}){
  const rolls=legacy?[]:chronicleRollStories(entry,p,tests,name,hazard);
  const flow={
   narratedHazard:rolls.some(beat=>beat.kind==='hazard'),
-  narratedDirection:rolls.some(beat=>beat.kind==='direction'&&beat.after),
+  narratedDirection:rolls.some(beat=>beat.kind==='direction'&&(beat.after||beat.text)),
+  narratedTracking:rolls.some(beat=>/tracking/i.test(beat.test?.skill||'')&&beat.after),
   narratedEndurance:rolls.some(beat=>beat.kind==='endurance')
  };
  const beats=legacy?personalChronicleBeats(entry,p,tests,{hazard,encounter,name,calendar}):
@@ -3667,7 +3668,11 @@ function chronicleWounds953(injuries){return injuries.map(w=>{
  }).join('; ');}
 function chronicleBeatHTML953(beat,overrides,name){
   const editor=overrides||{};
-  if(beat.text)return `<p class="hc-story-paragraph hc-story-paragraph--${esc(beat.kind)}">${esc(typeof editor.text==='string'?editor.text:beat.text)}</p>`;
+  if(beat.text){
+   const text=typeof editor.text==='string'?editor.text:beat.text;
+   return text.split(/\n\s*\n/).filter(Boolean).map(paragraph=>
+    `<p class="hc-story-paragraph hc-story-paragraph--${esc(beat.kind)}">${esc(paragraph)}</p>`).join('');
+  }
   const roll=beat.test?` ${chronicleRollHTML953(beat.test,name)}`:'';
   const encounter=beat.encounter;
   const encRoll=encounter?` <span class="hc-story-receipt" role="group" aria-label="Doložený Encounter hod"><span class="hc-story-receipt__bracket">(</span><b${journalHelp('Encounter','HMK str. 150: šance na setkání vychází z prostředí, světla a délky intervalu; v minutové variantě procento platí jen pro daný úsek.')}>Encounter</b><span${journalHelp('Šance','Procentní pravděpodobnost setkání pro tento interval, nikoli počet setkání ani automatický herní následek.')}>šance ${esc(encounter.chance||'nedoložena')}</span><span${journalHelp(encounter.die,personalTestHelp('DIE',{}))}>${esc(encounter.die)} (${encounter.roll===null?'—':esc(encounter.roll)})</span><span class="hc-story-receipt__bracket">)</span></span>`:'';
@@ -3679,14 +3684,8 @@ function chronicleNarrativeHTML953(_entry,{legacy,beats,rolls,encounter},name,pa
  const prose=beats.map((beat,i)=>({kind:beat.kind,html:chronicleBeatHTML953(beat,paragraphs?.[i],name)}));
  if(legacy)return prose.map(beat=>beat.html).join('');
  const story=[
-  ...prose.filter(beat=>beat.kind==='intro'||beat.kind==='travel'),
-  ...rolls.filter(beat=>beat.kind==='travel'),
-  ...prose.filter(beat=>beat.kind==='activity'),
-  ...rolls.filter(beat=>beat.kind==='activity'),
-  ...rolls.filter(beat=>beat.kind==='hazard'),
-  ...rolls.filter(beat=>beat.kind==='aftermath'),
-  ...rolls.filter(beat=>beat.kind==='direction'),
-  ...rolls.filter(beat=>beat.kind==='endurance'),
+  ...prose.filter(beat=>['intro','travel','activity'].includes(beat.kind)),
+  ...rolls,
   ...prose.filter(beat=>beat.kind==='aftermath')
  ];
  if(encounter?.count)story.push({kind:'encounter',encounter,before:'Výprava měla také společnost na cestě.',after:'Podrobnosti jsou zapsány v Kronice epizod.'});
