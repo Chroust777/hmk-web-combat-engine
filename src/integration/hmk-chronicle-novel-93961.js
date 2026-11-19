@@ -8,7 +8,12 @@ const terrainGroups = {
  'alpine-vegetation':'mountains','ice-snow-rockfield':'stone',dunes:'sand','desert-flats':'stone'
 };
 const terrain = {
- needles:['Stezka mizí mezi kmeny vždycky jen o kus napřed.','Pod jehličím vystupují kořeny jako příčky žebříku.','Pod korunami jehličnanů leží zem v stínu i tam, kde se les rozestupuje.','Mezi kořeny a kamením se vine úzký pruh udusané země.'],
+ needles:[
+  'Stezka se mezi kmeny stáčí tu k jedné, tu k druhé straně.',
+  'Přes stezku leží obnažené kořeny. Jinde je zem vysypaná starým jehličím.',
+  'I v místech, kde se les rozestupuje, sahá stín jehličnanů až na stezku.',
+  'Cesta se vine mezi kořeny a kamením. Místy z ní zbývá sotva pruh udusané země.'
+ ],
  wood:['Pod stromy zbývá z širého kraje sotva to, co se vejde mezi dva kmeny.','Lesní půda mění barvu podle toho, kde na ni dolehne světlo.','Podél stezky se střídá vysoký les s mlázím.','V houští by se cesta ztratila docela, kdyby ji neprozrazovala udusaná zem.'],
  trail:['Stezka je v zemi zapsána tak mělce, že ji místy přebíjí porost.','Po stranách stezky sahá porost až do cesty.','Stezka se před očima ztrácí a o něco dál zase vystupuje.','Kraj se tu ukazuje po útržcích, jak se stezka stáčí dál.'],
  paved:['Kameny v cestě jsou uprostřed ohlazené. Po stranách si v jejich spárách dělá místo tráva.','Podél kamenů na kraji cesty se táhne pruh měkké země.','Cestu prozrazuje pravidelný pás kamene, i když okolní kraj mění tvář.','Některé kameny sedí v cestě zpola pohřbené a jiné vystupují nad zem.'],
@@ -22,147 +27,16 @@ const terrain = {
  stone:['Po holé zemi vystupují hrany kamene.','Mezi kameny leží mělké prohlubně, sotva postřehnutelné z dálky.','Tady i nízký balvan na holé pláni vystupuje zdaleka.','V otevřené krajině prozrazují nerovnosti především úzké pruhy stínu.'],
  general:['Nejbližší kus kraje se dá přehlédnout jediným pohledem. Dál už je třeba hledět pozorněji.','Přímo před výpravou se dají číst i drobnosti, které z dálky splývají.','Co leží dál, ukazuje se po částech, jak to dovoluje kraj.','Obrysy okolí postupně odkrývají, co z dálky zůstávalo skryto.']
 };
-const terrainDetails = {
- needles:[
-  'Kmen od kmene se mění dálka, do níž je odtud vidět.',
-  'Zem pod jehličnany je samý kořen. Jeden se skrývá pod jehličím, druhý trčí napříč.',
-  'Cesta si mezi kmeny podržela sotva tolik místa, kolik potřebuje.',
-  'Ke stranám se zem zvedá ke kořenům. Uprostřed zůstává pruh, po němž se dá projít.'
- ],
- wood:[
-  'Nejnižší větve sahají skoro k zemi. Za nimi už je vidět jen další porost.',
-  'Mezi místy, kde stromy rostou nahusto, jsou i volná místa, ale z dálky je není znát.',
-  'Podél cesty bývá vidět hlavně zem a nejbližší řadu kmenů.',
-  'Nad mezerami v porostu se znovu zavírají koruny stromů.'
- ],
- marsh:[
-  'Z vody vyčnívají stébla a mezi nimi se ukazuje tmavá zem.',
-  'Pevná zem je tu vzácná a i ta se ukazuje po kouscích.',
-  'Někde je vidět holá voda, jinde její hladinu prozrazuje sotva několik stébel.',
-  'Za nejbližším pruhem pevné země už začíná měkký kraj mokřin.'
- ],
- trail:[
-  'Na místech, kde stezka mizí pod porostem, se dá poznat podle udusané hlíny.',
-  'Podél pěšiny se zem mění jen o málo. Právě v tom málu je třeba hledat pokračování.',
-  'Pěšina je místy tak mělká, že se ukazuje až těsně pod nohama.',
-  'Stezka má sotva patrné okraje. Zem po obou stranách už náleží porostu.'
- ],
- paved:[
-  'Spáry mezi kameny se táhnou šikmo přes cestu.',
-  'Dlažba je tu složená z kamenů nestejné výšky.',
-  'Po krajích dlažby už kameny vykukují z měkké půdy jen zpola.',
-  'Nejhladší místa v kameni ukazují, kudy se chodívá.'
- ],
- road:[
-  'Koleje se při okraji ztrácejí v měkké zemi.',
-  'Vysoký prostředek cesty dělí jednu kolej od druhé.',
-  'Uježděná zem sahá až k okraji cesty.',
-  'Místy vystupují z hlíny kameny, které kola zatlačila jen napůl.'
- ],
- fields:[
-  'Vysoké stéblo se v otevřeném kraji ukazuje zdaleka.',
-  'V trávě se prozrazují mělká místa, kde je porost o něco řidší.',
-  'Z nízkého porostu vystupují hrboly země.',
-  'V otevřeném kraji je sotva kde schovat pohled před dálkou.'
- ],
- moor:[
-  'Pod nízkými keříky je znát holá zem.',
-  'Nízký porost mění barvu od jednoho návrší ke druhému.',
-  'Místy se na vřesovišti ukáže světlý kámen.',
-  'Vřes se drží při zemi i tam, kde se kraj zvedá.'
- ],
- hills:[
-  'Jeden svah zakrývá druhý a mezi nimi se kraj na chvíli ztrácí.',
-  'Přes rameno nejbližšího vrchu vystupují další obrysy.',
-  'Pod návrším se obzor přibližuje, nad ním se znovu otevírá.',
-  'Na zlomu svahu má zem jiný sklon, než se zdálo z dálky.'
- ],
- mountains:[
-  'Pod svahy zůstává nebe vidět jen tam, kde se hory rozestoupí.',
-  'Na úbočí leží kamení nepravidelně, drobné mezi velkým.',
-  'Hřeben hor je zřetelný. To, co leží pod ním, se ztrácí v záhybech.',
-  'Po úbočí se zdálky dají sledovat dlouhé, nepravidelné pruhy kamene.'
- ],
- sand:[
-  'Písek se pod dunami sype z prudších ploch na mírnější.',
-  'Pod hřbetem duny je vidět, jak jemně se rozlévá písek.',
-  'Čáry v písku mizí na strmější straně duny.',
-  'Některé hřbety dun jsou hladké, jiné se na kraji drolí.'
- ],
- stone:[
-  'V nízkých kamenných hranách se povrch láme na každém kroku.',
-  'Mezi balvany bývají prohlubně, z dálky takřka neviditelné.',
-  'Kamenitá zem má zblízka mnohem hrubší tvář.',
-  'Největší kameny prozrazují ráz půdy, menší ukáže teprve blízkost.'
- ],
- general:[
-  'V dálce se drobné rozdíly ztrácejí. Zblízka jich má zem na rozdávání.',
-  'Co leží při zemi, ukazuje teprve bližší pohled.',
-  'Tvar kraje určují drobné nerovnosti. Některé jsou znát teprve zblízka.',
-  'Nejbližší kus země se zdá docela prostý, dokud si ho člověk neprohlédne pozorněji.'
- ]
-};
 const nightTerrain = {
  needles:'Mezi nejbližšími kmeny se od sebe stíny sotva dají rozeznat.',
  wood:'Za tmy se okraj lesa dá spíš tušit než rozeznat.',
  marsh:'Kde končí pevná zem a začíná mokřina, se ve tmě těžko pozná.',
  general:'Ve tmě se kraj ukazuje jen v hrubých obrysech.'
 };
-const nightDetails = [
- 'V šeru už drobné nerovnosti splývají s okolím.',
- 'Co leží dál po stranách, je vidět čím dál hůř.',
- 'Za nejbližšími obrysy zůstává kraj skrytý.',
- 'Tady se ve tmě nedá spoléhat na první pohled.',
- 'Nejvíc je znát vždycky to, co leží nejblíž.',
- 'Dálka se ztrácí ve tmě a blízké věci vystupují jen po částech.',
- 'Blízká znamení se ještě dají rozeznat. Ta vzdálenější už mizí.'
-];
-const travelFocus = [
- 'Výprava má před sebou vždycky jen ten kus cesty, který se jí právě ukazuje.',
- 'Jaký bude další kus cesty, ukáže vždy až pohled zblízka.',
- 'Než se výprava dostane dál, musí se nejdřív vyznat v tom, co má před sebou.',
- 'Záleží na malých znameních. Těch velkých má tenhle kus cesty poskrovnu.'
-];
-const trackingFocus = [
- 'Při hledání stopy je nutné číst zem pomalu.',
- 'Jediné znamení mnoho nepoví. Teprve druhé ukáže, zda spolu souvisejí.',
- 'Co člověk v chůzi mine, může při stopování rozhodnout o směru.',
- 'Nejvíce pozornosti si žádají místa, kde stopa slábne.'
-];
-const forageFocus = [
- 'Kdo tu hledá něco k užitku, musí se dívat i tam, kam cesta sama nevede.',
- 'Každý kus země je třeba při hledání prohlédnout zvlášť.',
- 'Pozornost teď patří tomu, co může krajina výpravě poskytnout.',
- 'Pátrání se řídí tím, co nabízí nejbližší okolí.'
-];
-const watchFocus = [
- 'Při hlídce lze dojít k jistotě jen po malých znameních.',
- 'Ostraha patří hlavně tomu, co se může přiblížit od kraje.',
- 'Při hlídání stojí za pozornost i ten nejmenší jiný zvuk.',
- 'Hlídka má čas rozeznat, které zvuky patří k okolí.'
-];
-const sleepFocus = [
- 'V čase spánku se síly vracejí pomalu.',
- 'Na chvíli zůstává vše, co ještě čeká, stranou.',
- 'Po tu dobu má přednost spánek.',
- 'Cesta a práce musí prozatím počkat.'
-];
-const restFocus = [
- 'Při oddechu zbývá na okolí víc pozornosti.',
- 'Zastavení dává čas všimnout si věcí, které v chůzi snadno unikají.',
- 'Pro tu chvíli je dost času vnímat, co se děje blízko.',
- 'Spěch v těchto chvílích ustupuje klidu.'
-];
 const weatherLines = {
  rain:['Kapky dopadají jedna za druhou a z jejich šumu se jen občas vyloupne jiný zvuk.','Déšť stírá vzdálené obrysy. Co je potřeba rozeznat, musí být blízko.','V dešti má zem všude tmavší barvu.','Voda hledá na zemi nejnižší místa a tam se jí po kapkách sbírá čím dál víc.'],
  snow:['Sníh po troškách zakrývá drobná znamení na zemi.','Vločky přicházejí z bílé dálky a bílou dálku za sebou nechávají.','Sníh plní mělké prohlubně dřív než ty hlubší.','Co před chvílí vystupovalo ze země, ztrácí pod sněhem obrys.'],
  sleet:['Mokrý sníh se sotva dotkne země a už se mění ve vodu.','Místy dopadá na zem vločka, místy těžká kapka.','Z nebe padá déšť se sněhem a všechno na dosah vlhne.','Po chvilce zůstane z mokrých vloček na šatu jen chlad a voda.'],
- unknown:[
-  'Daleko odtud už nelze drobné věci rozeznat.',
-  'Co je nablízku, má své barvy a zvuky. Dál všechno splývá.',
-  'Dálka zatím dává poznat jen to nejvýraznější.',
-  'O blízkých věcech lze soudit lépe. V dálce se jejich obrysy ztrácejí.'
- ],
  dry:['Z nebe teď nic nepadá a zvuky z okolí dostávají prostor.','Bez srážek je snáz slyšet, co se děje nablízku.','Kraj zůstává bez deště.','Počasí alespoň nepřidává vodu tam, kde už jí může být dost.']
 };
 const climateDetails = {
@@ -171,10 +45,10 @@ const climateDetails = {
  subpolar:['V tom severním podnebí bývá tepla poskrovnu.','Zdejší kraj je skoupý na teplo i za příznivého počasí.']
 };
 const forestRain = [
- 'Voda sbíhá po jehličí na konce větví. Odtud padá na zem v těžkých kapkách, po jedné a po druhé.',
- 'Z větví kape do mělkých prohlubní a stará znamení na zemi se pomalu ztrácejí pod vodou.',
- 'Nad stezkou šumí déšť a z jehličí padají těžší kapky než z nebe.',
- 'Pod korunami dopadá voda po jednotlivých úderech. Mezi stromy je slyšet každý zvlášť.'
+ 'Na jehličí se sbírá voda. Pod převislými větvemi padají na cestu těžké kapky.',
+ 'Z větví kape do mělkých prohlubní. Vodou zalitý okraj stezky už se nedá dobře rozeznat.',
+ 'V korunách šumí déšť. Tam, kde se větve rozestupují, je jeho hlas slyšet nejzřetelněji.',
+ 'Déšť prosakuje vrstvou jehličí a kolem vystouplých kořenů se leskne tmavá hlína.'
 ];
 const times = {
  dawn:['Pomalu svítá.','Za úsvitu už se nejbližší tvary od sebe dají rozeznat.','Jitro se teprve rozednívá.','Rozednívá se jen zvolna.'],
@@ -204,7 +78,10 @@ export function novelChoice(seed, topic, lines) {
  return lines[((h^(h>>>16))>>>0)%lines.length];
 }
 
-function sceneContext(p){
+export function novelScene(entry,p,ordinal) {
+ const pick=(topic,lines)=>novelChoice(entry.id,topic,lines);
+ const group=terrainGroups[p.terrain]||'general';
+ const ground=terrain[group];
  const weather=p.precipitation?.precipitation||p.weather?.precipitation;
  const fall=weatherLines[weather] ? weather : weather==='none'||p.weather?.hasPrecipitation===false?'dry':'';
  const periods=Object.keys(p.daylight?.minutesByPeriod||{}).filter(key=>p.daylight.minutesByPeriod[key]>0);
@@ -215,45 +92,13 @@ function sceneContext(p){
   stored==='twilight'?(twilight%1440<720?'dawn':'dusk'):times[stored]?stored:'unknown';
  const seasonCode=p.weather?.season||p.settings?.season;
  const season=seasonCode==='fall'?'autumn':seasonCode;
- return {fall,stored,light,season,area:p.area||p.settings?.area};
-}
-
-export function novelEpisodeOrdinals(journal,campaignId){
- const counts=new Map(), ordinals=new Map();
- for(const row of journal){
-  if(row.calendarCampaignId!==campaignId||!row.calendarTimeEpisode)continue;
-  const p=row.calendarTimeEpisode;
-  const {fall,light,season,area}=sceneContext(p);
-  const key=JSON.stringify([p.kind,terrainGroups[p.terrain]||'general',fall,light,season,area]);
-  const ordinal=counts.get(key)||0;
-  counts.set(key,ordinal+1);
-  ordinals.set(row.id,ordinal);
- }
- return ordinals;
-}
-
-export function novelScene(entry,p,ordinal) {
- const pick=(topic,lines)=>novelChoice(entry.id,topic,lines);
- const numbered=Number.isSafeInteger(ordinal)&&ordinal>=0;
- // Four time phrases, eight descriptions, four weather phrases, two orders
- // and four focuses. The offsets vary neighbours but are reversible.
- const step=numbered?ordinal%1024:0;
- const opening=step%4;
- const groundIndex=(Math.floor(step/4)+opening)%8;
- const weatherIndex=(Math.floor(step/32)+groundIndex)%4;
- const frame=(Math.floor(step/128)+weatherIndex)%2;
- const focusIndex=(Math.floor(step/256)+groundIndex)%4;
- const choose=(topic,lines,index)=>numbered?lines[index]:pick(topic,lines);
- const group=terrainGroups[p.terrain]||'general';
- const ground=[...terrain[group],...(terrainDetails[group]||terrainDetails.general)];
- const {fall,stored,light,season,area}=sceneContext(p);
  const seasonal=seasonScenes[season];
  const dark=light==='night'||light==='dusk';
- const scenery=choose('krajina',dark?[nightTerrain[group]||nightTerrain.general,...nightDetails]:ground,groundIndex);
+ const scenery=dark?(nightTerrain[group]||nightTerrain.general):pick('krajina',ground);
  const time=times[light];
- const rollTime=lines=>choose('světlo',lines,opening);
- const rain=fall==='rain'&&group==='needles'?forestRain:weatherLines[fall||'unknown'];
- const rainPhrase=choose('srážky',rain,weatherIndex);
+ const rollTime=lines=>Number.isSafeInteger(ordinal)&&ordinal>=0?lines[ordinal%lines.length]:pick('světlo',lines);
+ const rain=fall==='rain'&&group==='needles'?forestRain:weatherLines[fall];
+ const rainPhrase=rain?pick('srážky',rain):'';
  const condition=p.precipitation?.hazard||
   (stored==='night'?p.weather?.nightHazard:stored==='day'?p.weather?.daylightHazard:null);
  const climateCode=p.weather?.climate||p.settings?.climate;
@@ -262,24 +107,24 @@ export function novelScene(entry,p,ordinal) {
   pick('podnebí',climateBank):'';
  const cold=condition==='cold'?pick('chlad',['Chlad zalézá i pod šat.','V chladu tuhne všechno, co zůstane nezakryté.','V tom chladu ani krátké postání nepřináší úlevu.']):'';
  const heat=condition==='heat'?pick('žár',['Žár nedává klid ani při postání.','Vzduch tíží horkem.','Ani zastavení na chvíli nedá od žáru oddechnout.']):'';
- const where=area?` v kraji zvaném „${area}“`:'';
+ const area=p.area||p.settings?.area;
+ const where=area?` v kraji zvaném ${area}`:'';
  const weatherAdj=seasonalAdjective[season];
  const period=({morning:'dopoledne',afternoon:'odpoledne',night:'noc',dusk:'soumrak',dawn:'jitro'})[light];
  const phrase=weatherAdj&&period?`${weatherAdj} ${period}`:'';
  const timePhrase=phrase?rollTime([
   `Je ${phrase}${where}.`,
   `Výpravu zastihuje ${phrase}${where}.`,
-  area?`V kraji, jemuž říkají „${area}“, je ${phrase}.`:`Tady nastává ${phrase}.`,
+  area?`V kraji, jemuž říkají ${area}, je ${phrase}.`:`Tady nastává ${phrase}.`,
   `${phrase[0].toLocaleUpperCase('cs')+phrase.slice(1)} zastihuje výpravu${where||' právě tady'}.`
  ]):rollTime(time);
  const place=area&&!phrase?`Výprava je${where}.`:'';
  const seasonPhrase=seasonal&&!phrase?pick('období',seasonal):'';
- const focusBank=({rest:restFocus,sleep:sleepFocus,winded:restFocus,tracking:trackingFocus,forage:forageFocus,watch:watchFocus})[p.kind]||travelFocus;
- const focus=choose('pozornost',focusBank,focusIndex);
- const order=choose('stavba',[
-  [timePhrase,scenery,rainPhrase,place,seasonPhrase,climate,cold,heat,focus],
-  [timePhrase,rainPhrase,scenery,climate,cold,heat,place,seasonPhrase,focus]
- ],frame);
+ const order=pick('stavba',[
+  [timePhrase,scenery,rainPhrase,place,seasonPhrase,climate,cold,heat],
+  [timePhrase,rainPhrase,scenery,climate,cold,heat,place,seasonPhrase],
+  [timePhrase,place,seasonPhrase,scenery,rainPhrase,climate,cold,heat]
+ ]);
  return order.filter(Boolean).join(' ');
 }
 

@@ -1,5 +1,5 @@
-import {knownChronicleCase} from './hmk-chronicle-novel-93961.js?v=93.962';
-import {chronicleTravelParty,ledAnimalDescription} from './hmk-chronicle-travel-93951.js?v=93.962';
+import {knownChronicleCase} from './hmk-chronicle-novel-93961.js?v=93.963';
+import {chronicleTravelParty,ledAnimalDescription} from './hmk-chronicle-travel-93951.js?v=93.963';
 import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js?v=93.961';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */
