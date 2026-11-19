@@ -60,3 +60,9 @@
 #app [data-skill-physical-impact] label[hidden]:has(> select[name="direction"]) {
   display: none !important;
 }
+
+#app [data-episode-encounter-gm-93902] label.hc-episode-needs-input :is(input:not([type=checkbox]), select) {
+  border-color: #ac3a32;
+  outline: 1px solid #ac3a32;
+  background-color: #fff4ef;
+}

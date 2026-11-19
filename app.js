@@ -243,6 +243,8 @@ import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisod
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
+import {weatherSkinComplexion} from './src/integration/hmk-weather-skin-coverage.js';
+import {decorateEpisodeEncounter93949} from './src/integration/hmk-episode-encounter-ui-93949.js';
 import {episodeEncounterPartyWatchfulness,episodeEncounterGMReceipt93902,validateEpisodeEncounterGM93902,assertEpisodeEncounterGMAppendOnly93902} from './src/integration/hmk-episode-encounter-gm-93902.js';
 import {createTrainingInterruption93902,trainingEffectiveDue93902,validateTrainingInterruption93902,assertTrainingInterruptionAppendOnly93902} from './src/integration/hmk-animal-training-interruption-93902.js';
 import {createDirectionGMResolution,directionGMResolution,validateDirectionGMJournal,assertDirectionGMAppendOnly,lastDocumentedDirectionStatus} from './src/integration/hmk-trekking-direction-gm.js';
@@ -382,7 +384,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.948';
+const APP_VERSION='93.949';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3170,20 +3172,22 @@ function timeEpisodePageHTML(clock,participants){
  <label>Skutečný d4 vzdálenosti<input name="d4" type="number" min="1" max="4" step="1" required placeholder="1–4"></label>
  <label>Terén setkání<select name="terrain">${Object.entries(EPISODE_ENCOUNTER_TERRAINS).map(([value,label])=>`<option value="${esc(value)}" ${value===row.calendarTimeEpisode.terrain?'selected':''}>${esc(label)}</option>`).join('')}</select></label>
  <label>Osvětlení případné noci<select name="moon"><option value="dark">Tmavá noc</option><option value="quarter">Čtvrtinový Měsíc</option><option value="bright">Jasný Měsíc</option></select></label>
+ <label class="hc-check"><input name="wantHearing" type="checkbox"> Provést nepovinný Hearing d10</label>
  <label>Hearing d10 (pouze les / nepovinné)<input name="hearingD10" type="number" min="1" max="10" step="1"></label>
- <label class="hc-check"><input name="nonhostile" type="checkbox"> GM potvrdil klidné setkání – Surprise se neprovádí</label>
+ <label>Druh setkání<select name="encounterKind"><option value="">— vyberte —</option><option value="calm">Klidné setkání</option><option value="surprise">Vyhodnotit Surprise</option></select></label>
  <label>Ostražitost protistrany<select name="foeWatchfulness" required><option value="">— zvolte ostražitost —</option><option value="lax">Lax</option><option value="normal">Normal</option><option value="alert">Alert</option></select></label>
  <label class="hc-check"><input name="foeIsBeast" type="checkbox"> Nespící zvíře – automaticky Alert</label>
  <label hidden>Dovednost družiny<select name="partySkill" disabled><option value="">— bez hodu / automatické —</option><option value="Awareness">Awareness</option><option value="Stealth">Stealth</option></select></label>
- <label hidden>Skutečný d100 družiny<input name="partyRoll" disabled type="number" min="1" max="100"><button type="button" class="secondary" data-episode-surprise-die="partyRoll">⚄ Generovat d100</button></label>
+ <label hidden>Skutečný d100 družiny<input name="partyRoll" disabled type="number" min="1" max="100"></label>
  <label hidden>Doložené EML družiny<input name="partyEML" disabled type="number" min="-200" max="200"></label>
  <label hidden>Dovednost protistrany<select name="foeSkill" disabled><option value="">— bez hodu / automatické —</option><option value="Awareness">Awareness</option><option value="Stealth">Stealth</option></select></label>
- <label hidden>Skutečný d100 protistrany<input name="foeRoll" disabled type="number" min="1" max="100"><button type="button" class="secondary" data-episode-surprise-die="foeRoll">⚄ Generovat d100</button></label>
+ <label hidden>Skutečný d100 protistrany<input name="foeRoll" disabled type="number" min="1" max="100"></label>
  <label hidden>Doložené EML protistrany<input name="foeEML" disabled type="number" min="-200" max="200"></label>
  <label hidden>Rozhodnutí po Surprise<select name="decision" disabled><option value="">— potvrdit GM —</option><option value="observe">Pozorovat</option><option value="leave">Vzdálit se</option><option value="parlay">Vyjednávat</option><option value="ambush">Přepadení – pouze na konci intervalu, následný Combat odděleně</option></select></label>
  </div><label>Poznámka GM (nepovinná)<textarea name="note" rows="2" maxlength="500"></textarea></label>
  <p class="hc-hint">Družina je ${esc(watch.effective)}${row.calendarTimeEpisode.kind==='sleep'?' · při přepadení ve spánku je družina Unaware':''}. <span data-episode-surprise-guidance>Zvolte ostražitost protistrany.</span></p>
- <output role="status" aria-live="polite"></output><button type="submit">Potvrdit Encounter Distance a Surprise · GM</button>
+ <p data-episode-surprise-result role="status"></p><button type="button" class="secondary" data-episode-surprise-reset hidden>Změnit potvrzené hody</button>
+ <output role="status" aria-live="polite"></output><button type="submit" disabled>Potvrdit Encounter Distance a Surprise · GM</button>
  </form></details>`}).join('')}
  ${!pendingEncounter&&lastResolvedPause?`<p class="hc-hint" role="status">Předchozí cesta byla pozastavena; její nevyhodnocený zbytek byl ${lastResolvedPause.calendarTimeEpisode.interruption.remainingMinutes} minut. Zda pokračovat po vyřešeném setkání, rozhoduje GM podle aktuální situace.</p>`:''}
  ${currentEncounterReports.length?`<section class="hc-episode-interruption" role="status" data-episode-encounter-reported><h3>Encounter · oznámení GM na konci epizody</h3>
@@ -10539,7 +10543,7 @@ function enhanceHMKDiceFields(){
  const app=document.getElementById('app');if(!app)return;
  const legal=new Set([4,6,8,10,12,20,30,100]);
  for(const input of app.querySelectorAll('form input[type="number"]')){
-  if(input.closest('.hmk-special-stage-93917')||input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||(input.disabled&&!input.dataset.hmkDiceWhenEnabled)||input.readOnly||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die')||input.closest('[data-episode-medical-rolls]'))continue;
+  if(input.closest('form[data-episode-encounter-gm-93902],form[data-skill-weather-skin],.hmk-special-stage-93917')||input.nextElementSibling?.dataset?.hmkGeneralAutoDie==='true'||(input.disabled&&!input.dataset.hmkDiceWhenEnabled)||input.readOnly||input.closest('#campaign-expedition-form')||input.closest('.hc-calendar-recovery-die')||input.closest('[data-episode-medical-rolls]'))continue;
   const label=input.closest('label');if(!label)continue;
   if(label.querySelector('[data-episode-die],[data-hmk-skill-auto-die-93916]'))continue; // A dedicated episode dX generator is already present.
   // Existing dedicated generators already know each rule's roll provenance.
@@ -11416,6 +11420,7 @@ function render(){
  showSavedSkillGate93928();
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
  for(const form of app.querySelectorAll('.hmk-weather-care #hmk-frost-amputation-form'))syncWeatherHealerFields(form);
+ decorateEpisodeEncounter93949(app,secureHMKDie,form=>episodeEncounterGMFormReceipt93949(form,'observe'));
  decorateConfirmedNoncombatChains93918(app,secureHMKDie);decorateTalismanDice93919(app,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
@@ -12551,6 +12556,7 @@ function hskSkinCoveragePlan(actor,kind){
 }
 function hskTrekkingSkinForms(actorId){
  const actor=character(actorId);if(!actor)return '';
+ const complexion=weatherSkinComplexion(actor);
  const hazards=(persistentStateOf(actor).environmentalHazards||[]).filter(h=>h.skinPending);
  // Never feed p355 animal anatomy into the p167 human executor.
  if(actor.hmk?.verifiedMountedBreed)return hazards.map(h=>`<div class="hc-event"><strong>GM: ${esc(h.skinPending)} u zvířete ${esc(actor.name)}</strong><p class="hc-hint">HMK 185 / 355: lidský formulář se nepoužije. Expozice zůstává zachována pro samostatné posouzení zvířecí anatomie.</p></div>`).join('');
@@ -12566,15 +12572,16 @@ function hskTrekkingSkinForms(actorId){
   const automatic=coverage.filter(x=>x.state==='exposed');
   return `<details class="hsk-climb-fall"><summary>Dokončit ${frost?'Frostbite':'Sunburn'} · jednotlivá zranění · HMK str.185</summary>
   <form data-skill-weather-skin data-weather-skin-kind="${h.skinPending}" data-skin-automatic="yes"><input name="sourceId" type="hidden" value="${esc(h.sourceId)}">
-  <p><strong>1. ${frost?'Dva povinné hody d20':'Pleť postavy'}.</strong> ${frost?'Vítr určí délku intervalu, další d20 určí dobu mrazu. Nejsou to údaje odhadované GM.':'Pleť určí TN pro případný Sunburn d10.'} Na každé číslo je samostatné pole a tlačítko pro automatický hod; fyzický hod můžeš také přepsat ručně.</p>
+  <p><strong>1. ${frost?'Dva povinné hody d20':'Pleť postavy'}.</strong> ${frost?'Vítr určí délku intervalu, další d20 určí dobu mrazu. Nejsou to údaje odhadované GM.':'Pleť určí TN pro případný Sunburn d10.'} Zadejte skutečný hod nebo jej vygenerujte, poté ho samostatně potvrďte.</p>
   ${frost?`<div class="field-grid"><label data-hmk-help="${esc(HSK_SKIN_HELP.wind)}">Vítr · d20 ${hskSkinTip('wind')}<input name="windD20" type="number" min="1" max="20" required inputmode="numeric"></label><label data-hmk-help="${esc(HSK_SKIN_HELP.duration)}">Délka vystavení mrazu · d20 ${hskSkinTip('duration')}<input name="durationD20" type="number" min="1" max="20" required inputmode="numeric"></label></div><p class="hc-hint">Druhý d20 neudává další čas v Kalendáři: pouze určí výsledek tabulky HMK. Skutečná doba poranění nikdy nepřekročí délku původní cestovní epizody.</p>`:
-  `<label data-hmk-help="${esc(HSK_SKIN_HELP.complexion)}">Skutečná pleť postavy ${hskSkinTip('complexion')}<select name="complexion"><option value="very-light">Very Light · TN10</option><option value="light">Light · TN7</option><option value="medium">Medium · TN4</option><option value="dark">Dark · TN2</option><option value="very-dark">Very Dark · TN1</option></select></label>`}
+  `<label data-hmk-help="${esc(HSK_SKIN_HELP.complexion)}">Skutečná pleť postavy ${hskSkinTip('complexion')}<select name="complexion" ${complexion?'data-confirmed-complexion disabled':'required'}><option value="">— zvolte doloženou pleť —</option>${[['very-light','Very Light · TN10'],['light','Light · TN7'],['medium','Medium · TN4'],['dark','Dark · TN2'],['very-dark','Very Dark · TN1']].map(([value,label])=>`<option value="${value}" ${value===complexion?'selected':''}>${label}</option>`).join('')}</select></label>`}
   <p><strong data-hmk-help="${esc(HSK_SKIN_HELP.location)}" tabindex="0">2. Automaticky vyhodnocené anatomické lokace.</strong> ${automatic.length} typů lokací je podle aktuálně nasazené výbavy potenciálně vystavených. Zaškrtnutí obou stran končetin se předvyplní automaticky. GM upraví jen skutečnou výjimku, kterou inventář nezná (např. dodatečné zahalení).</p>
   ${uncertain.length?`<p class="hc-weather-skin-error" role="alert">Výbava neurčuje ochranu ${uncertain.length} lokací: ${esc(uncertain.map(x=>x.label).join(', '))}. Nejprve doplňte nebo opravte nasazené kusy, jejich pokrytí a vrstvy v inventáři; systém nesmí hádat ochranu.</p>`:''}
   <details class="hc-weather-skin-exceptions"><summary>Upravit výjimky ve skutečné expozici (GM; běžně není potřeba)</summary><p class="hc-hint">Pokud inventář neodpovídá tomu, co postava skutečně nosí, nejprve uprav nasazenou výbavu. Zde lze pouze potvrdit výjimku skutečné expozice (např. ochrana improvizovaným přístřeškem); AV se svévolně nemění.</p><div class="hc-weather-skin-groups">${locationGroups}</div></details>
   <label class="hc-weather-skin-none"><input name="noneExposed" data-weather-skin-none type="checkbox" ${automatic.length===0&&!uncertain.length?'checked':''}> Bez skutečně vystavených lokací (automaticky, pokud je ochrana všech míst doložena; GM může opravit výjimečnou situaci)</label>
   <p class="hc-hint" data-weather-skin-choice-status role="status">Zatím není vybrána žádná lokalita.</p>
-  <div data-weather-skin-rows></div>
+  <p class="hc-hint" data-weather-skin-next role="status"></p><div data-weather-skin-rows></div>
+  <button type="button" class="secondary" data-weather-skin-reset hidden>Změnit potvrzené hody</button>
   <button type="button" class="secondary" data-weather-skin-evaluate>Vyhodnotit zadané hody a určit další testy</button>
   <p class="hc-hint">Dokud nestisknete toto tlačítko, nejsou ze zadaných kostek vypočtena žádná poranění. Změna původních hodů vyžaduje nové vyhodnocení.</p>
   <p><strong>3. Potvrzení všech následků.</strong> AV pro Frostbite se načte z inventáře. Při Sunburn se d10 zpřístupní pouze pro vybranou lokaci. Při skutečné ráně se zpřístupní Shock d100; Compound d10 jen při slučování kompatibilních ran.</p>
@@ -12644,6 +12651,58 @@ function hskSkinAddLocation(form,code,side){
  form.querySelector('[data-weather-skin-rows]').append(panel);
  enhanceHMKDiceFields();
 }
+const HSK_SKIN_DICE='input:is([name="windD20"],[name="durationD20"],[name="skinD10"],[name="compoundD10"],[name="shockD100"])';
+function hskSkinDieAccepted(field){
+ return !!field?.value&&field.value===field.dataset.skinAcceptedValue&&field.validity.valid;
+}
+function hskSkinApplyStep(form,target,canEvaluate,canSave){
+ const dice=[...form.querySelectorAll(HSK_SKIN_DICE)];
+ const locked=dice.some(hskSkinDieAccepted);
+ const none=form.elements.namedItem('noneExposed').checked;
+ for(const choice of form.querySelectorAll('[data-weather-skin-none],[data-weather-skin-select],select[name="complexion"]'))
+  choice.disabled=locked||choice.dataset.skinAutoState==='unknown'||choice.hasAttribute('data-confirmed-complexion')||
+   (choice.name==='complexion'&&none);
+ form.querySelector('[data-weather-skin-reset]').hidden=!locked;
+ const evaluate=form.querySelector('[data-weather-skin-evaluate]');
+ evaluate.disabled=!canEvaluate;
+ evaluate.hidden=form.dataset.skinEvaluated==='yes'||form.elements.namedItem('noneExposed').checked;
+ form.querySelector('button[type=submit]').disabled=!canSave;
+ form.querySelector('[data-weather-skin-next]').textContent=target?
+  'Aktuální krok · '+target.closest('label').textContent.split('⚄')[0].trim():
+  canEvaluate&&!evaluate.hidden?'Hody jsou potvrzené. Pokračujte tlačítkem Vyhodnotit zadané hody a určit další testy.':
+  canSave?'Vše je připraveno k zápisu.':'Zkontrolujte vybrané lokace a ověřenou výbavu.';
+ for(const label of form.querySelectorAll('label.hmk-medical-required-target'))label.classList.remove('hmk-medical-required-target');
+ target?.closest('label')?.classList.add('hmk-medical-required-target');
+ for(const field of dice){
+  let generate=field.parentElement.querySelector('[data-weather-skin-generate]'),confirm=field.parentElement.querySelector('[data-weather-skin-confirm]');
+  if(!generate){
+   generate=document.createElement('button');generate.type='button';generate.dataset.weatherSkinGenerate='true';
+   generate.textContent='⚄ Generovat d'+field.max;
+   confirm=document.createElement('button');confirm.type='button';confirm.dataset.weatherSkinConfirm='true';confirm.textContent='Vložit hod';
+   confirm.setAttribute('aria-label','Potvrdit hod · '+field.name);
+   field.after(generate,confirm);groupConfirmedDieControls93928(field,generate,confirm);
+   generate.addEventListener('click',()=>{
+    field.value=String(secureHMKDie(Number(field.max)));
+    field.dataset.hmkAutoDice=field.value;hskSkinRefresh(form);field.focus();
+   });
+   confirm.addEventListener('click',()=>{
+    if(confirm.disabled)return;
+    field.dataset.skinAcceptedValue=field.value;
+    hskSkinRefresh(form)?.focus();
+   });
+  }
+  const accepted=hskSkinDieAccepted(field);
+  const isTarget=field===target;
+  field.readOnly=accepted;
+  field.disabled=!(accepted||isTarget);
+  const label=field.closest('label');
+  label.hidden=!(accepted||isTarget);
+  generate.hidden=confirm.hidden=!isTarget;
+  generate.disabled=!isTarget;
+  confirm.disabled=!isTarget||!field.value||!field.validity.valid;
+ }
+ return target||(canEvaluate&&!evaluate.hidden?evaluate:canSave?form.querySelector('button[type=submit]'):null);
+}
 function hskSkinRefresh(form){
  if(!form?.matches?.('[data-skill-weather-skin]'))return;
  const actor=character(selected),kind=form.dataset.weatherSkinKind;
@@ -12657,7 +12716,10 @@ function hskSkinRefresh(form){
  }
  const maxExposure=hskSkinEpisodeMinutes(actor,form.elements.namedItem('sourceId').value);
  const evaluationConfirmed=form.dataset.skinEvaluated==='yes';
- let awaitingPrior=false; // only one location-specific test is open at a time
+ const skinComplexion=form.elements.namedItem('complexion');
+ const missingComplexion=!none&&kind==='sunburn'&&!skinComplexion?.value;
+ let target=missingComplexion?skinComplexion:!none&&kind==='frostbite'?[wind,duration].find(f=>!hskSkinDieAccepted(f)):null;
+ let awaitingPrior=missingComplexion; // only one location-specific test is open at a time
  for(const row of rows){
   row.hidden=awaitingPrior; // Only the next independent injury is visible.
   const shock=row.querySelector('[data-weather-skin-shock]'),compound=row.querySelector('[data-weather-skin-compound-die]');
@@ -12669,8 +12731,8 @@ function hskSkinRefresh(form){
   const gmReason=row.querySelector('[name=gmFrostReason]');
   if(!evaluationConfirmed){
    // No injury prediction or roll selection from unconfirmed editable dice.
-   row.hidden=false;
-   if(sunDie){sunDie.disabled=false;sunDie.required=true;}
+   row.hidden=kind==='sunburn'&&(awaitingPrior||hskSkinDieAccepted(sunDie));
+   if(sunDie&&!awaitingPrior&&!hskSkinDieAccepted(sunDie)){target=sunDie;awaitingPrior=true;}
    row.dataset.skinLevel='';
    preview.textContent='Zadejte potřebné hody a stiskněte „Vyhodnotit zadané hody“.';
    shockWrap.hidden=true;compWrap.hidden=true;
@@ -12718,14 +12780,21 @@ function hskSkinRefresh(form){
   const needComp=!awaitingPrior&&il!==null&&il>0&&row.dataset.skinCompound==='yes';
   // Compound is an earlier step in the Injury Sequence; only one dice task
   // at a time. Once its actual d10 is supplied, unlock the wound's Shock.
-  const validDie=field=>!!field.value&&field.checkValidity();
-  const needShock=!awaitingPrior&&il!==null&&il>0&&(!needComp||validDie(compound));
+  const needShock=!awaitingPrior&&il!==null&&il>0&&(!needComp||hskSkinDieAccepted(compound));
   shockWrap.hidden=!needShock;compWrap.hidden=!needComp;
   hmkSyncConditionalRollField(shock,needShock);
   hmkSyncConditionalRollField(compound,needComp);
   if(awaitingPrior){preview.textContent='Nejdříve dokonči požadované hody u předchozí lokace.';}
-  else if(il===null||il>0&&(needComp&&!validDie(compound)||needShock&&!validDie(shock)))awaitingPrior=true;
+  else if(il===null||il>0&&(needComp&&!hskSkinDieAccepted(compound)||needShock&&!hskSkinDieAccepted(shock))){
+   if(il===null&&gmWrap&&!gmWrap.hidden)target=gmChoice.value!=='G5'?gmChoice:gmReason;
+   else if(needComp&&!hskSkinDieAccepted(compound))target=compound;
+   else if(needShock)target=shock;
+   awaitingPrior=true;
+  }
  }
+ const covered=form.dataset.skinCoverageComplete==='yes';
+ return hskSkinApplyStep(form,target,covered&&!none&&rows.length>0&&!target&&!evaluationConfirmed,
+  covered&&(none||rows.length>0&&evaluationConfirmed&&!awaitingPrior));
 }
 document.addEventListener('change',event=>{
  const pick=event.target.closest?.('[data-weather-skin-select]'),none=event.target.closest?.('[data-weather-skin-none]');
@@ -12742,22 +12811,12 @@ document.addEventListener('change',event=>{
  hskSkinRefresh(form);
 },true);
 document.addEventListener('input',event=>{
- const form=event.target.closest?.('form[data-skill-weather-skin]');if(!form)return;
- if(!['windD20','durationD20','skinD10','complexion','shockD100','compoundD10','gmFrostReason','gmFrostChoice'].includes(event.target.name))return;
- // If the premise of a wound changes, no previously staged Shock/Compound
- // may silently remain attached to a different resulting Injury Level.
- if(event.target.name==='compoundD10'){
-  const shock=event.target.closest('[data-weather-skin-row]')?.querySelector('[data-weather-skin-shock]');
-  if(shock)shock.value=''; // a changed Compound may alter the Injury Shock level
- }
- if(event.target.matches('[name="windD20"],[name="durationD20"],[name="complexion"],[name="skinD10"]')){
-  delete form.dataset.skinEvaluated;
-  const affected=event.target.name==='skinD10'?[event.target.closest('[data-weather-skin-row]')]:[...form.querySelectorAll('[data-weather-skin-row]')];
-  for(const row of affected){if(!row)continue;for(const x of row.querySelectorAll('[data-weather-skin-shock],[data-weather-skin-compound-die]'))x.value='';
-   const gmChoice=row.querySelector('[name=gmFrostChoice]'),gmReason=row.querySelector('[name=gmFrostReason]');
-   if(gmChoice)gmChoice.value='';if(gmReason)gmReason.value='';}
- }
- hskSkinRefresh(form);
+ const form=event.target.closest?.('form[data-skill-weather-skin]');
+ if(form&&event.target.matches(HSK_SKIN_DICE+',select[name="gmFrostChoice"],textarea[name="gmFrostReason"]'))hskSkinRefresh(form);
+},true);
+document.addEventListener('change',event=>{
+ const form=event.target.closest?.('form[data-skill-weather-skin]');
+ if(form&&['gmFrostChoice','complexion'].includes(event.target.name))hskSkinRefresh(form)?.focus();
 },true);
 document.addEventListener('click',event=>{
  const button=event.target.closest?.('[data-weather-skin-evaluate]');if(!button)return;
@@ -12765,7 +12824,7 @@ document.addEventListener('click',event=>{
  event.preventDefault();
  if(!form.elements.namedItem('noneExposed')?.checked){
   const missing=[...form.querySelectorAll('input[name="windD20"],input[name="durationD20"],input[name="skinD10"]')]
-   .find(x=>!x.disabled&&(!x.value.trim()||!x.checkValidity()));
+   .find(x=>!hskSkinDieAccepted(x));
   if(missing){
    markTravelBloodInput93787(form,missing);
    const out=form.querySelector('output');if(out)out.textContent='Nejdříve doplňte červeně označený skutečný hod ('+missing.name+'). Kožní následky dosud nebyly vyhodnoceny ani uloženy.';
@@ -12773,7 +12832,20 @@ document.addEventListener('click',event=>{
   }
  }
  form.dataset.skinEvaluated='yes';
- hskSkinRefresh(form); // Explicit user action: still no journal or health mutation.
+ hskSkinRefresh(form)?.focus(); // No journal or health mutation until final save.
+},true);
+document.addEventListener('click',event=>{
+ const reset=event.target.closest?.('[data-weather-skin-reset]');
+ if(!reset)return;
+ const form=reset.form;
+ delete form.dataset.skinEvaluated;
+ for(const field of form.querySelectorAll(HSK_SKIN_DICE)){
+  delete field.dataset.skinAcceptedValue;
+  delete field.dataset.hmkAutoDice;
+  field.value='';
+ }
+ for(const field of form.querySelectorAll('[name="gmFrostChoice"],[name="gmFrostReason"]'))field.value='';
+ hskSkinRefresh(form)?.focus();
 },true);
 /** The calendar owns all elapsed minutes and determines which course is due.
  * Previewing a continuous exposure is never itself permission to roll d100.
@@ -14902,10 +14974,13 @@ document.addEventListener('submit',event=>{
    {calendarCampaignId:onsetReceipt.calendarCampaignId,campaignMinute:data.campaignClock.minute}:{};
   if(combatActorLocked93725(actor.id))throw Error('Zranění účastníka boje musí vést Combat');
   const toNumber=x=>x?.trim()?Number(x.trim()):null;
-  hskSkinRefresh(form);
+  const next=hskSkinRefresh(form);
   if(form.dataset.skinCoverageComplete!=='yes')throw Error('Ochrana anatomických lokací není z inventáře ověřena. Opravte nejprve oblečenou výbavu.');
   const none=form.elements.namedItem('noneExposed').checked;
-  if(!none&&form.dataset.skinEvaluated!=='yes')throw Error('Nejprve potvrďte vyhodnocení zadaných hodů tlačítkem.');
+  if(form.querySelector('button[type=submit]').disabled){
+   next?.focus();
+   throw Error('Nejprve potvrďte aktuální povinný krok kožních následků.');
+  }
   const selectedRows=[...form.querySelectorAll('[data-weather-skin-row]')];
   if(!none&&!selectedRows.length)throw Error('Vyberte skutečně vystavené lokace nebo potvrďte, že žádná nebyla vystavena.');
   if(none&&selectedRows.length)throw Error('Nelze současně potvrdit žádné vystavené místo a vybrat lokalitu.');
@@ -18553,63 +18628,34 @@ document.addEventListener('submit',e=>{
   }))notice='Direction Hazard byl doložen pro konkrétní hlídku. Historický hod, čas a případná chybná poloha zůstávají zachovány.';
  }catch(err){if(out)out.textContent='Direction Hazard: '+(err.message||err);}
 },true);
-document.addEventListener('change',e=>{
- if(!['nonhostile','foeWatchfulness','foeIsBeast'].includes(e.target?.name))return;
- const form=e.target.closest('[data-episode-encounter-gm-93902]');
- if(!form)return;
- const fields=form.elements;
- const nonhostile=fields.nonhostile.checked;
- if(nonhostile)fields.foeIsBeast.checked=false;
- const beast=fields.foeIsBeast.checked;
- const foe=beast?'alert':fields.foeWatchfulness.value;
- const party={effective:form.dataset.partyWatchfulness,skills:form.dataset.partySkills.split(',')};
- const procedure=!nonhostile&&foe?trekSurpriseProcedure({party,foe}):null;
- const setField=(name,enabled,required=enabled,visible=enabled)=>{
-  const control=fields.namedItem(name);
-  control.disabled=!enabled;
-  control.required=required;
-  control.closest('label').hidden=!visible;
-  if(!enabled&&control.type!=='checkbox')control.value='';
- };
- setField('foeIsBeast',!nonhostile,false);
- setField('foeWatchfulness',!nonhostile&&!beast,!nonhostile&&!beast);
- setField('decision',!!procedure);
- for(const side of ['party','foe']){
-  const rolls=procedure?.kind==='opposed'||procedure?.kind==='unopposed'&&procedure.preferred===side;
-  const skills=side==='party'?party.skills:foe==='alert'?['Awareness','Stealth']:['Awareness'];
-  for(const suffix of ['Skill','Roll','EML'])setField(side+suffix,rolls);
-  const skill=fields.namedItem(side+'Skill');
-  for(const option of skill.options)option.disabled=!!option.value&&!skills.includes(option.value);
-  if(rolls){
-   if(skills.length===1)skill.value=skills[0];
-   else if(!skills.includes(skill.value))skill.value='';
+function episodeEncounterGMFormReceipt93949(form,decision=null){
+ const clock=data.campaignClock;
+ if(!clock||combatInitiativeSequence)throw Error('Vyžaduje aktivní kampaň mimo boj.');
+ const fields=form.elements,campaignId=campaignKey(clock);
+ const {sourceId,index,offset,d4,terrain,moon,wantHearing,hearingD10,encounterKind,foeWatchfulness,
+  foeIsBeast,partySkill,partyRoll,partyEML,foeSkill,foeRoll,foeEML,note}=fields;
+ const nonhostile=encounterKind.value==='calm';
+ if(!nonhostile&&encounterKind.value!=='surprise')throw Error('Zvolte druh setkání.');
+ const input={offset:offset.value,d4:d4.value,terrain:terrain.value,moon:moon.value,
+  hearingD10:wantHearing.checked?hearingD10.value:'',nonhostile,note:note.value};
+ if(!nonhostile){
+  Object.assign(input,{foeIsBeast:foeIsBeast.checked,foeWatchfulness:foeIsBeast.checked?'alert':foeWatchfulness.value,
+   decision:decision??fields.decision.value});
+  for(const [skill,roll,eml] of [[partySkill,partyRoll,partyEML],[foeSkill,foeRoll,foeEML]]){
+   if(!roll.disabled)Object.assign(input,{[skill.name]:skill.value,[roll.name]:roll.value,[eml.name]:eml.value});
   }
  }
- const guidance=nonhostile?'Klidné setkání. Potvrďte pouze vzdálenost.':!procedure?'Zvolte ostražitost protistrany.':
-  procedure.kind==='automatic'?'Automatic · překvapí strana Alert. Potvrďte rozhodnutí bez hodu.':
-  procedure.kind==='opposed'?'Opposed · zadejte nebo vygenerujte d100 a doložte EML obou stran.':
-  'Unopposed · d100 a EML zadává pouze '+(procedure.preferred==='party'?'družina.':'protistrana.');
- form.querySelector('[data-episode-surprise-guidance]').textContent=guidance;
-},true);
-document.addEventListener('click',e=>{
- const button=e.target.closest('[data-episode-surprise-die]');
- if(!button)return;
- const roll=button.form.elements.namedItem(button.dataset.episodeSurpriseDie);
- if(!roll.disabled)roll.value=1+Math.floor(Math.random()*100);
-},true);
+ return episodeEncounterGMReceipt93902({journal:data.journal,campaignId,sourceId:sourceId.value,
+  index:index.value,minute:clock.minute,input});
+}
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-episode-encounter-gm-93902]'))return;
  e.preventDefault();e.stopImmediatePropagation();
  const output=form.querySelector('output');
  try{
-  const clock=data.campaignClock;if(!clock||combatInitiativeSequence)throw Error('Vyžaduje aktivní kampaň mimo boj.');
-  const cid=campaignKey(clock),v=Object.fromEntries(new FormData(form));
-  const source=data.journal.find(j=>j.id===v.sourceId&&j.calendarCampaignId===cid&&j.calendarTimeEpisode);
-  if(!source)throw Error('Původní epizoda už neexistuje.');
-  const input={...v,nonhostile:form.elements.namedItem('nonhostile').checked,
-   foeIsBeast:form.elements.namedItem('foeIsBeast').checked};
-  const proof=episodeEncounterGMReceipt93902({journal:data.journal,campaignId:cid,sourceId:source.id,
-   index:v.index,minute:clock.minute,input});
+  const proof=episodeEncounterGMFormReceipt93949(form);
+  const cid=campaignKey(data.campaignClock);
+  const source=data.journal.find(j=>j.id===proof.sourceId&&j.calendarCampaignId===cid);
   const states={party:'družina',foe:'protistrana','party-unaware':'družina si přepadení nevšimla (Unaware)',
    'foe-unaware':'protistrana si přepadení nevšimla (Unaware)','party-confused':'družina je zaskočená (Confused)',
    'foe-confused':'protistrana je zaskočená (Confused)','both-aware':'obě strany jsou připravené (Aware)',
@@ -18617,11 +18663,11 @@ document.addEventListener('submit',e=>{
   const description=proof.nonhostile?'klidné setkání':
    'Surprise '+proof.surprise.procedure+' · '+(states[proof.surprise.winner]||'bez překvapení')+
    ' · '+proof.surprise.decision+' · '+states[proof.surprise.alertness];
-  const event={id:uuid(),characterId:source.characterId,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
+  const event={id:uuid(),characterId:source.characterId,calendarCampaignId:cid,campaignMinute:proof.minute,createdAt:stamp(),
    title:'Encounter · vzdálenost a Surprise · GM',body:'HMK 150 · '+description+' · '+proof.distance.sightingFeet+' ft. '+proof.input.note,
    calendarEpisodeEncounterGM93902:proof};
   if(mutate(()=>{
-   episodeEncounterGMReceipt93902({journal:data.journal,campaignId:cid,sourceId:source.id,index:v.index,minute:clock.minute,input});
+   episodeEncounterGMFormReceipt93949(form);
    data.journal.push(event);
   }))notice='GM potvrdil vzdálenost a Surprise. Historický Encounter, čas a hody zůstaly zachovány.';
  }catch(err){if(output)output.textContent='Encounter GM: '+(err.message||err);}
