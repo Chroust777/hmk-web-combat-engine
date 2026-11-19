@@ -64,7 +64,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
  encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
-  forcedBearing=0,trackingBearingPolicy=null,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[],walkingHandlerIds=[]}={}){
+  forcedBearing=0,trackingBearingPolicy=null,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[],walkingHandlerIds=[],waitingForComplication=false}={}){
  must(trackingBearingPolicy===null||trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904,
   'Neznámá pravidlová verze Tracking CF Bearing.');
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
@@ -89,6 +89,10 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  must(!dunesSlow||(kind==='travel'&&terrain==='dunes'&&conveyance==='foot'),
   'Dunes Slow lze zvolit pouze při pěší cestě přes duny (HMK 146).');
  if(!['travel','forage'].includes(kind))must(!survivalCriticalFailure&&survivalD10===null,'Survival Hazard platí pouze pro Orienteering při cestování nebo samostatném Foraging.');
+ if(waitingForComplication)must(kind==='travel'&&movementMinutes===0&&
+  progress===0&&bearing===0&&forcedBearing===0&&!trackingBearingPolicy&&
+  !progressD10.length&&!directionD10.length&&!survivalCriticalFailure&&survivalD10===null,
+  'Čekání po komplikaci nemůže zahájit nový pochod ani pohybové hody.');
  let motion=null,distanceMeters=0,actors=[],direction=null,survivalHazard=null;
  if(kind==='travel'){
   if(trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904)
@@ -99,7 +103,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
    continuousPrecipitation,doubleTime,hours:4});
   // The mandatory Bearing gained after Tracking CF is a MODE, not another
   // deficit. The legacy sum is retained only for receipts without this tag.
-  const directionDeficit=motion.bearingDeficit+(trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904?0:forcedBearing);
+  const directionDeficit=waitingForComplication?0:motion.bearingDeficit+(trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904?0:forcedBearing);
   must(Array.isArray(directionD10)&&directionD10.length===directionDeficit&&directionD10.every(x=>whole(x,1,10)),
    'Chybí '+directionDeficit+' platný Direction Hazard d10 (HMK 148).');
   const hazards=trekHazards({bearingDeficit:directionDeficit,directionD10,survivalCriticalFailure,survivalD10});
@@ -190,6 +194,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   memberIds:[...memberIds],...(transportedMemberIds.length?{transportedMemberIds:[...transportedMemberIds]}:{}),terrain,topography,conveyance,mapScale,motion,
   distanceMeters,distanceKilometres:distanceMeters/1000,
   ...(kind==='travel'?{movementMinutes}:{}),
+  ...(waitingForComplication?{waitingForComplication:true}:{}),
   ...(kind==='travel'?{distanceFractionIn:previousDistanceFraction,distanceFractionOut}:{}),
   mapCentimetres:Math.round(distanceMeters*100000/mapScale)/1000,
   actors,encounter,direction,survivalHazard,weather,slow,progress,bearing,loaded,
@@ -281,19 +286,48 @@ export function independentTravelDelayCarry(journal=[],campaignId,minute=Infinit
  let remaining=0;
  for(const e of episodes){
   if(e.kind==='travel')remaining=Math.max(0,remaining-e.minutes);
-  // Only new receipts opt into carrying the separately confirmed Foraging
-  // Complication. Archived v93.695/v93.863 travel receipts retain their original
-  // replay, and no event or dice result is rewritten.
-  if(includeForaging&&e.kind==='forage'&&
-     e.foragingTimePolicy93869==='complication-worked-minutes-v93.875'&&
-     ['long-delay','irreparable'].includes(e.foragingComplication93875?.result)){
-   remaining+=e.foragingComplication93875.nextWatchMinutes;
-  }
-  const complication=e.hazardDetails?.find(h=>h.hazard==='complication'&&
-   h.automationVersion==='v93.681'&&['long-delay','irreparable'].includes(h.result));
-  if(complication&&Number.isSafeInteger(e.travelDelay?.future)&&e.travelDelay.future>0)remaining+=e.travelDelay.future;
+  remaining+=newComplicationDelay(e,includeForaging);
  }
  return remaining;
+}
+
+function newComplicationDelay(episode,includeForaging){
+ if(includeForaging&&episode.kind==='forage'&&
+    episode.foragingTimePolicy93869==='complication-worked-minutes-v93.875'&&
+    ['long-delay','irreparable'].includes(episode.foragingComplication93875?.result)){
+  return episode.foragingComplication93875.nextWatchMinutes;
+ }
+ const source=episode.hazardDetails?.find(h=>h.hazard==='complication'&&
+  h.automationVersion==='v93.681'&&['long-delay','irreparable'].includes(h.result));
+ const future=episode.travelDelay?.future;
+ return source&&Number.isSafeInteger(future)&&future>0?future:0;
+}
+export const TREK_PARTICIPANT_DELAY_944='gm-complication-participant-delay-v93.944';
+export const TREK_PARTICIPANT_INCIDENT_944='gm-incident-participant-delay-v93.944';
+
+/** After a split or merge, only an actor's own elapsed journeys spend their
+ * pending delay. Members travelling together wait in parallel, for the longest
+ * remaining delay. Earlier receipts keep their original replay contract. */
+export function participantTravelDelayCarry(journal,campaignId,minute,memberIds){
+ if(!memberIds?.length)return 0;
+ const party=travelPartySet93763(memberIds);
+ const remaining=new Map([...party].map(id=>[id,0]));
+ const history=journal.filter(j=>j.calendarCampaignId===campaignId&&
+  (j.calendarMemberRelease?j.campaignMinute<=minute:j.calendarTimeEpisode?.startMinute<minute))
+  .sort((a,b)=>a.campaignMinute-b.campaignMinute);
+ for(const row of history){
+  const release=row.calendarMemberRelease;
+  if(release?.format==='hmk-calendar-member-release-v93.765'&&party.has(release.actorId)&&
+     release.actorId===row.characterId&&release.campaignId===campaignId&&
+     release.minute===row.campaignMinute&&release.gmConfirmed===true)
+   remaining.set(release.actorId,0);
+  const ep=row.calendarTimeEpisode;
+  if(!ep||!['travel','forage'].includes(ep.kind))continue;
+  const elapsed=ep.kind==='travel'?ep.minutes:0,added=newComplicationDelay(ep,true);
+  for(const id of ep.memberIds||[])if(party.has(id))
+   remaining.set(id,Math.max(0,remaining.get(id)-elapsed)+added);
+ }
+ return Math.max(0,...remaining.values());
 }
 
 /** Current-v93.876 next-watch Slow for a *separately confirmed* stationary
@@ -343,7 +377,7 @@ export function pendingTrackingCFBearing(journal=[],campaignId,minute=Infinity,m
   const cf=ep.trackingMemory?.level==='CF'&&ep.trackingMemory?.sourceMode==='new';
   if(cf&&members&&(party.length!==members.size||party.some(id=>!members.has(id))))
    throw Error('Tracking CF: původní družina změnila složení. Povinný Bearing vyžaduje rozhodnutí GM.');
-  if(ep.kind==='travel')return cf?1:0;
+  if(ep.kind==='travel'&&!ep.waitingForComplication)return cf?1:0;
   if(cf)return 1;
  }return 0;
 }
@@ -987,7 +1021,7 @@ export function validateTimeEpisodes(journal=[]){
       'Accident: skutečná minuta a zdravotní předání musí zachovat celé okno a původní hod.');
      if(e.kind==='travel')must(e.movementMinutes===incident.movementMinutes&&
       e.travelDelay?.current===incident.idleMinutes&&
-      ['gm-incident-fixed-window-v93.863','gm-incident-foraging-v93.876'].includes(e.travelDelay?.method),
+      ['gm-incident-fixed-window-v93.863','gm-incident-foraging-v93.876',TREK_PARTICIPANT_INCIDENT_944].includes(e.travelDelay?.method),
       'Accident: metry a únava musí používat jen skutečné minuty pohybu, nikoli změnit Kalendář.');
      continue;
     }
@@ -1336,13 +1370,26 @@ export function validateTimeEpisodes(journal=[]){
     a.carryOut===(a.carryIn+(a.weatherFatigueUnits||0))%240&&Number.isSafeInteger(a.endNotRequired.minute),
     'Vynechaný END d10 nemá doloženou neschopnost ze zdravotní kontroly.');
   }
+  if(e.waitingForComplication!==undefined){
+   must(e.waitingForComplication===true&&e.kind==='travel'&&!!travelScope&&
+    [TREK_PARTICIPANT_DELAY_944,'gm-complication-foraging-v93.876'].includes(e.travelDelay?.method)&&
+    e.travelDelay.incoming>=e.minutes&&e.travelDelay.current===0&&e.travelDelay.future===0&&
+    e.movementMinutes===0&&e.distanceMeters===0&&e.orientation===null&&e.trackingMemory===null&&
+    e.direction===null&&e.survivalHazard===null&&e.progress===0&&e.bearing===0&&e.forcedBearing===0&&
+    !e.navigationRecovered&&!e.trackingBearingPolicy&&
+    e.movementRolls?.progressD10?.length===0&&e.movementRolls?.directionD10?.length===0,
+    'Čekání po komplikaci vyžaduje doložené přenesené minuty a žádný nový pohybový hod.');
+  }
   if(e.travelDelay!==undefined){
    must(e.kind==='travel','Zdržení lze přenášet jen mezi cestovními epizodami.');
    const d=e.travelDelay;
-   const foragingVersion=['gm-complication-foraging-v93.876','gm-incident-foraging-v93.876'].includes(d.method);
+   const participantDelay=[TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944].includes(d.method);
+   if(participantDelay)must(!!travelScope,'Zdržení vyžaduje skutečné členy skupiny.');
+   const foragingVersion=participantDelay||['gm-complication-foraging-v93.876','gm-incident-foraging-v93.876'].includes(d.method);
    const independent=foragingVersion||['gm-complication-only-v93.695','gm-incident-fixed-window-v93.863'].includes(d.method);
    const expected=episodeMinuteDelay({minutes:e.minutes,
-    incoming:d.method==='gm-current-episode-only-v2'?0:independent?
+    incoming:participantDelay?participantTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute,travelScope):
+     d.method==='gm-current-episode-only-v2'?0:independent?
      independentTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute,travelScope,foragingVersion):
      lastEpisodeTravelDelayCarry(prior,j.calendarCampaignId,e.startMinute),
     current:d.current,future:d.future,persistCarry:d.method!=='gm-current-episode-only-v2'});
@@ -1365,7 +1412,7 @@ export function validateTimeEpisodes(journal=[]){
    const outcome=hazard?.result;
    const currentComplication=hazard?.hazard==='complication'&&hazard.automationVersion==='v93.681';
    const mandatoryNext=(hazard?.hazard==='equipment'||currentComplication)&&['long-delay','irreparable'].includes(outcome);
-   const verifiedIncident=['gm-incident-fixed-window-v93.863','gm-incident-foraging-v93.876'].includes(d.method)&&
+   const verifiedIncident=['gm-incident-fixed-window-v93.863','gm-incident-foraging-v93.876',TREK_PARTICIPANT_INCIDENT_944].includes(d.method)&&
     e.hazardDetails?.some(h=>h.hazard==='accident'&&h.automationVersion==='v93.863-fixed-window-incident'&&
      Number.isSafeInteger(h.hazardAtMinute)&&d.current===e.minutes-h.hazardAtMinute);
    if(d.method!=='gm-current-episode-only-v2')must(d.future===((independent?(currentComplication&&['long-delay','irreparable'].includes(outcome)):mandatoryNext)?e.minutes:0)&&
