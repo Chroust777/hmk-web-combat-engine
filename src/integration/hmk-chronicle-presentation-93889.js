@@ -4,7 +4,7 @@
  * This is an append-only editorial ledger, independent of game-rule proof.
  */
 export const CHRONICLE_PRESENTATION_FORMAT_93889='hmk-chronicle-presentation-v1';
-const ACTIONS=new Set(['edit','hide','restore']);
+const ACTIONS=new Set(['edit','hide','restore','edit-campaign-episode','edit-campaign-event']);
 const maxText=1800;
 export const CHRONICLE_TRAVEL_LAYOUT='travel-prose-v1';
 const must=(ok,why)=>{if(!ok)throw Error('Kronika: '+why)};
@@ -41,9 +41,18 @@ export function validateChroniclePresentation93889(database){
   must(ev&&typeof ev==='object'&&!Array.isArray(ev)&&typeof ev.id==='string'&&ev.id.length>0&&!eventIds.has(ev.id),
    'neplatná nebo duplicitní identita úpravy');
   eventIds.add(ev.id);
-  must(typeof ev.actorId==='string'&&ev.actorId.length>0&&typeof ev.episodeId==='string'&&ev.episodeId.length>0&&
-   typeof ev.campaignId==='string'&&ev.campaignId.length>0&&ACTIONS.has(ev.action)&&typeof ev.createdAt==='string',
+  must(typeof ev.campaignId==='string'&&ev.campaignId.length>0&&ACTIONS.has(ev.action)&&typeof ev.createdAt==='string',
    'neplatná identita či akce');
+  if(ev.action==='edit-campaign-event'){
+   must(typeof ev.planId==='string'&&ev.planId.length>0&&validEventText(ev.eventText),'neplatný text události');
+   continue;
+  }
+  must(typeof ev.episodeId==='string'&&ev.episodeId.length>0,'neplatná identita epizody');
+  if(ev.action==='edit-campaign-episode'){
+   must(validParagraphs(ev.paragraphs)&&ev.layout===CHRONICLE_TRAVEL_LAYOUT,'neplatný přepis společné kroniky');
+   continue;
+  }
+  must(typeof ev.actorId==='string'&&ev.actorId.length>0,'neplatná identita postavy');
   if(ev.action==='edit'){
    must(validParagraphs(ev.paragraphs),'neplatný přepis odstavců');
    must(ev.layout===undefined||ev.layout===CHRONICLE_TRAVEL_LAYOUT,'neplatná podoba vyprávění');
@@ -61,7 +70,7 @@ export function assertChroniclePresentationAppendOnly93889(before,after){
  return true;
 }
 export function recordChroniclePresentation93889(database,action,{id,actorId,episodeId,campaignId,createdAt,paragraphs,layout}={}){
- must(ACTIONS.has(action),'neznámá akce');
+ must(['edit','hide','restore'].includes(action),'neplatná osobní úprava');
  const source=(database?.journal||[]).find(j=>j.id===episodeId&&j.calendarCampaignId===campaignId&&j.calendarTimeEpisode?.memberIds?.includes(actorId));
  must(!!source,'zápis nenavazuje na potvrzenou epizodu postavy');
  const latest=chroniclePresentationSnapshot(database,actorId,episodeId);
@@ -72,9 +81,43 @@ export function recordChroniclePresentation93889(database,action,{id,actorId,epi
   ev.paragraphs=paragraphs;
   if(layout!==undefined)ev.layout=layout;
  }
+ return appendChronicleRevision(database,ev);
+}
+function appendChronicleRevision(database,ev){
  const copy=structuredClone(database?.chroniclePresentation||{format:CHRONICLE_PRESENTATION_FORMAT_93889,events:[]});
  copy.events.push(ev);
  validateChroniclePresentation93889({...database,chroniclePresentation:copy});
  database.chroniclePresentation=copy;
  return true;
+}
+
+
+function validEventText(text){
+ return typeof text?.title==='string'&&text.title.trim().length>0&&text.title.length<=160&&
+  typeof text.place==='string'&&text.place.length<=160&&
+  typeof text.note==='string'&&text.note.trim().length>0&&text.note.length<=2000;
+}
+
+export function campaignChronicleEpisodeEdit(database,campaignId,episodeId){
+ return database?.chroniclePresentation?.events?.findLast(ev=>
+  ev.action==='edit-campaign-episode'&&ev.campaignId===campaignId&&ev.episodeId===episodeId)||{};
+}
+
+export function campaignChronicleEventText(database,campaignId,plan){
+ return database?.chroniclePresentation?.events?.findLast(ev=>
+  ev.action==='edit-campaign-event'&&ev.campaignId===campaignId&&ev.planId===plan.id)?.eventText||
+  {title:plan.title,place:plan.place,note:plan.resolution?.note||plan.note};
+}
+
+export function recordCampaignChronicleEdit(database,{id,campaignId,createdAt,episodeId,paragraphs,planId,eventText}){
+ const clock=database.campaignClock;
+ must(clock&&(clock.campaignId||`legacy:${clock.events?.[0]?.id||""}`)===campaignId,'kampaň právě není otevřená');
+ if(planId){
+  must(clock.plans?.some(plan=>plan.id===planId)&&clock.planResolutions?.some(row=>row.planId===planId&&row.kind==='resolved'),
+   'událost ještě není v kronice');
+  return appendChronicleRevision(database,{id,campaignId,createdAt,action:'edit-campaign-event',planId,eventText});
+ }
+ must(database.journal?.some(row=>row.id===episodeId&&row.calendarCampaignId===campaignId&&row.calendarTimeEpisode),
+  'epizoda není v otevřené kampani');
+ return appendChronicleRevision(database,{id,campaignId,createdAt,action:'edit-campaign-episode',episodeId,paragraphs,layout:CHRONICLE_TRAVEL_LAYOUT});
 }
