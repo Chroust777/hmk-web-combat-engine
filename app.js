@@ -42,9 +42,9 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
-import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.962';
-import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.962';
-import {chronicleCases,chronicleLanguage,knownChronicleCase,novelEpisodeOrdinals} from './src/integration/hmk-chronicle-novel-93961.js?v=93.962';
+import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.963';
+import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.963';
+import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integration/hmk-chronicle-novel-93961.js?v=93.963';
 import {CHRONICLE_NOVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.962';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
@@ -386,7 +386,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.962';
+const APP_VERSION='93.963';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3605,7 +3605,8 @@ function chronicleEvidence951(clock){
   .filter(animal=>animal.campaignId===cid).map(animal=>[animal.id,owner])));
  const stable=new Map(registry.flatMap(c=>(c.hmk?.livestock||[]).filter(a=>a.campaignId===cid).map(a=>[a.id,a])));
  const language=id=>stableOwners.get(id)?.hmk?.chronicleAnimalLanguage?.[id]||actors.get(id)?.hmk?.chronicleLanguage;
- const sequence=novelEpisodeOrdinals(data.journal,cid);
+ const sequence=new Map(data.journal.filter(row=>row.calendarCampaignId===cid&&row.calendarTimeEpisode)
+  .map((row,index)=>[row.id,index]));
  const name=id=>character(id)?.name||registry.find(c=>c.id===id)?.name||stable.get(id)?.name||'Účastník';
  const animalKind=id=>{
   const beastId=stable.get(id)?.beastId||registry.find(c=>c.id===id)?.hmk?.livestockSourceId;
