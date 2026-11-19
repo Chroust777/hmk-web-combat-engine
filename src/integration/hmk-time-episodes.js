@@ -15,7 +15,7 @@ import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-o
 import {allocateTrekModes} from './hmk-trekking-correction.js';
 import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js?v=93.957';
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 import {incidentMinutes93863} from './hmk-incident-window-93863.js';
@@ -1098,6 +1098,10 @@ export function validateTimeEpisodes(journal=[]){
      }else{
       must(!x.requiresGMCompletion&&JSON.stringify(h.result)===JSON.stringify(x.result),
        'Hazard nesouhlasí s potvrzenými kostkami nebo výsledkem.');
+      if(h.hazard==='equipment'&&h.equipmentDisposition==='no-equipment')
+       must((e.kind==='forage'||e.conveyance==='foot')&&!(e.settings?.animalIds||[]).length&&
+        !(e.settings?.stableAnimalIds||[]).length&&!h.itemId&&!h.repairProofId&&!h.repairSkill&&!h.repairLevel,
+        'Výstroj: rozhodnutí bez výstroje nesmí mít zvíře, vozidlo ani doklad opravy.');
       if(h.hazard==='equipment'&&h.equipmentDisposition==='repair'){
        const proof=journal.find(k=>k.id===h.repairProofId);
        must(episodeSkillProof(proof,h.repairSkill,proof?.characterId,j.calendarCampaignId,e.startMinute)?.level===h.repairLevel,

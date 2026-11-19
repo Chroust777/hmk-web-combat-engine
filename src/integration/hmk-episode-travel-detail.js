@@ -160,7 +160,7 @@ export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
  directionTurn=null,directionD10=null,directionAwareness=null,directionObservationDeferred=false}={}){
  requireTrue(['equipment','accident','complication','misdirection','lost','lost-time'].includes(hazard),
   'Nesprávný druh hazardu.');
- requireTrue(['repair','ignore','abandon'].includes(equipmentDisposition)&&
+ requireTrue((['repair','ignore','abandon'].includes(equipmentDisposition)||hazard==='equipment'&&equipmentDisposition==='no-equipment')&&
   ['test','reroute'].includes(complicationDecision),'Hazard: neplatné rozhodnutí GM.');
  const outcomes={CF:'irreparable',F:'long-delay',S:'short-delay',CS:'no-delay'};
  let result='pending';
@@ -168,7 +168,7 @@ export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
   requireTrue(repairSkill===null||['Hideworking','Metalcraft','Textilecraft','Woodworking'].includes(repairSkill),
    'Výstroj: zvolte opravářskou dovednost z HMK 148.');
   requireTrue(repairLevel===null||levels.includes(repairLevel),'Výstroj: doložte skutečnou úroveň testu.');
-  result=equipmentDisposition==='ignore'?'ignored':equipmentDisposition==='abandon'?'abandoned':
+  result=equipmentDisposition==='no-equipment'?'no-equipment':equipmentDisposition==='ignore'?'ignored':equipmentDisposition==='abandon'?'abandoned':
    repairLevel===null?'pending':outcomes[repairLevel];
  }
  if(hazard==='accident'){
