@@ -8317,3 +8317,31 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 /* Body data is readable normal weight, including selected and risky rows. */
 #app .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-current td,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody tr.hc-weather-timeline-hazard td:nth-child(6){font-weight:400!important;color:#38291a!important;}
 #app .hc-episode-weather-timeline tbody td strong,#app .hc-weather-hover-popover .hc-episode-weather-timeline tbody td strong{font-weight:400!important;}
+
+/* Keep the character gallery grid stable while its small actions panel is open. */
+.content-sheet .journal-book--characters .character-card:has(.character-card__more[open]){
+ overflow:visible;
+ z-index:3;
+}
+.content-sheet .journal-book--characters .character-card__more-actions{
+ position:absolute;
+ inset:auto 0 calc(100% + 3px);
+ z-index:1;
+ box-sizing:border-box;
+ margin:0!important;
+ padding:5px;
+ border:1px solid #a8845d;
+ border-radius:4px;
+ background:#f5e8cd;
+ box-shadow:0 4px 12px #39281950;
+}
+.hc-chronicle-travel-proof{
+ margin-block:0.65rem;
+}
+.hc-chronicle-travel-proof ul{
+ list-style:none;
+ padding-inline-start:0;
+}
+.hc-chronicle-travel-proof li{
+ margin-block:0.4rem;
+}
