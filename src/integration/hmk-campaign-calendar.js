@@ -387,7 +387,19 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  // in-progress operation, never emitted a second time at its onset.
  const running=openConcurrentProcedures(clock);
  const busy=new Set(running.map(p=>p.characterId+'::'+p.woundId));
- for(let i=all.length-1;i>=0;i--)if(all[i].kind==='treatment'&&busy.has(all[i].characterId+'::'+all[i].woundId))all.splice(i,1);
+ const occupiedPatient=new Map(running.map(op=>[op.characterId,op]));
+ for(let i=all.length-1;i>=0;i--){
+  const event=all[i];
+  if(event.kind!=='treatment')continue;
+  if(busy.has(event.characterId+'::'+event.woundId)){all.splice(i,1);continue;}
+  const active=occupiedPatient.get(event.characterId);
+  if(!active||active.startMinute>clock.minute||active.endMinute<clock.minute)continue;
+  const woundOrigin=getCampaignAnchor(clock,'wound',event.characterId,event.woundId)?.minute;
+  if(woundOrigin===undefined||woundOrigin>active.startMinute)continue;
+  all.splice(i,1);
+  suspended.push({...event,description:'Treatment čeká na dokončení současného zákroku u téhož pacienta.',
+   reason:'Další již doložená rána pacienta se vrátí k vyřízení po dokončení nebo přerušení zákroku.'});
+ }
  for(let i=unknown.length-1;i>=0;i--)if(unknown[i].kind==='treatment'&&busy.has(unknown[i].characterId+'::'+unknown[i].woundId))unknown.splice(i,1);
  for(const op of running){
   const patient=characters.find(c=>c.id===op.characterId);

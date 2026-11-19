@@ -6,7 +6,7 @@ import {validateSharedTimeWindowJournal93767,assertSharedEpisodeOverlaps93768} f
  * not compulsory four-hour watches. Printed LPW remains the source speed.
  * All receipts are append-only and never substitute for genuine Skill Tests.
  */
-import {trekMovement,trekWeatherDay,trekWeatherWatch,trekHazards} from './hmk-trekking-routine.js';
+import {trekMovement,trekMovementTableRow,trekWeatherDay,trekWeatherWatch,trekHazards} from './hmk-trekking-routine.js';
 import {pcShelteredStayAt} from './hmk-pc-sheltered-stay-93730.js';
 import {coldCatalogRule} from './hmk-cold-gear-93740.js';
 import {expeditionSecondaryRoll} from './hmk-calendar-expedition.js';
@@ -27,6 +27,7 @@ export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
 export const EPISODE_TRACKING_BEARING_POLICY_93904='hmk-tracking-cf-free-bearing-v93.904';
 export const EPISODE_TRACKING_BEARING_MARKER_93904='minute-episode-tracking-cf-v93.904';
 // Opt-in: skip legacy/non-navigation episodes which have no confirmed direction state.
+export const EPISODE_PARTICIPANT_NAVIGATION_93945='hmk-member-navigation-v93.945';
 export const EPISODE_NAVIGATION_EVIDENCE_POLICY_93907='hmk-navigation-evidence-only-v93.907';
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
@@ -59,12 +60,19 @@ export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d
   procedure:'gm-minute-poisson-from-hmk-d10-density',sourcePage:150};
 }
 
+export const EPISODE_MIXED_PACE_93945='hmk-slowest-conveyance-v93.945';
+export function slowestEpisodeConveyance(topography,terrain,conveyance,hasWalkers){
+ if(!hasWalkers||conveyance==='foot')return conveyance;
+ const rates=trekMovementTableRow({topography,terrain});
+ must(rates.foot>0&&rates[conveyance]>0,'Smíšená doprava: zvolte terén schůdný pro celou skupinu.');
+ return rates.foot<=rates[conveyance]?'foot':conveyance;
+}
 export function calculateTimeEpisode({minute,minutes,kind='travel',topography='flat',terrain='paved-road',conveyance='foot',
  progress=0,bearing=0,extraSlow=0,wearied=false,injured=false,loaded=false,continuousPrecipitation=false,progressD10=[],directionD10=[],
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
  encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
-  forcedBearing=0,trackingBearingPolicy=null,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[],walkingHandlerIds=[],waitingForComplication=false}={}){
+  forcedBearing=0,trackingBearingPolicy=null,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[],walkingHandlerIds=[],waitingForComplication=false,mixedPacePolicy=null}={}){
  must(trackingBearingPolicy===null||trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904,
   'Neznámá pravidlová verze Tracking CF Bearing.');
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
@@ -95,11 +103,13 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   'Čekání po komplikaci nemůže zahájit nový pochod ani pohybové hody.');
  let motion=null,distanceMeters=0,actors=[],direction=null,survivalHazard=null;
  if(kind==='travel'){
+  must(mixedPacePolicy===null||mixedPacePolicy===EPISODE_MIXED_PACE_93945,'Neznámý výpočet tempa smíšené dopravy.');
+  const paceConveyance=mixedPacePolicy?slowestEpisodeConveyance(topography,terrain,conveyance,walkingHandlerIds.length>0):conveyance;
   if(trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904)
    must(!forcedBearing||bearing>=1,'Tracking CF musí v nové epizodě přidat bezplatný Bearing Mode.');
   // HMK printed rate is leagues per four-hour WATCH.  A freely timed GM episode
   // uses that rate as a speed; no fictional hour-based dice are rolled.
-  motion=trekMovement({topography,terrain,conveyance,progress,slow,loaded,bearing,progressD10,
+  motion=trekMovement({topography,terrain,conveyance:paceConveyance,progress,slow,loaded,bearing,progressD10,
    continuousPrecipitation,doubleTime,hours:4});
   // The mandatory Bearing gained after Tracking CF is a MODE, not another
   // deficit. The legacy sum is retained only for receipts without this tag.
@@ -113,7 +123,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
    if(direction.direction==='lost-time'){
     // Printed Lost Time adds one Slow. One of the previously spare Progress
     // rolls is consumed by the new Slow; never credit the same die twice.
-    motion=trekMovement({topography,terrain,conveyance,progress,slow:slow+1,loaded,bearing,
+    motion=trekMovement({topography,terrain,conveyance:paceConveyance,progress,slow:slow+1,loaded,bearing,
      progressD10:progressD10.slice(Math.max(0,progress-slow)-Math.max(0,progress-slow-1)),
      continuousPrecipitation,doubleTime:false,hours:4});
     motion.directionLostTime=true;
@@ -191,6 +201,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   resolved:!!encounterResolved};
  return {format:EPISODE_FORMAT,startMinute:minute,endMinute:minute+minutes,minutes,kind,
   ...(walkingHandlerIds.length?{walkingHandlerIds:[...walkingHandlerIds]}:{}),
+  ...(mixedPacePolicy?{mixedPacePolicy}:{}),
   memberIds:[...memberIds],...(transportedMemberIds.length?{transportedMemberIds:[...transportedMemberIds]}:{}),terrain,topography,conveyance,mapScale,motion,
   distanceMeters,distanceKilometres:distanceMeters/1000,
   ...(kind==='travel'?{movementMinutes}:{}),
@@ -520,6 +531,26 @@ export function lastNavigationEvidenceBefore(journal=[],campaignId,minute,member
     ['lost','misdirection'].includes(e.direction?.direction)||e.navigationRecovered===true);
  }).sort((a,b)=>b.calendarTimeEpisode.endMinute-a.calendarTimeEpisode.endMinute)[0]||null;
 }
+export function participantNavigationEvidence(journal, campaignId, minute, memberIds){
+ const navigationalJournal=journal.filter(row=>{
+  const episode=row.calendarTimeEpisode;
+  return episode?.navigationContinuityPolicy93907!==EPISODE_PARTICIPANT_NAVIGATION_93945||
+   episode.kind==='travel'&&episode.movementMinutes>0||episode.navigationRecovered;
+ });
+ const evidence=(memberIds||[]).map(id=>lastNavigationEvidenceBefore(navigationalJournal,campaignId,minute,[id]));
+ return evidence.find(row=>episodeNavigationState(row)==='lost')||
+  evidence.find(row=>episodeNavigationState(row)==='misdirection')||evidence.find(Boolean)||null;
+}
+export function lostRecoveryBearingTarget(terrainBearing, forcedBearing){
+ return Math.max(terrainBearing,forcedBearing)+1;
+}
+function navigationEvidenceForReceipt(journal,campaignId,minute,memberIds,policy){
+ if(policy===EPISODE_PARTICIPANT_NAVIGATION_93945)
+  return participantNavigationEvidence(journal,campaignId,minute,memberIds);
+ if(policy===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907)
+  return lastNavigationEvidenceBefore(journal,campaignId,minute,memberIds);
+ return lastEpisodeBefore(journal,campaignId,minute,memberIds);
+}
 export function mayReuseEpisodeSkill({previous,minute,context,kind='orientation',trail='',trackerId=null }={}){
  const old=previous?.calendarTimeEpisode;
  if(!old||old.endMinute!==minute||(kind==='orientation'?old.kind!=='travel':!['tracking','travel'].includes(old.kind)))return false;
@@ -766,10 +797,10 @@ export function validateTimeEpisodes(journal=[]){
      continuousPrecipitation:!!e.precipitation?.slowMode,
      bearingRule:e.trekTerrainPolicy93851==='hmk-v1.2-93851'?'hmk':'legacy'}).requiredBearing;
     const recoveryRule=e.navigationRecoveryRule==='special-bearing-and-awareness-v93.780';
-    const navPrior=recoveryRule?(e.navigationContinuityPolicy93907===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907?
-     lastNavigationEvidenceBefore(prior,j.calendarCampaignId,e.startMinute,e.memberIds):
-     lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,e.memberIds)):null;
-    const specialBearing=recoveryRule&&e.navigationRecovered&&episodeNavigationState(navPrior)==='lost'?1:0;
+    const navPolicy=e.navigationContinuityPolicy93907;
+    const navPrior=recoveryRule?navigationEvidenceForReceipt(prior,j.calendarCampaignId,e.startMinute,e.memberIds,navPolicy):null;
+    const recoveringLost=recoveryRule&&e.navigationRecovered&&episodeNavigationState(navPrior)==='lost';
+    const specialBearing=recoveringLost?1:0;
     const trackingBearing=recoveryRule?pendingTrackingCFBearing(prior,j.calendarCampaignId,e.startMinute,e.memberIds):0;
     const freeTracking=e.trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904;
     must(e.trackingBearingPolicy===undefined||freeTracking,
@@ -780,7 +811,11 @@ export function validateTimeEpisodes(journal=[]){
       e.bearing>=trackingBearing,
       'Tracking CF: nový Bearing Mode musí odpovídat doložené předchozí hlídce.');
     }
-    if(recoveryRule&&specialBearing)must(e.bearing>=required+(freeTracking?0:trackingBearing)+1,
+    const bearingTarget=recoveringLost&&navPolicy===EPISODE_PARTICIPANT_NAVIGATION_93945?
+     lostRecoveryBearingTarget(required,trackingBearing):required+(freeTracking?0:trackingBearing)+specialBearing;
+    if(recoveringLost&&navPolicy===EPISODE_PARTICIPANT_NAVIGATION_93945)
+     must(memo.sourceMode==='new','Lost: návrat vyžaduje nový Orienteering.');
+    if(recoveringLost)must(e.bearing>=bearingTarget,
      'Lost: návrat na trasu bez zvláštního, skutečně přiděleného Bearing Mode.');
     let allocation;
     if(memo.allocationMode==='manual'){
@@ -798,7 +833,7 @@ export function validateTimeEpisodes(journal=[]){
      allocation=allocateTrekModes({autoAllocate:true,autoPriority:memo.priority,slow:0,
       orienteeringSlow:0,foraging:0,stalking:0,vigilance:0,
       trackingForcedBearingSourceId:freeTracking&&trackingBearing?EPISODE_TRACKING_BEARING_MARKER_93904:null},
-      memo.adjustment,{requiredBearing:required+(freeTracking?0:trackingBearing)+specialBearing});
+      memo.adjustment,{requiredBearing:bearingTarget});
      if(memo.lowChoice==='lax'&&memo.adjustment.adjustedSV>=1&&memo.adjustment.adjustedSV<=2){
       allocation.lax=true;allocation.orienteeringSlow=0;
      }
@@ -1458,6 +1493,23 @@ export function validateTimeEpisodes(journal=[]){
      'Únava zvířat nebyla přepočtena na skutečný čas pohybu.');
    }
   }
+  if(e.mixedPacePolicy!==undefined){
+   must(e.mixedPacePolicy===EPISODE_MIXED_PACE_93945&&e.kind==='travel'&&e.conveyance==='mount',
+    'Neplatný doklad tempa smíšené dopravy.');
+   const mount=e.transportProof?.mount;
+   const walking=mount?.handlerPosition==='leading'?[mount.handlerId]:e.mountRiding93823?.walkingMemberIds||[];
+   must(walking.length>0&&JSON.stringify(walking)===JSON.stringify(e.walkingHandlerIds),
+    'Pěší doprovod neodpovídá přiděleným rolím přepravy.');
+   const conveyance=slowestEpisodeConveyance(e.topography,e.terrain,e.conveyance,true);
+   const lostTime=e.direction?.direction==='lost-time';
+   const dice=e.movementRolls.progressD10;
+   const expected=trekMovement({topography:e.topography,terrain:e.terrain,conveyance,progress:e.progress,
+    slow:e.slow+Number(lostTime),loaded:e.motion.loaded,bearing:e.bearing,
+    progressD10:lostTime&&dice.length?dice.slice(1):dice,
+    continuousPrecipitation:!!e.precipitation?.slowMode,doubleTime:!!e.doubleTime&&!lostTime});
+   must(['baseLPW','remainingSlow','spareProgress','progressSuccess','finalLPW'].every(key=>expected[key]===e.motion[key]),
+    'Tempo smíšené dopravy musí použít nejpomalejší způsob dopravy před uplatněním Slow a Progress.');
+  }
   if(e.distanceFractionIn!==undefined){
    must(e.kind==='travel'&&Math.abs(e.distanceFractionIn-lastTimeEpisodeDistanceFraction(prior,j.calendarCampaignId,e.startMinute,travelScope))<1e-7,
     'Ztracený nebo cizí zlomek cestovní vzdálenosti.');
@@ -1473,20 +1525,15 @@ export function validateTimeEpisodes(journal=[]){
    // or historical episode records as part of an application upgrade.
    must(e.navigationPartyScope===undefined||e.navigationPartyScope==='v93.699',
     'Neznámý formát návaznosti navigace.');
-   must(e.navigationContinuityPolicy93907===undefined||
-    e.navigationContinuityPolicy93907===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907,
-    'Neznámá verze pokračování orientace.');
-   const modernNavigation=e.navigationContinuityPolicy93907===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907;
+   const navPolicy=e.navigationContinuityPolicy93907;
+   must(navPolicy===undefined||navPolicy===EPISODE_NAVIGATION_EVIDENCE_POLICY_93907||
+    navPolicy===EPISODE_PARTICIPANT_NAVIGATION_93945,'Neznámá verze pokračování orientace.');
    const navigationMembers=e.navigationPartyScope==='v93.699'?e.memberIds:null;
-   const earlier=modernNavigation?
-    lastNavigationEvidenceBefore(prior,j.calendarCampaignId,e.startMinute,navigationMembers):
-    lastEpisodeBefore(journal,j.calendarCampaignId,e.startMinute,navigationMembers);
+   const earlier=navigationEvidenceForReceipt(navPolicy?prior:journal,j.calendarCampaignId,e.startMinute,navigationMembers,navPolicy);
    const recoveryRule=e.navigationRecoveryRule;
    must(recoveryRule===undefined||recoveryRule==='special-bearing-and-awareness-v93.780',
     'Neznámý formát pravidlového návratu na trasu.');
-   const scopedEarlier=modernNavigation?
-    lastNavigationEvidenceBefore(prior,j.calendarCampaignId,e.startMinute,navigationMembers):
-    lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,navigationMembers);
+   const scopedEarlier=navPolicy?earlier:lastEpisodeBefore(prior,j.calendarCampaignId,e.startMinute,navigationMembers);
    if(recoveryRule){
     const hadLost=episodeNavigationState(scopedEarlier)==='lost';
     if(e.navigationRecovered&&episodeNavigationState(scopedEarlier)==='misdirection'){
@@ -1502,7 +1549,10 @@ export function validateTimeEpisodes(journal=[]){
       continuousPrecipitation:!!e.precipitation?.slowMode,
       bearingRule:e.trekTerrainPolicy93851==='hmk-v1.2-93851'?'hmk':'legacy'}).requiredBearing;
      const forced=pendingTrackingCFBearing(prior,j.calendarCampaignId,e.startMinute,e.memberIds);
-     must(e.orientation?.modes?.bearing>=terrainBearing+(e.trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904?0:forced)+1,
+     const target=navPolicy===EPISODE_PARTICIPANT_NAVIGATION_93945?
+      lostRecoveryBearingTarget(terrainBearing,forced):
+      terrainBearing+(e.trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904?0:forced)+1;
+     must(e.orientation?.modes?.bearing>=target,
       'Lost vyžaduje zvláštní Bearing z prokázaného Orienteering, nikoli jen rozhodnutí GM.');
     }
     const reoriented=(e.hazardDetails||[]).some(h=>h.hazard==='misdirection'&&
