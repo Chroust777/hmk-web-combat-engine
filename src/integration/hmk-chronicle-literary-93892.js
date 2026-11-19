@@ -101,6 +101,10 @@ const PLACES={
  ]
 };
 const CLIMATES={
+ subpolar:['Vzduch měl ostrost dalekého severu.','V severním kraji bývalo tepla poskrovnu i v příznivější části roku.'],
+ subtropical:['Teplý vzduch se držel při zemi i tam, kam přímé světlo nedosáhlo.','I ve stínu si vzduch podržel teplo zdejšího kraje.'],
+ 'dry-tropical':['V suchém horkém podnebí měla místa s vodou větší cenu než kratší cesta.','Zdejší horký kraj uměl být skoupý na vláhu.'],
+ 'wet-tropical':['Teplá vlhkost se držela nízko i tam, kde se krajina otevřela.','V teplém vlhkém vzduchu bylo znát, jak nesnadno tu cokoli osychá.'],
  cool:[
   'Chladnější podnebí přidávalo vzduchu ostrost, kterou nešlo přehlédnout.',
   'Vzduch měl chladnější ráz a bránil zapomenout na únavu cesty.',
@@ -127,10 +131,12 @@ const WEATHER={
   'Sněžení zjemňovalo svět a na každé větvi zanechávalo nový obrys.',
   'Sníh měnil pevnost i vzhled cesty; to, co působilo bezpečně, muselo být znovu přečteno.'
  ],
+ sleet:['Do deště se mísil sníh. Vlhkost ulpívala na šatech i na výstroji.','Obloha střídala vodu a sníh tak rychle, že se jejich stopy na zemi slévaly.'],
  precipitation:['Srážky měnily zvuk i povrch země a zvyšovaly význam opatrného kroku.','Pod srážkami se okraje stezky stávaly méně zřetelnými.','Vlhkost prostupovala okolím a měnila jeho čitelnost.'],
- dry:['Obloha v tomto úseku nepřidala déšť ani sněžení, a přece zůstávalo dost důvodů sledovat zem.','Bez srážek bylo možné číst krajinu jinak, nikoli však s neomylnou jistotou.','Povrch nepřekrýval nový déšť ani sníh a starší znaky se v něm daly hledat pečlivěji.']
+ dry:['Obloha toho času zůstala beze srážek. Znamení na zemi si uchovala své obrysy.','Beze srážek měl poutník víc času prohlédnout si drobná znamení na cestě.','Srážky ten úsek minuly a starší znaky na zemi se daly zkoumat pečlivěji.']
 };
 const LIGHT={
+ mixed:['Během té doby se proměnilo světlo a s ním i to, co se dalo rozeznat v dálce.','Kraj se pod měnícím se světlem ukazoval pokaždé trochu jinak.'],
  day:['Denní světlo zachovávalo obrysům jejich podobu, ale neodhalovalo všechno.','Světlá část dne nechávala krajinu dobře viditelnou jen tam, kde jí to dovoloval terén.','Za dne získávaly drobné znaky země ostřejší podobu.'],
  twilight:['Soumrak prodlužoval stíny a ubíral okrajům cesty jejich dřívější jistotu.','Světlo sláblo, obrysy se měnily a vzdálenější znaky splývaly.','Na pomezí světla a tmy se krajina zdála jiná než o chvíli dříve.'],
  night:['Za noci dostávaly obyčejné zvuky jinou váhu než ve dne.','Tma skrývala dálku a ponechávala cestujícím jen tolik okolí, kolik dokázali rozeznat.','Noc ubrala světu tvarů; o to pozorněji bylo nutné naslouchat.']
@@ -159,13 +165,16 @@ const terrainGroup=p=>{
  return 'open';
 };
 const weatherGroup=p=>{
- if(p?.weather?.hasPrecipitation===true){const t=str(p?.precipitation?.precipitation).toLowerCase();return t==='rain'?'rain':t==='snow'?'snow':'precipitation';}
- return p?.weather?.hasPrecipitation===false?'dry':null;
+ const t=str(p?.precipitation?.precipitation||p?.weather?.precipitation).toLowerCase();
+ if(['rain','snow','sleet'].includes(t))return t;
+ if(t==='none'||p?.weather?.hasPrecipitation===false)return 'dry';
+ return p?.weather?.hasPrecipitation===true?'precipitation':null;
 };
 const daylight=p=>{
- const periods=p?.daylight?.minutesByPeriod;
- if(periods){const eligible=Object.entries(periods).sort((a,b)=>Number(b[1])-Number(a[1]));if(eligible.length&&Number(eligible[0][1])>0)return eligible[0][0];}
- return str(p?.settings?.lightPeriod)||'day';
+ const periods=Object.entries(p?.daylight?.minutesByPeriod||{}).filter(([,minutes])=>minutes>0);
+ if(periods.length===1)return periods[0][0];
+ if(periods.length>1)return 'mixed';
+ return str(p?.settings?.lightPeriod);
 };
 export function literaryChronicleIntro(entry,p,{month=null,monthName=null}={}){
  const key=`${entry?.id||'none'}|${p?.startMinute}|${p?.endMinute}|${p?.terrain||''}|${p?.kind||''}`;
@@ -177,16 +186,36 @@ export function literaryChronicleIntro(entry,p,{month=null,monthName=null}={}){
    `Měsíc ${monthName||month} zastihl krajinu v podmínkách, které určoval zdejší čas a počasí.`)
   :choose(SEASONS[season]||SEASONS.unknown,key+':season');
  const climate=str(p?.weather?.climate||p?.settings?.climate).toLowerCase();
- const climateText=CLIMATES[climate]&&hash(key+':climate-include')%3!==0?choose(CLIMATES[climate],key+':climate'):'';
+ const climateText=CLIMATES[climate]?choose(CLIMATES[climate],key+':climate'):'';
  const terrainText=choose(ground,key+':terrain');
- const weather=weatherGroup(p);
- const weatherText=weather?choose(WEATHER[weather],key+':weather'):'';
- const lightText=choose(LIGHT[daylight(p)]||LIGHT.day,key+':light');
- const pace=choose(PACING,key+':pace');
- // A month only names the recorded TR month. We do not use it to infer weather.
- const firstParagraph=[first,terrainText,climateText].filter(Boolean).join(' ');
- const secondParagraph=[weatherText,lightText,pace].filter(Boolean).join(' ');
- return [firstParagraph,secondParagraph];
+ const weather=weatherGroup(p), light=daylight(p);
+ const seasonText=season==='unknown'&&!month?'':first;
+ const area=str(p?.area||p?.settings?.area);
+ const before=[terrainText,seasonText,climateText,area?'Bylo to v kraji zvaném „'+area+'“.':''].filter(Boolean);
+ const rainInForest=weather==='rain'&&terrainGroup(p)==='forest';
+ const weatherText=rainInForest?choose(WEATHER.rain,key+':weather'):
+  weather==='rain'?choose([
+   'Déšť se táhl přes kraj v šedé cloně. Z dálky nechal na pohled sotva tolik, kolik bylo třeba k příštímu kroku.',
+   'Kapky rozbíjely zvuky okolí na drobné útržky. Co bylo nablízku, dalo se snáze zaslechnout než rozeznat.',
+   'Déšť bral pevným obrysům jejich ostrost. Za ním se kraj ukazoval jen po kusech.'
+  ],key+':weather'):weather&&WEATHER[weather]?choose(WEATHER[weather],key+':weather'):'';
+ const temperature=p?.precipitation?.hazard||
+  (light==='night'?p?.weather?.nightHazard:light==='day'?p?.weather?.daylightHazard:null);
+ const extremes=new Set([temperature,...(p?.weatherHazards||[])]);
+ const hot=extremes.has('heat')?choose([
+  'Horko doléhalo jako náklad, který nebylo kam odložit.',
+  'Žár se držel nad zemí i tam, kde si poutník sliboval trochu úlevy.'
+ ],key+':heat'):'';
+ const cold=extremes.has('cold')?choose([
+  'Chlad si nacházel cestu mezi záhyby šatu.',
+  'V takovém chladu se i krátká zastávka brzy připomněla tělu.'
+ ],key+':cold'):'';
+ const lightText=light==='day'&&weather&&weather!=='dry'?
+  'I za denního světla záleželo na tom, co se dalo rozeznat zblízka.':LIGHT[light]?choose(LIGHT[light],key+':light'):'';
+ const after=[weatherText,lightText,hot,cold].filter(Boolean);
+ if(p?.precipitation?.continuous===true&&weatherText&&weather!=='dry')after.push('Po celý ten čas srážky nepolevily.');
+ if(!after.length&&p?.kind==='travel')after.push(choose(PACING,key+':pace'));
+ return [before.join(' '),after.join(' ')].filter(Boolean);
 }
 
 const SKILLS={

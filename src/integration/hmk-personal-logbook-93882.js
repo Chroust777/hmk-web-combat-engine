@@ -1,5 +1,5 @@
-import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js?v=93.956';
-import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js';
+import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js?v=93.959';
+import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js?v=93.959';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */
 const txt = value => String(value ?? '').trim();
@@ -43,6 +43,12 @@ export function personalEpisodeTests(episode,journalById){
   tests.push(personalSkillReceipt(row,fallback));
  };
  for(const link of p.skillLinks||[])add(journalById.get(link.id),link);
+ for(const h of p.hazardDetails?.length?p.hazardDetails:(p.hazardDetail?[p.hazardDetail]:[])){
+  for(const id of [h.repairProofId,h.complicationProofId,...(h.complicationProofIds||[]),h.directionProofId]){
+   const row=id&&journalById.get(id);
+   if(row)add(row,{id,actorId:h.workerId});
+  }
+ }
  for(const [name,memory] of [['Survival / Orienteering',p.orientation],['Tracking',p.trackingMemory]]){
   if(!memory||seen.has(txt(memory.skillId)))continue;
   if(memory.skillId&&journalById.has(memory.skillId)){add(journalById.get(memory.skillId),{id:memory.skillId,title:name});continue;}
@@ -58,7 +64,9 @@ export function personalEpisodeTests(episode,journalById){
    actorId:txt(actor.id),id:`end-${txt(actor.id)}`});
  }
  if(p.survivalHazard&&p.survivalHazard!=='none'){
-  tests.push({skill:'Survival Hazard',kind:'Hazard Roll',eml:null,roll:numeric(p.hazardDetail?.hazardD10??p.hazardDetails?.[0]?.hazardD10??p.settings?.survivalD10),die:'d10',
+  const detail=p.hazardDetails?.find(h=>h.hazard===p.survivalHazard)||p.hazardDetail;
+  const raw=txt(detail?.hazardD10??p.settings?.survivalD10);
+  tests.push({skill:'Survival Hazard',kind:'Hazard Roll',eml:null,roll:/^(?:[1-9]|10)$/.test(raw)?Number(raw):null,die:'d10',
    level:'',result:HAZARDS[p.survivalHazard]||txt(p.survivalHazard),effect:'Vyhodnotit konkrétní hazard a jeho doložený navazující postup',actorId:'',id:'survival-hazard'});
  }
  for(const [i,roll] of (p.direction?.rolls||[]).entries()){
