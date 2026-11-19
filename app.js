@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.972';
+const APP_VERSION='93.973';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7717,8 +7717,15 @@ function stableVehicleTravelLoad950(animal,campaignId){
  }
  if(!vehicle)return '';
  const lb=n=>Number(n).toLocaleString('cs-CZ',{maximumFractionDigits:3})+' lb';
+ const freeCapacityLb=Math.max(0,vehicle.capacityLb-vehicle.totalLb);
  return `<div data-stable-travel-load><p><strong>${validDraft?'Rozpracovaný Pochod':'Poslední uložený Pochod s tímto zvířetem'}</strong> · ${esc(vehicle.vehicleName)}
-  · Celkem ${esc(lb(vehicle.totalLb))} / ${esc(lb(vehicle.capacityLb))} · Předměty uložené ve vozidle ${esc(lb(vehicle.cargoLb))}</p>
+  </p>
+  <div class="hmk-stable-load-stats" role="group" aria-label="Zátěž a nosnost vozidla">
+   <div><small>Celková zátěž</small><strong>${esc(lb(vehicle.totalLb))}</strong></div>
+   <div><small>Nosnost vozidla</small><strong>${esc(lb(vehicle.capacityLb))}</strong></div>
+   <div><small>Volná kapacita</small><strong>${esc(lb(freeCapacityLb))}</strong></div>
+   <div><small>Předměty ve vozidle</small><strong>${esc(lb(vehicle.cargoLb))}</strong></div>
+  </div>
   ${mass?.people?.map(person=>`<p>${esc(character(person.id)?.name||'Cestující')} · tělo ${esc(lb(person.bodyLb))} + nesená výbava ${esc(lb(person.gearLb))} = ${esc(lb(person.totalLb))}</p>`).join('')||''}
   ${mass?.additionalLb?`<p>Další náklad mimo evidenci ${esc(lb(mass.additionalLb))}</p>`:''}</div>`;
 }
