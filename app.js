@@ -1,6 +1,6 @@
 import {treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
-import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.950';
+import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.972';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
 import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.952';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
@@ -43,7 +43,7 @@ import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.964';
-import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.964';
+import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.972';
 import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integration/hmk-chronicle-novel-93961.js?v=93.964';
 import {CHRONICLE_NOVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.962';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.971';
+const APP_VERSION='93.972';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -11843,7 +11843,7 @@ function render(){
  hskHydrateAccidentAgility93864(app);
  enhanceHMKDiceFields();
  decorateNoncombatRollQueue93913(app,secureHMKDie);
- decorateSkillWorkbenchRolls93916(app,secureHMKDie,skillPrimaryNeedsNoDie950);
+ decorateSkillWorkbenchRolls93916(app,secureHMKDie,skillPrimaryNeedsNoDie950,skillHasLinkedWorkflow972);
  decorateSpecialSecondaryRolls93917(app,secureHMKDie,hskSpecialPreviewPrimary93917);
  showSavedSkillGate93928();
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
@@ -11861,14 +11861,14 @@ const skillFollowupObserver=new MutationObserver(records=>{
  if(records.some(record=>[...record.addedNodes].some(node=>node.nodeType===1&&(
   node.matches?.('form,section,div,fieldset,label,input')||
   node.querySelector?.('form[data-hmk-animal-training],form[data-skill-critical-form],input[type=number]')))))
-   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie,skillPrimaryNeedsNoDie950);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);decorateTalismanDice93919(root,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
+   {const root=document.getElementById('app');enrichAnimalTrainingForms(root);decorateSkillContinuationHelp(root);updateFollowupDiceGuides(root);decorateTimedSkillProject591(root);hskHydrateAccidentAgility93864(root);enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie,skillPrimaryNeedsNoDie950,skillHasLinkedWorkflow972);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);decorateTalismanDice93919(root,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});syncWeatherCarePanel();hideVisibleTechnicalUUIDs(root);decorateHumanJSONReferences(root);}
 });
 skillFollowupObserver.observe(document.getElementById('app'),{subtree:true,childList:true});
 // Closed noncombat chapters are decorated only when opened, never in Combat.
 document.addEventListener('toggle',event=>{
  if(event.target instanceof HTMLDetailsElement&&event.target.open){
   const root=document.getElementById('app');
-  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie,skillPrimaryNeedsNoDie950);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);decorateTalismanDice93919(root,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});}
+  if(root){enhanceHMKDiceFields();decorateSkillWorkbenchRolls93916(root,secureHMKDie,skillPrimaryNeedsNoDie950,skillHasLinkedWorkflow972);decorateSpecialSecondaryRolls93917(root,secureHMKDie,hskSpecialPreviewPrimary93917);decorateSimpleNoncombatRolls93915(root,secureHMKDie);decorateConfirmedNoncombatChains93918(root,secureHMKDie);decorateTalismanDice93919(root,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});}
  }
 },true);
 // v93.783: a Secondary Roll can become usable WITHOUT a render or added DOM
@@ -12144,6 +12144,10 @@ function skillAutoFor(actor,name,form=null,prefix='A'){
 }
 function skillTraumaText(tr){return 'Shock '+tr.shock.value+', Injury '+tr.injury.modifier+', Bulk '+tr.bulk.modifier+', PER '+tr.perception.modifier+(tr.slPenalty?' · STN: −'+tr.slPenalty+' SL':'');}
 function skillConditionsText(ctx){return 'Fatigue '+ctx.fatigue.modifier+' ('+ctx.fatigue.source+'), ENC '+ctx.enc.modifier+' ('+ctx.enc.source+')';}
+function skillHasLinkedWorkflow972(){
+ return !!(episodeOpenActorRequest(selected)||pendingTrekHandoff||pendingTrackingAwarenessId||
+  pendingStableAnimalcraftId||pendingCalendarGMTest);
+}
 function skillPrimaryNeedsNoDie950(form,name){
  if(!['skill-value-form','skill-secondary-form','skill-assistance-form'].includes(form.id))return false;
  const side=name==='rollB'?'B':'A';
