@@ -1,4 +1,4 @@
-import {knownChronicleCase,novelActor,novelDistance,novelScene} from './hmk-chronicle-novel-93961.js?v=93.963';
+import {knownChronicleCase,novelActor,novelDistance,novelScene} from './hmk-chronicle-novel-93961.js?v=93.964';
 import {literaryChronicleIntro} from './hmk-chronicle-literary-93892.js?v=93.961';
 /** Czech travel prose built from the committed episode, with stable variation. */
 const list = values => new Intl.ListFormat('cs').format(values);
@@ -87,6 +87,43 @@ export function ledAnimalDescription(animal,animalKind=()=>'',{reins=true,langua
  return lead+object+' jménem '+animal.name;
 }
 
+function wheeledCompany(party,name,priorInjuries,halted,guides){
+ const {guide,drover,patients,severe,animals,conveyance,aboard}=party;
+ const cart=conveyance==='cart';
+ const vehicle=cart?'káru':'vůz';
+ const here=cart?'Na káře':'Na voze';
+ const team=animals.filter(a=>a.team).map(a=>a.name);
+ const carried=animals.filter(a=>a.carried).map(a=>a.name);
+ const riders=[...aboard].filter(id=>id!==drover);
+ const patientsHere=patients.filter(id=>!animals.some(a=>a.passenger===id));
+ const drives=!!drover&&!halted&&aboard.has(drover);
+ const direction=guides&&guide===drover?' a udává směr':'';
+ const occupants=[...patientsHere,...riders];
+ const lines=[];
+ if(team.length)lines.push('V zápřahu '+(team.length===1?'je ':'jsou ')+list(team)+'.');
+ if(occupants.length||carried.length){
+  if(drives&&team.length)lines.push('Otěže drží '+name(drover)+direction+'.');
+  const patient=patientsHere.length===1?patientsHere[0]:null;
+  if(patient&&severe.has(patient)){
+   const cause=priorInjuries.has(patient)?' Po starém zranění se pěšky dál nedostane.':' Pěšky dál nemůže.';
+   lines.push(here+(halted?' zůstává ':' jede ')+name(patient)+'.'+cause);
+   if(riders.length)lines.push('Místo tam '+(riders.length===1?'má ':'mají ')+'také '+list(riders.map(name))+'.');
+  }else if(occupants.length){
+   lines.push(here+(halted?(occupants.length===1?' zůstává ':' zůstávají '):
+    (occupants.length===1?' jede ':' jedou '))+list(occupants.map(name))+'.');
+   for(const id of patientsHere.filter(id=>severe.has(id)))lines.push(name(id)+
+    (priorInjuries.has(id)?' kvůli starému zranění nemůže jít pěšky.':' nemůže jít vlastními silami.'));
+  }
+  if(carried.length)lines.push((occupants.length?'Na korbě':here)+' se '+(halted?(carried.length===1?'nachází ':'nacházejí '):(carried.length===1?'veze ':'vezou '))+list(carried)+'.');
+  if(drives&&!team.length)lines.push('Řídí '+name(drover)+direction+'.');
+ }else if(drives){
+  lines.push(name(drover)+' řídí '+vehicle+direction+'.');
+ }else{
+  lines.push((cart?'Kára':'Vůz')+' patří k výpravě.');
+ }
+ return lines;
+}
+
 function company(p,party,name,say,priorInjuries,animalKind,language){
  const {people,guide,drover,patients,severe,animals,conveyance,walking,aboard}=party;
  const lines=[];
@@ -105,7 +142,9 @@ function company(p,party,name,say,priorInjuries,animalKind,language){
    dative?'Volba cesty připadá '+dative+'.':'O dalším směru rozhoduje '+name(guide)+'.'
   ]));
  }
- if(wheeled){
+ if(wheeled&&language){
+  lines.push(...wheeledCompany(party,name,priorInjuries,halted,guides));
+ }else if(wheeled){
   const vehicle=conveyance==='cart'?'káru':'vůz';
   if(team.length){
    const animal=team[0];
@@ -153,7 +192,8 @@ function company(p,party,name,say,priorInjuries,animalKind,language){
    lines.push(name(animal.rider)+(halted?' zůstává':' jede')+' v sedle '+saddle+'.');
   }
  }
- for(const id of patients.filter(id=>severe.has(id)))lines.push(name(id)+
+ for(const id of patients.filter(id=>severe.has(id)&&
+  (!language||!wheeled||animals.some(a=>a.passenger===id))))lines.push(name(id)+
   (priorInjuries.has(id)?' kvůli dřívějšímu zranění nemůže pokračovat pěšky.':' nemůže tuto cestu ujít vlastními silami.'));
  const free=animals.filter(a=>!a.carried&&!a.team&&!a.rider&&!a.passenger&&!a.handler);
  if(free.length)lines.push('K výpravě patří také '+(free.length===1?'zvíře ':'zvířata ')+beasts(free)+'.');
@@ -430,8 +470,8 @@ function travelSkillBeat(entry,p,test,name,party,context='',language){
    const damp=['rain','sleet'].includes(p.precipitation?.precipitation||p.weather?.precipitation);
    const team=beasts.filter(a=>a.team);
    const before=team.length?who+say('román-spřežení',[
-    ' vede zápřah a dává pozor, aby náhlá pobídka nezmařila klidný tah.',
-    ' hledá pro zápřah stejnoměrný krok. S otěžemi zachází podle toho, jak zvířata táhnou.'
+    ' pobízí zvířata tak, aby nepřišla o pravidelný krok.',
+    ' při každé pobídce sleduje, jak zvířata zabírají.'
    ]):riding?who+say('román-sedlo',[
     ' se v sedle snaží přizpůsobit kroku zvířete.',' hledá v sedle míru mezi vlastním pohybem a krokem zvířete.'
    ]):who+say('román-vedení',[

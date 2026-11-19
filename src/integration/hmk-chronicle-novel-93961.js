@@ -17,7 +17,7 @@ const terrain = {
  wood:['Pod stromy zbývá z širého kraje sotva to, co se vejde mezi dva kmeny.','Lesní půda mění barvu podle toho, kde na ni dolehne světlo.','Podél stezky se střídá vysoký les s mlázím.','V houští by se cesta ztratila docela, kdyby ji neprozrazovala udusaná zem.'],
  trail:['Stezka je v zemi zapsána tak mělce, že ji místy přebíjí porost.','Po stranách stezky sahá porost až do cesty.','Stezka se před očima ztrácí a o něco dál zase vystupuje.','Kraj se tu ukazuje po útržcích, jak se stezka stáčí dál.'],
  paved:['Kameny v cestě jsou uprostřed ohlazené. Po stranách si v jejich spárách dělá místo tráva.','Podél kamenů na kraji cesty se táhne pruh měkké země.','Cestu prozrazuje pravidelný pás kamene, i když okolní kraj mění tvář.','Některé kameny sedí v cestě zpola pohřbené a jiné vystupují nad zem.'],
- road:['V koleji po vozech se drží všechno, co cesta nepustí do stran.','Tam, kde se koleje sbíhají, je zřetelně vidět, kolik vozů tudy už projelo.','Za každým ohybem se vynoří další kus uježděné cesty.','Na okraji kolejí zbývá jen úzký pruh pro pěší.'],
+ road:['V koleji po vozech se drží všechno, co cesta nepustí do stran.','Tam, kde se koleje sbíhají, je zřetelně vidět, kolik vozů tudy už projelo.','Za každým ohybem se ukáže další kus uježděné hlíny.','Na okraji kolejí zbývá jen úzký pruh pro pěší.'],
  fields:['V otevřeném kraji je vidět daleko. Co však leží těsně při zemi, skrývá tráva.','Porost je nízký a oko má před sebou víc země, než kolik jí lze brzy přejít.','Nad zemí je otevřené nebe a každý hrb krajiny je dobře znát.','Tráva přikrývá mělčí nerovnosti a větší se rýsují už z dálky.'],
  moor:['Nízký porost leží při zemi a pod ním se místy černá hlína.','Obzor je prostý a bez mnoha znamení, jichž by se dalo držet.','Mezi nízkými keříky vystupují místa, kde země zůstala holá.','Na vřesovišti se každé vyvýšené místo ukazuje dlouho předem.'],
  marsh:['Mezi trsy trávy se lesknou místa, kam by nebylo radno stoupnout bez rozmyslu.','Pod nízkou zelení místy prosvítá voda.','Z mokřadní půdy vystupují ostrůvky pevnější země.','Co se zdálky tváří jako souvislý drn, dělí zblízka úzké proužky vody.'],
@@ -34,15 +34,15 @@ const nightTerrain = {
  general:'Ve tmě se kraj ukazuje jen v hrubých obrysech.'
 };
 const weatherLines = {
- rain:['Kapky dopadají jedna za druhou a z jejich šumu se jen občas vyloupne jiný zvuk.','Déšť stírá vzdálené obrysy. Co je potřeba rozeznat, musí být blízko.','V dešti má zem všude tmavší barvu.','Voda hledá na zemi nejnižší místa a tam se jí po kapkách sbírá čím dál víc.'],
+ rain:['Kapky dopadají jedna za druhou a z jejich šumu se jen občas vyloupne jiný zvuk.','Déšť stírá vzdálené obrysy. Co je potřeba rozeznat, musí být blízko.','Déšť ztmavil holou hlínu.','Voda hledá na zemi nejnižší místa a tam se jí po kapkách sbírá čím dál víc.'],
  snow:['Sníh po troškách zakrývá drobná znamení na zemi.','Vločky přicházejí z bílé dálky a bílou dálku za sebou nechávají.','Sníh plní mělké prohlubně dřív než ty hlubší.','Co před chvílí vystupovalo ze země, ztrácí pod sněhem obrys.'],
  sleet:['Mokrý sníh se sotva dotkne země a už se mění ve vodu.','Místy dopadá na zem vločka, místy těžká kapka.','Z nebe padá déšť se sněhem a všechno na dosah vlhne.','Po chvilce zůstane z mokrých vloček na šatu jen chlad a voda.'],
  dry:['Z nebe teď nic nepadá a zvuky z okolí dostávají prostor.','Bez srážek je snáz slyšet, co se děje nablízku.','Kraj zůstává bez deště.','Počasí alespoň nepřidává vodu tam, kde už jí může být dost.']
 };
 const climateDetails = {
- 'wet-tropical':['V tom vlhkém kraji výstroj pomalu osychá.','Zdejší vláha se dlouho drží i tam, kde zrovna neprší.'],
- 'dry-tropical':['V kraji, kde je vláhy poskrovnu, má voda cenu i po krátké cestě.','V tom suchém kraji si putující musí vláhu hlídat.'],
- subpolar:['V tom severním podnebí bývá tepla poskrovnu.','Zdejší kraj je skoupý na teplo i za příznivého počasí.']
+ 'wet-tropical':['V tak vlhkém vzduchu výstroj osychá pomalu.','Zdejší vláha se dlouho drží i tam, kde zrovna neprší.'],
+ 'dry-tropical':['I po krátké cestě je tu znát, jakou cenu má voda.','V takovém suchu je třeba dobře hospodařit s vodou.'],
+ subpolar:['V tom severním podnebí bývá tepla poskrovnu.','Tepla je tu poskrovnu i za příznivého počasí.']
 };
 const forestRain = [
  'Na jehličí se sbírá voda. Pod převislými větvemi padají na cestu těžké kapky.',
@@ -55,19 +55,19 @@ const times = {
  morning:['Je dopoledne.','Dopolední světlo už stačí na to, aby se v okolí dalo číst.','Den je ještě před polednem.','Dopoledne je v plném běhu.'],
  noon:['Je kolem poledne.','Čas se přehoupl k poledni.','Den je kolem své poloviny.','Poledne zastihuje výpravu právě tady.'],
  afternoon:['Je odpoledne.','Poledne už je za nimi.','Den se přehoupl do odpoledne.','Je čas po poledni.'],
- dusk:['Soumrak bere věcem jejich obrysy.','Přichází soumrak.','Světla pomalu ubývá.','V kraji se smráká.'],
+ dusk:['Soumrak bere věcem jejich obrysy.','Přichází soumrak.','Světla pomalu ubývá.','Připozdívá se.'],
  night:['Je noc.','Den už ustoupil noci.','Noc leží všude kolem.','Za tmy se okolí ozývá zřetelněji, než se ukazuje.'],
- mixed:['Světlo se v té době mění.','V tomto čase mají blízké i vzdálené věci pokaždé jiný obrys.','Světlo během té chvíle mění tvář kraje.','Výpravu zastihuje proměna denního světla.'],
- unknown:['Tady zastihuje výpravu další díl jejího putování.','Okolí je teď výpravě na dosah.','Výprava má na tu chvíli kolem sebe tento kus kraje.','V té chvíli je kraj nejlépe znát zblízka.']
+ mixed:['Světlo se v té době mění.','V tomto čase mají blízké i vzdálené věci pokaždé jiný obrys.','Světlo už dopadá jinak než před chvílí.','Výpravu zastihuje proměna denního světla.'],
+ unknown:['Tady zastihuje výpravu další díl jejího putování.','Okolí je teď výpravě na dosah.','Z dálky k výpravě doléhá jen málo.','Nejlépe jsou znát věci v bezprostřední blízkosti.']
 };
 const seasonalAdjective={
  spring:'jarní',summer:'letní',autumn:'podzimní',winter:'zimní'
 };
 const seasonScenes={
- spring:['Jarní čas je znát na zemi i ve vzduchu.','Jaro má v kraji už své místo.','Je jarní čas.'],
- summer:['Je letní čas.','Kraj kolem prochází létem.','Je léto.'],
- autumn:['Je podzimní čas.','V kraji už nastal podzim.','Je podzim.'],
- winter:['Je zimní čas.','V kraji vládne zima.','Je zima.']
+ spring:['Jarní čas je znát na zemi i ve vzduchu.','Jaro je v plném běhu.','Je jarní čas.'],
+ summer:['Je letní čas.','Letní čas už nastal.','Je léto.'],
+ autumn:['Je podzimní čas.','Nastal podzim.','Je podzim.'],
+ winter:['Je zimní čas.','Nastal zimní čas.','Je zima.']
 };
 
 export function novelChoice(seed, topic, lines) {
@@ -108,18 +108,27 @@ export function novelScene(entry,p,ordinal) {
  const cold=condition==='cold'?pick('chlad',['Chlad zalézá i pod šat.','V chladu tuhne všechno, co zůstane nezakryté.','V tom chladu ani krátké postání nepřináší úlevu.']):'';
  const heat=condition==='heat'?pick('žár',['Žár nedává klid ani při postání.','Vzduch tíží horkem.','Ani zastavení na chvíli nedá od žáru oddechnout.']):'';
  const area=p.area||p.settings?.area;
- const where=area?` v kraji zvaném ${area}`:'';
+ const placePhrase=/\bkraj(?:e|i|ina|iny)?\b/i.test(scenery)?
+  'v končinách zvaných':'v kraji zvaném';
+ const where=area?` ${placePhrase} ${area}`:'';
+ const initialPlace=placePhrase[0].toUpperCase()+placePhrase.slice(1);
  const weatherAdj=seasonalAdjective[season];
  const period=({morning:'dopoledne',afternoon:'odpoledne',night:'noc',dusk:'soumrak',dawn:'jitro'})[light];
  const phrase=weatherAdj&&period?`${weatherAdj} ${period}`:'';
  const timePhrase=phrase?rollTime([
   `Je ${phrase}${where}.`,
   `Výpravu zastihuje ${phrase}${where}.`,
-  area?`V kraji, jemuž říkají ${area}, je ${phrase}.`:`Tady nastává ${phrase}.`,
+  area?`${initialPlace} ${area} je ${phrase}.`:`Tady nastává ${phrase}.`,
   `${phrase[0].toLocaleUpperCase('cs')+phrase.slice(1)} zastihuje výpravu${where||' právě tady'}.`
+ ]):light==='noon'&&weatherAdj?rollTime([
+  `Kolem ${weatherAdj}ho poledne je výprava${where||' právě tady'}.`,
+  `Výpravu zastihuje čas kolem ${weatherAdj}ho poledne${where}.`,
+  area?`${initialPlace} ${area} je kolem ${weatherAdj}ho poledne.`:`Je kolem ${weatherAdj}ho poledne.`,
+  `${weatherAdj[0].toLocaleUpperCase('cs')+weatherAdj.slice(1)} den je kolem své poloviny. Výprava je${where||' právě tady'}.`
  ]):rollTime(time);
- const place=area&&!phrase?`Výprava je${where}.`:'';
- const seasonPhrase=seasonal&&!phrase?pick('období',seasonal):'';
+ const joined=phrase||(light==='noon'&&weatherAdj);
+ const place=area&&!joined?`Výprava je${where}.`:'';
+ const seasonPhrase=seasonal&&!joined?pick('období',seasonal):'';
  const order=pick('stavba',[
   [timePhrase,scenery,rainPhrase,place,seasonPhrase,climate,cold,heat],
   [timePhrase,rainPhrase,scenery,climate,cold,heat,place,seasonPhrase],
