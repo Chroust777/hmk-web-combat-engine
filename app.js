@@ -42,8 +42,8 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
-import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.951';
-import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.953';
+import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.954';
+import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.954';
 import {CHRONICLE_TRAVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.951';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
@@ -385,7 +385,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.953';
+const APP_VERSION='93.954';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3517,10 +3517,22 @@ function timeEpisodePageHTML(clock,participants){
 }
 function chronicleEvidence951(clock){
  const evidence=new Map(data.journal.map(j=>[j.id,j]));
- const stableNames=new Map(verifiedLivestock(data,campaignKey(clock)).map(a=>[a.id,a.name]));
- const name=id=>character(id)?.name||stableNames.get(id)||'Účastník';
+ const cid=campaignKey(clock);
+ const registry=[...data.characters,...data.trash];
+ const stable=new Map(registry.flatMap(c=>(c.hmk?.livestock||[]).filter(a=>a.campaignId===cid).map(a=>[a.id,a])));
+ const name=id=>character(id)?.name||registry.find(c=>c.id===id)?.name||stable.get(id)?.name||'Účastník';
+ const animalKind=id=>{
+  const beastId=stable.get(id)?.beastId||registry.find(c=>c.id===id)?.hmk?.livestockSourceId;
+  const species=livestockOffer(beastId)?.name;
+  return ({
+   'Palfrey, cart horse':'tažný kůň','Palfrey, plough horse':'tažný kůň','Palfrey, riding horse':'jezdecký kůň',
+   'Bovine (Oxen)':'vůl',Mule:'mezek',Donkey:'osel',Warpony:'válečný poník',Camel:'velbloud',Elephant:'slon',
+   'Warhorse, courser':'lehký válečný kůň','Warhorse, charger':'válečný kůň','Warhorse, destrier':'těžký válečný kůň',
+   'Dog, guard':'strážní pes','Dog, hunter':'lovecký pes','Dog, ratter':'pes krysař','Hawk • Falcon':'dravý pták'
+  })[species]||species||'';
+ };
  const healthEvents=data.characters.flatMap(c=>(c?.hmk?.healthState?.events||[]).filter(e=>e.type==='travel-accident-injury'));
- return {evidence,name,healthEvents};
+ return {evidence,name,animalKind,healthEvents};
 }
 function chronicleParagraphs951(clock,entry,presentation,source,{gm=false}={}){
  const p=entry.calendarTimeEpisode,{evidence,name,healthEvents}=source;
@@ -3593,7 +3605,13 @@ function chronicleNarrativeHTML953(entry,{legacy,beats,tests,hazard,encounter},n
   // Rolls come first in the closing section, so the reader sees the
   // decisive results before the consequence narrative.
   const prose=beats.flatMap((beat,i)=>beat.kind===kind?[chronicleBeatHTML953(beat,paragraphs?.[i],name)]:[]);
-  const proof=rolls.filter(beat=>beat.kind===kind).map(beat=>chronicleBeatHTML953(beat,null,name));
+  const currentRolls=rolls.filter(beat=>beat.kind===kind);
+  const proof=currentRolls.filter(beat=>!beat.endurance).map(beat=>chronicleBeatHTML953(beat,null,name));
+  const endurance=currentRolls.filter(beat=>beat.endurance);
+  if(endurance.length){
+   const results=endurance.map(beat=>chronicleRollHTML953(beat.test,name)).join(' ');
+   proof.push(`<p class="hc-story-paragraph hc-story-paragraph--aftermath">${esc(endurance[0].before)} ${results}</p>`);
+  }
   html.push(...(kind==='aftermath'?[...proof,...prose]:[...prose,...proof]));
  }
  if(hazard?.injuryDetails?.length)html.push(`<p class="hc-story-paragraph">${chronicleWounds953(hazard.injuryDetails)}</p>`);
@@ -3615,21 +3633,29 @@ function personalTimeEpisodeChronicleHTML(clock,personalId,{gm=false}={}){
   const locality=p.terrain?personalTerrainLabel(p.terrain):p.area||'';
   const timeRange=`${historyTRMoment950(clock,p.startMinute)} · ${start}–${endShort}`;
   const routePart=locality?`Typ krajiny / cesta: ${locality}${distance}`:(distance?distance.slice(3):'');
-  const roles=personalEpisodeRoles(p,name);
+  const roles=personalEpisodeRoles(p,name,source.animalKind);
+  const weather=chronicleWeather954(p);
   const chronicle=chronicleParagraphs951(clock,entry,presentation,source,{gm});
   const {tests,hazard,encounter}=chronicle;
-  const context=[personalEpisodeWeather(p),p.area&&p.area.toLowerCase()!==locality.toLowerCase()?`Oblast: ${p.area}`:'',Number.isInteger(p.minutes)?`${p.minutes} minut`:''].filter(Boolean);
+  const context=[p.area&&p.area.toLowerCase()!==locality.toLowerCase()?`Oblast: ${p.area}`:'',Number.isInteger(p.minutes)?`${p.minutes} minut`:''].filter(Boolean);
   const narrative=String(p.narrative||'').trim();
   const gmSuggestions=gm?personalGMFollowups(entry,p,tests,{name,hazard,encounter}):[];
   const gmHTML=gmSuggestions.length?`<aside class="hc-personal-episode__gm-ideas" aria-label="Náměty pro GM po skončení epizody"><h4>Co může následovat – inspirace pro GM</h4><p class="hc-gm-ideas__notice">Následující situace jsou pouze dobrovolné náměty, nikoli nové povinné hody nebo již nastalé následky. GM rozhodne, zda a kdy vůbec vzniknou.</p>${gmSuggestions.map((idea,i)=>`<section class="hc-gm-idea"><h5>${i+1}. ${esc(idea.title)}</h5><p>${esc(idea.question)}</p><p><strong>Možný test:</strong> ${esc(idea.skill)}</p><details><summary>Inspirace pro možné vyústění</summary><p><b>Pokud uspějí:</b> ${esc(idea.success)}</p><p><b>Pokud neuspějí:</b> ${esc(idea.failure)}</p></details></section>`).join('')}</aside>`:'';
-  const actions=`<div class="hc-chronicle-editor-actions" aria-label="Správa cestovního zápisu"><button type="button" class="secondary hc-small" data-chronicle-edit="${esc(entry.id)}" data-chronicle-actor="${esc(personalId)}">Upravit vyprávění</button><button type="button" class="secondary danger hc-small" data-chronicle-hide="${esc(entry.id)}" data-chronicle-actor="${esc(personalId)}">Smazat zápis</button></div>`;
-  return `<details class="hc-episode-history hc-personal-episode" data-personal-episode-id="${esc(entry.id)}"><summary><span class="hc-personal-episode__summary-text"><span class="hc-personal-episode__summary-time">${esc(timeRange)}</span><span class="hc-personal-episode__summary-main"><span class="hc-personal-episode__summary-action">${esc(activity)}</span>${routePart?`<span class="hc-personal-episode__summary-route">${esc(routePart)}</span>`:''}</span></span></summary><div class="hc-personal-episode__content"><div class="hc-personal-episode__context">${context.map(x=>`<span>${esc(x)}</span>`).join('')}</div>${roles.length?`<section class="hc-personal-episode__roles" aria-label="Účastníci"><h4>Účastníci</h4><ul>${roles.map(role=>`<li>${esc(role)}</li>`).join('')}</ul></section>`:''}<div class="hc-personal-episode__story hc-personal-episode__story--integrated">${chronicleNarrativeHTML953(entry,chronicle,name,presentation.paragraphs)}</div>${narrative?`<p class="hc-personal-episode__gm-note"><b>Poznámka GM:</b> ${esc(narrative)}</p>`:''}${gmHTML}${actions}</div></details>`;
+  const actions=`<div class="hc-chronicle-editor-actions" aria-label="Správa cestovního zápisu"><button type="button" class="secondary hc-small" data-chronicle-edit="${esc(entry.id)}" data-chronicle-actor="${esc(personalId)}">Upravit</button><button type="button" class="secondary danger hc-small" data-chronicle-hide="${esc(entry.id)}" data-chronicle-actor="${esc(personalId)}">Smazat</button></div>`;
+  return `<details class="hc-episode-history hc-personal-episode" data-personal-episode-id="${esc(entry.id)}"><summary><span class="hc-personal-episode__summary-text"><span class="hc-personal-episode__summary-time">${esc(timeRange)}</span>${weather?`<span class="hc-episode-weather">${esc(weather)}</span>`:''}<span class="hc-personal-episode__summary-main"><span class="hc-personal-episode__summary-action">${esc(activity)}</span>${routePart?`<span class="hc-personal-episode__summary-route">${esc(routePart)}</span>`:''}</span></span></summary><div class="hc-personal-episode__content"><div class="hc-personal-episode__context">${context.map(x=>`<span>${esc(x)}</span>`).join('')}</div>${roles.length?`<section class="hc-personal-episode__roles" aria-label="Účastníci"><h4>Účastníci</h4><ul>${roles.map(role=>`<li>${esc(role)}</li>`).join('')}</ul></section>`:''}<div class="hc-personal-episode__story hc-personal-episode__story--integrated">${chronicleNarrativeHTML953(entry,chronicle,name,presentation.paragraphs)}</div>${narrative?`<p class="hc-personal-episode__gm-note"><b>Poznámka GM:</b> ${esc(narrative)}</p>`:''}${gmHTML}${actions}</div></details>`;
  });
  const sorted=results.filter(Boolean); // already newest-first: rows were reversed before map
  const recent=sorted.slice(0,5).join('');
  const restore=suppressed.length?`<details class="hc-personal-archive hc-chronicle-hidden"><summary>Skryté zápisy – obnovit (${suppressed.length})</summary>${suppressed.map(row=>`<div class="hc-chronicle-hidden-item"><span>${esc(displayCampaignMinute(row.calendarTimeEpisode.startMinute))} · ${esc(personalEpisodeActivities(row.calendarTimeEpisode))}</span><button type="button" class="secondary hc-small" data-chronicle-restore="${esc(row.id)}" data-chronicle-actor="${esc(personalId)}">Obnovit zápis</button></div>`).join('')}</details>`:'';
  const archive=sorted.length>5?`<details class="hc-personal-archive"><summary>Příloha · starší cestovní zápisy (${sorted.length-5})</summary><div class="hc-personal-archive__items">${sorted.slice(5).join('')}</div></details>`:'';
- return `<section class="hc-calendar hc-episode-chronicle hc-episode-chronicle--personal${gm?' hc-episode-chronicle--gm':''}" data-personal-chronicle><h3>Osobní zápis cestování <small>(${sorted.length})</small></h3><div class="hc-episode-chronicle__body">${recent||'<p>Žádná viditelná cestovní epizoda.</p>'}${archive}${restore}</div></section>`;
+ const body=`<div class="hc-episode-chronicle__body">${recent||'<p>Žádná viditelná cestovní epizoda.</p>'}${archive}${restore}</div>`;
+ const caption=`Kronika epizod <small>(${sorted.length})</small>`;
+ const klass='hc-calendar hc-episode-chronicle hc-episode-chronicle--personal';
+ return gm?`<section class="${klass} hc-episode-chronicle--gm" data-personal-chronicle><h3>${caption}</h3>${body}</section>`:
+  `<details class="${klass}" data-personal-chronicle><summary><strong>${caption}</strong></summary>${body}</details>`;
+}
+function chronicleWeather954(episode){
+ return episode?.weather||episode?.precipitation?.precipitation?personalEpisodeWeather(episode):'';
 }
 function timeEpisodeChronicleHTML(clock){
  const cid=campaignKey(clock),source=chronicleEvidence951(clock),{name}=source;
@@ -3639,10 +3665,17 @@ function timeEpisodeChronicleHTML(clock){
  const chapters=campaignBookChapters953(rows,gmCalendarAgenda(clock),journal,legacy);
  const participants=ids=>new Intl.ListFormat('cs').format(ids.map(name));
  const clockLabel=(minute)=>displayCampaignMinute(minute).split(' · ').at(-1);
+ const roles=p=>personalEpisodeRoles(p,name,source.animalKind);
+ const roleList=p=>`<ul class="hc-book-roles" aria-label="Účastníci">${roles(p).map(role=>`<li>${esc(role)}</li>`).join('')}</ul>`;
  const paragraphs=(value)=>String(value||'').trim().split(/\n\s*\n/).filter(Boolean).map(p=>`<p>${esc(p)}</p>`).join('');
  const sections=chapters.map((items,i)=>{
   const minute=items[0].minute;
   const day=clock.trOrigin?formatTRDate(campaignTRDate(clock,minute)):displayCampaignMinute(minute).split(' · ')[0];
+  const weather=[...new Set(items.flatMap(item=>{
+   const p=item.row?.calendarTimeEpisode||item.row?.calendarTrekProof;
+   const label=chronicleWeather954(p);
+   return label?[p.area?`${p.area} — ${label}`:label]:[];
+  }))];
   const body=items.map(item=>{
    const time=`<time>${esc(clockLabel(item.minute))}</time>`;
    if(item.type==='event'){
@@ -3668,11 +3701,12 @@ function timeEpisodeChronicleHTML(clock){
    const story=chronicleParagraphs951(clock,entry,{},source);
    const title=[personalEpisodeActivities(p),p.area].filter(Boolean).join(' · ');
    return `<article class="hc-book-scene"><header><time>${esc(clockLabel(p.startMinute))}–${esc(clockLabel(p.endMinute))}</time><h4>${esc(title)}</h4></header>
-    <p class="hc-book-meta">${esc(participants(p.memberIds))}</p>
+    ${chronicleWeather954(p)?`<p class="hc-episode-weather">${esc(chronicleWeather954(p))}</p>`:''}
+    ${roleList(p)}
     <div class="hc-personal-episode__story hc-personal-episode__story--integrated">${chronicleNarrativeHTML953(entry,story,name)}</div>
     ${paragraphs(p.narrative)}</article>`;
   }).join('');
-  return `<details class="hc-book-day" ${i===0?'open':''}><summary><strong>${esc(day)}</strong></summary>${body}</details>`;
+  return `<details class="hc-book-day" ${i===0?'open':''}><summary><strong>${esc(day)}</strong>${weather.length?`<span class="hc-episode-weather">${weather.map(esc).join(' / ')}</span>`:''}</summary>${body}</details>`;
  }).join('');
  return `<section class="panel hc-campaign-book"><h3>Kronika epizod</h3>
   <details class="hc-book-compose"><summary>Zapsat událost do kroniky</summary><form id="hmk-chronicle-event-form">
@@ -6675,7 +6709,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
   const personalNotes=logs.filter(isPersonalNote).filter(j=>!hiddenLogbookIds(data,c.id).has(j.id));
   const noteRows=personalNotes.map(l=>`<article class="journal-personal-note" data-journal-entry="${esc(l.id)}"><div class="journal-personal-note__heading"><b>${esc(l.title||'Bez názvu')}</b><time>${esc(personalNoteGameMoment(l))}</time></div><p>${esc(l.body||'').replace(/\n/g,'<br>')}</p><div class="actions"><button class="secondary" type="button" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" type="button" data-delete-log="${esc(l.id)}">Smazat</button></div></article>`).join('');
   const currentTime=data.campaignClock&&calendarMemberIds(data.campaignClock,data.characters).some(a=>a.id===c.id)?medicalFullMoment(data.campaignClock.minute):'Herní datum a čas nejsou dostupné';
-  const chroniclePanel=`<section class="panel panel--chapter hmk-notes-left"><h3>Osobní zápisník</h3><p class="journal-minor">Přehled cestovních epizod, doložených hodů a jejich skutečných následků.</p><button type="button" class="secondary" data-nav="gmhistory">▤ Historie GM</button>${data.campaignClock?timeEpisodeChronicleHTML(data.campaignClock,c.id):'<p>Postava nemá otevřenou kampaň.</p>'}${characterSkillHistory950(c,logs)}</section>`;
+  const chroniclePanel=`<section class="panel panel--chapter hmk-notes-left"><h3>Osobní zápisník</h3><p class="journal-minor">Přehled cestovních epizod, doložených hodů a jejich skutečných následků.</p><button type="button" class="secondary" data-nav="gmhistory">▤ Historie GM</button>${data.campaignClock?personalTimeEpisodeChronicleHTML(data.campaignClock,c.id):'<p>Postava nemá otevřenou kampaň.</p>'}${characterSkillHistory950(c,logs)}</section>`;
   const notesPanel=`<aside class="panel panel--chapter hmk-notes-right"><h3>Vlastní poznámky</h3><p class="journal-note-current-time">Herní čas pro nový zápis: <strong>${esc(currentTime)}</strong></p><form id="journal-form" class="journal-personal-note-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form><div class="journal-personal-note-list">${noteRows||'<p class="muted">Zatím nejsou zapsány žádné vlastní poznámky.</p>'}</div></aside>`;
   return journalShell(`<section class="journal-technical-shell hmk-notes-screen"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Vlevo osobní kronika cestování; vpravo vlastní poznámky zapsané s herním datem a časem.</p></header><div class="journal-tech-columns hmk-notes-columns">${chroniclePanel}${notesPanel}</div></section>`,`journal-book--chapter journal-book--notes`);
  }
@@ -23807,8 +23841,8 @@ document.addEventListener('submit',e=>{
 
 // After a deliberate edit/hide/restore, retain the operator's current view.
 // First entry to GM history remains collapsed; this only follows a real click.
-function revealChronicleAfterMutation93889(actorId,episodeId,{restoring=false}={}){
- const parent=[...document.querySelectorAll('[data-gm-chronicle-person]')].find(node=>node.dataset.gmChroniclePerson===actorId);
+function revealChronicleAfterMutation93889(episodeId,{restoring=false}={}){
+ const parent=document.querySelector('[data-personal-chronicle]');
  if(parent?.tagName==='DETAILS')parent.open=true;
  if(restoring){
   const hidden=parent?.querySelector('.hc-chronicle-hidden');if(hidden)hidden.open=true;
@@ -23821,7 +23855,7 @@ function revealChronicleAfterMutation93889(actorId,episodeId,{restoring=false}={
 function chronicleEditorHTML(actorId,source){
  const clock=data.campaignClock,context=chronicleEvidence951(clock),{name}=context;
  const presentation=chroniclePresentationSnapshot(data,actorId,source.id);
- const {beats}=chronicleParagraphs951(clock,source,presentation,context,{gm:true});
+ const {beats}=chronicleParagraphs951(clock,source,presentation,context,{gm:view==='gmhistory'});
  const saved=presentation.paragraphs||[];
  const fields=beats.map((beat,i)=>{
   const text=key=>Object.hasOwn(saved[i]||{},key)?saved[i][key]:String(beat[key]||'');
@@ -23833,15 +23867,22 @@ function chronicleEditorHTML(actorId,source){
  return `<div class="editor-backdrop"><section class="panel editor-dialog hc-chronicle-editor" role="dialog" aria-modal="true" aria-labelledby="chronicle-editor-title"><h2 id="chronicle-editor-title">Upravit vyprávění · ${esc(name(actorId))}</h2><p>Upravuješ pouze literární části zápisu. Kostky, EML, výsledky, zranění, čas ani původní herní událost změnit nelze. Úprava se promítne do osobního i GM zápisníku.</p><form id="hmk-chronicle-edit-form"><input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="episodeId" value="${esc(source.id)}">${fields}<div class="actions"><button type="submit">Uložit vyprávění</button><button type="button" class="secondary" data-action="cancel-editor">Zrušit</button></div></form></section></div>`;
 }
 document.addEventListener('click',e=>{
+ const cancel=e.target.closest?.('[data-action="cancel-editor"]');
+ const editForm=cancel?.closest('#hmk-chronicle-edit-form');
+ if(editForm){
+  e.preventDefault();e.stopImmediatePropagation();
+  const episodeId=editForm.elements.namedItem('episodeId').value;
+  overlay=null;render();revealChronicleAfterMutation93889(episodeId);return;
+ }
  const b=e.target.closest?.('[data-chronicle-edit],[data-chronicle-hide],[data-chronicle-restore]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
  const actorId=b.dataset.chronicleActor,episodeId=b.dataset.chronicleEdit||b.dataset.chronicleHide||b.dataset.chronicleRestore;
  const source=data.journal.find(j=>j.id===episodeId&&j.calendarCampaignId===campaignKey(data.campaignClock)&&j.calendarTimeEpisode?.memberIds?.includes(actorId));
  if(!source)return alert('Zápis už nepatří této postavě nebo právě otevřené kampani.');
- if(b.dataset.chronicleEdit){overlay=chronicleEditorHTML(actorId,source);render();return;}
+ if(b.dataset.chronicleEdit){overlay=chronicleEditorHTML(actorId,source);render();revealChronicleAfterMutation93889(episodeId);return;}
  const action=b.dataset.chronicleHide?'hide':'restore';
  if(action==='hide'&&!ask('Smazat tento zápis z osobní kroniky i GM historie? Potvrzené herní události, hody a zdravotní následky zůstanou nezměněné a zápis lze obnovit.'))return;
- if(mutate(()=>recordChroniclePresentation93889(data,action,{id:uuid(),actorId,episodeId,campaignId:campaignKey(data.campaignClock),createdAt:stamp()})))revealChronicleAfterMutation93889(actorId,episodeId,{restoring:action==='hide'});
+ if(mutate(()=>recordChroniclePresentation93889(data,action,{id:uuid(),actorId,episodeId,campaignId:campaignKey(data.campaignClock),createdAt:stamp()})))revealChronicleAfterMutation93889(episodeId,{restoring:action==='hide'});
 },true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(form?.id!=='hmk-chronicle-edit-form')return;
@@ -23851,10 +23892,10 @@ document.addEventListener('submit',e=>{
  if(!source)return alert('Zdroj cestovního zápisu již není dostupný.');
  const clock=data.campaignClock,context=chronicleEvidence951(clock);
  const presentation=chroniclePresentationSnapshot(data,actorId,source.id);
- const {legacy,beats}=chronicleParagraphs951(clock,source,presentation,context,{gm:true});
+ const {legacy,beats}=chronicleParagraphs951(clock,source,presentation,context,{gm:view==='gmhistory'});
  const paragraphs=beats.map((beat,i)=>beat.text?{text:String(fd.get(`beat_${i}_text`)??'')}:
   {before:String(fd.get(`beat_${i}_before`)??''),after:String(fd.get(`beat_${i}_after`)??'')});
- if(mutate(()=>recordChroniclePresentation93889(data,'edit',{id:uuid(),actorId,episodeId,campaignId:campaignKey(data.campaignClock),createdAt:stamp(),paragraphs,layout:legacy?undefined:CHRONICLE_TRAVEL_LAYOUT}))){overlay=null;render();revealChronicleAfterMutation93889(actorId,episodeId);}
+ if(mutate(()=>recordChroniclePresentation93889(data,'edit',{id:uuid(),actorId,episodeId,campaignId:campaignKey(data.campaignClock),createdAt:stamp(),paragraphs,layout:legacy?undefined:CHRONICLE_TRAVEL_LAYOUT}))){overlay=null;render();revealChronicleAfterMutation93889(episodeId);}
 },true);
 
 // v11: Multi-line journal editor preserves timestamps and record identity.

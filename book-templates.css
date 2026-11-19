@@ -8412,3 +8412,20 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .hc-book-scene .hc-story-receipt { display: inline; white-space: normal; }
 .hc-book-scene .hc-story-receipt__sep { margin-inline: .22em; }
 .hc-book-scene .hc-story-receipt [data-hmk-help] { text-decoration: underline dotted; text-underline-offset: .15em; }
+
+.hc-episode-weather {
+ color: #624b34;
+ font-size: .85rem;
+ line-height: 1.45;
+ overflow-wrap: anywhere;
+}
+.hc-book-day > summary .hc-episode-weather,
+.hc-personal-episode__summary-text > .hc-episode-weather {
+ display: inline-block;
+ margin-inline-start: .7rem;
+}
+.hc-book-roles { padding-inline-start: 1.15rem; margin-block: .35rem .85rem; }
+.content-sheet .journal-book--notes details[data-personal-chronicle] > summary {
+ display: list-item !important;
+ cursor: pointer;
+}
