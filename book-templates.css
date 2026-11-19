@@ -8345,3 +8345,70 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
 .hc-chronicle-travel-proof li{
  margin-block:0.4rem;
 }
+
+/* A library folio can be narrow even in a wide two-page spread. */
+.content-sheet .journal-book--library .folio-catalog-entry { container-type: inline-size; }
+.content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-top {
+ grid-template-columns: minmax(0, 1.3fr) minmax(145px, 1fr) !important;
+}
+.content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-stats {
+ display: grid !important;
+ grid-template-columns: repeat(auto-fit, minmax(min(100%, 105px), 1fr)) !important;
+ gap: 9px 10px !important;
+}
+.content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-field {
+ min-width: 0 !important;
+ max-width: 100% !important;
+}
+.content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-field :is(dt,dd) {
+ min-width: 0;
+ white-space: normal !important;
+ overflow-wrap: anywhere;
+}
+.content-sheet .journal-book--library .folio-catalog-entry select {
+ box-sizing: border-box;
+ min-width: 0;
+ max-width: 100%;
+}
+@container (max-width: 500px) {
+ .content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-top {
+  grid-template-columns: minmax(0, 1fr) !important;
+ }
+ .content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-actions {
+  border-left: none;
+  border-top: 1px solid var(--folio-rule);
+  padding: 8px 0 0 !important;
+ }
+}
+@media (max-width: 720px) {
+ .content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-top {
+  grid-template-columns: minmax(0, 1fr) !important;
+ }
+ .content-sheet .journal-book--library .folio-catalog-entry .folio-catalog-actions {
+  border-left: none;
+  border-top: 1px solid var(--folio-rule);
+  padding: 8px 0 0 !important;
+ }
+}
+.hmk-gm-chronicle-intro select { width: min(100%, 26rem); }
+.hmk-gm-chronicle-person .catalog-scroll { overflow-x: auto; max-width: 100%; }
+.hc-campaign-book { min-width: 0; width: 100%; }
+.hc-book-compose { margin-bottom: 1.25rem; }
+.hc-book-compose form { display: grid; gap: .75rem; margin-top: .65rem; max-width: 55ch; }
+.hc-book-compose :is(input, textarea, button) { min-width: 0; max-width: 100%; }
+.hc-book-day { padding: .75rem 0; border-top: 1px solid var(--folio-rule, #b99a6d); }
+.hc-book-day > summary { cursor: pointer; }
+.hc-book-scene { margin: 1.15rem 0; padding: 0 0 1rem; border-bottom: 1px solid var(--folio-rule, #b99a6d); }
+.hc-book-scene header { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .65rem; }
+.hc-book-scene header h4 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.hc-book-scene time, .hc-book-meta { color: #674d33; }
+.hc-book-meta { margin: .3rem 0 .7rem; }
+.hc-book-scene .hc-story-paragraph, .hc-book-scene > p {
+ max-width: 72ch;
+ font-size: 1rem;
+ line-height: 1.64;
+ overflow-wrap: anywhere;
+}
+.hc-book-scene .hc-story-receipt { display: inline; white-space: normal; }
+.hc-book-scene .hc-story-receipt__sep { margin-inline: .22em; }
+.hc-book-scene .hc-story-receipt [data-hmk-help] { text-decoration: underline dotted; text-underline-offset: .15em; }
