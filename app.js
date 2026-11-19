@@ -1,7 +1,8 @@
+import {treatmentRollEMLFromInjury} from './src/rules/healing.js';
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.929';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.943';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -206,7 +207,7 @@ import {weatherTreatmentTiming} from './src/integration/hmk-weather-treatment-ti
 import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
-import {travelBleedingTerm,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
+import {travelBleedingTerm,travelBloodStoppageEML,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
 import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
@@ -381,7 +382,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.942';
+const APP_VERSION='93.943';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1498,7 +1499,7 @@ function weatherBusyHealerStatusHTML(){
  return 'Právě probíhá: '+busy.map(p=>{
   const patient=character(p.characterId);
   const wound=patient?persistentStateOf(patient).wounds.find(w=>w.id===p.woundId):null;
-  const place=wound?[(HMK_WOUND_LOCATION_NAMES[String(wound.location||'').toLowerCase()]||wound.location||'unknown'),wound.side||'',wound.severity?String(wound.severity)+(wound.level||''):''].filter(Boolean).join(' '):p.woundId;
+  const place=wound?[(HMK_WOUND_LOCATION_NAMES[String(wound.location||'').toLowerCase()]||wound.location||'unknown'),wound.side||'',wound.severity?String(wound.severity)+(wound.level||''):''].filter(Boolean).join(' '):'rána mimo evidenci';
   return `${character(p.healerId)?.name||p.healerId} ošetřuje ${patient?.name||p.characterId} (${place}) do ${displayCampaignMinute(p.endMinute)}`;
  }).join(' · ')+'.';
 }
@@ -1559,9 +1560,26 @@ function syncWeatherHealerFields(form){
   healer?'Vybraný léčitel: '+healer.name+' · ML '+healer.ml+' · Index '+healer.index+'.'+
     (healer.self?' Vlastní ošetření je možné jen pokud skutečný stav a okolnosti dovolují.':''):
     'Vyberte léčitele; aplikace převezme jeho ML, Index a případný DEX modifikátor.';
+ if(form.id==='hmk-frost-amputation-form'){
+  const patient=character(String(wound?.value||'').split('::')[0]);
+  const injury=patient&&persistentStateOf(patient).wounds.find(w=>patient.id+'::'+w.id===wound.value);
+  const age=Number(form.elements.namedItem('daySinceInjury')?.value);
+  form.dataset.hmkFrostTreatmentEml=healer&&healer.dexSecondary!==null&&injury&&Number.isSafeInteger(age)?
+   String(treatmentRollEMLFromInjury({physicianML:healer.ml,aspect:'frost',injuryLevel:injury.level,
+    daysSinceInjury:age,dexSecondaryModifier:healer.dexSecondary})):'';
+  form.dataset.hmkFrostTriangle=injury&&hmkHumanLocationSymbols(injury.location)?.triangle!=null?'yes':'no';
+  const strength=form.elements.namedItem('amputationStrengthML');
+  const mastery=patient&&availableMasteries(patient).find(m=>m.name==='Strength');
+  if(strength){
+   if(Number.isSafeInteger(mastery?.ml))strength.value=String(mastery.ml);
+   else if(strength.dataset.hmkWound!==wound?.value)strength.value='';
+   strength.dataset.hmkWound=wound?.value||'';
+   strength.readOnly=Number.isSafeInteger(mastery?.ml);
+  }
+ }
  const roll=form.elements.namedItem('physicianRoll');
  if(roll){roll.required=!untreated;roll.disabled=untreated;
-   const label=roll.closest('label');if(label)label.hidden=untreated;
+   const label=roll.closest('label');if(label)label.hidden=untreated||roll.type==='hidden';
    const die=roll.nextElementSibling;if(die?.dataset?.hmkGeneralAutoDie)die.hidden=untreated;
  }
  const wrapper=select.closest('label');if(wrapper)wrapper.hidden=untreated;
@@ -3317,12 +3335,13 @@ function timeEpisodePageHTML(clock,participants){
  <div data-episode-scent-details hidden>
   <label class="hc-check"><input type="checkbox" name="trackingScentPresent"> GM potvrzuje, že toto konkrétní zvíře je se skupinou a může v této situaci sledovat pach</label>
   <label>Awareness zvířete · skutečný d100<span class="hc-episode-die"><input name="trackingScentD100" type="number" min="1" max="100" placeholder="1–100"><button type="button" data-episode-die="trackingScentD100" data-episode-faces="100">⚄ d100</button></span></label>
+  <label data-episode-scent-observation hidden>Observation zvířete (SV 3–4) · Awareness d100<span class="hc-episode-die"><input name="trackingScentObservationD100" type="number" min="1" max="100" disabled><button type="button" data-episode-die="trackingScentObservationD100" data-episode-faces="100" disabled>⚄ d100</button></span></label>
   <p class="hc-hint" data-episode-scent-status role="status">Nejprve vyberte skutečné zvíře. D100 musí být výslovně potvrzen.</p>
  </div>
  </section>
  <label data-episode-tracking-new>Doložený Tracking SV (aktuální minuta)<select name="trackingProofId"><option value="">— Vyberte skutečný uložený test —</option>${skillOptions('Tracking')}</select></label></div>
  <div data-episode-tracking-followup hidden><h4>Tracking · výsledek a stopové hvězdy</h4><div class="hmk-trek-grid">
- <label>Awareness při Tracking SV 3–4 ${episodeRuleHelp('Tracking Awareness','HMK 147: pouze skutečný uložený Awareness test postavy v současné minutě může dát 1 Spoor.')}<select name="trackingAwarenessProofId"><option value="">— Vyberte skutečný Awareness test —</option>${skillOptions('Awareness')}</select></label>
+ <label hidden>Awareness při Tracking SV 3–4 ${episodeRuleHelp('Tracking Awareness','HMK 147: pouze skutečný uložený Awareness test postavy v současné minutě může dát 1 Spoor.')}<select name="trackingAwarenessProofId" disabled><option value="">— Vyberte skutečný Awareness test —</option>${skillOptions('Awareness')}</select></label>
  <label>Počet Spoor hvězd věnovaných skrytí vlastní stopy<input name="trackingSpoorSpent" type="number" min="0" max="100" value="0"></label></div>
  <p class="hc-hint">Tracking CF vynutí jeden Bearing při příští cestovní epizodě; není to nový náhodný hod. Pozor: Spoor od různých hodů se nesčítají.</p></div>
   <div class="hc-episode-navigation" data-episode-navigation><p data-episode-navigation-text class="hc-hint" data-hmk-help="Všechny možné stavy: clear = družina drží správný směr; misdirection = jde odchýleným směrem; lost = ztratila orientaci. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení. Samotný další hod je automaticky nemaže.">Dřívější bloudění se nepřestane počítat jen kvůli novému testu nebo uplynutí času.</p>
@@ -3399,15 +3418,6 @@ function timeEpisodePageHTML(clock,participants){
   <span class="hmk-hazard-choice-status" data-hazard-choice-status role="status">Vyberte postup a potvrďte jej.</span>
   <button type="button" class="hc-small" data-hazard-choices-confirm>Potvrdit postup</button>
  </div><p data-episode-hazard-result class="hc-hint">Všechny povinné následky se ověří před finálním zápisem celé epizody.</p></fieldset>
- <label class="hc-check hc-episode-other-event"><input type="checkbox" name="generalStopActive93875" data-episode-other-event-toggle> Nastala jiná skutečná událost, která přerušila výkon této skupiny</label><details class="hc-episode-universal-stop" data-episode-universal-stop hidden><summary>Jiná potvrzená přerušující událost · volitelné</summary>
- <p class="hc-hint">Použijte pouze při skutečném zastavení výkonu. Survival Accident a Complication F/CF mají svůj vlastní potvrzovací krok výše; nezadávejte je podruhé. Ostatní členové ani celé časové okno se nezkracují. Zdravotní a další následky se řeší až po konci okna.</p>
- <div class="hmk-trek-grid"><label>Důvod zastavení<select name="generalEventKind93869"><option value="">Žádná další přerušující událost</option>${Object.entries(UNIVERSAL_STOP_REASONS_93869).map(([id,label])=>option(id,label)).join('')}</select></label>
- <label>Popis skutečné události<input name="generalEventDescription93869" maxlength="400" placeholder="Co zastavilo výkon této skupiny?"></label>
- <label>Minuta od začátku intervalu<span class="hc-episode-die"><input name="generalEventMinute93869" type="number" min="1" max="10080" step="1" placeholder="1 až délka intervalu"><button type="button" data-episode-general-minute-generate>⚄ Vygenerovat minutu</button></span></label>
- </div><input type="hidden" name="generalEventOrigin93869" value="manual"><input type="hidden" name="generalEventProof93869" value="">
- <p data-episode-general-event-status class="hc-hint" role="status">Vyberte důvod a minutu; nic se neuloží, dokud nestisknete potvrzovací tlačítko.</p>
- <button type="button" class="hc-small" data-episode-general-event-confirm>Potvrdit minutu přerušení</button>
- </details>
  <fieldset data-episode-weather-details hidden><legend>Prochladnutí / přehřátí · HMK 149</legend>
  <p class="hc-hint">Každá expozice vyžaduje skutečný Endurance (Survival) hod. Schopná postava jej doloží původním Skill Testem; nepohyblivá INC/UNC provádí pouze nedobrovolný zdravotní odpor (d100) bez samostatné akce. Vypočte se z ověřené Endurance, Survival a aktuální Fatigue. Po dokončení Pochodu se zdravotní následky zapisují ve Zdraví &amp; Expozice; žádná rána se předem nevytváří.</p>
  ${['cold','heat'].map(h=>`<div data-episode-weather-kind="${h}"><h4>${h==='cold'?'❄️ Nebezpečný chlad':'☀️ Nebezpečné horko'}</h4>
@@ -3448,6 +3458,15 @@ function timeEpisodePageHTML(clock,participants){
  <div class="hc-episode-route-actions"><button type="button" class="secondary" data-episode-nav="skills" hidden title="Pouze pokud epizoda skutečně vyžaduje další test.">Otevřít požadovaný Skill Test ↗</button><span class="hc-hint">Encounter je pouze oznámení a rozhodnutí GM; samostatný Combat GM otevře až podle své potřeby.</span></div>
 
  <p class="hc-hint" data-episode-skill-links>Pracovní Skill Tests se k epizodě přiřazují výhradně jejím požadavkem a uloží se až při dokončení. Nezávislé testy se nepřebírají.</p>
+ </details>
+ <label class="hc-check hc-episode-other-event"><input type="checkbox" name="generalStopActive93875" data-episode-other-event-toggle> Nastala jiná skutečná událost, která přerušila výkon této skupiny</label><details class="hc-episode-universal-stop" data-episode-universal-stop hidden><summary>Jiná potvrzená přerušující událost · volitelné</summary>
+ <p class="hc-hint">Použijte pouze při skutečném zastavení výkonu. Survival Accident a Complication F/CF mají svůj vlastní potvrzovací krok výše; nezadávejte je podruhé. Ostatní členové ani celé časové okno se nezkracují. Zdravotní a další následky se řeší až po konci okna.</p>
+ <div class="hmk-trek-grid"><label>Důvod zastavení<select name="generalEventKind93869"><option value="">Žádná další přerušující událost</option>${Object.entries(UNIVERSAL_STOP_REASONS_93869).map(([id,label])=>option(id,label)).join('')}</select></label>
+ <label>Popis skutečné události<input name="generalEventDescription93869" maxlength="400" placeholder="Co zastavilo výkon této skupiny?"></label>
+ <label>Minuta od začátku intervalu<span class="hc-episode-die"><input name="generalEventMinute93869" type="number" min="1" max="10080" step="1" placeholder="1 až délka intervalu"><button type="button" data-episode-general-minute-generate>⚄ Vygenerovat minutu</button></span></label>
+ </div><input type="hidden" name="generalEventOrigin93869" value="manual"><input type="hidden" name="generalEventProof93869" value="">
+ <p data-episode-general-event-status class="hc-hint" role="status">Vyberte důvod a minutu; nic se neuloží, dokud nestisknete potvrzovací tlačítko.</p>
+ <button type="button" class="hc-small" data-episode-general-event-confirm>Potvrdit minutu přerušení</button>
  </details>
  <label>Popis pro kroniku GM<textarea name="narrative" rows="2" maxlength="400" placeholder="Družina se vydala podél lesa, déšť sílil…"></textarea></label>
 <input type="checkbox" name="confirmed" checked hidden aria-hidden="true" tabindex="-1">
@@ -3546,9 +3565,15 @@ function timeEpisodeChronicleHTML(clock,personalId=null){
  const participantName=id=>character(id)?.name||id;
  const html=rows.slice(-120).reverse().map(j=>{const p=j.calendarTimeEpisode;
   const km=(p.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:3});
+  const scent=p.trackingScent;
+  const complication=p.foragingComplication93875;
+  const trekComplication=p.kind==='travel'&&p.hazardDetails?.find(h=>h.hazard==='complication'&&h.result==='irreparable');
+  const trekComplicationText=trekComplication?`<p><b>Pochod · Complication CF</b> · Překážka v minutě ${trekComplication.hazardAtMinute}. Pohyb ${p.movementMinutes} z ${p.minutes} min. Při dalším pochodu zvolte jinou trasu.</p>`:'';
+  const complicationText=complication?.atMinute!=null?`<p><b>Foraging · Complication ${esc(complication.level)}</b> · Překážka v minutě ${complication.atMinute}. Sběr probíhal ${complication.workedMinutes} z ${p.minutes} min.</p>`:'';
+  const scentText=scent?`<p><b>Scent · ${esc(scent.name)}</b> · Awareness d100 ${scent.roll} · ${esc(scent.level)} · SV ${scent.adjustedSV} · ${scent.spoorStars} Spoor ★${scent.observationLevel?' · Observation d100 '+scent.observationRoll+' · '+esc(scent.observationLevel):''}</p>`:'';
   return `<article class="hc-episode-history"><header><strong>${esc(displayCampaignMinute(p.startMinute))}–${esc(displayCampaignMinute(p.endMinute))}</strong><span>${p.minutes} minut · ${esc(({travel:'Cestování',rest:'Odpočinek',sleep:'Spánek',winded:'Klid',forage:'Hledání potravy',tracking:'Tracking',watch:'Ostraha',other:'Činnost'})[p.kind]||p.kind)}</span></header><p>${esc(p.narrative||p.area||'Činnost družiny.')}</p><p>Účastníci: ${esc(p.memberIds.map(participantName).join(', '))}. ${p.distanceMeters?`Vzdálenost ${p.distanceMeters} m (${km} km), na mapě 1 : ${p.mapScale} = ${p.mapCentimetres} cm.`:'Bez přesunu.'}</p>${p.kind==='travel'&&p.actors?.length?`<div class="hc-episode-person-results">${p.actors.map(a=>a.sr?
    `<p>${esc(participantName(a.id))}: END (d10: ${a.roll}), TN ${a.sr.tn} · ${a.sr.success?'úspěch':'neúspěch'}, Weariness +${a.delta}, ${a.before} → ${a.after}${a.carryOut?' · nevyčerpaný zlomek se převádí':''}${a.earlyIncapacity?' · další pohyb znemožněn od '+esc(displayCampaignMinute(a.earlyIncapacity.minute))+' ('+esc(a.earlyIncapacity.shock)+')':''}.</p>`:
-   `<p>${esc(participantName(a.id))}: END SR se neprováděl${a.endNotRequired?' · postava neschopná pohybu od '+esc(displayCampaignMinute(a.endNotRequired.minute))+' ('+esc(a.endNotRequired.shock)+')':' · bez potvrzeného důvodu nelze výsledek doložit'}. Weariness ${a.before} → ${a.after}.</p>`).join('')}</div>`:''}${p.recovery?.length?`<div class="hc-episode-person-results">${p.recovery.map(a=>`<p>${esc(participantName(a.id))}: ${p.kind==='winded'?'Windedness':'Weariness'} ${a.prior} → ${a.after} (změna ${a.delta>=0?'+':''}${a.delta})${a.weatherAdded?' · únava z počasí +'+a.weatherAdded:''}${a.carry?' · zbytek časového kreditu '+a.carry:''}.</p>`).join('')}</div>`:''}${p.stableAnimalLoad?.length?`<p>Stájová zvířata: ${p.stableAnimalLoad.map(a=>esc(a.name)+' · ENC '+a.enc+(a.loaded?' · Loaded':'')).join('; ')}. Zatížení převzato z původní evidence.</p>`:''}${p.animals?.length?`<p>Vlastní zvířata (GM analogie): ${p.animals.map(a=>`${esc(participantName(a.id))} +${a.delta} Weariness (${a.before} → ${a.after})`).join('; ')}</p>`:''}${p.survivalHazard?`<p>Survival Hazard (HMK 148) · ${esc(p.survivalHazard)} (d10 ${p.settings?.survivalD10||'doložený'}). Následky jsou doloženy v automatických navazujících výsledcích epizody.</p>`:''}${p.direction?`<p>Direction Hazard (${p.direction.rolls.map(x=>'d10: '+x).join('; ')}) · ${esc(p.direction.direction)}.</p>`:''}${p.foraging?`<p>Foraging (d10: ${p.foraging.roll}) · ${esc(p.foraging.habitat)} · nalezeno ${p.foraging.results[0].foodDays} dne potravy, ${p.foraging.results[0].waterDays} dne vody, ${p.foraging.results[0].herbDoses} dávek bylin. Záznam v původním účtu zásob.</p>`:''}${p.orientation?`<p><b>Survival / Orienteering</b> · ${p.orientation.roll!==null?'(d100: '+p.orientation.roll+') · ':''}SV ${p.orientation.adjustment.adjustedSV}, ${p.orientation.stars??'—'} ★ · ${p.orientation.sourceMode==='reuse'?'převzatý platný test':'nový skutečný test'} · Progress ${p.progress}, Bearing ${p.bearing}, Slow z orientace ${p.orientation.modes.orienteeringSlow}; Foraging ${p.orientation.modes.foraging}, Stalking ${p.orientation.modes.stalking}, Vigilance ${p.orientation.modes.vigilance}. Původní Skill Test bude uložen do historie až při dokončení epizody.</p>`:''}${p.trackingMemory?`<p><b>Tracking</b> · ${esc(p.trackingMemory.trail)} · ${p.trackingMemory.roll!==null?'(d100: '+p.trackingMemory.roll+') · ':''}SV ${p.trackingMemory.sv}, upravené ${p.trackingMemory.score?.adjustedSV??p.trackingMemory.sv}, Spoor ${p.trackingMemory.score?.spoorStars??'—'} ★ · ${p.trackingMemory.sourceMode==='reuse'?'pokračování stejné stopy':'nový hod'}.</p>`:''}${p.navigationState&&p.navigationState!=='clear'?`<p><strong>Pokračující problém orientace:</strong> ${esc(p.navigationState)}; historické úspěchy jej samy neodstraní.</p>`:''}${p.navigationRecovered?'<p>GM potvrdil skutečný návrat na správnou trasu.</p>':''}${p.encounterDetails?.length?`<p><b>Setkání GM:</b> ${p.encounterDetails.map(x=>'Setkání '+(x.i+1)+' · '+(x.externalToGM?(x.disposition==='reported-to-gm'?'ohlášeno GM na konci intervalu':x.disposition==='adjudicated'?'GM řeší mimo aplikaci':'bez dalšího vyhodnocení'):'vzdálenost '+x.distance.sightingFeet+' ft, '+(x.nonhostile?'klidné setkání':'Surprise '+x.surprise.winner+' / '+x.surprise.decision))).join('; ')}</p>`:''}${p.encounter?`<p>Encounter ${p.encounter.format==='hmk-episode-encounter-minute-v1'?`(minutová GM varianta · d100 ${p.encounter.d100}; podklad HMK d10 TN ${p.encounter.tn}; pravděpodobnost ${(p.encounter.chance*100).toLocaleString('cs-CZ',{maximumFractionDigits:2})} %; počet ${p.encounter.count})`:`(d10 ${p.encounter.roll}; TN ${p.encounter.tn}; ${p.encounter.found?'setkání':'bez setkání'})`}${p.encounterDetails?.some(x=>x.disposition==='reported-to-gm')?' · oznámeno GM na konci intervalu':p.encounter.resolved?' · GM vyřízeno':''}.</p>`:''}${p.skillLinks?.length?`<p>Skill Tests:</p>${p.skillLinks.map(x=>`<p><b>${esc(x.title)}</b> · ${esc(x.body||'Doložený výsledek')}</p>`).join('')}`:''}</article>`;}).join('');
+   `<p>${esc(participantName(a.id))}: END SR se neprováděl${a.endNotRequired?' · postava neschopná pohybu od '+esc(displayCampaignMinute(a.endNotRequired.minute))+' ('+esc(a.endNotRequired.shock)+')':' · bez potvrzeného důvodu nelze výsledek doložit'}. Weariness ${a.before} → ${a.after}.</p>`).join('')}</div>`:''}${p.recovery?.length?`<div class="hc-episode-person-results">${p.recovery.map(a=>`<p>${esc(participantName(a.id))}: ${p.kind==='winded'?'Windedness':'Weariness'} ${a.prior} → ${a.after} (změna ${a.delta>=0?'+':''}${a.delta})${a.weatherAdded?' · únava z počasí +'+a.weatherAdded:''}${a.carry?' · zbytek časového kreditu '+a.carry:''}.</p>`).join('')}</div>`:''}${p.stableAnimalLoad?.length?`<p>Stájová zvířata: ${p.stableAnimalLoad.map(a=>esc(a.name)+' · ENC '+a.enc+(a.loaded?' · Loaded':'')).join('; ')}. Zatížení převzato z původní evidence.</p>`:''}${p.animals?.length?`<p>Vlastní zvířata (GM analogie): ${p.animals.map(a=>`${esc(participantName(a.id))} +${a.delta} Weariness (${a.before} → ${a.after})`).join('; ')}</p>`:''}${p.survivalHazard?`<p>Survival Hazard (HMK 148) · ${esc(p.survivalHazard)} (d10 ${p.settings?.survivalD10||'doložený'}). Následky jsou doloženy v automatických navazujících výsledcích epizody.</p>`:''}${p.direction?`<p>Direction Hazard (${p.direction.rolls.map(x=>'d10: '+x).join('; ')}) · ${esc(p.direction.direction)}.</p>`:''}${p.foraging?`<p>Foraging (d10: ${p.foraging.roll}) · ${esc(p.foraging.habitat)} · nalezeno ${p.foraging.results[0].foodDays} dne potravy, ${p.foraging.results[0].waterDays} dne vody, ${p.foraging.results[0].herbDoses} dávek bylin. Záznam v původním účtu zásob.</p>`:''}${p.orientation?`<p><b>Survival / Orienteering</b> · ${p.orientation.roll!==null?'(d100: '+p.orientation.roll+') · ':''}SV ${p.orientation.adjustment.adjustedSV}, ${p.orientation.stars??'—'} ★ · ${p.orientation.sourceMode==='reuse'?'převzatý platný test':'nový skutečný test'} · Progress ${p.progress}, Bearing ${p.bearing}, Slow z orientace ${p.orientation.modes.orienteeringSlow}; Foraging ${p.orientation.modes.foraging}, Stalking ${p.orientation.modes.stalking}, Vigilance ${p.orientation.modes.vigilance}. Původní Skill Test bude uložen do historie až při dokončení epizody.</p>`:''}${trekComplicationText}${complicationText}${scentText}${p.trackingMemory?`<p><b>Tracking</b> · ${esc(p.trackingMemory.trail)} · ${p.trackingMemory.roll!==null?'(d100: '+p.trackingMemory.roll+') · ':''}SV ${p.trackingMemory.sv}, upravené ${p.trackingMemory.score?.adjustedSV??p.trackingMemory.sv}, Spoor ${p.trackingMemory.score?.spoorStars??'—'} ★ · ${p.trackingMemory.sourceMode==='reuse'?'pokračování stejné stopy':'nový hod'}.</p>`:''}${p.navigationState&&p.navigationState!=='clear'?`<p><strong>Pokračující problém orientace:</strong> ${esc(p.navigationState)}; historické úspěchy jej samy neodstraní.</p>`:''}${p.navigationRecovered?'<p>GM potvrdil skutečný návrat na správnou trasu.</p>':''}${p.encounterDetails?.length?`<p><b>Setkání GM:</b> ${p.encounterDetails.map(x=>'Setkání '+(x.i+1)+' · '+(x.externalToGM?(x.disposition==='reported-to-gm'?'ohlášeno GM na konci intervalu':x.disposition==='adjudicated'?'GM řeší mimo aplikaci':'bez dalšího vyhodnocení'):'vzdálenost '+x.distance.sightingFeet+' ft, '+(x.nonhostile?'klidné setkání':'Surprise '+x.surprise.winner+' / '+x.surprise.decision))).join('; ')}</p>`:''}${p.encounter?`<p>Encounter ${p.encounter.format==='hmk-episode-encounter-minute-v1'?`(minutová GM varianta · d100 ${p.encounter.d100}; podklad HMK d10 TN ${p.encounter.tn}; pravděpodobnost ${(p.encounter.chance*100).toLocaleString('cs-CZ',{maximumFractionDigits:2})} %; počet ${p.encounter.count})`:`(d10 ${p.encounter.roll}; TN ${p.encounter.tn}; ${p.encounter.found?'setkání':'bez setkání'})`}${p.encounterDetails?.some(x=>x.disposition==='reported-to-gm')?' · oznámeno GM na konci intervalu':p.encounter.resolved?' · GM vyřízeno':''}.</p>`:''}${p.skillLinks?.length?`<p>Skill Tests:</p>${p.skillLinks.map(x=>`<p><b>${esc(x.title)}</b> · ${esc(x.body||'Doložený výsledek')}</p>`).join('')}`:''}</article>`;}).join('');
  return `<section class="hc-calendar hc-episode-chronicle"><h2>${personalId?'Osobní zápis cestování':'Kronika časových epizod'}</h2><p class="hc-hint">Skutečné minuty, vzdálenost z HMK LPW, individuální END, Weariness a historické důkazy; čtením se nic nepřičítá podruhé. Dřívější historické doklady zůstávají dostupné v původní evidenci GM.</p>${html||'<p>Zatím neexistuje dokončená epizoda.</p>'}</section>`;
 }
 function campaignCalendarView(){
@@ -6431,7 +6456,7 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='animals'){activeSheetSection='overview';}
  if(activeSheetSection==='stable')return characterStableView(c);
 
- if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Zdraví & Expozice</h3><p>Počasí, nemoci, zdravotní následky a navazující povinnosti · ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${gmShockStatePanel(c)}${gmWoundManagementPanel(c)}${hazardsView(c.id)}${hskWeatherHealthConsequences(c.id)}${hskEnvironmentalWoundCarePanel(c)}</div></section>`,`journal-book--chapter journal-book--hazards`);
+ if(activeSheetSection==='hazards')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Zdraví & Expozice</h3><p>Počasí, nemoci, zdravotní následky a navazující povinnosti · ${esc(c.name)} · HMK</p></header><div class="columns journal-tech-columns">${gmShockStatePanel(c)}${gmWoundManagementPanel(c)}${concurrentMedicalProceduresHTML({actorId:c.id})}${hazardsView(c.id)}${hskWeatherHealthConsequences(c.id)}${hskEnvironmentalWoundCarePanel(c)}</div></section>`,`journal-book--chapter journal-book--hazards`);
  if(activeSheetSection==='provisions')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Provisions · jídlo a pití</h3><p>${esc(c.name)} · přehled doložených zásob</p></header><div class="columns journal-tech-columns">${characterProvisionActionsHTML(c)}</div></section>`,`journal-book--chapter journal-book--provisions`);
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}${physicalWaterPanel(c)}</section>${foragingEvidenceInCharacterInventory(c.id)}${combatantLoadPanel(c)}${armourLoadoutPanel(inv,c)}<section class="panel wide hmk-inventory-add-panel">${journalAddInventoryForm()}</section>${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id,{includeWeather:false})}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
@@ -9036,6 +9061,7 @@ let calendarFocusedMedicalStartId=null;
 function concurrentMedicalProceduresHTML({actorId=null}={}){
  const clock=data.campaignClock;if(!clock)return '';
  const plans=openConcurrentProcedures(clock).filter(p=>!actorId||p.characterId===actorId);
+ if(!plans.length&&actorId)return '';
  if(!plans.length)return `<section class="panel hmk-concurrent-health" aria-label="Časový přehled ošetření"><h3>Časový přehled ošetření</h3><p class="hc-hint">Nyní neprobíhá žádné časované ošetření. Po jeho zahájení zde bude léčitel, pacient, uplynulý i zbývající čas a možnost přerušení.</p></section>`;
  return `<section class="panel hmk-concurrent-health" aria-label="Časový přehled ošetření"><h3>Časový přehled ošetření · ${plans.length}</h3><p class="hc-hint">Údaje se řídí skutečnou minutou Kalendáře, nikoli hodinami zařízení. Zákrok lze kdykoli doloženě přerušit; výsledný zdravotní stav vzniká až při dokončení.</p>
  <div class="hc-medical-table-scroll"><table class="hc-medical-time-table"><thead><tr><th>Léčitel</th><th>Pacient · rána</th><th>Zákrok</th><th>Začátek</th><th>Celkem</th><th>Už léčí</th><th>Zbývá</th><th>Konec</th><th>Akce</th></tr></thead><tbody>${plans.map(p=>{
@@ -9043,11 +9069,11 @@ function concurrentMedicalProceduresHTML({actorId=null}={}){
   const started=Math.max(0,Math.min(clock.minute-p.startMinute,p.endMinute-p.startMinute));
   const remaining=Math.max(0,p.endMinute-clock.minute);
   const complete=clock.minute===p.endMinute;
-  const patientLabel=patient?.name||p.characterId;
-  const woundLabel=w?medicalWoundOptionLabel({name:patientLabel},w,(patient?persistentStateOf(patient).wounds.findIndex(x=>x.id===w.id):-1)+1).replace(patientLabel+' · ',''):p.woundId;
+  const patientLabel=patient?.name||'Pacient mimo registr';
+  const woundLabel=w?medicalWoundOptionLabel(patient,w,persistentStateOf(patient).wounds.findIndex(x=>x.id===w.id)+1).slice(patientLabel.length+3):'Rána mimo evidenci';
   const action=complete?`<button type="button" class="hc-small" data-concurrent-medical-finish="${esc(p.startId)}">Dokončit ošetření</button>`:
    clock.minute>p.endMinute?'<span class="hc-hint">Termín překročen · zkontrolovat GM</span>':'<span class="hc-hint">Probíhá</span>';
-  return `<tr data-medical-procedure="${esc(p.startId)}" class="${p.startId===calendarFocusedMedicalStartId?'hc-medical-procedure-focus':''}"><td><strong>${esc(character(p.healerId)?.name||p.healerId)}</strong></td><td>${esc(patientLabel)}<small>${esc(woundLabel)}</small></td><td>${esc(p.formId==='hmk-frost-amputation-form'?'Amputation':'Treatment')}</td><td>${esc(displayCampaignMinute(p.startMinute))}</td><td>${esc(readableCampaignDuration(p.endMinute-p.startMinute))}</td><td>${esc(readableCampaignDuration(started))}</td><td><strong>${remaining?esc(readableCampaignDuration(remaining)):'Dokončení splatné'}</strong></td><td>${esc(displayCampaignMinute(p.endMinute))}</td><td>${action} <button type="button" class="hc-small secondary" data-concurrent-medical-cancel="${esc(p.startId)}">Přerušit (GM)</button></td></tr>`;
+  return `<tr tabindex="-1" data-medical-procedure="${esc(p.startId)}" class="${p.startId===calendarFocusedMedicalStartId?'hc-medical-procedure-focus':''}"><td><strong>${esc(character(p.healerId)?.name||'Léčitel mimo registr')}</strong></td><td>${esc(patientLabel)}<small>${esc(woundLabel)}</small></td><td>${esc(p.formId==='hmk-frost-amputation-form'?'Amputation':'Treatment')}</td><td>${esc(displayCampaignMinute(p.startMinute))}</td><td>${esc(readableCampaignDuration(p.endMinute-p.startMinute))}</td><td>${esc(readableCampaignDuration(started))}</td><td><strong>${remaining?esc(readableCampaignDuration(remaining)):'Dokončení splatné'}</strong></td><td>${esc(displayCampaignMinute(p.endMinute))}</td><td>${action} <button type="button" class="hc-small secondary" data-concurrent-medical-cancel="${esc(p.startId)}">Přerušit (GM)</button></td></tr>`;
  }).join('')}</tbody></table></div></section>`;
 }
 
@@ -9067,6 +9093,7 @@ function hmkLongtermHealingPanel(chars,{origin='combat'}={}){
  const woundOptions=chars.flatMap(c=>eligibleWounds(c).filter(w=>!w.healed&&!(weatherCare&&w.aspect==='frost'&&w.severity==='G')).map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(medicalWoundOptionLabel(c,w,woundNumber(c,w)))}</option>`)).join('');
  const infected=chars.flatMap(c=>eligibleWounds(c).filter(w=>!w.healed&&w.healing?.infected).map(w=>({c,w})));
  const frostOptions=chars.flatMap(c=>eligibleWounds(c).filter(w=>!w.healed&&w.severity==='G'&&
+  !runningTreatmentKeys.has(c.id+'::'+w.id)&&
   ['frost'].includes(String(w.aspect).toLowerCase())&&!w.healing?.treated&&(w.bodyKind===undefined||w.bodyKind==='human')&&
   ['fa','face','ua','el','fo','ha','th','kn','ca','ft','upper arm','elbow','forearm','hand','thigh','knee','calf','foot'].includes(String(w.location).toLowerCase()))
   .map(w=>`<option value="${esc(c.id+'::'+w.id)}">${esc(medicalWoundOptionLabel(c,w,woundNumber(c,w)))}</option>`)).join('');
@@ -9122,7 +9149,7 @@ function hmkLongtermHealingPanel(chars,{origin='combat'}={}){
  if(!sections.some(s=>s.id===activeSection&&s.enabled))activeSection=(sections.find(s=>s.enabled)||sections[0]).id;
  const nav=weatherCare?`<p class="hc-hint"><strong>Aktuální krok: ${esc(sections.find(s=>s.id===activeSection)?.title||'zdravotní vyhodnocení')}</strong>. Další formulář se otevře až po zapsání a následném přepočtu Kalendáře. Přechod na jinou splatnou povinnost provádějte přímo přes její odkaz v Kalendáři.</p>`:'';
  const body=weatherCare?sections.map(s=>`<section class="hmk-weather-care-card ${s.id===activeSection?'is-active':''}" data-weather-care-card="${esc(s.id)}" ${s.id===activeSection?'':'hidden'}>${s.body}</section>`).join(''):`<div class="field-grid">${treatmentForm}${healingForm}${frostForm}${infectionForm}${bloodForm}${grimForm}</div>`;
- return `<section class="panel ${weatherCare?'hmk-weather-care':'hmk-combat-care'}"><h3>${weatherCare?'Weather Injury Care · HMK 177–182, 185':'HMK · dlouhodobé léčení bojových zranění (str. 177–182)'}</h3>${herbHints}${weatherCare?concurrentMedicalProceduresHTML():''}<p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>${nav}${body}</section>`;
+ return `<section class="panel ${weatherCare?'hmk-weather-care':'hmk-combat-care'}"><h3>${weatherCare?'Weather Injury Care · HMK 177–182, 185':'HMK · dlouhodobé léčení bojových zranění (str. 177–182)'}</h3>${herbHints}<p class="muted">Pro každou ránu samostatně. Léčení vyžaduje zastavené krvácení, ukončený Extended Shock, potvrzený den a skutečné hody. Další léčitel musí mít vyšší Physician Index. Aktivní infekce přerušuje Healing Rolls všech ran. Veškeré výsledky jsou trvale uloženy u postavy, nikoli odhadované podle bojových kol.</p>${nav}${body}</section>`;
 }
 function encounterImpactPreviewPanel(chars){
  if(!chars.length)return '';
@@ -11337,6 +11364,7 @@ function render(){
  decorateSpecialSecondaryRolls93917(app,secureHMKDie,hskSpecialPreviewPrimary93917);
  showSavedSkillGate93928();
  decorateSimpleNoncombatRolls93915(app,secureHMKDie);
+ for(const form of app.querySelectorAll('.hmk-weather-care #hmk-frost-amputation-form'))syncWeatherHealerFields(form);
  decorateConfirmedNoncombatChains93918(app,secureHMKDie);decorateTalismanDice93919(app,secureHMKDie,(form,roll)=>{const shaman=character(selected);if(!shaman)return false;try{const mastery=skillActorMastery(shaman,'Trance'),ctx=skillAutoFor(shaman,'Trance');return skillResolvedResult({mastery,form,dieKey:'talismanTranceRoll',condition:ctx.condition,trauma:ctx.trauma}).result.level==='CF';}catch{return false;}});
  syncWeatherCarePanel();
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
@@ -12800,7 +12828,7 @@ function hskWeatherInjuryMandatory(actorId){
  if(m){
   const automatic=m.kind.startsWith('automatic-'),attributes=actor.hmk?.attributes||{};
   return `<section class="panel wide hmk-weather-injury-mandatory"><h3>Cestovní Injury Mishap · ${esc(actor.name)}</h3>
-  <p class="hc-hint">Povinný následek skutečné rány z počasí (HMK 170). Žádný bojový útok ani tah se nespouští. Rána ${esc(m.woundId)} · ${esc(m.kind)}. Vyhodnoťte pouze tuto povinnost a potvrďte GM.</p>
+  <p class="hc-hint">Povinný následek skutečné rány z počasí (HMK 170). Žádný bojový útok ani tah se nespouští. Dotčená rána: ${esc(medicalWoundOptionLabel(actor,state.wounds.find(w=>w.id===m.woundId)||{},state.wounds.findIndex(w=>w.id===m.woundId)+1))}. Vyhodnoťte pouze tuto povinnost a potvrďte GM.</p>
   <form data-weather-injury-mishap><input type="hidden" name="mishapId" value="${esc(m.id)}">
   <label>Jaká skutečná činnost byla narušena?<select name="test"><option value="agility">Agility (${esc(String(attributes.agl??'?'))} × 5)</option>${Number.isSafeInteger(attributes.dex)?`<option value="dexterity">Dexterity (${attributes.dex} × 5), pouze pokud GM potvrdí činnost vyžadující DEX</option>`:''}${(actor.hmk?.skills||[]).filter(x=>['acrobatics','legerdemain'].includes(String(x.name).toLowerCase())).map(x=>`<option value="${esc(x.name.toLowerCase())}">${esc(x.name)} · ML ${x.ml}</option>`).join('')}</select></label>
   ${automatic?'<p>Automatický Mishap: podle tabulky se další d100 nehází.</p>':'<label>Skutečný d100<input name="roll" type="number" min="1" max="100" required></label>'}
@@ -12811,7 +12839,7 @@ function hskWeatherInjuryMandatory(actorId){
   const w=state.wounds.find(x=>x.id===morale.woundId);
   const init=hskVerifiedNoncombatInitiativeML93874(actor);
   return `<section class="panel wide hmk-weather-injury-mandatory"><h3>Cestovní Injury Morale · ${esc(actor.name)}</h3>
-  <p class="hc-hint">Až po úplném Shock zotavení: jediný Morale d100 z vážné rány ${esc(w.id)} (HMK 162, 170). Bez aktivního Combatu; případný skutečný zdroj Aberrance stanoví GM.</p>
+  <p class="hc-hint">Až po úplném Shock zotavení: jediný Morale d100 z vážné rány ${esc(medicalWoundOptionLabel(actor,w,state.wounds.findIndex(x=>x.id===w.id)+1))} (HMK 162, 170). Bez aktivního Combatu; případný skutečný zdroj Aberrance stanoví GM.</p>
   <form data-weather-injury-morale><input type="hidden" name="woundId" value="${esc(w.id)}">
   <p>Initiative ML: ${esc(String(init??'nedoloženo'))}</p>
   <label><span class="hc-help-term" tabindex="0" data-hmk-help="Aberrance je skutečná, doložená hodnota původce zranění, pokud byl původce relevantní. Prázdná hodnota neznamená 0. Není-li doložena přímo v ráně, hodnotu včetně nuly musí výslovně potvrdit GM.">Skutečná Aberrance zdroje (0 jen po výslovném potvrzení GM)</span><input name="aberrance" type="number" min="0" max="200" ${Number.isSafeInteger(w.moraleThreatABE)?`value="${w.moraleThreatABE}" readonly`:''} required></label>
@@ -12832,15 +12860,15 @@ function hskWeatherBleedingCarePanel(actorId){
  if(!wounds.length)return '';
  const party=calendarMemberIds(clock,data.characters);
  const items=wounds.map(w=>{
+  const title=esc(medicalWoundOptionLabel(actor,w,state.wounds.findIndex(x=>x.id===w.id)+1).slice(actor.name.length+3));
   let term;
   try{term=travelBleedingTerm({clock,actorId:actor.id,wound:w,state});}
-  catch(error){return `<p class="notice">${esc(w.id)} · Blood Stoppage nelze zatím otevřít: ${esc(error.message)}</p>`;}
+  catch(error){return `<p class="notice">${title} · Blood Stoppage nelze zatím otevřít: ${esc(error.message)}</p>`;}
   const due=clock.minute===term.dueMinute,remaining=term.dueMinute-clock.minute;
   const plan=term.plan;
   const who=plan?party.find(c=>c.id===plan.healerId):null;
   const healerOptions=weatherPhysicianCandidates({patient:actor,wound:w,party,requireHigherTreatmentIndex:false});
   const start=remaining===5&&!plan;
-  const title=`${esc(w.location)} ${esc(w.severity+w.level)} · ${esc(w.id)}`;
   const head=`<h4>Blood Stoppage · ${title}</h4><p class="hc-hint">Původ ${esc(displayCampaignMinute(term.anchorMinute))} ·
    příští povinný interval ${esc(displayCampaignMinute(term.dueMinute))} ·
    ${plan?`probíhá 5minutové ${plan.method==='cau'?'Cauterisation':'Staunch'} u ${esc(who?.name||plan.healerId)}`:
@@ -12861,8 +12889,13 @@ function hskWeatherBleedingCarePanel(actorId){
    <button type="submit" ${healerOptions.length?'':'disabled'}>Zahájit 5minutové ošetření</button>
    <p class="tiny">D100 se zatím nehází. Kalendář se sám neposune; GM jej posune na vyznačený konec ošetření.</p>
    </form></article>`;}
-  if(due){return `<article class="hc-calendar-linked-row">${head}
-   <form data-weather-blood-complete class="hc-fields"><input type="hidden" name="woundId" value="${esc(w.id)}">
+  if(due){
+   let eml='',warning='';
+   if(plan)try{eml=String(travelBloodStoppageEML({clock,state,patient:actor,healer:who,party,wound:w,plan}));}
+   catch(error){warning=error.message;}
+   return `<article class="hc-calendar-linked-row">${head}
+   ${warning?`<p class="notice error" role="alert">${esc(warning)}</p>`:''}
+   <form data-weather-blood-complete data-hmk-stoppage-eml="${esc(eml)}" class="hc-fields"><input type="hidden" name="woundId" value="${esc(w.id)}">
    <input type="hidden" name="mode" value="${plan?'stoppage':'loss'}">
    ${plan?`<p>Potvrzený léčitel: <strong>${esc(who?.name||plan.healerId)}</strong> · ${esc(plan.method)}
     · 5 minut skutečně uplynulo.</p>
@@ -14610,6 +14643,8 @@ document.addEventListener('submit',event=>{
   const bandageNeed=start&&v.method==='sta'?bandagesNeededForStaunch(state.bloodLoss.bp,bandageD6):0;
   const bandagePlan=bandageNeed?planBandageConsumption(data.inventory,healerId,bandageNeed):null;
   const numeric=(x)=>x===undefined||x===null||String(x).trim()===''?null:Number(x);
+  const woundIndex=state.wounds.findIndex(x=>x.id===woundId);
+  const woundLabel=medicalWoundOptionLabel(actor,state.wounds[woundIndex],woundIndex+1);
   const outcome=start?beginTravelBloodStoppage({clock,state,patient:actor,healer,party,woundId,
    method:v.method,hasBandage:!!bandagePlan,hasWater:v.hasWater==='on',
    hasNeedleThread:v.hasNeedleThread==='on',hasHeatedTool:v.hasHeatedTool==='on',
@@ -14628,9 +14663,9 @@ document.addEventListener('submit',event=>{
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:expectedVersion,
     campaignMinute:expectedMinute,createdAt:stamp(),
     title:start?'Zahájení Blood Stoppage · HMK 178':'Weather Blood Stoppage / Blood Loss · HMK 178',
-    body:start?('GM zahájil skutečné pětiminutové ošetření '+woundId+' · léčitel '+healer.name+
+    body:start?('GM zahájil pětiminutové ošetření · '+woundLabel+' · léčitel '+healer.name+
       ' · do '+displayCampaignMinute(outcome.dueMinute)):
-      ('Bleeder '+woundId+' · '+v.mode+' · Physician '+(outcome.physicianSL||'bez ošetření')+
+      ('Bleeder · '+woundLabel+' · Physician '+(outcome.physicianSL||'bez ošetření')+
       ' · Blood Loss '+(outcome.bloodSL||'bez dalšího hodu')+' · BP '+outcome.bp+'/4'+
       ' · Shock '+outcome.shock+(outcome.stopped?' · krvácení zastaveno':'')),
     calendarTravelBloodProof:{format:'hmk-weather-blood-v93.714',kind:start?'blood-stoppage-start':v.mode,
@@ -18218,22 +18253,22 @@ document.addEventListener('change',e=>{
  * This is navigation only; the existing guarded finish/cancel handlers own all writes. */
 function openCalendarConcurrentTreatment(actor,startId){
  const clock=data.campaignClock,op=clock&&openConcurrentProcedures(clock).find(p=>p.startId===startId);
- if(!actor||!op||op.characterId!==actor.id)throw Error('Rozpracovaný Treatment s tímto ID nebyl nalezen. Nic se neuložilo.');
+ if(!actor||!op||op.characterId!==actor.id)throw Error('Otevřete aktuální přehled Kalendáře a vyberte probíhající ošetření pacienta. Tento odkaz už k žádnému otevřenému zákroku nevede.');
  calendarFocusedMedicalStartId=startId;
  selected=actor.id;view='sheet';activeSheetSection='hazards';weatherCareActiveSection='treatment';render();
  const row=[...document.querySelectorAll('[data-medical-procedure]')].find(n=>n.dataset.medicalProcedure===startId);
- if(!row)throw Error('Časový přehled Treatment není dostupný u správného pacienta; stav ani hod se nezměnil.');
+ if(!row)throw Error('Otevřete Kalendář → Přehled → Časový přehled ošetření a najděte řádek pacienta '+actor.name+'.');
  for(let el=row.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;
  row.scrollIntoView({block:'center',behavior:'auto'});
- const action=row.querySelector(clock.minute===op.endMinute?'[data-concurrent-medical-finish]':'[data-concurrent-medical-cancel]');
- action?.focus({preventScroll:true});
+ const action=clock.minute===op.endMinute?row.querySelector('[data-concurrent-medical-finish]'):null;
+ action?.classList.add('hmk-medical-required-target');
+ (action||row).focus({preventScroll:true});
  const status=clock.minute===op.endMinute?
-  'Dokončení časovaného Treatment je NYNÍ splatné. Klikněte „Dokončit ošetření“; původní hod se neopakuje.':
+  'Klikněte na červeně označené „Dokončit ošetření“. Výsledek se uloží z původního hodu.':
   clock.minute>op.endMinute?
   'Termín Treatment už uplynul. Nelze zpětně předstírat včasné dokončení. GM může doložit přerušení; pokud byl zákrok ve skutečnosti včas dokončen, nejprve obnovte ověřený historický stav kampaně.':
   'Treatment ještě není splatný. Přesné dokončení: '+displayCampaignMinute(op.endMinute)+'.';
- const message='Pacient '+actor.name+' · rána ID '+op.woundId+' · zákrok ID '+startId+'. '+status;
- notice=message;
+ const message='Pacient '+actor.name+'. '+status;
  const noticeNode=document.createElement('p');noticeNode.className='hc-treatment-route-notice';noticeNode.setAttribute('role','status');noticeNode.textContent=message;
  row.closest('.hmk-concurrent-health')?.prepend(noticeNode);
  return op;
@@ -18703,6 +18738,13 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  case 'shock-followup':{const q=persistentStateOf(actor).shockFollowup;
   if(isNoncombatMedicalOrigin(q?.domain)){form=byHidden('form[data-weather-shock-followup]');break;}
   form=document.getElementById('combat-recovery-persistent-form');choose(form,'characterId',actor.id);break;}
+ case 'frost-amputation':{
+  weatherCareActiveSection='frost';syncWeatherCarePanel();
+  form=document.getElementById('hmk-frost-amputation-form');
+  choose(form,'wound',actor.id+'::'+sourceId);
+  if(form)refreshCalendarHealingFields(form);
+  break;
+ }
  case 'treatment':case 'healing':case 'infection':case 'grim':{
   if(hskIsEnvironmentalWound(actor,sourceId)){
    if(view!=='sheet'||activeSheetSection!=='hazards'||selected!==actor.id){selected=actor.id;view='sheet';activeSheetSection='hazards';render();}
@@ -18794,14 +18836,22 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
    'input[name="windD20"],input[name="durationD20"],input[name="skinD10"],select[name="gmFrostChoice"],textarea[name="gmFrostReason"],input[name="compoundD10"],input[name="shockD100"]')]
    .find(x=>!x.disabled&&!x.closest('[hidden]')&&(!String(x.value||'').trim()||!x.checkValidity()))||
    form.querySelector('[data-weather-skin-evaluate]')):null;
-  const rollInput=kind==='weather-skin'?skinTarget:
-   kind==='injury-morale'&&form.id==='hmk-guided-mandatory-form'?
-   (form.querySelector('input[name="abe"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
+  const careTarget=['treatment','frost-amputation'].includes(kind)?
+   ['healerId','physicianRoll'].map(name=>form.elements.namedItem(name)).find(node=>
+    node&&!node.disabled&&!node.closest('[hidden]')&&!String(node.value||'').trim()):null;
+  const rollInput=(careTarget?.type!=='hidden'?careTarget:null)||
+   (kind==='frost-amputation'?form.querySelector('[data-hmk-chain-value-93918]:not([disabled])'):null)||
+   (kind==='weather-skin'?skinTarget:
+   kind==='injury-morale'?
+   (form.querySelector('input[name="abe"]:not([type="hidden"]):not([readonly]),input[name="aberrance"]:not([type="hidden"]):not([readonly])')||
+    form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
+   kind==='injury-mishap'?(form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
+   kind==='bleeding'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name="physicianRoll"]:not([type="hidden"]),select[name="healerId"]')||form.querySelector('button[type="submit"]')):
    kind==='skill-fall'?form.elements.namedItem('heightFt'):
-   form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"],input[name="physicianRoll"]');
+   form.querySelector('input[name="roll"],input[name="courseD100"],input[name="followRoll"],input[name="enduranceD10"],input[name="physicianRoll"]'));
   // Calendar/Travel rule links must land on the REAL original input and
   // visibly mark it, not merely open a whole module without a target.
-  if(['treatment','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin'].includes(kind)&&rollInput&&!rollInput.disabled){
+  if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding'].includes(kind)&&rollInput&&!rollInput.disabled){
    for(const old of document.querySelectorAll('.hmk-medical-required-target'))old.classList.remove('hmk-medical-required-target');
    (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
   }
@@ -21539,7 +21589,7 @@ document.addEventListener('click',e=>{
   const patient=character(op.characterId);
   if(!patient)throw Error('Pacient neexistuje.');
   const current=persistentStateOf(patient),w=current.wounds.find(x=>x.id===op.woundId);
-  if(!w||w.healed)throw Error('Rána už není dostupná; výsledek nebyl přepsán.');
+  if(!w||w.healed)throw Error('Rána už není dostupná. Otevřete aktuální přehled zdravotních povinností pacienta.');
   const origin=getCampaignAnchor(clock,'wound',patient.id,op.woundId);
   if(!origin||Math.floor((clock.minute-origin.minute)/DAY_MINUTES)!==op.args.daySinceInjury)
    throw Error('Od zahájení se změnil doložený věk rány; původní hod zůstává uložen pro kontrolu GM.');
@@ -21743,7 +21793,7 @@ document.addEventListener('submit',e=>{
    originalWound.healed=!!resolvedWound.healed;
    advancedTreatmentClock=advanceCampaignCalendar(clock,{
     deltaMinutes:treatmentFinish-clock.minute,eventId:uuid(),
-    reason:'GM: dokončení Treatment rány '+woundId+' u '+c.name,
+    reason:'GM: dokončení ošetření u '+c.name,
     gmConfirmed:true,characters:projected,journal:data.journal,inventory:data.inventory,
     deferConcurrentTreatmentAtStart:true});
   }
@@ -22422,7 +22472,6 @@ function hmkSheet(c){
 function gmWoundObligationSummary(c,w){
  const state=persistentStateOf(c),h=w.healing||{},details=[];
  if(w.bleeding)details.push('Bleeder / Blood Stoppage');
- if(!w.healing)details.push('Treatment / bez ošetření – vyžaduje rozhodnutí');
  if(h.infected)details.push('denní Infection Course');
  if(h.grimWound)details.push('denní Grim Wound Shock');
  if(h.treated&&!h.noMundaneHealing)details.push('Injury Healing Roll · den '+(h.nextHealingDay??'neurčen'));
@@ -22435,11 +22484,12 @@ function gmWoundObligationSummary(c,w){
  if(w.moralePending)details.push('Injury Morale');
  const procedures=data.campaignClock?openConcurrentProcedures(data.campaignClock)
   .filter(x=>x.characterId===c.id&&x.woundId===w.id):[];
- for(const p of procedures)details.push('rozpracovaný Treatment do '+displayCampaignMinute(p.endMinute));
+ if(!w.healing&&!procedures.length)details.push('Čeká na rozhodnutí o ošetření');
+ for(const p of procedures)details.push('Probíhá ošetření do '+displayCampaignMinute(p.endMinute));
  // Patient-wide consequences are resolved automatically by causal evidence;
  // the GM never has to supply a separate Shock or BP decision.
  const consequences=gmWoundConsequenceAssessment(state,w.id);
- if(consequences.shockActive)details.push('Shock / Extended Shock / Coma: '+consequences.shock);
+ if(consequences.shockActive)details.push('Navázaný Shock / Extended Shock / Coma');
  if(consequences.bloodPoints>0)details.push('Blood Loss BP '+consequences.bloodPoints+' / '+consequences.blood);
  if(consequences.hasBloodShock)details.push('Blood Shock');
  return {details,procedures,consequences};
@@ -22484,21 +22534,28 @@ function gmShockStatePanel(c){
 function gmWoundManagementPanel(c){
  const live=persistentStateOf(c),open=live.wounds.filter(w=>!w.healed),allowed=!combatInitiativeSequence?.order?.includes(c.id);
  const locations=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name])=>`<option value="${esc(code)}">${esc(name)} (${esc(code)})</option>`).join('');
- const options=open.map(w=>`<option value="${esc(w.id)}">${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)} ${esc(w.aspect)} · ID ${esc(w.id)}</option>`).join('');
- const woundRows=open.map(w=>{const items=gmWoundObligationSummary(c,w);return `<div class="list-row" data-gm-wound-row="${esc(w.id)}"><div><b>${esc(w.location.toUpperCase())}${w.side?' / '+esc(w.side):''} · ${esc(w.severity+w.level)}</b> · ${esc(w.aspect)}<div class="tiny muted">ID: ${esc(w.id)} · ${items.details.length?esc(items.details.join(' · ')):'bez dalších doložených termínů'}</div></div><button type="button" class="danger" data-gm-select-wound="${esc(w.id)}" ${allowed?'':'disabled'}>Vyřešit / odstranit</button></div>`}).join('');
+ const label=w=>medicalWoundOptionLabel(c,w,live.wounds.findIndex(x=>x.id===w.id)+1).slice(c.name.length+3);
+ const options=open.map(w=>`<option value="${esc(w.id)}">${esc(label(w))}</option>`).join('');
+ const woundRows=open.map(w=>{
+  const items=gmWoundObligationSummary(c,w);
+  const upcoming=items.procedures[0];
+  const action=upcoming?`<button type="button" data-wound-treatment="${esc(w.id)}">${data.campaignClock.minute===upcoming.endMinute?'Dokončit probíhající ošetření':'Otevřít probíhající ošetření'}</button>`:
+   !w.healing?`<button type="button" data-wound-treatment="${esc(w.id)}">Pokračovat ke zdravotnímu kroku</button>`:'';
+  return `<div class="list-row" data-gm-wound-row="${esc(w.id)}"><div><b>${esc(label(w))}</b><div class="tiny muted">${esc(items.details.join(' · ')||'Bez dalších doložených termínů')}</div><p data-wound-next-message role="status"></p></div><div>${action}<button type="button" class="danger" data-gm-select-wound="${esc(w.id)}" ${allowed?'':'disabled'}>Odstranit ránu (GM)</button></div></div>`;
+ }).join('');
  return `<section class="panel wide" id="hmk-wound-management" data-gm-wound-manager="${esc(c.id)}"><h3>Zranění · společná zdravotní evidence GM</h3>
  <p class="muted">Pro boj, cestování i jinou událost se používá tentýž zdravotní stav a kalendář. <b>Odstranit ránu úplně (GM)</b> znamená ukončit její doložené akutní i trvalé následky včetně Shock, Coma, Blood Loss, trvalé újmy a navázaných povinností; bez dalších polí pro Shock, Coma nebo Blood Loss. Běžné zhojení může trvalé následky ponechat. Historie původních událostí a hodů zůstává zachována.</p>
  <h4>Skutečné rány · ${open.length} aktivní</h4>${woundRows||'<p>Žádná aktivní rána.</p>'}
- <details data-gm-wound-editor><summary><b>Přidat skutečnou ránu / vyřešit ránu podle ID</b></summary>
- <form id="hmk-gm-health-form" novalidate><label>Akce<select name="action" required><option value="add">Vytvořit skutečnou ránu</option><option value="resolve">Vyřešit / odstranit konkrétní ránu</option></select></label>
+ <details data-gm-wound-editor><summary><b>Přidat nebo odstranit ránu (GM)</b></summary>
+ <form id="hmk-gm-health-form" novalidate><label>Akce<select name="action" required><option value="add">Vytvořit skutečnou ránu</option><option value="resolve">Odstranit konkrétní ránu (GM)</option></select></label>
  <div data-gm-add-inputs><div class="field-grid"><label>Anatomická lokalita<select name="location" required><option value="">— Vyberte lokalitu —</option>${locations}</select></label>
  <label>Strana<select name="side"><option value="">— Zvolte stranu, pokud jde o končetinu —</option><option value="left">levá</option><option value="right">pravá</option></select></label>
  <label>Úroveň<select name="level" required><option value="">— Vyberte závažnost —</option><option value="1">M1</option><option value="2">S2</option><option value="3">S3</option><option value="4">G4</option><option value="5">G5</option></select></label>
  <label>Typ zásahu<select name="aspect" required><option value="">— Vyberte typ —</option><option value="blunt">Blunt</option><option value="edge">Edge</option><option value="point">Point</option><option value="fire">Fire</option></select></label></div><label>Počáteční stav léčby<select name="initialCare" required><option value="pending">Nejdřív rozhodnout o Treatment (povinná událost nyní)</option><option value="untreated">Bez ošetření – GM potvrzuje následky Untreated (HMK 180)</option></select></label>
  <p class="tiny muted">Založí se nové trvalé ID a původní čas rány. Při volbě Treatment se kalendář zastaví na povinném rozhodnutí, dokud není skutečně provedené. Volba Untreated výslovně nastaví pravidlové HR, Infection, Grim a Bleeder podle HMK, bez předstírání hodu.</p></div>
  <div data-gm-resolve-inputs hidden><label>Konkrétní aktivní rána<select name="woundId"><option value="">— Vyberte ránu —</option>${options}</select></label>
- <div class="notice" data-gm-wound-impact aria-live="polite">Vyberte ránu: před uložením uvidíte přesné navazující povinnosti, které se zruší.</div>
- <p class="tiny muted" data-gm-wound-cause-note>Rána i její ID-vázané následky se automaticky uzavřou; jiné doložené zdroje zůstanou. Žádné další rozhodovací pole není potřeba.</p></div>
+ <div class="notice" data-gm-wound-impact aria-live="polite">Vyberte ránu a zkontrolujte, které zdravotní povinnosti se jejím odstraněním uzavřou.</div>
+ <p class="tiny muted" data-gm-wound-cause-note>Aplikace uzavře následky navázané na vybranou ránu.</p></div>
  <div data-gm-creation-confirm><label>Odůvodnění GM (10–500 znaků)<textarea name="reason" minlength="10" maxlength="500" rows="2" placeholder="Důvod vytvoření skutečné rány"></textarea></label>
  <label><input type="checkbox" name="gmConfirmed" value="yes"> GM potvrzuje vytvoření rány a její kalendářové následky.</label></div>
  <output data-gm-wound-error role="alert"></output><button type="submit" ${allowed?'':'disabled'}>Potvrdit a uložit s auditní stopou</button>
@@ -22519,16 +22576,55 @@ function gmWoundSyncForm(form){
  const note=form.querySelector('[data-gm-wound-cause-note]');
  const creationConfirm=form.querySelector('[data-gm-creation-confirm]');
  if(creationConfirm)creationConfirm.hidden=resolve;
- if(impact){if(!w)impact.textContent='Vyberte konkrétní ránu podle ID.';
+ const submit=form.querySelector('button[type=submit]');
+ if(submit)submit.textContent=resolve?'Odstranit vybranou ránu (GM)':'Zapsat novou ránu (GM)';
+ if(impact){if(!w)impact.textContent='Vyberte konkrétní aktivní ránu.';
  else{const items=gmWoundObligationSummary(target,w);
   const cause=items.consequences;
-  impact.textContent='Ukončí se otevřené povinnosti ID '+w.id+': '+
-   (items.details.join(' · ')||'žádné aktuálně')+'. Historické hody a jiné rány zůstanou. ';
-  if(note)note.textContent='Bez dalšího rozhodnutí GM: Shock / Coma / Extended Shock '+
-   (cause.autoPlan.shockRootToRemove?'se uzavřou dle původu rány':'se zachovají, pokud patří jiné nebo neurčené příčině')+
-   '; Blood Loss automaticky odečte '+cause.autoPlan.bloodPointsToRemove+' BP z '+cause.bloodPoints+'.';
+  impact.textContent=items.details.length?'Odstraněním rány se uzavře: '+items.details.join(' · ')+'.':'Tato rána nemá žádné další otevřené povinnosti.';
+  if(note)note.textContent=[
+   cause.autoPlan.shockRootToRemove?'Aplikace uzavře navázaný Shock.':'',
+   cause.autoPlan.bloodPointsToRemove?'Aplikace odečte '+cause.autoPlan.bloodPointsToRemove+' Blood Loss Points.':''
+  ].filter(Boolean).join(' ');
  }}
 }
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-wound-treatment]');if(!button)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const actor=character(button.closest('[data-gm-wound-manager]')?.dataset.gmWoundManager);
+ const state=actor&&persistentStateOf(actor),w=state?.wounds.find(x=>x.id===button.dataset.woundTreatment&&!x.healed);
+ const message=button.closest('[data-gm-wound-row]')?.querySelector('[data-wound-next-message]');
+ if(!w)return;
+ const clock=data.campaignClock;
+ const operation=clock&&openConcurrentProcedures(clock).find(p=>p.characterId===actor.id&&p.woundId===w.id);
+ if(operation){try{overlay=null;openCalendarConcurrentTreatment(actor,operation.startId);}catch(error){uiAlert(error.message);}return;}
+ const weather=hskIsEnvironmentalWound(actor,w.id);
+ const mishap=unresolvedInjuryMishaps(state).find(m=>!weather||hskIsEnvironmentalWound(actor,m.woundId));
+ const bleeding=state.wounds.find(x=>!x.healed&&x.bleeding&&(!weather||hskIsEnvironmentalWound(actor,x.id)));
+ const shock=state.shockFollowup,course=state.extendedShock;
+ const morale=dueInjuryMorale(state).find(m=>!weather||hskIsEnvironmentalWound(actor,m.woundId));
+ const frost=weather&&w.aspect==='frost'&&w.severity==='G';
+ let kind=frost?'frost-amputation':'treatment',source=w.id;
+ if(bleeding){kind='bleeding';source=bleeding.id;}
+ else if(course){kind='extended-shock';source='';}
+ else if(mishap){kind='injury-mishap';source=mishap.id;}
+ else if(weather&&isNoncombatMedicalOrigin(shock?.domain)){kind='weather-shock';source=shock.sourceId;}
+ else if(morale){kind='injury-morale';source=morale.woundId;}
+ const agenda=clock&&campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory);
+ const scheduled=agenda?.future.find(x=>x.characterId===actor.id&&x.kind===kind&&(x.sourceId||x.woundId||'')===source);
+ // Blood Stoppage can begin five minutes before its completion check.
+ const canBeginStoppage=kind==='bleeding'&&weather&&clock&&scheduled?.minute===clock.minute+5&&
+  !travelBleedingTerm({clock,actorId:actor.id,wound:bleeding,state}).plan;
+ if(scheduled&&!canBeginStoppage){
+  if(message)message.textContent=scheduled.description+' bude možné vyhodnotit '+displayCampaignMinute(scheduled.minute)+'.';
+  return;
+ }
+ overlay=null;selected=actor.id;
+ if(weather||kind==='weather-shock'){view='sheet';activeSheetSection='hazards';}
+ else{if(!combatInitiativeSequence)encounterSelection.add(actor.id);view='encounter';}
+ render();
+ focusCalendarRuleAction(actor,kind,source);
+},true);
 document.addEventListener('click',e=>{
  const b=e.target.closest?.('[data-gm-select-wound]');if(!b)return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -22538,7 +22634,7 @@ document.addEventListener('click',e=>{
  form.elements.namedItem('action').value='resolve';
  form.elements.namedItem('woundId').value=b.dataset.gmSelectWound;
  gmWoundSyncForm(form);
- form.requestSubmit();
+ form.querySelector('button[type=submit]')?.focus();
 },true);
 document.addEventListener('change',e=>{if(e.target.matches?.('form#hmk-gm-health-form [name="action"],form#hmk-gm-health-form [name="woundId"],form#hmk-gm-health-form [name="location"]'))gmWoundSyncForm(e.target.form)},true);
 document.addEventListener('click',e=>{
@@ -23308,13 +23404,13 @@ document.addEventListener('submit',e=>{
  gmWoundSyncForm(f);
  const v=Object.fromEntries(new FormData(f)),action=v.action==='resolve'?'resolve':'add';
  const mark=(name,why)=>{const node=f.elements.namedItem(name);if(node){markTravelBloodInput93787(f,node);f.querySelector('[data-gm-wound-error]').textContent=why;}return false;};
- if(action==='resolve'&&!v.woundId)return mark('woundId','Vyberte skutečnou nezhojenou ránu podle ID.');
+ if(action==='resolve'&&!v.woundId)return mark('woundId','Vyberte skutečnou nezhojenou ránu.');
  if(action==='add'){
   for(const key of ['location','level','aspect','initialCare'])if(!v[key])return mark(key,'Vyplňte konkrétní údaj pro novou skutečnou ránu.');
   if(['sh','ua','el','fo','ha','th','kn','ca','ft'].includes(v.location)&&!v.side)return mark('side','U párových anatomických lokací vyberte levou či pravou stranu.');
  }
  const reason=action==='resolve'
-  ?'GM odstranil celou ránu '+v.woundId+' včetně navázaných zdravotních následků.'
+  ?'GM odstranil vybranou ránu včetně navázaných zdravotních následků.'
   :String(v.reason||'').trim();
  if(action==='add'&&reason.length<10)return mark('reason','Zdůvodnění vytvoření musí mít alespoň 10 znaků.');
  if(action==='add'&&v.gmConfirmed!=='yes')return mark('gmConfirmed','GM musí potvrdit vytvoření rány.');
@@ -23326,7 +23422,7 @@ document.addEventListener('submit',e=>{
  const scope=action==='resolve'?gmWoundObligationSummary(c,w):{details:[],procedures:[],consequences:null};
  const promptText=action==='add'
   ?'POTVRZENÍ GM: založit jednu SKUTEČNOU ránu s doloženým místem a typem. '+(v.initialCare==='pending'?'Založí se povinné rozhodnutí o Treatment.':'Výslovně se potvrdí Untreated a spočítají se jeho pravidlové následky.')+' Žádný hod nebude vymyšlen.'
-  :'Odstranit ránu '+w.id+' a všechny její navázané zdravotní následky a budoucí termíny? '+
+  :'Odstranit ránu '+medicalWoundOptionLabel(c,w,source.wounds.findIndex(x=>x.id===w.id)+1)+' a její navázané zdravotní následky a budoucí termíny? '+
    (scope.procedures.length?'Přeruší se '+scope.procedures.length+' otevřených časovaných Treatment. ':'')+
    'Shock/Coma se vyřeší automaticky podle evidovaného původu. Blood Loss odečte '+
    scope.consequences.autoPlan.bloodPointsToRemove+' BP. Jiné rány zůstanou. Historie bude zachována.';
@@ -23346,7 +23442,7 @@ document.addEventListener('submit',e=>{
    for(const other of before.wounds){
     if(other.id===target.id||other.healed||!other.healing?.treated||other.healing.noMundaneHealing)continue;
     const elapsed=elapsedCalendarDays(data.campaignClock,'wound',current.id,other.id);
-    if(!Number.isSafeInteger(elapsed))throw Error('Doložte nejprve datum původu další rány '+other.id+' pro obnovení Healing po Infection.');
+    if(!Number.isSafeInteger(elapsed))throw Error('Pro obnovení Healing po Infection doložte datum vzniku další rány: '+medicalWoundOptionLabel(current,other,before.wounds.findIndex(x=>x.id===other.id)+1)+'.');
     otherWoundDays[other.id]=elapsed;
    }
   }
@@ -23358,7 +23454,7 @@ document.addEventListener('submit',e=>{
   // healing rows. Append cancellation receipts in this SAME atomic mutation.
   for(const op of inProgress){
    data.campaignClock=cancelConcurrentProcedure(data.campaignClock,{id:uuid(),startId:op.startId,
-    reason:'GM vyřešil ránu '+result.woundId+': '+reason,confirmed:true});
+    reason,confirmed:true});
    cancelled.push(op.startId);
   }
   synchronizeCombatInjuries(current,result.state);
@@ -23367,8 +23463,7 @@ document.addEventListener('submit',e=>{
   data.journal.push({id:uuid(),characterId:current.id,createdAt:stamp(),
    ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
    title:'HMK · zdravotní rozhodnutí GM · '+(action==='add'?'nová rána':'vyřešená rána'),
-   body:(action==='add'?'Nová skutečná rána':'Vyřešená rána')+' · '+result.woundId+
-    (action==='add'?' · '+created.location+' · '+created.severity+created.level+' · '+created.aspect:'')+
+   body:(action==='add'?'Nová skutečná rána':'Vyřešená rána')+' · '+medicalWoundOptionLabel(current,created||target,before.wounds.findIndex(x=>x.id===result.woundId)+1||before.wounds.length+1)+
     (cancelled.length?' · přerušeno '+cancelled.length+' časovaných zákroků':'')+' · '+reason,
    calendarGMHealthOverride:{format:'hmk-gm-health-override-v1',action,sourceEventId:eventId,
     woundId:result.woundId,reason,actualRoll:null,cancelledProcedureStartIds:cancelled,
@@ -25161,6 +25256,7 @@ function episodeEquipmentSync93843(form){
    const eligible=members.includes(option.value);
    const ml=episodeEquipmentRepairML93848(option.value,rule.skill);
    option.textContent=(character(option.value)?.name||option.value)+' · '+(rule.skill||'dovednost')+' ML '+ml;
+   option.hidden=!eligible;
    option.disabled=!eligible||(disposition==='repair'&&ml<=0);
    option.title=!eligible?'Postava není členem právě cestující skupiny.':ml<=0?'Postava nemá osvojenou příslušnou dovednost.':'';
   }
@@ -25292,6 +25388,16 @@ function episodeHazardPending93840(form){
 }
 function episodeHazardSelectionUI93840(form,required){
  const box=form.querySelector('[data-hazard-confirmation]');if(!box)return;
+ const roll=Number(form.elements.namedItem('survivalD10')?.value);
+ const worker=form.elements.namedItem('hazardWorkerId');
+ if(worker&&roll>=7){
+  const memberIds=new Set([...form.querySelectorAll('[name="memberIds"]:checked')].map(x=>x.value));
+  for(const option of worker.options)if(option.value){
+   option.disabled=!memberIds.has(option.value);
+   option.hidden=option.disabled;
+  }
+  if(worker.selectedOptions[0]?.disabled)worker.value='';
+ }
  const pending=episodeHazardPending93840(form);
  // Keep the real confirmation reachable after the exact minute was edited.
  // Only this UI visibility changes: no result, dice or saved proof is accepted.
@@ -25504,7 +25610,9 @@ function episodeUpdateDiceGuides93849(form){
   }
   b.disabled=!!input.disabled||count===0||excessEndDice>0;
   b.hidden=!!input.disabled;
-  b.setAttribute('aria-label','Potvrdit '+name+': '+(count>1?`${count} hodnot oddělených čárkami`:'jedno celé číslo'));
+  const fieldLabel=label&&[...label.childNodes].find(node=>node.nodeType===Node.TEXT_NODE&&node.textContent.trim())?.textContent.trim();
+  b.setAttribute('aria-label',(fieldLabel?'Potvrdit hod · '+fieldLabel:'Potvrdit hod')+
+   ' · '+(count>1?`${count} hodnot oddělených čárkami`:'jedno celé číslo'));
  }
 }
 function episodeHasUnconfirmedDice93849(form){
@@ -25796,9 +25904,15 @@ function episodeSkillReturnBannerHTML(){
 function episodeIssue(message,form){
  // Show the exact missing input, not merely the first member of the party.
  const missing=(names)=>names.find(n=>{const field=form?.elements.namedItem(n);return field&&!String(field.value||'').trim();});
+ if(/^Přerušení:/.test(message)){
+  const kind=form?.elements.namedItem('generalEventKind93869')?.value;
+  const description=form?.elements.namedItem('generalEventDescription93869')?.value.trim()||'';
+  return {field:!kind?'generalEventKind93869':description.length<3?'generalEventDescription93869':'generalEventMinute93869',skill:null,actorId:null};
+ }
  // Animal Scent has its own confirmed d100 and GM presence. A blocker
  // must open that exact control, not the human Tracking Skill Test.
  if(/^Scent:/i.test(message))return {field:
+  /^Scent Observation:/i.test(message)?'trackingScentObservationD100':
   /d100|hod/i.test(message)?'trackingScentD100':
   /naložen|evidován|evidováno|registrován/i.test(message)?'trackingScentAnimalId':'trackingScentPresent',
   skill:null,actorId:null};
@@ -26360,9 +26474,11 @@ function episodeEncounterProbability(form,clock,sky){
 }
 function episodeGeneralStopProof93869(v,clock){
  const reason=String(v.generalEventKind93869||''),raw=String(v.generalEventProof93869||'');
- if(!reason&&!raw)return null;
- if(!reason)throw Error('Přerušení: nejdříve zrušte dříve potvrzenou událost.');
- if(!raw)throw Error('Přerušení: zvolte minutu a potvrďte ji tlačítkem „Potvrdit minutu přerušení“.');
+ if(!v.generalStopActive93875&&!reason&&!raw)return null;
+ if(!reason)throw Error('Přerušení: vyberte skutečný důvod zastavení.');
+ if(String(v.generalEventDescription93869||'').trim().length<3)
+  throw Error('Přerušení: popište skutečnou událost alespoň třemi znaky.');
+ if(!raw)throw Error('Přerušení: zadejte nebo vygenerujte minutu a klikněte na „Potvrdit minutu přerušení“.');
  let proof;try{proof=JSON.parse(raw);}catch{throw Error('Přerušení: poškozený doklad potvrzení. Potvrďte znovu.');}
  const minutes=Number(v.minutes),startMinute=Number(clock?.minute);
  validateUniversalStop93869(proof,{startMinute,minutes,activityKind:v.kind});
@@ -26375,13 +26491,25 @@ function episodeGeneralStopProof93869(v,clock){
 function episodeGeneralStopUI93869(form){
  const status=form.querySelector('[data-episode-general-event-status]');
  if(!status)return;
+ const toggle=form.elements.namedItem('generalStopActive93875');
+ if(toggle)toggle.closest('label').hidden=!episodeEvaluationRequested;
  const reason=form.elements.namedItem('generalEventKind93869')?.value||'';
  const raw=form.elements.namedItem('generalEventProof93869')?.value||'';
+ const description=form.elements.namedItem('generalEventDescription93869');
+ const minute=form.elements.namedItem('generalEventMinute93869');
+ const canSetMinute=!!reason&&(description?.value.trim().length||0)>=3;
+ if(description)description.disabled=!reason;
+ if(minute){minute.disabled=!canSetMinute;minute.max=form.elements.namedItem('minutes')?.value||'10080';}
+ const generate=form.querySelector('[data-episode-general-minute-generate]');
+ if(generate)generate.disabled=!canSetMinute;
+ const confirm=form.querySelector('[data-episode-general-event-confirm]');
+ if(confirm)confirm.disabled=!canSetMinute||!minute?.value||!minute?.checkValidity();
  let valid=false;
  if(reason&&raw){try{episodeGeneralStopProof93869(episodeFormSnapshot(form),data.campaignClock);valid=true;}catch{}}
  status.textContent=valid?'✓ Potvrzená minuta přerušení. Změna některého vstupu vyžaduje nové potvrzení.':
-  reason?'Vybranou událost zatím nepotvrzujete; potvrďte konkrétní minutu tlačítkem.':
-  'Bez dodatečného přerušení. Survival Accident a Complication zůstávají v původním hazardovém kroku.';
+  !reason?'Vyberte důvod zastavení.':
+  !canSetMinute?'Popište skutečnou událost alespoň třemi znaky.':
+  'Zadejte nebo vygenerujte minutu a klikněte na „Potvrdit minutu přerušení“.';
 }
 function episodePreviewFromForm(form,clock){
  // A failed/aborted orientation must never leak the previous episode's Watchfulness.
@@ -26762,12 +26890,14 @@ function episodePreviewFromForm(form,clock){
   const a=bestiaryKnownAnimals().find(x=>x.id===v.trackingScentAnimalId);
   if(!a||!a.spec?.bestiaryId||!Number.isSafeInteger(a.spec.aware)||a.spec.aware<1||!Number.isSafeInteger(a.spec.scent)||a.spec.scent<1)throw Error('Scent: vybrané zvíře s doloženým čichem již není řádně evidováno ve Stáji.');
   if(loadedStableAnimalIds93879(data,campaignKey(clock)).includes(a.id))throw Error('Scent: zvíře je fyzicky naloženo jako náklad a nemůže současně volně sledovat stopu.');
+  if(!v.trackingScentPresent)throw Error('Scent: potvrďte, že '+a.name+' je se skupinou a může sledovat pach.');
   const raw=String(v.trackingScentD100||'').trim();
   if(!raw||!Number.isSafeInteger(Number(raw))||Number(raw)<1||Number(raw)>100)
    throw Error('Scent: pro '+a.name+' potvrďte skutečný Awareness d100 (1–100) v části Sledování stop.');
   result.trackingScent=episodeAnimalScentTracking93936({animalId:a.id,name:a.name,breed:a.spec.bestiaryId,
    awarenessML:a.spec.aware,scentIndex:a.spec.scent,roll:Number(raw),
-   trackingModifier:trackingMemory?.modifier?.delta||0,gmPresent:v.trackingScentPresent===true});
+   trackingModifier:trackingMemory?.modifier?.delta||0,gmPresent:v.trackingScentPresent===true,
+   observationRoll:v.trackingScentObservationD100?Number(v.trackingScentObservationD100):null});
  }
  result.trackingMemory=trackingMemory;
  result.daylight=autoLight;
@@ -27239,6 +27369,10 @@ function episodeEndTasks(result){
  const tasks=[];const add=(name,detail,action='')=>tasks.push({name,detail,action});
  if(result.encounter?.found&&!result.encounter.resolved)
   add('Encounter · rozhodnutí GM','Kladný procentní výsledek: '+result.encounter.count+' setkání. GM může doložit vzdálenost a Surprise jednotlivě přímo v Cestování nebo potvrdit externí vyhodnocení. Combat zůstává oddělený a nesmí vzniknout bez protivníka.','encounterResolution');
+ if(result.trackingScent?.needsAwareness)
+  tasks.push({name:'Scent · Observation · '+result.trackingScent.name,
+   detail:'Výsledek SV '+result.trackingScent.adjustedSV+' vyžaduje nový Awareness d100 téhož zvířete. Úspěch přidá jednu Spoor ★.',
+   action:'trackingScentObservationD100'});
  if(result.trackingFollowup?.needsAwareness&&!result.trackingFollowup.awarenessLevel)
   tasks.push({name:'Tracking · Awareness',detail:'Doložte Awareness test osoby sledující stopu; Spoor se bez něj neuzavře.',
    action:'trackingAwarenessProofId',skill:'Awareness',actorId:result.trackingMemory?.trackerId||result.trackingMemory?.guideId||result.memberIds?.[0]});
@@ -27317,6 +27451,14 @@ function renderEpisodeEndStatus(form,result,weather){
    (result.orientation.roll===null?'převzatý hod':'d100 '+result.orientation.roll)+
    ' · SV '+result.orientation.adjustment.adjustedSV+' · '+(result.orientation.stars??'—')+' ★',
    result.orientation.skillId||result.orientation.reusedFromEpisodeId||'', 'orientationProofId']);
+  const trekComplication=result.kind==='travel'&&result.hazardDetails?.find(h=>h.hazard==='complication'&&h.result==='irreparable');
+ if(trekComplication)rows.push(['Pochod · Complication CF',
+  'Překážka v minutě '+trekComplication.hazardAtMinute+' · pohyb '+result.movementMinutes+' z '+result.minutes+' min. Při dalším pochodu zvolte jinou trasu.','','']);
+ const complication=result.foragingComplication93875;
+ if(complication?.atMinute!=null)rows.push(['Foraging · Complication '+complication.level,
+  'Překážka v minutě '+complication.atMinute+' · sběr probíhal '+complication.workedMinutes+' z '+result.minutes+' min','','']);
+ if(result.trackingScent){const scent=result.trackingScent;rows.push(['Scent · '+scent.name,
+   'Awareness d100 '+scent.roll+' · '+scent.level+' · SV '+scent.adjustedSV+' · '+scent.spoorStars+' Spoor ★'+(scent.observationLevel?' · Observation d100 '+scent.observationRoll+' · '+scent.observationLevel:''),'','trackingScentD100']);}
   if(result.trackingMemory)rows.push(['Tracking',
    'SV '+(result.trackingMemory.score?.adjustedSV??result.trackingMemory.sv)+
    ' · Spoor '+(result.trackingFollowup?.spoorStars??'—')+' ★',result.trackingMemory.skillId||'', 'trackingProofId']);
@@ -27570,9 +27712,14 @@ function episodePlannedTasks(form){
    'trackingProofId','Tracking',v.trackingActorId||v.guideId);
  if(v.trackingScentAnimalId&&(['tracking','travel'].includes(v.kind))){
   const animal=bestiaryKnownAnimals().find(a=>a.id===v.trackingScentAnimalId);
-  add('Zvíře · Scent d100 · '+(animal?.name||'zvíře'),
-   'Samostatný Awareness d100 vybraného zvířete. Potvrďte skutečnou přítomnost zvířete a potom klikněte na „Vložit číslo“. Lidský Tracking SV se nemění.',
-   'trackingScentD100');
+  if(v.trackingUse==='reuse'||v.trackingProofId){
+   add('Zvíře · přítomnost · '+(animal?.name||'zvíře'),
+    'Potvrďte, že zvíře je se skupinou a může sledovat pach. Hned poté se odemkne jeho hod.',
+    'trackingScentPresent');
+   if(v.trackingScentPresent)add('Zvíře · Scent d100 · '+(animal?.name||'zvíře'),
+    'Zadejte nebo vygenerujte Awareness d100 zvířete a klikněte na „Vložit číslo“. Lidský Tracking SV se nemění.',
+    'trackingScentD100');
+  }
  }
  const incap=new Map((episodeTimedMedical(form)?.incapacitations||[]).map(x=>[x.actorId,x]));
  // The orientation evidence must first establish the episode's actual
@@ -28919,11 +29066,17 @@ function updateEpisodePreview(form){
   const dog=bestiaryKnownAnimals().find(a=>a.id===v.trackingScentAnimalId&&!!a.spec?.bestiaryId&&Number.isSafeInteger(a.spec.aware)&&a.spec.aware>0&&Number.isSafeInteger(a.spec.scent)&&a.spec.scent>0);
   const details=form.querySelector('[data-episode-scent-details]');if(details)details.hidden=!dog;
   const die=form.elements.namedItem('trackingScentD100'),button=form.querySelector('[data-episode-die="trackingScentD100"]');
-  if(die)die.disabled=!dog||!episodeEvaluationRequested;
-  if(button)button.disabled=!dog||!episodeEvaluationRequested;
-  const present=form.elements.namedItem('trackingScentPresent');if(present)present.disabled=!dog;
+  const ready=!!dog&&episodeEvaluationRequested&&(v.trackingUse==='reuse'||!!v.trackingProofId);
+  const canRoll=ready&&v.trackingScentPresent;
+  const observation=scentPanel.querySelector('[data-episode-scent-observation]');
+  if(observation){observation.hidden=true;for(const field of observation.querySelectorAll('button,input'))field.disabled=true;}
+  if(die)die.disabled=!canRoll||!!v.trackingScentD100;
+  if(button)button.disabled=!canRoll||!!v.trackingScentD100;
+  const present=form.elements.namedItem('trackingScentPresent');
+  if(present)present.disabled=!ready||!!v.trackingScentD100;
   const note=form.querySelector('[data-episode-scent-status]');
-  if(note)note.textContent=dog?`Potvrzené údaje: ${dog.name} · Awareness ML ${dog.spec.aware} · Scent Index +${dog.spec.scent}. Potvrďte skutečný d100. Výsledkem je samostatné zvířecí SV.`:'Bez evidovaného zvířete se schopností Scent není čichový test.';
+  if(note)note.textContent=dog?`${dog.name} · Awareness ML ${dog.spec.aware} · Scent Index +${dog.spec.scent}. `+
+   (!ready?'Nejprve doložte lidský Tracking.':!v.trackingScentPresent?'Potvrďte, že zvíře může sledovat pach.':'Zadejte nebo vygenerujte Awareness d100 zvířete a potvrďte číslo.'):'Bez evidovaného zvířete se schopností Scent není čichový test.';
  }
  const droverNeed=episodeDroverRequirement93851(v);
  for(const node of form.querySelectorAll('[data-episode-drover],[data-episode-drover-proof]'))node.hidden=!travel||!droverNeed.present;
@@ -29304,6 +29457,12 @@ function updateEpisodePreview(form){
   const {result,weather,precipitation}=episodePreviewFromForm(form,data.campaignClock);
   delete form.dataset.episodeProblem;delete form.dataset.episodeProblemField;
   for(const node of form.querySelectorAll('.hc-episode-needs-input'))node.classList.remove('hc-episode-needs-input');
+  const observation=form.querySelector('[data-episode-scent-observation]');
+  if(observation){
+   observation.hidden=!result.trackingScent?.needsAwareness&&!result.trackingScent?.observationLevel;
+   for(const field of observation.querySelectorAll('button,input'))field.disabled=!result.trackingScent?.needsAwareness;
+   for(const field of observation.querySelectorAll('[data-episode-roll-confirm]'))field.hidden=field.disabled;
+  }
   renderEpisodeEndStatus(form,result,weather);
   for(const row of form.querySelectorAll('[data-episode-encounter-row]')){
    const i=Number(row.dataset.episodeEncounterRow),event=result.encounterDetails?.find(x=>x.i===i);
@@ -29586,7 +29745,7 @@ function episodeCarrySettingsFromLast(){
   navigationRecovered:false,checkEncounter:true};
 }
 function episodeFreshDraft(){return {rememberSettings:false,orientationUse:'new',trackingUse:'none',confirmed:false,hazardComplicationRouteChanged:false,
- memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportExtraLb:'0',transportMountAnimalId:'',transportMountHandlerId:'',transportMountHandlerPosition:'leading',travelRideAnimalId:'',travelRideRiderId:'',transportMountConfirmed:false,transportCoLocated:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',trackingScentAnimalId:'',trackingScentD100:'',trackingScentPresent:false,progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
+ memberIds:[],animalIds:[],stableAnimalIds:[],transportedMemberIds:[],transportTeamIds:[],transportVehicleKey:'',transportOtherLb:'',transportExtraLb:'0',transportMountAnimalId:'',transportMountHandlerId:'',transportMountHandlerPosition:'leading',travelRideAnimalId:'',travelRideRiderId:'',transportMountConfirmed:false,transportCoLocated:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',trackingScentAnimalId:'',trackingScentD100:'',trackingScentObservationD100:'',trackingScentPresent:false,progressD10:'',directionD10:'',checkEncounter:true,encounterRollContext:'',episodeTimedRollsJson:'{}',episodeIncapChoice:'',episodeIncapMoveMinutes:'',episodeGMReviewedJson:'{}'};}
 function episodeClearDiceDraft(draft){
  const saved={...draft,confirmed:false,orientationProofId:'',trackingProofId:'',trackingActorId:'',droverProofId:'',encounterD100Sub:'',
   progressD10:'',directionD10:'',survivalD10:'',precipitationD6:'',encounterD100:'',forageD10:'',trackingScentD100:'',trackingScentPresent:false,trackingScentAnimalId:'',
@@ -30121,7 +30280,8 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{
  if(!e.target.matches?.('[data-episode-other-event-toggle]'))return;
  const form=e.target.closest('#hmk-time-episode-form');if(!form)return;
- if(!e.target.checked){for(const name of ['generalEventKind93869','generalEventDescription93869','generalEventMinute93869']){const el=form.elements.namedItem(name);if(el)el.value='';}}
+ if(!e.target.checked){for(const name of ['generalEventKind93869','generalEventDescription93869','generalEventMinute93869','generalEventProof93869']){const el=form.elements.namedItem(name);if(el)el.value='';}
+  form.elements.namedItem('generalEventOrigin93869').value='manual';}
  timeEpisodeDraft=episodeFormSnapshot(form);updateEpisodePreview(form);
 },true);
 document.addEventListener('click',e=>{
@@ -31021,6 +31181,7 @@ document.addEventListener('submit',e=>{
    throw Error('Encounter: doložte skutečný výsledek každého setkání nebo výslovné externí rozhodnutí GM. Boj se nikdy nespouští automaticky.');
   const pendingTasks=episodeEndTasks(result);
   if(pendingTasks.length)throw Error('Epizodu nelze ukončit: '+pendingTasks.map(t=>t.name).join(', '));
+  if(result.trackingScent?.needsAwareness)throw Error('Scent Observation: potvrďte druhý Awareness d100 zvířete.');
   if(result.trackingFollowup?.needsAwareness&&result.trackingFollowup.awarenessLevel===null)
    throw Error('Tracking SV 3–4 vyžaduje skutečný Awareness test, uveďte jeho výsledek.');
   if(result.hazardDetails?.some(x=>x.requiresGMCompletion))
