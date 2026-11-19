@@ -9,7 +9,7 @@ import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue9
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
 import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js';
-import {assessMountedPackGroup93859} from './src/integration/hmk-mixed-transport-93859.js';
+import {travelOccupancy93956,travelOccupancyContext93956,travelCompanionAssignment93956,travelWheeledOccupants93956} from './src/integration/hmk-mixed-transport-93859.js?v=93.956';
 import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
 import {planEpisodeRows93772,rowMaximum93772} from './src/integration/hmk-episode-rows-93772.js';
@@ -43,7 +43,7 @@ import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.954';
-import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.954';
+import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.956';
 import {CHRONICLE_TRAVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.955';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
@@ -169,10 +169,10 @@ import {fateEligibility93866,fateEML93866,fateRoll93866,fateSkillResult93866} fr
 import {animalBaselineFromStable93861,missingStableHealth93861,validateStableAutoHealth93861} from './src/integration/hmk-stable-auto-health-93861.js';
 import {equipmentHazardSkill93843} from './src/integration/hmk-equipment-hazard-skill-93843.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
-import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js';
+import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js?v=93.956';
 import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,stableGearFit93838,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js';
 import {stableAnimalZones575,stableTraining575,effectiveStableBeast575,stableHauling575,validateStableTravel575} from './src/integration/hmk-stable-operations-575.js';
-import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js';
+import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js?v=93.956';
 import {carriedStableAnimal93879,loadedStableAnimalIds93879} from './src/integration/hmk-transport-animal-cargo-93879.js';
 import {certifiedTransportMass93816,securedMountedPassenger93816,validateTransportMassEvidence93816} from './src/integration/hmk-transport-passengers-93816.js';
 import {validateTravelPositions93764} from './src/integration/hmk-trek-positions-93764.js';
@@ -240,7 +240,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=93.956';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -385,7 +385,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.955';
+const APP_VERSION='93.956';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2827,25 +2827,20 @@ function episodeSetupIssue(form){
    if(!(v.stableAnimalIds||[]).includes(v.travelRideAnimalId))return {field:'stableAnimalIds',message:'Jízda na zvířeti: zvolené jízdní zvíře musí být zaškrtnuto v seznamu Stáje. Před zahájením testů zůstává seznam aktivní.'};
    if(!v.travelRideRiderId||!(v.memberIds||[]).includes(v.travelRideRiderId))return {field:'travelRideRiderId',message:'Jízda na zvířeti: vyberte konkrétního jezdce z této skupiny.'};
   }
-  if(v.conveyance==='mount'&&(v.stableAnimalIds||[]).length>1&&!(v.transportedMemberIds||[]).length){
-   const mount=resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),v.stableAnimalIds,v.travelRideAnimalId||'').animal;
-   if(mount){
-    const riderId=v.travelRideRiderId||v.guideId;
-    for(const animalId of v.stableAnimalIds.filter(id=>id!==mount.id)){
-     const active=verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===animalId);
-     if(active&&(stableBurden(data,campaignKey(data.campaignClock),active).vehicles||[]).length)
-      return {field:'stableAnimalIds',message:'Smíšená doprava: zvíře '+active.name+' má doložené vozidlo. Režim jezdec + pěšky vedené zvíře nedokáže zároveň modelovat tažený vůz. Odeberte vozidlo ze společného modelu nebo zvolte samostatnou činnost; nelze započíst odhadovanou rychlost.'};
-     const field='packHandler_'+animalId,handlerId=v[field]||'';
-     if(!v.memberIds.includes(handlerId)||handlerId===riderId)
-      return {field,message:'Smíšená doprava: zvolte pěšího vodiče pro '+(verifiedLivestock(data,campaignKey(data.campaignClock)).find(a=>a.id===animalId)?.name||animalId)+
-       '. Vodič musí být v této skupině a nesmí současně sedět na koni.'};
-    }
-    const leadIds=v.stableAnimalIds.filter(id=>id!==mount.id).map(id=>v['packHandler_'+id]);
-    const droverId=v.droverActorId||riderId;
-    if(droverId!==riderId&&!leadIds.includes(droverId))
-     return {field:'droverActorId',message:'Smíšená doprava: hlavní Drover musí být skutečný jezdec nebo některý doložený vodič zvířete v této skupině.'};
+  try{
+   const clock=data.campaignClock,cid=campaignKey(clock);
+   const occupancy=episodeOccupancy93956(v,clock);
+   if(occupancy){
+    const gear=planTravelEquipment93812(data,cid,v).checks.find(check=>check.status==='missing'&&
+     (check.id.startsWith('gear:')||check.id.startsWith('packHandler_')));
+    if(gear)return {field:'stableAnimalIds',message:gear.title+'. '+gear.detail};
+    const roster=verifiedLivestock(data,cid);
+    for(const ride of occupancy.riders)episodeMountLoad93956(ride,roster,cid);
+    if(['cart','wagon'].includes(v.conveyance))episodePassengerMass93816(v);
+    slowestEpisodeConveyance(v.topography,v.terrain,v.conveyance,occupancy.walkingMemberIds.length>0,
+     v.conveyance!=='mount'&&occupancy.riders.length>0);
    }
-  }
+  }catch(error){return {field:error.transportField||'stableAnimalIds',message:error.message};}
   const patients=v.kind==='travel'?episodeTransportPatients93821(v):[];
   if(patients.length){
    if(!['cart','wagon','mount'].includes(v.conveyance))
@@ -3285,12 +3280,12 @@ function timeEpisodePageHTML(clock,participants){
  <details class="hmk-transport-guidance"><summary>Jak se počítá jezdec a ENC</summary><p>Aplikace započítá hmotnost výslovně zvoleného jezdce s inventářem a výstrojí. Zvolte konkrétní jízdní zvíře a zaškrtněte je v seznamu Stáje. Vůl může skupinu doprovázet, ale tažný postroj nenahrazuje sedlo. Výsledek se zapíše až po potvrzení celé cesty.</p></details>
  <label>Jízdní zvíře<select name="travelRideAnimalId"><option value="">— Vyberte konkrétní jízdní zvíře —</option>${stableTravelRoster.filter(isRidingAnimal93837).map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${esc(a.spec.name)}</option>`).join('')}</select></label>
  <label>Postava jedoucí na zvířeti<select name="travelRideRiderId"><option value="">— Vyberte konkrétního jezdce —</option>${participants.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · Riding ML ${availableMasteries(c).find(x=>x.name==='Riding')?.ml??'neosvojeno'}</option>`).join('')}</select><small class="hc-hint" data-episode-rider-availability></small></label>
- <div class="hc-episode-pack-handlers" data-episode-pack-handlers>
- <strong>Další zvířata vedená vedle jezdce</strong>
- <p class="hc-hint">Pro každé další vybrané zvíře určete skutečného pěšího vodiče z této skupiny. Jeden člověk nemůže současně sedět na zvířeti a vést jiné pěšky. Průvodce orientace a hlavní Drover mohou být různé postavy (HMK 141). Druhé jezdecké zvíře se v tomto režimu NEPOVAŽUJE za automaticky obsazené dalším jezdcem.</p>
- ${stableTravelRoster.map(a=>`<label data-episode-pack-handler-row="${esc(a.id)}" hidden>${esc(a.name)} · kdo jej skutečně vede pěšky?<select name="packHandler_${esc(a.id)}"><option value="">— Zvolte člena této skupiny —</option>${participants.map(c=>option(c.id,c.name)).join('')}</select></label>`).join('')}
- <p class="hc-hint" data-episode-pack-handler-status role="status"></p></div>
  <p class="hc-hint" data-episode-healthy-ride-mass role="status"></p></div>
+ <div class="hc-episode-pack-handlers" data-episode-pack-handlers hidden>
+ <strong>Další zvířata · jezdci a pěší vodiči</strong>
+ <p class="hc-hint">Každé další zvíře mimo spřežení má vlastního jezdce nebo pěšího vodiče. Výstroj a náklad každého sedla se počítají samostatně.</p>
+ ${stableTravelRoster.map(a=>`<label data-episode-pack-handler-row="${esc(a.id)}" hidden>${esc(a.name)} · způsob cestování<select name="packHandler_${esc(a.id)}"><option value="">— Vyberte jezdce nebo vodiče —</option>${isRidingAnimal93837(a)?participants.map(c=>option('ride:'+c.id,'Jezdec · '+c.name)).join(''):''}${participants.map(c=>option(c.id,'Pěší vodič · '+c.name)).join('')}</select></label>`).join('')}
+ <p class="hc-hint" data-episode-pack-handler-status role="status"></p></div>
  <section class="hc-episode-equipment-guide panel" data-episode-equipment-checklist hidden aria-live="polite">
  <h4>Povinné vybavení a úkony před vyhodnocením dopravy · HMK 122</h4>
  <div data-episode-equipment-checklist-body></div></section>
@@ -7566,7 +7561,7 @@ function stableRiderWeight584(actor){
 /** Live physical mass evidence, shared by Travel and Stable, not by Combat UI.
  * No manual body-weight value can override a verified character sheet. */
 function episodePassengerMass93816(v){
- const ids=v.memberIds||[],patients=v.transportedMemberIds||[];
+ const ids=['cart','wagon'].includes(v.conveyance)?travelWheeledOccupants93956(v):v.memberIds||[],patients=v.transportedMemberIds||[];
  const extraText=String(v.transportExtraLb??'0').trim();
  if(!/^\d+(?:[.,]\d{1,3})?$/.test(extraText))throw Error('Přeprava: dodatečný náklad musí být skutečná nezáporná hmotnost v lb.');
  const extra=Number(extraText.replace(',','.'));
@@ -7612,7 +7607,10 @@ function stableTravelRiderCard93823(animal,campaignId,burden){
   }else if(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
    const chosen=resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),v.stableAnimalIds||[],v.travelRideAnimalId||'').animal;
    if(chosen?.id===animal.id)draft={ids:[v.travelRideRiderId||v.guideId].filter(Boolean),position:'mounted'};
-  }else draft={ids:[],position:'none'};
+  }
+  const extra=travelCompanionAssignment93956(v['packHandler_'+animal.id]||'');
+  if(extra.position==='mounted'&&extra.personId)draft={ids:[extra.personId],position:'mounted'};
+  if(!draft)draft={ids:[],position:'none'};
  }
  const ride=burden.travelRide93823;
  const names=ids=>ids.map(id=>character(id)?.name||'postava').join(' + ');
@@ -26991,66 +26989,38 @@ function chooseNamedRecord(records,label,question){
  if(!Number.isSafeInteger(index)||index<1||index>records.length)throw Error('Vyberte číslo ze seznamu.');
  return records[index-1];
 }
-function episodePartyLoad(memberIds,conveyance,v=null){
- const result={};
- // Only people actually riding have mounted personal ENC. A guide who leads
- // the horse remains a PEDESTRIAN even if the passenger is mounted.
- const mountedIds=new Set();
- if(conveyance==='mount'){
-  if((v?.transportedMemberIds||[]).length){
-   for(const id of v.transportedMemberIds)mountedIds.add(id);
-   if(v.transportMountHandlerPosition==='mounted')mountedIds.add(v.transportMountHandlerId||v.guideId);
-  }else mountedIds.add((v?.stableAnimalIds||[]).length>1?
-   (v?.travelRideRiderId||v?.guideId||memberIds[0]):
-   episodeTravelAnimalRoles({conveyance,memberIds,guideId:v?.guideId||memberIds[0],riderId:v?.travelRideRiderId||'',droverId:v?.droverActorId||''}).riderId);
- }
- for(const id of memberIds){
+function episodePartyLoad(memberIds,conveyance,v,occupancy){
+ const mountedIds=new Set(occupancy?.riders.map(r=>r.riderId)||[]);
+ if(conveyance==='mount'&&(v?.transportedMemberIds||[]).length&&v.transportMountHandlerPosition==='mounted')
+  mountedIds.add(v.transportMountHandlerId||v.guideId);
+ return Object.fromEntries(memberIds.map(id=>{
   const actor=character(id),load=resolveCombatantLoad({character:actor,inventory:activeRationInventory(),mounted:mountedIds.has(id)});
   if(!load.encReady||!Number.isSafeInteger(load.modifiedENC)||load.modifiedENC<0||load.modifiedENC>100)
    throw Error((actor?.name||'Postava')+': ENC z inventáře není spolehlivě doložené. Opravte váhy, výstroj a STR v deníku postavy.');
-  result[id]=load.modifiedENC;
- }
- return result;
+  return [id,load.modifiedENC];
+ }));
 }
-/** Riding in a live Pochod: rider is selected HERE, never via a Stable event.
- * Exact existing mass is carried once; a previous historical Stable rider is
- * ignored even when the horse was once marked as occupied there.
- */
-function episodeHealthyMountRide93823(v,memberIds,clock){
- if(v.kind!=='travel'||v.conveyance!=='mount'||(v.transportedMemberIds||[]).length)return null;
- const cid=campaignKey(clock),choices=(v.stableAnimalIds||[]);
- if(!choices.length)return null;
- const mount=resolveTravelMount93837(verifiedLivestock(data,cid),choices,v.travelRideAnimalId||'');
- if(!mount.animal)throw Error('Jízda na zvířeti: '+mount.reason);
- const animal=mount.animal,animalId=animal.id;
- const mixed=(choices.length>1);
- const riderId=mixed?(v.travelRideRiderId||v.guideId):
-  episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds,guideId:v.guideId,
-   riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).riderId;
- // A second animal is not magically a second riding mount. Its handler is
- // explicit, belongs to THIS row, and walks with it. The printed mixed
- // Drover test still belongs to exactly ONE primary beast wrangler.
- if(mixed){
-  const roster=verifiedLivestock(data,cid);
-  const towed=choices.filter(id=>id!==animalId&&
-   (stableBurden(data,cid,roster.find(a=>a.id===id)).vehicles||[]).length);
-  if(towed.length)throw Error('Smíšená doprava: další zvíře má připojený vůz/vozidlo. Režim jezdec + pěšky vedená zvířata NENÍ režim dvou souběžných vozidel. Vůz vyřaďte, nebo plán rozdělte na samostatné skupiny; nelze odhadovat jeho tempo.');
- }
- const roles=mixed?assessMountedPackGroup93859({memberIds,riderId,mountAnimalId:animalId,
-  selectedAnimalIds:choices,packHandlers:Object.fromEntries(choices.map(id=>[id,v['packHandler_'+id]||''])),
-  droverId:v.droverActorId||riderId}):null;
+function episodeOccupancy93956(v,clock){
+ if(v.kind!=='travel')return null;
+ const wheeled=['cart','wagon'].includes(v.conveyance),team=v.transportTeamIds||[];
+ const selected=v.stableAnimalIds||[];
+ if(!(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length||wheeled&&selected.some(id=>!team.includes(id))))return null;
+ const cid=campaignKey(clock);
+ return travelOccupancy93956({v,roster:verifiedLivestock(data,cid),droverId:episodeDroverRequirement93851(v).actorId,
+  canOperate:id=>episodeTravelRoleEligibility93865(id).eligible,
+  hasVehicle:animal=>stableBurden(data,cid,animal).vehicles.length>0});
+}
+function episodeMountLoad93956({animalId,riderId},roster,cid){
+ const animal=roster.find(a=>a.id===animalId);
+ if(!isRidingAnimal93837(animal))throw Error('Jízda vyžaduje skutečné jezdecké zvíře.');
  const rider=character(riderId),mass=stableRiderWeight584(rider);
  if(!mass?.ready)throw Error((rider?.name||'Jezdec')+': '+(mass?.reason||'chybí skutečná hmotnost pro jízdu.'));
- const b=stableBurden(data,cid,animal);
- const kind=animal.spec.breed==='camel'?'camel':animal.spec.breed==='bovine'?'bovine':'horse';
- const totalLb=b.gearAndCargoLb+mass.totalLb;
- // Never subtract an already clamped/rounded ENC: that loses the animal's
- // STR modifier and makes the Stable display disagree with the journey.
- const enc=Math.max(0,mountLoadENC(totalLb,{kind})+
-  strengthEncumbranceModifier(animal.spec.str)+(animal.spec.breed==='mule'?-20:0));
+ const b=stableBurden(data,cid,animal),kind=animal.spec.breed==='camel'?'camel':'horse';
+ const totalLb=Math.round((b.gearAndCargoLb+mass.totalLb)*1000)/1000;
+ const enc=Math.max(0,mountLoadENC(totalLb,{kind})+strengthEncumbranceModifier(animal.spec.str)+(animal.spec.breed==='mule'?-20:0));
+ if(animal.spec.move-enc<=0)throw Error(animal.name+': s nákladem a jezdcem se nemůže pohybovat.');
  return {format:TRAVEL_RIDING_FORMAT_93823,animalId,riderId,riderLb:mass.totalLb,
-  gearAndCargoLb:b.gearAndCargoLb,totalLb,enc,moveAfterLoad:animal.spec.move-enc,
-  ...(roles?{mixedRoles93859:roles}:{}),sourcePage:122};
+  gearAndCargoLb:b.gearAndCargoLb,totalLb,enc,moveAfterLoad:animal.spec.move-enc,sourcePage:122};
 }
 /** HMK 141/145. A drover may be someone other than the guide. No dice are created here.
  * Single selected conveyance uses Riding for a mount and Animalcraft for
@@ -27061,9 +27031,15 @@ function episodeDroverRequirement93851(v){
  const stable=[...new Set(v.stableAnimalIds||[])],legacy=[...new Set(v.animalIds||[])];
  const animals=[...new Set([...stable,...legacy])];
  const present=v.kind==='travel'&&(v.conveyance!=='foot'||animals.length>0);
- const mixed=v.conveyance==='mount'&&animals.length>1;
+ const wheeled=['cart','wagon'].includes(v.conveyance);
+ const mountedPatients=(v.transportedMemberIds||[]).length>0;
+ const accompanying=stable.filter(id=>wheeled?!(v.transportTeamIds||[]).includes(id):id!==v.travelRideAnimalId).map(id=>travelCompanionAssignment93956(v['packHandler_'+id]||''));
+ const additionalRiderIds=new Set(accompanying.filter(a=>a.position==='mounted').map(a=>a.personId));
+ const mixed=wheeled?additionalRiderIds.size>0:
+  v.conveyance==='mount'&&!mountedPatients&&((v.memberIds||[]).some(id=>id!==(v.travelRideRiderId||v.guideId)&&!additionalRiderIds.has(id))||
+   accompanying.some(a=>a.position==='leading'&&a.personId));
  const actorId=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length?
-  (mixed?(v.droverActorId||v.travelRideRiderId||v.guideId):
+  (stable.length>1?(v.droverActorId||v.travelRideRiderId||v.guideId):
    episodeTravelAnimalRoles({conveyance:v.conveyance,memberIds:v.memberIds,guideId:v.guideId,
     riderId:v.travelRideRiderId||'',droverId:v.droverActorId||''}).droverId):
   (v.memberIds||[]).includes(v.droverActorId)?v.droverActorId:v.guideId;
@@ -27118,7 +27094,7 @@ function episodeOrientationReuseCheck(form,clock,sky){
   const weather=episodeCurrentWeather(form,clock,{mandatory:false});
   if(!weather.weather)return {allowed:false,reason:'Není dosud doloženo aktuální počasí.'};
   const previous=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,
-   v.memberIds?.length?v.memberIds:null,true);
+   v.memberIds?.length?v.memberIds:null);
   if(!previous?.calendarTimeEpisode?.orientation)return {allowed:false,reason:'Předchozí cestovní epizoda nemá doložený Orienteering.'};
   if(previous.calendarTimeEpisode.endMinute!==clock.minute)return {allowed:false,reason:'Předchozí epizoda neskončila přesně v aktuální minutě.'};
   const period=sky?.period||v.lightPeriod;
@@ -27127,7 +27103,7 @@ function episodeOrientationReuseCheck(form,clock,sky){
    weatherSourceId:episodeWeatherContextKey(weather.sourceId,weather.weather),minute:clock.minute,
    nightOverride:period==='night',familiar:!!v.orientationFamiliar,
    torchlight:period==='night'&&!!v.orientationTorch,fullMoon:period==='night'&&!!v.orientationMoon,
-   afterSnowfall:period==='night'&&!!v.orientationSnow});
+   afterSnowfall:period==='night'&&!!v.orientationSnow,transportOccupancy:travelOccupancyContext93956(episodeOccupancy93956(v,clock))});
   return mayReuseEpisodeSkill({previous,minute:clock.minute,context})?
    {allowed:true,reason:'Předchozí Orienteering má shodný čas i všechny požadované podmínky.'}:
    {allowed:false,reason:'Změnila se družina, průvodce, oblast, počasí, terén, doprava nebo podmínky viditelnosti; případně předchozí výsledek není platný pro převzetí.'};
@@ -27243,8 +27219,10 @@ function episodePreviewFromForm(form,clock){
  // v93.812: a mounted journey cannot silently assume tack or a real mount.
  // This preflight is intentionally limited to future departures; immutable
  // prior campaigns are not rewritten on replay.
- if(animalActivity&&v.conveyance==='mount'){
-  const incomplete=planTravelEquipment93812(data,campaignKey(clock),v).checks.find(x=>x.status==='missing');
+ const occupancy=animalActivity?episodeOccupancy93956(v,clock):null;
+ if(animalActivity&&(v.conveyance==='mount'||occupancy?.riders.length)){
+  const incomplete=planTravelEquipment93812(data,campaignKey(clock),v).checks.find(x=>x.status==='missing'&&
+   (v.conveyance==='mount'||x.id.startsWith('gear:')||x.id.startsWith('packHandler_')));
   if(incomplete)throw Error('Jízda na zvířeti: '+incomplete.title+'. '+incomplete.detail+' Použijte kontrolní seznam u Stáje v tomto Pochodu.');
  }
 
@@ -27297,12 +27275,13 @@ function episodePreviewFromForm(form,clock){
   throw Error('Epizoda překračuje hranici dne a noci. Kvůli rozdílným bonusům Orienteering ji rozdělte v okamžiku změny světla.');
  const lightMinutes=autoLight?{day:autoLight.minutesByPeriod.day+autoLight.minutesByPeriod.twilight,
   night:autoLight.minutesByPeriod.night}:null;
- const previous=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute);
+ const previous=lastEpisodeBefore(data.journal,campaignKey(clock),clock.minute,members);
  const context=episodeMovementContext({guideId,memberIds:members,area:weather.area,
   topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
   weatherSourceId:episodeWeatherContextKey(weather.sourceId,seasonWeather),minute:clock.minute,
   nightOverride:actualPeriod==='night',familiar:!!v.orientationFamiliar,torchlight:actualPeriod==='night'&&!!v.orientationTorch,
-  fullMoon:actualPeriod==='night'&&!!v.orientationMoon,afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow});
+  fullMoon:actualPeriod==='night'&&!!v.orientationMoon,afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow,
+  transportOccupancy:travelOccupancyContext93956(occupancy)});
  const skillAtMinute=(id,skill,actorId=guideId)=>episodeSkillProof(data.journal.find(j=>j.id===id),skill,
   actorId,campaignKey(clock),clock.minute,{requireSV:true});
  const priorNavigationRow=participantNavigationEvidence(data.journal,campaignKey(clock),clock.minute,members);
@@ -27388,12 +27367,6 @@ function episodePreviewFromForm(form,clock){
    row.hidden=Number(row.dataset.episodeTravelForageRow)>=modes.foraging;
  }
 
- const encByActor=kind==='travel'?episodePartyLoad(members,v.conveyance,v):{};
- const loadedByPeople=v.conveyance==='foot'&&Object.values(encByActor).some(n=>n>=10);
- const loadedByAnimal=stableAnimals.some(a=>a.loaded)||!!v.loaded;
- if(v.loadBypass&&(loadedByAnimal||!loadedByPeople))
-  throw Error('Zrušení Loaded v této epizodě není možné bez doložené dodatečné únavy zatíženého zvířete. Pro pěší postavy lze použít automatickou únavu podle ENC.');
- const actualLoaded=(loadedByPeople||loadedByAnimal)&&!v.loadBypass;
  const taskSlow=Number(modes.foraging>0)+Number(modes.stalking>0);
  // The primary Calendar travel form must derive the exact same canonical
  // health-dependent Trek Modes as the older Trekking Routine (HMK pp.145–146).
@@ -27426,14 +27399,6 @@ function episodePreviewFromForm(form,clock){
  if(animalActivity){
   const droverRole=episodeDroverRequirement93851(v);
   if(droverRole.present)episodeRequireTravelOperator93865(droverRole.actorId,members,'Drover · '+(droverRole.skill||'Riding/Animalcraft'));
-  if(v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
-   const actualRider=v.travelRideRiderId||v.guideId;
-   episodeRequireTravelOperator93865(actualRider,members,'Jezdec');
-   for(const animalId of (v.stableAnimalIds||[]).length>1?v.stableAnimalIds:[]){
-    const handlerId=v['packHandler_'+animalId];
-    if(handlerId)episodeRequireTravelOperator93865(handlerId,members,'Pěší vodič zvířete');
-   }
-  }
   if(v.conveyance==='mount'&&(v.transportedMemberIds||[]).length){
    const handlerId=v.transportMountHandlerId||members.find(id=>id!==v.transportedMemberIds[0]&&episodeTravelRoleEligibility93865(id).eligible);
    episodeRequireTravelOperator93865(handlerId,members,'Vodič koně s nepohyblivým pacientem');
@@ -27456,18 +27421,22 @@ function episodePreviewFromForm(form,clock){
   mountRow.loaded=mountRow.enc>=20;
   mountRow.loadLb=mountedPassenger93816.totalLb;
  }
- const healthyMountRide93823=animalActivity&&v.conveyance==='mount'&&!mountedPassenger93816?
-  episodeHealthyMountRide93823(v,members,clock):null;
- // HMK p.141: one selected horse gives ONE confirmed rider. Every other
- // healthy member of this group is walking; no unassigned second saddle is
- // inferred from the Stable or from an earlier trip. Foot travel is the
- // party's pace starts from the slowest column, and END uses the actual gait.
- const mixedFootMemberIds93858=healthyMountRide93823?
-  members.filter(id=>id!==healthyMountRide93823.riderId):[];
- if(healthyMountRide93823){
-  const row=stableAnimals.find(a=>a.id===healthyMountRide93823.animalId);
-  if(row){row.enc=healthyMountRide93823.enc;row.loaded=row.enc>=20;row.loadLb=healthyMountRide93823.totalLb;row.rider=healthyMountRide93823.riderId;}
+ const roster=occupancy?.riders.length?verifiedLivestock(data,campaignKey(clock)):[];
+ const riderLoads=(occupancy?.riders||[]).map(ride=>episodeMountLoad93956(ride,roster,campaignKey(clock)));
+ for(const ride of riderLoads){
+  const row=stableAnimals.find(a=>a.id===ride.animalId);
+  Object.assign(row,{enc:ride.enc,loaded:ride.enc>=20,loadLb:ride.totalLb,rider:ride.riderId});
  }
+ const walkingHandlerIds=occupancy?.walkingMemberIds||
+  (mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:[]);
+ const hasOtherMounts=['cart','wagon'].includes(v.conveyance)&&riderLoads.length>0;
+ const encByActor=kind==='travel'?episodePartyLoad(members,v.conveyance,v,occupancy):{};
+ const walking=v.conveyance==='foot'?members:walkingHandlerIds;
+ const loadedByPeople=walking.some(id=>encByActor[id]>=10);
+ const loadedByAnimal=stableAnimals.some(a=>a.loaded)||!!v.loaded;
+ if(v.loadBypass&&(loadedByAnimal||!loadedByPeople))
+  throw Error('Zrušení Loaded vyžaduje doloženou pěší zátěž a nesmí obejít zátěž zvířete.');
+ const actualLoaded=(loadedByPeople||loadedByAnimal)&&!v.loadBypass;
  const wearied=travelHealth.some(p=>p.fatigue>=20)||animalHealth.some(a=>a.fatigue>=20);
  const injured=travelHealth.some(p=>p.injured)||animalHealth.some(a=>a.injured);
  const equipmentSlowIn=kind==='travel'?lastEquipmentSlowCarry(data.journal,campaignKey(clock),clock.minute,members)+
@@ -27526,7 +27495,6 @@ function episodePreviewFromForm(form,clock){
  const medAtEnd=episodeEvaluationRequested?episodeTimedMedical(form):null;
  const inactiveByActor=Object.fromEntries((medAtEnd?.incapacitations||[]).filter(x=>members.includes(x.actorId))
   .map(x=>[x.actorId,x]));
- const walkingHandlerIds=mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:mixedFootMemberIds93858;
  const result=calculateTimeEpisode({minute:clock.minute,minutes,kind,topography:v.topography,terrain:v.terrain,
   conveyance:v.conveyance,progress:modes.progress+gmExtraProgress,bearing:modes.bearing,extraSlow:Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow+Number(equipmentSlowIn>0),
   wearied,injured,loaded:actualLoaded,continuousPrecipitation:!!precipitation?.slowMode,
@@ -27540,7 +27508,7 @@ function episodePreviewFromForm(form,clock){
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
   encByActor,forcedBearing,waitingForComplication,
   trackingBearingPolicy:waitingForComplication?null:EPISODE_TRACKING_BEARING_POLICY_93904,
-  walkingHandlerIds,mixedPacePolicy:walkingHandlerIds.length?EPISODE_MIXED_PACE_93945:null,
+  walkingHandlerIds,mixedPacePolicy:walkingHandlerIds.length||hasOtherMounts?EPISODE_MIXED_PACE_93945:null,hasOtherMounts,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
  if(Object.keys(unusedEndDice93868).length)result.unusedEndDice93868={
@@ -27551,10 +27519,7 @@ function episodePreviewFromForm(form,clock){
   originalHealth:travelHealth.filter(p=>result.transportedMemberIds.includes(p.id)).map(p=>({id:p.id,
    shock:p.shock,comaActive:p.comaActive,extendedShockActive:p.extendedShockActive,
    immobile:p.immobile,fatigue:p.fatigue})),sourcePage:145};
- if(animalActivity&&healthyMountRide93823)result.mountRiding93823={...healthyMountRide93823,
-  ...(mixedFootMemberIds93858.length?{walkingMemberIds:[...mixedFootMemberIds93858]}:{})};
- if(animalActivity&&healthyMountRide93823?.mixedRoles93859)
-  result.mixedTransport93859=structuredClone(healthyMountRide93823.mixedRoles93859);
+ if(occupancy)result.travelOccupancy93956={...occupancy,riders:riderLoads};
  if(kind==='travel'&&mountedPassenger93816){
   result.transportProof={...(result.transportProof||{}),format:'gm-transport-confirmation-v93.816',
    mass:transportMass93816,mount:mountedPassenger93816};
@@ -29403,6 +29368,7 @@ function episodeGroupRoleChoices93856(form,v){
   if(!episodeEvaluationRequested&&mountHandler.value&&mountHandler.selectedOptions[0]?.disabled){mountHandler.value='';v.transportMountHandlerId='';}
  }
  const healthyRide=v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length;
+ const wheeled=['cart','wagon'].includes(v.conveyance);
  const selectedCompanions=(v.stableAnimalIds||[]).filter(id=>!reservations.has(id));
  const mountId=healthyRide?resolveTravelMount93837(verifiedLivestock(data,campaignKey(data.campaignClock)),selectedCompanions,v.travelRideAnimalId||'').animal?.id:null;
  const mixedRide=healthyRide&&selectedCompanions.some(id=>id!==mountId);
@@ -29410,17 +29376,22 @@ function episodeGroupRoleChoices93856(form,v){
  if(rider)v.travelRideRiderId=rider.value;
  // Each led animal has a real, named walker; no automatic assignment from
  // selecting a checkbox, no member from another concurrent travel group.
- const currentRider=rider?.value||v.guideId;
+ const currentRider=healthyRide?rider?.value:'';
+ const teamIds=[...form.querySelectorAll('[name="transportTeamIds"]:checked')].map(node=>node.value);
+ const panel=form.querySelector('[data-episode-pack-handlers]');
+ if(panel)panel.hidden=!(v.kind==='travel'&&(mixedRide||wheeled&&selectedCompanions.some(id=>!teamIds.includes(id))));
+
  let unassigned=0;
  for(const label of form.querySelectorAll('[data-episode-pack-handler-row]')){
   const animalId=label.dataset.episodePackHandlerRow;
-  const show=mixedRide&&selectedCompanions.includes(animalId)&&animalId!==mountId;
+  const show=v.kind==='travel'&&selectedCompanions.includes(animalId)&&(mixedRide&&animalId!==mountId||wheeled&&!teamIds.includes(animalId));
   label.hidden=!show;
   const select=label.querySelector('select');if(!select)continue;
   if(show){
    for(const opt of select.options)if(opt.value){
-    opt.disabled=!able(opt.value)||opt.value===currentRider;
-    opt.title=!able(opt.value)?roleHealth.get(opt.value)?.reason||'nezpůsobilý':opt.value===currentRider?'jezdec nemůže současně vést další zvíře pěšky':'';
+    const {personId}=travelCompanionAssignment93956(opt.value);
+    opt.disabled=!able(personId)||personId===currentRider||(v.transportedMemberIds||[]).includes(personId);
+    opt.title=!able(personId)?roleHealth.get(personId)?.reason||'nezpůsobilý':'Jeden cestující může mít jen jednu polohu.';
     opt.hidden=opt.disabled;
    }
    if(!episodeEvaluationRequested&&select.value&&select.selectedOptions[0]?.disabled)select.value='';
@@ -29429,9 +29400,8 @@ function episodeGroupRoleChoices93856(form,v){
   select.disabled=!show||episodeEvaluationRequested;
  }
  const packStatus=form.querySelector('[data-episode-pack-handler-status]');
- if(packStatus)packStatus.textContent=!mixedRide?'Žádná další vedená zvířata.':
-  unassigned?'Chybí '+unassigned+' skutečných pěších vodičů. Doplňte je před vyhodnocením.':
-  'Všechna další zvířata mají doloženého pěšího vodiče; skupina použije tempo nejpomalejšího.';
+ if(packStatus)packStatus.textContent=unassigned?'Zbývá určit roli pro '+unassigned+' zvířat.':
+  'Doprava skupiny se řídí jejím nejpomalejším způsobem přesunu.';
  const actor=setChoices('droverActorId',healthyRide&&!mixedRide?'— Totožný s jezdcem —':'— Hlavní Drover skupiny —',!healthyRide||mixedRide);
  if(actor){
   if(healthyRide&&!mixedRide&&!episodeEvaluationRequested){
@@ -29582,10 +29552,12 @@ function updateEpisodePreview(form){
   if(tableOut)try{
    const row=trekMovementTableRow({topography:v.topography,terrain:v.terrain});
    const bearing=trekBearingRequirement({topography:v.topography,terrain:v.terrain,continuousPrecipitation:false});
+   const occupancy=episodeOccupancy93956(v,data.campaignClock);
    const mountedPatients=(v.transportedMemberIds||[]).length>0;
-   const hasWalkers=v.conveyance==='mount'&&(mountedPatients?
-    v.transportMountHandlerPosition!=='mounted':(v.memberIds||[]).length>1);
-   const pace=slowestEpisodeConveyance(v.topography,v.terrain,v.conveyance,hasWalkers);
+   const hasWalkers=!!occupancy?.walkingMemberIds.length||
+    v.conveyance==='mount'&&mountedPatients&&v.transportMountHandlerPosition!=='mounted';
+   const separateRiders=['cart','wagon'].includes(v.conveyance)&&!!occupancy?.riders.length;
+   const pace=slowestEpisodeConveyance(v.topography,v.terrain,v.conveyance,hasWalkers,separateRiders);
    const selected=row[pace];
    tableOut.textContent='Trek Movement (HMK 146) · '+selected+' lig na 240 referenčních minut · '+
     (bearing.conditional?'Bearing 1 při souvislých srážkách':
@@ -29785,7 +29757,7 @@ function updateEpisodePreview(form){
  const droverStatus=form.querySelector('[data-episode-drover-requirement]');
  if(droverStatus)droverStatus.textContent=!droverNeed.present?'Bez zvířat se Drover Test neprovádí.':
   'Doložte '+droverNeed.skill+' Skill Test postavy '+(character(droverNeed.actorId)?.name||'vybraný Drover')+
-  (droverNeed.mixed?' · kombinovaná doprava: nižší Riding / Animalcraft ML hlavního Droveře; další zvířata mají vlastní pěší vodiče.':' · doprava určila dovednost automaticky.')+ ' (HMK 141,145).';
+  (droverNeed.mixed?' · kombinovaná doprava: nižší Riding / Animalcraft ML hlavního Droveře; další zvířata mají přidělené role.':' · doprava určila dovednost automaticky.')+ ' (HMK 141,145).';
  const duneOption=form.querySelector('[data-episode-dunes-slow]');
  if(duneOption){const allowed=travel&&v.terrain==='dunes'&&v.conveyance==='foot';duneOption.hidden=!allowed;
   const cb=duneOption.querySelector('[name="dunesSlow"]');if(cb){if(!allowed)cb.checked=false;cb.disabled=!allowed;}}
@@ -29971,11 +29943,13 @@ function updateEpisodePreview(form){
  }
  const healthyRideMass=form.querySelector('[data-episode-healthy-ride-mass]');
  if(healthyRideMass&&transportActivity&&v.conveyance==='mount'&&!(v.transportedMemberIds||[]).length){
-  try{const choice=episodeHealthyMountRide93823(v,v.memberIds||[],data.campaignClock);
-   const walkers=choice?(v.memberIds||[]).filter(id=>id!==choice.riderId):[];
-   healthyRideMass.textContent=choice?`${character(choice.riderId)?.name||'Jezdec'}: ${choice.riderLb} lb + výstroj a náklad ${choice.gearAndCargoLb} lb = ${choice.totalLb} lb · ENC ${choice.enc} · Move ${choice.moveAfterLoad}.`+
-    (walkers.length?' Pěšky jdou: '+walkers.map(id=>character(id)?.name||id).join(', ')+'. HMK 141: skupina se pohybuje rychlostí nejpomalejšího a pěší mají vlastní END. Další zaškrtnuté zvíře neznamená automaticky dalšího jezdce.':''):
-    'Nejdříve vyberte zvíře ze Stáje.';
+  try{
+   const clock=data.campaignClock,cid=campaignKey(clock),roster=verifiedLivestock(data,cid);
+   const roles=episodeOccupancy93956(v,clock);
+   healthyRideMass.textContent=roles.riders.map(ride=>{
+    const load=episodeMountLoad93956(ride,roster,cid);
+    return `${character(ride.riderId)?.name||'Jezdec'} · ${roster.find(a=>a.id===ride.animalId)?.name}: ${load.totalLb} lb · ENC ${load.enc} · Move ${load.moveAfterLoad}.`;
+   }).join(' ')+(roles.walkingMemberIds.length?' Pěšky jdou: '+roles.walkingMemberIds.map(id=>character(id)?.name||id).join(', ')+'.':'');
    healthyRideMass.classList.remove('hc-episode-needs-input');
   }catch(err){healthyRideMass.textContent=err.message;healthyRideMass.classList.add('hc-episode-needs-input');}
  }
