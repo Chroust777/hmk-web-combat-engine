@@ -7,6 +7,8 @@ export const CHRONICLE_PRESENTATION_FORMAT_93889='hmk-chronicle-presentation-v1'
 const ACTIONS=new Set(['edit','hide','restore','edit-campaign-episode','edit-campaign-event']);
 const maxText=1800;
 export const CHRONICLE_TRAVEL_LAYOUT='travel-prose-v1';
+export const CHRONICLE_NOVEL_LAYOUT='travel-prose-v2';
+const travelLayouts=new Set([CHRONICLE_TRAVEL_LAYOUT,CHRONICLE_NOVEL_LAYOUT]);
 const must=(ok,why)=>{if(!ok)throw Error('Kronika: '+why)};
 const validParagraphs=parts=>Array.isArray(parts)&&parts.length<=40&&parts.every(part=>{
  if(!part||typeof part!=='object'||Array.isArray(part))return false;
@@ -49,13 +51,13 @@ export function validateChroniclePresentation93889(database){
   }
   must(typeof ev.episodeId==='string'&&ev.episodeId.length>0,'neplatná identita epizody');
   if(ev.action==='edit-campaign-episode'){
-   must(validParagraphs(ev.paragraphs)&&ev.layout===CHRONICLE_TRAVEL_LAYOUT,'neplatný přepis společné kroniky');
+   must(validParagraphs(ev.paragraphs)&&travelLayouts.has(ev.layout),'neplatný přepis společné kroniky');
    continue;
   }
   must(typeof ev.actorId==='string'&&ev.actorId.length>0,'neplatná identita postavy');
   if(ev.action==='edit'){
    must(validParagraphs(ev.paragraphs),'neplatný přepis odstavců');
-   must(ev.layout===undefined||ev.layout===CHRONICLE_TRAVEL_LAYOUT,'neplatná podoba vyprávění');
+   must(ev.layout===undefined||travelLayouts.has(ev.layout),'neplatná podoba vyprávění');
   }else must(!('paragraphs' in ev)&&!('layout' in ev),'skrytí nesmí upravit příběh');
  }
  return true;
@@ -109,7 +111,7 @@ export function campaignChronicleEventText(database,campaignId,plan){
   {title:plan.title,place:plan.place,note:plan.resolution?.note||plan.note};
 }
 
-export function recordCampaignChronicleEdit(database,{id,campaignId,createdAt,episodeId,paragraphs,planId,eventText}){
+export function recordCampaignChronicleEdit(database,{id,campaignId,createdAt,episodeId,paragraphs,planId,eventText,layout=CHRONICLE_TRAVEL_LAYOUT}){
  const clock=database.campaignClock;
  must(clock&&(clock.campaignId||`legacy:${clock.events?.[0]?.id||""}`)===campaignId,'kampaň právě není otevřená');
  if(planId){
@@ -119,5 +121,5 @@ export function recordCampaignChronicleEdit(database,{id,campaignId,createdAt,ep
  }
  must(database.journal?.some(row=>row.id===episodeId&&row.calendarCampaignId===campaignId&&row.calendarTimeEpisode),
   'epizoda není v otevřené kampani');
- return appendChronicleRevision(database,{id,campaignId,createdAt,action:'edit-campaign-episode',episodeId,paragraphs,layout:CHRONICLE_TRAVEL_LAYOUT});
+ return appendChronicleRevision(database,{id,campaignId,createdAt,action:'edit-campaign-episode',episodeId,paragraphs,layout});
 }

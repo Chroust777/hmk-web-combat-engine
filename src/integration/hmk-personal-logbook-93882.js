@@ -1,5 +1,6 @@
-import {chronicleTravelParty,ledAnimalDescription} from './hmk-chronicle-travel-93951.js?v=93.960';
-import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js?v=93.960';
+import {knownChronicleCase} from './hmk-chronicle-novel-93961.js?v=93.961';
+import {chronicleTravelParty,ledAnimalDescription} from './hmk-chronicle-travel-93951.js?v=93.961';
+import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js?v=93.961';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */
 const txt = value => String(value ?? '').trim();
@@ -126,7 +127,7 @@ export function personalEpisodeActivities(p){
  if(!tasks.length)tasks.push('přesun po trase');
  return 'Cestování – '+[...new Set(tasks)].join(' · ');
 }
-export function personalEpisodeRoles(p,name,animalKind=()=>'',formatMinute){
+export function personalEpisodeRoles(p,name,animalKind=()=>'',formatMinute,language){
  const {people,guide,drover,patients,severe,animals,conveyance,walking,aboard,stopped}=chronicleTravelParty(p,name);
  const ground=conveyance==='cart'?'na káře':conveyance==='wagon'?'na voze':'';
  const halted=p.movementMinutes===0;
@@ -135,7 +136,7 @@ export function personalEpisodeRoles(p,name,animalKind=()=>'',formatMinute){
    const tags=[];
    const patient=patients.includes(id),stop=stopped.get(id);
    const mount=animals.find(a=>a.passenger===id);
-   if(id===guide&&p.kind==='travel'&&!patient)tags.push('průvodce výpravy');
+   if(id===guide&&p.kind==='travel'&&!patient)tags.push(language?.(id)?.sex==='female'?'průvodkyně výpravy':'průvodce výpravy');
    if(id===p.trackingMemory?.trackerId)tags.push('sleduje stopu');
    if(p.kind==='watch')tags.push('drží hlídku');
    if(p.kind==='forage')tags.push('hledá zásoby');
@@ -145,8 +146,9 @@ export function personalEpisodeRoles(p,name,animalKind=()=>'',formatMinute){
    }else{
     const mounts=animals.filter(a=>a.rider===id);
     const led=animals.filter(a=>a.handler===id);
-    if(mounts.length)tags.push('v sedle zvířete jménem '+mounts.map(a=>a.name).join(', '));
-    if(led.length)tags.push((halted?'':'jde pěšky · ')+'vede '+led.map(a=>ledAnimalDescription(a,animalKind)).join(', '));
+    if(mounts.length)tags.push('v sedle '+mounts.map(a=>
+     (language&&knownChronicleCase(a.name,'genitive',language(a.id)))||'zvířete jménem '+a.name).join(', '));
+    if(led.length)tags.push((halted?'':'jde pěšky · ')+'vede '+led.map(a=>ledAnimalDescription(a,animalKind,{language})).join(', '));
     else if(walking.has(id)&&!halted)tags.push('jde pěšky');
     if(aboard.has(id))tags.push(id===drover?(halted?'má na starosti zápřah':(conveyance==='cart'?'řídí káru':'řídí vůz')):'cestuje '+ground);
    }
