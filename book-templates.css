@@ -8446,3 +8446,17 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  outline-offset: -2px;
  color: #7b271d;
 }
+
+/* Keep the expanded personal entry in the order of the written journal. */
+.content-sheet .journal-book--notes .hc-personal-episode[open] > summary .hc-episode-weather{
+ display:none;
+}
+.content-sheet .journal-book--chapter.journal-book--notes .hc-personal-episode__story--integrated .hc-story-paragraph{
+ font-size:14px!important;
+ line-height:1.62!important;
+ margin-bottom:11px!important;
+}
+.content-sheet .journal-book--notes .hc-personal-episode__story--integrated .hc-story-paragraph--intro:first-child::first-letter{
+ font-size:1.55em;
+ line-height:.85;
+}
