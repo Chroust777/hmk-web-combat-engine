@@ -8429,3 +8429,6 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  display: list-item !important;
  cursor: pointer;
 }
+
+.hc-book-filter { margin-block: .65rem 1rem; max-width: 24rem; }
+.hc-book-filter select { width: 100%; min-width: 0; }
