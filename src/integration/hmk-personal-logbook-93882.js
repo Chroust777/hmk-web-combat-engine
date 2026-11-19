@@ -1,3 +1,4 @@
+import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js';
 import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */
@@ -118,36 +119,27 @@ export function personalEpisodeActivities(p){
  return 'Cestování – '+[...new Set(tasks)].join(' · ');
 }
 export function personalEpisodeRoles(p,name){
- const ids=Array.isArray(p?.memberIds)?p.memberIds:[], stable=Array.isArray(p?.stableAnimalLoad)?p.stableAnimalLoad:[];
- const settings=p?.settings||{}, drover=txt(settings.droverActorId),guide=txt(settings.guideId||p?.orientation?.guideId);
- const handlers=new Set(p?.walkingHandlerIds||[]),transported=new Set(p?.transportedMemberIds||[]);
- const riders=new Map(stable.filter(x=>x.rider).map(x=>[x.rider,x.name||'jezdecké zvíře']));
- const unmounted=stable.filter(x=>!x.rider),placed=new Set(),roles=[];
- for(const id of ids){
-  const tags=[];if(id===guide)tags.push('průvodce');
-  if(transported.has(id))tags.push('přepravovaný člen družiny');
-  else{
-   if(riders.has(id))tags.push(`jede na koni (${riders.get(id)})`);
-   const individuallyAssigned=unmounted.filter(a=>txt(settings[`packHandler_${a.id}`])===id);
-   // A drover leading a single accompanying, unmounted horse is direct evidence
-   // for the user's description; in a multi-animal group do not invent handlers.
-   const horses=individuallyAssigned.length?individuallyAssigned:unmounted.length===1&&drover===id?unmounted:[];
-   if(drover===id&&!horses.length)tags.push('honák');
-   if(horses.length){tags.push(`honák – vede za uzdu ${horses.length===1?'koně jménem':'koně'} ${horses.map(x=>x.name).join(', ')}`);horses.forEach(x=>placed.add(x.id));}
-   if(!riders.has(id)&&!horses.length){
-    if(handlers.has(id))tags.push('pěší doprovod');
-    else if(p?.kind==='travel')tags.push('jde pěšky');
-    else tags.push('účastní se činnosti');
+ const {people,guide,drover,patients,severe,animals,conveyance}=chronicleTravelParty(p,name);
+ const vehicle=conveyance==='cart'?'kára':conveyance==='wagon'?'vůz':'';
+ return [
+  ...people.map(id=>{
+   const tags=[];
+   if(id===guide)tags.push('průvodce');
+   if(patients.includes(id)){
+    tags.push(vehicle?'převoz · '+vehicle:'převoz v sedle');
+    if(severe.has(id))tags.push('nemůže jít vlastními silami');
+   }else{
+    const mounts=animals.filter(a=>a.rider===id);
+    const led=animals.filter(a=>a.handler===id);
+    if(mounts.length)tags.push('v sedle · '+mounts.map(a=>a.name).join(', '));
+    if(led.length)tags.push('vede za uzdu · '+led.map(a=>a.name).join(', '));
+    if(id===drover&&animals.some(a=>a.team))tags.push('má na starosti zápřah');
+    if(!tags.length&&p.kind==='travel'&&(!conveyance||conveyance==='foot'||conveyance==='mount'))tags.push('pěší doprovod');
    }
-  }
-  roles.push(`${name(id)} — ${[...new Set(tags)].join('; ')||'účastník'}`);
- }
- for(const horse of stable){
-  if(horse.rider)roles.push(`${horse.name} — jezdecké zvíře; jezdec ${name(horse.rider)}`);
-  else if(placed.has(horse.id))roles.push(`${horse.name} — vedené zvíře (na uzdě)`);
-  else roles.push(`${horse.name} — doprovázející zvíře`);
- }
- return roles;
+   return tags.length?`${name(id)} — ${tags.join('; ')}`:name(id);
+  }),
+  ...animals.map(a=>`${a.name} — ${a.carried?'převážené zvíře':a.team?'tažné zvíře':a.passenger?'převoz osoby v sedle':a.rider?'jezdecké zvíře':a.handler?'vedeno za uzdu':'doprovázející zvíře'}`)
+ ];
 }
 // Descriptive manuscript prose, not a new game event. Every adjective comes from
 // the episode's environment; anything merely illustrative stays in the flavor layer.

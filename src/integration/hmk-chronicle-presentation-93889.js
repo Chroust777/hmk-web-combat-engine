@@ -6,6 +6,7 @@
 export const CHRONICLE_PRESENTATION_FORMAT_93889='hmk-chronicle-presentation-v1';
 const ACTIONS=new Set(['edit','hide','restore']);
 const maxText=1800;
+export const CHRONICLE_TRAVEL_LAYOUT='travel-prose-v1';
 const must=(ok,why)=>{if(!ok)throw Error('Kronika: '+why)};
 const validParagraphs=parts=>Array.isArray(parts)&&parts.length<=40&&parts.every(part=>{
  if(!part||typeof part!=='object'||Array.isArray(part))return false;
@@ -19,7 +20,11 @@ export function chroniclePresentationSnapshot(database,actorId,episodeId){
  for(const event of events){
   if(event.actorId!==actorId||event.episodeId!==episodeId)continue;
   state.revision++;
-  if(event.action==='edit')state.paragraphs=event.paragraphs;
+  if(event.action==='edit'){
+   state.paragraphs=event.paragraphs;
+   if(event.layout===undefined)delete state.layout;
+   else state.layout=event.layout;
+  }
   if(event.action==='hide')state.hidden=true;
   if(event.action==='restore')state.hidden=false;
  }
@@ -39,8 +44,10 @@ export function validateChroniclePresentation93889(database){
   must(typeof ev.actorId==='string'&&ev.actorId.length>0&&typeof ev.episodeId==='string'&&ev.episodeId.length>0&&
    typeof ev.campaignId==='string'&&ev.campaignId.length>0&&ACTIONS.has(ev.action)&&typeof ev.createdAt==='string',
    'neplatná identita či akce');
-  if(ev.action==='edit')must(validParagraphs(ev.paragraphs),'neplatný přepis odstavců');
-  else must(!('paragraphs' in ev),'skrytí nesmí upravit příběh');
+  if(ev.action==='edit'){
+   must(validParagraphs(ev.paragraphs),'neplatný přepis odstavců');
+   must(ev.layout===undefined||ev.layout===CHRONICLE_TRAVEL_LAYOUT,'neplatná podoba vyprávění');
+  }else must(!('paragraphs' in ev)&&!('layout' in ev),'skrytí nesmí upravit příběh');
  }
  return true;
 }
@@ -53,7 +60,7 @@ export function assertChroniclePresentationAppendOnly93889(before,after){
  for(let i=0;i<old.length;i++)must(JSON.stringify(old[i])===JSON.stringify(current[i]),'historii úprav nelze přepisovat');
  return true;
 }
-export function recordChroniclePresentation93889(database,action,{id,actorId,episodeId,campaignId,createdAt,paragraphs}={}){
+export function recordChroniclePresentation93889(database,action,{id,actorId,episodeId,campaignId,createdAt,paragraphs,layout}={}){
  must(ACTIONS.has(action),'neznámá akce');
  const source=(database?.journal||[]).find(j=>j.id===episodeId&&j.calendarCampaignId===campaignId&&j.calendarTimeEpisode?.memberIds?.includes(actorId));
  must(!!source,'zápis nenavazuje na potvrzenou epizodu postavy');
@@ -61,7 +68,10 @@ export function recordChroniclePresentation93889(database,action,{id,actorId,epi
  if(action==='hide'&&latest.hidden)return false;
  if(action==='restore'&&!latest.hidden)return false;
  const ev={id,actorId,episodeId,campaignId,createdAt,action};
- if(action==='edit')ev.paragraphs=paragraphs;
+ if(action==='edit'){
+  ev.paragraphs=paragraphs;
+  if(layout!==undefined)ev.layout=layout;
+ }
  const copy=structuredClone(database?.chroniclePresentation||{format:CHRONICLE_PRESENTATION_FORMAT_93889,events:[]});
  copy.events.push(ev);
  validateChroniclePresentation93889({...database,chroniclePresentation:copy});
