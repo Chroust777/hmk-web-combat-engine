@@ -8,7 +8,7 @@ import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-r
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
-import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js';
+import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js?v=93.957';
 import {travelOccupancy93956,travelOccupancyContext93956,travelCompanionAssignment93956,travelWheeledOccupants93956} from './src/integration/hmk-mixed-transport-93859.js?v=93.956';
 import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
@@ -240,8 +240,8 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=93.956';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=93.957';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js?v=93.957';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {weatherSkinComplexion} from './src/integration/hmk-weather-skin-coverage.js';
@@ -385,7 +385,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.956';
+const APP_VERSION='93.957';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3404,7 +3404,7 @@ function timeEpisodePageHTML(clock,participants){
   <p class="hmk-equipment-timing">HMK 148: výsledek skutečného opravářského hodu zůstane v deníku. Poškozený předmět má v inventáři stav <strong>Rozbitý</strong> a WQ 0, pokud WQ má. <strong>Termín a čas dalších oprav určuje GM</strong>; žádná automatická minutová blokace Pochodu nevzniká. Úspěšné CS/S opravují předmět podle hodu ihned.</p>
  </section>
  <div class="hmk-trek-grid">
- <label data-hazard-repair>Jak naložit s poškozenou výstrojí?<select name="hazardEquipmentDisposition"><option value="repair">Opravit · Skill Test</option><option value="ignore">Ponechat poškozené</option><option value="abandon">Odložit / opustit</option></select></label>
+ <label data-hazard-repair>Jak naložit s poškozenou výstrojí?<select name="hazardEquipmentDisposition"><option value="repair">Opravit · Skill Test</option><option value="ignore">Ponechat poškozené</option><option value="abandon">Odložit / opustit</option><option value="no-equipment" hidden disabled>Bez použitelné výstroje · rozhodnutí GM</option></select></label>
  <label data-hazard-complication>Překážka · postup<select name="hazardComplicationDecision"><option value="test">Překonat testem</option><option value="reroute">GM mění trasu</option></select></label>
  <label data-hazard-item>Čí a který skutečný předmět je poškozen?<select name="hazardItemId"><option value="">— vyberte skutečný předmět —</option>${data.inventory.filter(x=>participants.some(c=>c.id===x.characterId)&&Number(x.quantity)>0&&!['chest','stable'].includes(x.slot)).map(x=>`<option value="${esc(x.id)}">${esc(character(x.characterId)?.name||x.characterId)} · ${esc(x.snapshot?.name||x.id)} (${esc(x.slot||'neseno')})</option>`).join('')}</select></label>
  <div data-hazard-repair class="hmk-equipment-derived-skill"><strong>Oprava · dovednost podle předmětu</strong><input name="hazardRepairSkill" type="hidden" value=""><output data-hazard-repair-skill-text>Nejdříve vyberte předmět.</output><small data-hazard-repair-skill-source></small></div>
@@ -25846,14 +25846,26 @@ function refreshWeatherAreaAVFields(form){
    msg.style.color=area.ready?'':'#a42c21';}
  }
 }
+function episodeCarriedHazardItems957(memberIds){
+ return data.inventory.filter(item=>memberIds.includes(item.characterId)&&
+  Number(item.quantity)>0&&!['chest','stable'].includes(item.slot));
+}
+function episodeNoEquipmentHazard957(v){
+ return (v.kind==='forage'||v.conveyance==='foot')&&!(v.animalIds||[]).length&&!(v.stableAnimalIds||[]).length&&
+  episodeCarriedHazardItems957(v.memberIds||[]).length===0;
+}
+function episodeHazardGearContext957(form,members){
+ return {kind:form.elements.namedItem('kind')?.value,conveyance:form.elements.namedItem('conveyance')?.value,
+  memberIds:members,animalIds:[...form.querySelectorAll('[name="animalIds"]:checked')].map(x=>x.value),
+  stableAnimalIds:[...form.querySelectorAll('[name="stableAnimalIds"]:checked')].map(x=>x.value)};
+}
 function episodeRefreshHazardInventory93790(form){
  const select=form?.elements.namedItem('hazardItemId');if(!select)return;
  const members=[...form.querySelectorAll('[name="memberIds"]:checked')].map(x=>x.value);
  const current=select.value;
  // The FAILED Orienteering belongs to the guide; the Equipment Hazard is a
  // PARTY problem (HMK 148). Never silently restrict it to the guide's pack.
- const carried=data.inventory.filter(x=>members.includes(x.characterId)&&
-  Number(x.quantity)>0&&!['chest','stable'].includes(x.slot));
+ const carried=episodeCarriedHazardItems957(members);
  const signature=[...members].sort().join(',')+'|'+carried.map(x=>x.id+':'+x.characterId+':'+(x.snapshot?.name||'')+':'+x.slot).join('|');
  if(select.dataset.hazardInventorySignature===signature)return;
  select.replaceChildren(new Option('— vyberte předmět člena skupiny —',''));
@@ -25904,7 +25916,14 @@ function episodeEquipmentSync93843(form){
  const field=form?.querySelector('[data-episode-hazard-details]');
  if(!field||field.hidden||![1,2,3].includes(Number(form.elements.namedItem('survivalD10')?.value)))return;
  const {item,rule,members}=episodeEquipmentDerived93843(form);
- const disposition=form.elements.namedItem('hazardEquipmentDisposition')?.value;
+ const choice=form.elements.namedItem('hazardEquipmentDisposition');
+ const empty=episodeNoEquipmentHazard957(episodeHazardGearContext957(form,members));
+ const fallback=[...choice.options].find(option=>option.value==='no-equipment');
+ fallback.disabled=fallback.hidden=!empty;
+ if(!empty&&choice.value==='no-equipment')choice.value='repair';
+ const disposition=choice.value;
+ const itemLabel=field.querySelector('[data-hazard-item]');
+ if(itemLabel)itemLabel.hidden=disposition==='no-equipment';
  const workerSelect=form.elements.namedItem('hazardWorkerId');
  if(workerSelect){
   for(const option of workerSelect.options){
@@ -25940,6 +25959,7 @@ function episodeEquipmentSync93843(form){
  }
  const owner=field.querySelector('[data-hazard-equipment-owner]');
  if(owner)owner.textContent=item?'Vlastník: '+(character(item.characterId)?.name||item.characterId)+' · '+(item.snapshot?.name||'předmět'):
+  empty?'V této pěší skupině není žádná evidovaná výstroj. GM může výslovně potvrdit, že nevznikla škoda.':
   'Vyberte konkrétní předmět. Výběr sám nic nepoškodí.';
  const skill=field.querySelector('[data-hazard-repair-skill-text]');
  if(skill)skill.textContent=rule.skill||'Dovednost zatím nelze doložit';
@@ -25979,6 +25999,11 @@ function episodeEquipmentValidateConfirm93843(form){
  const types=Number(form.elements.namedItem('survivalD10')?.value);
  if(![1,2,3].includes(types))return;
  const {item,rule,members}=episodeEquipmentDerived93843(form);
+ if(form.elements.namedItem('hazardEquipmentDisposition')?.value==='no-equipment'){
+  if(!episodeNoEquipmentHazard957(episodeHazardGearContext957(form,members)))
+   throw Error('Equipment Hazard: rozhodnutí bez výstroje je dostupné pouze pěší skupině bez evidované výstroje a zvířat.');
+  return;
+ }
  if(!item)throw Error('Equipment Hazard: vyberte skutečný předmět některé postavy v tomto cestovním intervalu.');
  if(form.elements.namedItem('hazardEquipmentDisposition')?.value==='repair'){
   if(!rule.skill)throw Error('Equipment Hazard: k tomuto předmětu není doložena vhodná dovednost. '+rule.reason);
@@ -27598,7 +27623,7 @@ function episodePreviewFromForm(form,clock){
   const complicationWorst=complicationParty&&complicationPartyProofs.every(Boolean)?
    ['CF','F','S','CS'].find(level=>complicationPartyProofs.some(p=>p.level===level)):null;
   const detail=episodeHazardFollowup({hazard:hazardType,
-   equipmentDisposition:v.hazardEquipmentDisposition||'repair',
+   equipmentDisposition:hazardType!=='equipment'&&v.hazardEquipmentDisposition==='no-equipment'?'repair':v.hazardEquipmentDisposition||'repair',
    complicationDecision:v.hazardComplicationDecision||'test',
    repairSkill:hazardType==='equipment'?v.hazardRepairSkill||null:null,
    repairLevel:hazardType==='equipment'?l:null,
@@ -27621,7 +27646,10 @@ function episodePreviewFromForm(form,clock){
   if(hazardType==='misdirection'&&detail.result==='pending-awareness')detail.requiresGMCompletion=true;
   if(hazardType==='equipment'){
    const item=data.inventory.find(x=>x.id===v.hazardItemId&&members.includes(x.characterId)&&Number(x.quantity)>0&&!['chest','stable'].includes(x.slot));
-   if(!item)detail.requiresGMCompletion=true;
+   if(v.hazardEquipmentDisposition==='no-equipment'){
+    if(!episodeNoEquipmentHazard957(v))throw Error('Výstroj: u této skupiny vyberte skutečný předmět.');
+    detail.requiresGMCompletion=false;
+   }else if(!item)detail.requiresGMCompletion=true;
    else{
     detail.itemId=item.id;detail.itemOwnerId=item.characterId;
     detail.itemName=item.snapshot?.name||item.id;
