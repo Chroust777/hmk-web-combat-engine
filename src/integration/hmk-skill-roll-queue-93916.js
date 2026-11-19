@@ -49,7 +49,7 @@ function focusField(field){
  if(!field)return;
  try{field.focus({preventScroll:true});field.closest('label')?.scrollIntoView({block:'center',behavior:'smooth'});}catch{}
 }
-export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>false){
+export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>false,isLinkedTest=()=>false){
  if(!root||typeof secureDie!=='function')return {forms:0,fields:0};
  installTabFocus();
  for(const [id,item] of controllers)if(!item.form.isConnected){
@@ -61,6 +61,8 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
   if(!form||form.hasAttribute('data-hmk-skill-roll-stage-93916'))continue;
   const ordered=namesFor(form).map(name=>form.elements.namedItem(name)).filter(x=>x instanceof HTMLInputElement);
   if(!ordered.length)continue; // No extra tiebreak d10 when the original proof already resolves the tie.
+  const ordinaryStart=(id==='skill-secondary-form'||id==='skill-assistance-form')&&!isLinkedTest();
+  let rollingStarted=!ordinaryStart;
   const state=new Map();form.setAttribute('data-hmk-skill-roll-stage-93916','yes');forms++;
   const submit=form.querySelector('button[type="submit"]');
   const message=document.createElement('p');message.className='hmk-simple-roll-status-93915';
@@ -100,6 +102,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
     refresh();focusField(pending()?.field);
    });
    field.addEventListener('input',()=>{
+    rollingStarted=true;
     if(state.get(field.name).accepted!==String(field.value))state.get(field.name).accepted=null;
     refresh();
    });
@@ -120,7 +123,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
      entry.field.value='';entry.accepted=null;delete entry.field.dataset.hmkAutoDice;
     }
     entry.field.readOnly=!current;
-    entry.field.closest('label')?.classList.toggle('hmk-simple-current-93915',current);
+    entry.field.closest('label')?.classList.toggle('hmk-simple-current-93915',current&&rollingStarted);
     entry.field.closest('label')?.classList.toggle('hmk-simple-done-93915',on&&!current&&entry.accepted===String(entry.field.value)&&inRange(entry.field));
     entry.generator.disabled=!current;
     entry.generator.hidden=!on;
@@ -129,7 +132,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
    }
    reset.hidden=![...state.values()].some(x=>x.accepted!==null);
    if(now){const index=list.indexOf(now.field)+1;
-    message.textContent='ČERVENÝ AKTIVNÍ HOD '+index+'/'+list.length+' · '+now.field.name+' · d'+values[now.field.name]+' · Generovat hod nebo ručně zadat číslo → Vložit hodnotu.';
+    message.textContent=(rollingStarted?'ČERVENÝ AKTIVNÍ HOD ':'Hod ')+index+'/'+list.length+' · '+now.field.name+' · d'+values[now.field.name]+' · Generovat hod nebo ručně zadat číslo → Vložit hodnotu.';
    }else if(list.length)message.textContent='Všechny požadované hody potvrzené · lze použít původní Vyhodnotit.';
    else message.textContent='Tato situace nevyžaduje další kostku · rozhodne původní pravidlové vyhodnocení.';
   }
@@ -146,6 +149,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
    if(need){
     // Primary rolls may be absent only with an explicit forced-CF exemption.
     event.preventDefault();event.stopImmediatePropagation();
+    rollingStarted=true;refresh();
     message.textContent='Uložení pozastaveno: potvrďte červený hod '+need.field.name+' (d'+values[need.field.name]+').';
     focusField(need.field);return;
    }
@@ -174,7 +178,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
   // When a new workflow appears, guide the user to the only active red die.
   window.setTimeout(()=>{
    const next=pending()?.field;
-   if(form.isConnected&&next&&next.getClientRects().length&&!next.closest('[hidden]')&&
+   if(rollingStarted&&form.isConnected&&next&&next.getClientRects().length&&!next.closest('[hidden]')&&
       (document.activeElement===document.body||document.activeElement?.closest?.('[data-skill-tab]')))
     focusField(next);
   },80);

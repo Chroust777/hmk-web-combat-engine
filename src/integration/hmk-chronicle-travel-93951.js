@@ -464,15 +464,17 @@ function travelSkillBeat(entry,p,test,name,party,context='',language){
  }
  if(!context&&(p.orientation?.droverSkillId===test.id||/animalcraft|riding/.test(skill))){
   const riding=/riding/.test(skill);
-  const beasts=party.animals.filter(a=>riding?a.rider===test.actorId:a.handler===test.actorId||(a.team&&party.drover===test.actorId));
+  const driving=['cart','wagon'].includes(party.conveyance)&&party.drover===test.actorId&&party.aboard.has(test.actorId);
+  const beasts=party.animals.filter(a=>driving?a.team:riding?a.rider===test.actorId:a.handler===test.actorId);
+  const mounted=beasts.some(a=>a.rider===test.actorId)&&!driving;
+  const reins=[
+   ' drží otěže pevně a čeká, až se tah zápřahu srovná.',
+   ' vede zápřah otěžemi a dbá, aby zvířata neztratila krok.'
+  ];
   const names=list(beasts.map(a=>'„'+a.name+'“'));
   if(language){
    const damp=['rain','sleet'].includes(p.precipitation?.precipitation||p.weather?.precipitation);
-   const team=beasts.filter(a=>a.team);
-   const before=team.length?who+say('román-spřežení',[
-    ' pobízí zvířata tak, aby nepřišla o pravidelný krok.',
-    ' při každé pobídce sleduje, jak zvířata zabírají.'
-   ]):riding?who+say('román-sedlo',[
+   const before=driving?who+say('román-spřežení',reins):mounted?who+say('román-sedlo',[
     ' se v sedle snaží přizpůsobit kroku zvířete.',' hledá v sedle míru mezi vlastním pohybem a krokem zvířete.'
    ]):who+say('román-vedení',[
     ' při vedení zvířete dává pozor, aby mu nepřekážel každý tah.',damp?
@@ -488,7 +490,7 @@ function travelSkillBeat(entry,p,test,name,party,context='',language){
    })[test.level]||['']);
    return {kind:p.kind==='travel'?'travel':'activity',test,before,after};
   }
-  const before=riding?who+' se v sedle '+(names?'zvířete jménem '+names+' ':'')+'spoléhá na souhru se zvířetem.':
+  const before=driving?who+say('zápřah',reins):mounted?who+' se v sedle '+(names?'zvířete jménem '+names+' ':'')+'spoléhá na souhru se zvířetem.':
    names?who+say('otěže',[
     ' při vedení '+names+' hledá míru mezi pevným pokynem a trpělivostí, kterou nešlo uspěchat.',
     ' vede '+names+' a musí vycítit, kdy přitáhnout a kdy povolit.'
