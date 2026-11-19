@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.967';
+const APP_VERSION='93.968';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3280,7 +3280,16 @@ function timeEpisodePageHTML(clock,participants){
  <button type="submit">Zapsat dořešení události</button></form></section>`}).join('')}</section>`:''}
  ${pendingAccidents.length?`<section class="hc-episode-interruption" role="status"><h3>Navazující nehoda · Injury Sequence ještě není uzavřena</h3>
  <p>Dokončený úsek již uložil původní Survival CF a Hazard d10. Je nutné provést jen příslušný Agility test a případné zranění. Kalendář nezahajuje nový pochod s neznámou pohyblivostí oběti.</p>
- ${pendingAccidents.map(row=>`<p><strong>${esc(displayCampaignMinute(row.calendarTimeEpisode.endMinute))}</strong> · ${esc(character(row.characterId)?.name||row.characterId)} · hod na hazard d10 ${row.calendarTimeEpisode.hazardDetails.find(h=>h.hazard==='accident').hazardD10}. <button type="button" data-episode-open-accident="${esc(row.characterId)}">Otevřít původní zdravotní následky ve Skill Tests</button></p>`).join('')}</section>`:''}
+ ${pendingAccidents.map(row=>{
+  const ep=row.calendarTimeEpisode,hazard=ep.hazardDetails.find(h=>h.hazard==='accident'&&h.externalMedicalPending);
+  const minute=hazard.eventWindow93868?.eventMinute??ep.startMinute+hazard.hazardAtMinute;
+  const handoff=hazard.medicalHandoffMinute??ep.endMinute;
+  return `<p><strong>${esc(character(row.characterId)?.name||'Člen skupiny')}</strong> ·
+   ${Number.isSafeInteger(minute)?'Nehoda '+esc(displayCampaignMinute(minute))+' · ':''}
+   Zdravotní vyhodnocení po společném intervalu od ${esc(displayCampaignMinute(handoff))} · Hazard d10 ${hazard.hazardD10}.
+   <button type="button" class="hmk-medical-required-target" data-episode-open-accident="${esc(row.characterId)}"
+    data-episode-accident-source="${esc(ep.orientation.skillId)}">Otevřít původní zdravotní následky ve Skill Tests</button></p>`;
+ }).join('')}</section>`:''}
  <div class="hc-episode-columns"><section class="hc-episode-editor"><h3>1 · Nastavit epizodu</h3>
 <section class="hc-episode-checklist" data-shared-window-control>
 <h4>Společný interval epizody</h4>
@@ -29529,6 +29538,7 @@ function updateSharedTimeWindowControls(form){
  // Show the limiting treatment/medical/day boundary exactly where minutes
  // are chosen. After starting the interval this warning is not repeated.
  const capLine=document.querySelector('[data-shared-window-cap]');
+ let startBlocked=false;
  if(capLine&&total){
   capLine.hidden=active;
   if(!active){
@@ -29536,23 +29546,27 @@ function updateSharedTimeWindowControls(form){
    const maximum=Math.min(10080,Math.max(0,dayLimit),Math.max(0,cap?.maxAllowed??10080));
    total.max=String(maximum);
    const source=cap?.first;
+   startBlocked=maximum===0||!!cap?.unknown?.length;
+   total.disabled=startBlocked;
    const reason=source?(source.origin==='gm'?(source.title||'GM událost'):(source.description||'povinná kontrola')):null;
    capLine.textContent=cap?.unknown?.length?'Neověřená zdravotní časová osa: '+cap.unknown[0].description+'. Nejprve ji vyřešte v Kalendáři.':
-    maximum===0?'Nyní nelze zahájit nový interval: splatná '+(reason||'povinná událost')+'. Nejprve ji dokončete v Kalendáři.':
+    maximum===0?'Nyní nelze zahájit nový interval. Nejdříve vyřešte: '+(reason||'povinná událost')+'.':
     'Maximální délka nového intervalu: '+maximum+' minut (do '+displayCampaignMinute(data.campaignClock.minute+maximum)+').'+
     (reason&&cap.maxAllowed<=dayLimit?' Poté: '+reason+'.':dayLimit<=cap?.maxAllowed?' Hranice kalendářního dne; pro další den se potvrzuje nové počasí.':'');
-   if(maximum===0&&source?.kind==='weather-skin'&&character(source.characterId)){
-    const open=document.createElement('button');
-    open.type='button';
-    open.className='secondary';
-    open.textContent='Otevřít kožní následek · '+character(source.characterId).name;
-    open.addEventListener('click',()=>focusCalendarRuleAction(
-     character(source.characterId),source.kind,source.sourceId));
-    capLine.append(' ',open);
+   if(startBlocked&&!cap?.unknown?.length&&source?.origin==='rule'&&character(source.characterId)){
+    const accident=episodeOriginalTravelAccidentForCritical93856(source);
+    if(accident)capLine.append(' Použijte odkaz u navazující nehody výše.');
+    else capLine.insertAdjacentHTML('beforeend',` <button type="button" class="secondary hmk-medical-required-target"
+     data-cal-link="${esc(source.characterId)}" data-cal-kind="${esc(source.kind)}"
+     data-cal-destination="${esc(calendarEventDestination(source))}" data-cal-source="${esc(source.sourceId||source.woundId||'')}"
+     data-cal-concurrent-id="${esc(source.startId||'')}" data-cal-elapsed="${esc(source.elapsedMinutes??'')}">
+     Otevřít splatnou kontrolu · ${esc(character(source.characterId).name)}</button>`);
+   }else if(startBlocked&&!cap?.unknown?.length){
+    capLine.append(' Otevřete Přehled a čas → K vyřízení.');
    }
   }
  }
- const create=document.querySelector('[data-shared-window-create]');if(create){create.disabled=active||episodeUnresolvedGeneralStops93869(data.campaignClock).length>0;create.hidden=active;}
+ const create=document.querySelector('[data-shared-window-create]');if(create){create.disabled=active||startBlocked||episodeUnresolvedGeneralStops93869(data.campaignClock).length>0;create.hidden=active;}
  const planner=document.querySelector('[data-shared-window-planner]');if(planner)planner.hidden=!active;
  const addCard=document.querySelector('[data-shared-plan-add]');if(addCard){addCard.disabled=!active||!!sharedTimeWindowActivePlanId||!!episodeEvaluationRequested||!!episodePendingSkillRequest||sharedEpisodeAutoRun93772;
   addCard.title=addCard.disabled?(!active?'Nejprve založte společný interval. Pokud jej kalendář blokuje, vyřešte konkrétní splatnou událost nahoře.':'Dokončete nynější skupinu nebo její skutečně vyžádané testy.'):'';}
@@ -31490,7 +31504,8 @@ document.addEventListener('click',e=>{
  // on the general Skill Tests chapter with all continuation forms hidden.
  const source=document.querySelector('[data-hmk-followup-source-598]');
  const pending=[...(source?.querySelectorAll('form[data-skill-physical-impact]')||[])].find(f=>
-  f.querySelector('[name="kind"]')?.value==='survival-accident');
+  f.elements.namedItem('kind')?.value==='survival-accident'&&
+  f.elements.namedItem('sourceId')?.value===accident.dataset.episodeAccidentSource);
  const choice=document.querySelector('[data-hmk-followup-choice-598]');
  if(pending&&choice){
   choice.value=pending.getAttribute('data-hmk-followup-entry-598')||'';
