@@ -80,9 +80,11 @@ export function projectChronicleHealth_558({actorId,state,now=null,campaignId=nu
  }
  for(const w of s.wounds||[]){
   if(w.healed)continue;
-  const name=[w.location||w.loc||'neznámá lokace',w.severity&&w.level?w.severity+w.level:null].filter(Boolean).join(' ');
+  const side={l:'L',left:'L',r:'R',right:'R'}[String(w.side).toLowerCase()];
+  const name=[w.location||w.loc||'neznámá lokace',side,w.severity&&w.level?w.severity+w.level:null].filter(Boolean).join(' ');
+  const woundRow=(...fields)=>({...item(w.id,...fields),woundId:w.id});
   const h=w.healing;
-  if(!h){rows.push(item(w.id,'Rána · '+name,'Bez ošetření',
+  if(!h){rows.push(woundRow('Rána · '+name,'Bez ošetření',
     w.bleeding?'krvácení':'léčba nepotvrzena','Termín dalšího hojení neověřen',
     'Nejprve dokončit původní Treatment a případné zastavení krvácení.',false));continue;}
   const infected=!!h.infected;
@@ -92,7 +94,7 @@ export function projectChronicleHealth_558({actorId,state,now=null,campaignId=nu
    h.treated?'ošetřená rána':'čeká na ošetření';
   const stateHR=infected?('Infection HR'+(integer(h.infectionHR)?h.infectionHR:'?')):
    healing&&integer(h.healingRate)?'Healing HR'+h.healingRate:'HR neurčeno';
-  rows.push(item(w.id,'Rána · '+name,stateHR,status,
+  rows.push(woundRow('Rána · '+name,stateHR,status,
    kind?dueDescriptor(agenda,kind,actorId,gmTime,displayMinute,null,w.id):
     'Termín nedoložen nebo běžné léčení pozastaveno',
    infected?'Infekce pozastavuje Healing Rolls všech ran (HMK str. 181).':
