@@ -239,7 +239,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,lastNavigationEvidenceBefore,EPISODE_NAVIGATION_EVIDENCE_POLICY_93907,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,independentTravelDelayCarry,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,lastNavigationEvidenceBefore,EPISODE_NAVIGATION_EVIDENCE_POLICY_93907,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -382,7 +382,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.943';
+const APP_VERSION='93.944';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2453,6 +2453,17 @@ function persistEpisodeDraftSidecar({snapshotForm=false}={}){
  localStorage.setItem(EPISODE_SIDECAR_KEY,JSON.stringify(body));
 }
 function discardEpisodeDraftSidecar(){localStorage.removeItem(EPISODE_SIDECAR_KEY);}
+// Used only after the caller has safely kept or replaced the committed campaign.
+function clearTimeEpisodeDraft(){
+ sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowSelectedGroupId=null;
+ sharedTimeWindowActivePlanId=null;sharedTimeWindowPlans=[];sharedPlanMembersOpen93806=null;
+ episodeGroupStartingReceiptIds93810=[];sharedEpisodeAutoRun93772=false;episodeQueueAction=false;
+ episodeEvaluationRequested=false;episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;
+ episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;
+ episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];episodeFocusedTaskField='';
+ timeEpisodeDraft=episodeFreshDraft();timeEpisodeDraftCampaign=null;episodePendingRemainderMinutes=null;episodeDraftEpoch=uuid();
+ discardEpisodeDraftSidecar();
+}
 function restoreEpisodeDraftSidecar(){
  const raw=localStorage.getItem(EPISODE_SIDECAR_KEY);if(!raw)return;
  let side;try{side=JSON.parse(raw);}catch{return;}
@@ -3567,13 +3578,16 @@ function timeEpisodeChronicleHTML(clock,personalId=null){
   const km=(p.distanceMeters/1000).toLocaleString('cs-CZ',{maximumFractionDigits:3});
   const scent=p.trackingScent;
   const complication=p.foragingComplication93875;
+  const delayText=p.travelDelay&&(p.travelDelay.incoming||p.travelDelay.current||p.travelDelay.carryOut)?
+   `<p>Zdržení převzato ${p.travelDelay.incoming} min · vyčerpáno ${p.travelDelay.applied} min · zbývá ${p.travelDelay.carryOut} min · pohyb ${p.movementMinutes} min.</p>`:'';
+
   const trekComplication=p.kind==='travel'&&p.hazardDetails?.find(h=>h.hazard==='complication'&&h.result==='irreparable');
   const trekComplicationText=trekComplication?`<p><b>Pochod · Complication CF</b> · Překážka v minutě ${trekComplication.hazardAtMinute}. Pohyb ${p.movementMinutes} z ${p.minutes} min. Při dalším pochodu zvolte jinou trasu.</p>`:'';
   const complicationText=complication?.atMinute!=null?`<p><b>Foraging · Complication ${esc(complication.level)}</b> · Překážka v minutě ${complication.atMinute}. Sběr probíhal ${complication.workedMinutes} z ${p.minutes} min.</p>`:'';
   const scentText=scent?`<p><b>Scent · ${esc(scent.name)}</b> · Awareness d100 ${scent.roll} · ${esc(scent.level)} · SV ${scent.adjustedSV} · ${scent.spoorStars} Spoor ★${scent.observationLevel?' · Observation d100 '+scent.observationRoll+' · '+esc(scent.observationLevel):''}</p>`:'';
   return `<article class="hc-episode-history"><header><strong>${esc(displayCampaignMinute(p.startMinute))}–${esc(displayCampaignMinute(p.endMinute))}</strong><span>${p.minutes} minut · ${esc(({travel:'Cestování',rest:'Odpočinek',sleep:'Spánek',winded:'Klid',forage:'Hledání potravy',tracking:'Tracking',watch:'Ostraha',other:'Činnost'})[p.kind]||p.kind)}</span></header><p>${esc(p.narrative||p.area||'Činnost družiny.')}</p><p>Účastníci: ${esc(p.memberIds.map(participantName).join(', '))}. ${p.distanceMeters?`Vzdálenost ${p.distanceMeters} m (${km} km), na mapě 1 : ${p.mapScale} = ${p.mapCentimetres} cm.`:'Bez přesunu.'}</p>${p.kind==='travel'&&p.actors?.length?`<div class="hc-episode-person-results">${p.actors.map(a=>a.sr?
    `<p>${esc(participantName(a.id))}: END (d10: ${a.roll}), TN ${a.sr.tn} · ${a.sr.success?'úspěch':'neúspěch'}, Weariness +${a.delta}, ${a.before} → ${a.after}${a.carryOut?' · nevyčerpaný zlomek se převádí':''}${a.earlyIncapacity?' · další pohyb znemožněn od '+esc(displayCampaignMinute(a.earlyIncapacity.minute))+' ('+esc(a.earlyIncapacity.shock)+')':''}.</p>`:
-   `<p>${esc(participantName(a.id))}: END SR se neprováděl${a.endNotRequired?' · postava neschopná pohybu od '+esc(displayCampaignMinute(a.endNotRequired.minute))+' ('+esc(a.endNotRequired.shock)+')':' · bez potvrzeného důvodu nelze výsledek doložit'}. Weariness ${a.before} → ${a.after}.</p>`).join('')}</div>`:''}${p.recovery?.length?`<div class="hc-episode-person-results">${p.recovery.map(a=>`<p>${esc(participantName(a.id))}: ${p.kind==='winded'?'Windedness':'Weariness'} ${a.prior} → ${a.after} (změna ${a.delta>=0?'+':''}${a.delta})${a.weatherAdded?' · únava z počasí +'+a.weatherAdded:''}${a.carry?' · zbytek časového kreditu '+a.carry:''}.</p>`).join('')}</div>`:''}${p.stableAnimalLoad?.length?`<p>Stájová zvířata: ${p.stableAnimalLoad.map(a=>esc(a.name)+' · ENC '+a.enc+(a.loaded?' · Loaded':'')).join('; ')}. Zatížení převzato z původní evidence.</p>`:''}${p.animals?.length?`<p>Vlastní zvířata (GM analogie): ${p.animals.map(a=>`${esc(participantName(a.id))} +${a.delta} Weariness (${a.before} → ${a.after})`).join('; ')}</p>`:''}${p.survivalHazard?`<p>Survival Hazard (HMK 148) · ${esc(p.survivalHazard)} (d10 ${p.settings?.survivalD10||'doložený'}). Následky jsou doloženy v automatických navazujících výsledcích epizody.</p>`:''}${p.direction?`<p>Direction Hazard (${p.direction.rolls.map(x=>'d10: '+x).join('; ')}) · ${esc(p.direction.direction)}.</p>`:''}${p.foraging?`<p>Foraging (d10: ${p.foraging.roll}) · ${esc(p.foraging.habitat)} · nalezeno ${p.foraging.results[0].foodDays} dne potravy, ${p.foraging.results[0].waterDays} dne vody, ${p.foraging.results[0].herbDoses} dávek bylin. Záznam v původním účtu zásob.</p>`:''}${p.orientation?`<p><b>Survival / Orienteering</b> · ${p.orientation.roll!==null?'(d100: '+p.orientation.roll+') · ':''}SV ${p.orientation.adjustment.adjustedSV}, ${p.orientation.stars??'—'} ★ · ${p.orientation.sourceMode==='reuse'?'převzatý platný test':'nový skutečný test'} · Progress ${p.progress}, Bearing ${p.bearing}, Slow z orientace ${p.orientation.modes.orienteeringSlow}; Foraging ${p.orientation.modes.foraging}, Stalking ${p.orientation.modes.stalking}, Vigilance ${p.orientation.modes.vigilance}. Původní Skill Test bude uložen do historie až při dokončení epizody.</p>`:''}${trekComplicationText}${complicationText}${scentText}${p.trackingMemory?`<p><b>Tracking</b> · ${esc(p.trackingMemory.trail)} · ${p.trackingMemory.roll!==null?'(d100: '+p.trackingMemory.roll+') · ':''}SV ${p.trackingMemory.sv}, upravené ${p.trackingMemory.score?.adjustedSV??p.trackingMemory.sv}, Spoor ${p.trackingMemory.score?.spoorStars??'—'} ★ · ${p.trackingMemory.sourceMode==='reuse'?'pokračování stejné stopy':'nový hod'}.</p>`:''}${p.navigationState&&p.navigationState!=='clear'?`<p><strong>Pokračující problém orientace:</strong> ${esc(p.navigationState)}; historické úspěchy jej samy neodstraní.</p>`:''}${p.navigationRecovered?'<p>GM potvrdil skutečný návrat na správnou trasu.</p>':''}${p.encounterDetails?.length?`<p><b>Setkání GM:</b> ${p.encounterDetails.map(x=>'Setkání '+(x.i+1)+' · '+(x.externalToGM?(x.disposition==='reported-to-gm'?'ohlášeno GM na konci intervalu':x.disposition==='adjudicated'?'GM řeší mimo aplikaci':'bez dalšího vyhodnocení'):'vzdálenost '+x.distance.sightingFeet+' ft, '+(x.nonhostile?'klidné setkání':'Surprise '+x.surprise.winner+' / '+x.surprise.decision))).join('; ')}</p>`:''}${p.encounter?`<p>Encounter ${p.encounter.format==='hmk-episode-encounter-minute-v1'?`(minutová GM varianta · d100 ${p.encounter.d100}; podklad HMK d10 TN ${p.encounter.tn}; pravděpodobnost ${(p.encounter.chance*100).toLocaleString('cs-CZ',{maximumFractionDigits:2})} %; počet ${p.encounter.count})`:`(d10 ${p.encounter.roll}; TN ${p.encounter.tn}; ${p.encounter.found?'setkání':'bez setkání'})`}${p.encounterDetails?.some(x=>x.disposition==='reported-to-gm')?' · oznámeno GM na konci intervalu':p.encounter.resolved?' · GM vyřízeno':''}.</p>`:''}${p.skillLinks?.length?`<p>Skill Tests:</p>${p.skillLinks.map(x=>`<p><b>${esc(x.title)}</b> · ${esc(x.body||'Doložený výsledek')}</p>`).join('')}`:''}</article>`;}).join('');
+   `<p>${esc(participantName(a.id))}: END SR se neprováděl${a.endNotRequired?' · postava neschopná pohybu od '+esc(displayCampaignMinute(a.endNotRequired.minute))+' ('+esc(a.endNotRequired.shock)+')':' · bez potvrzeného důvodu nelze výsledek doložit'}. Weariness ${a.before} → ${a.after}.</p>`).join('')}</div>`:''}${p.recovery?.length?`<div class="hc-episode-person-results">${p.recovery.map(a=>`<p>${esc(participantName(a.id))}: ${p.kind==='winded'?'Windedness':'Weariness'} ${a.prior} → ${a.after} (změna ${a.delta>=0?'+':''}${a.delta})${a.weatherAdded?' · únava z počasí +'+a.weatherAdded:''}${a.carry?' · zbytek časového kreditu '+a.carry:''}.</p>`).join('')}</div>`:''}${p.stableAnimalLoad?.length?`<p>Stájová zvířata: ${p.stableAnimalLoad.map(a=>esc(a.name)+' · ENC '+a.enc+(a.loaded?' · Loaded':'')).join('; ')}. Zatížení převzato z původní evidence.</p>`:''}${p.animals?.length?`<p>Vlastní zvířata (GM analogie): ${p.animals.map(a=>`${esc(participantName(a.id))} +${a.delta} Weariness (${a.before} → ${a.after})`).join('; ')}</p>`:''}${p.survivalHazard?`<p>Survival Hazard (HMK 148) · ${esc(p.survivalHazard)} (d10 ${p.settings?.survivalD10||'doložený'}). Následky jsou doloženy v automatických navazujících výsledcích epizody.</p>`:''}${p.direction?`<p>Direction Hazard (${p.direction.rolls.map(x=>'d10: '+x).join('; ')}) · ${esc(p.direction.direction)}.</p>`:''}${p.foraging?`<p>Foraging (d10: ${p.foraging.roll}) · ${esc(p.foraging.habitat)} · nalezeno ${p.foraging.results[0].foodDays} dne potravy, ${p.foraging.results[0].waterDays} dne vody, ${p.foraging.results[0].herbDoses} dávek bylin. Záznam v původním účtu zásob.</p>`:''}${p.orientation?`<p><b>Survival / Orienteering</b> · ${p.orientation.roll!==null?'(d100: '+p.orientation.roll+') · ':''}SV ${p.orientation.adjustment.adjustedSV}, ${p.orientation.stars??'—'} ★ · ${p.orientation.sourceMode==='reuse'?'převzatý platný test':'nový skutečný test'} · Progress ${p.progress}, Bearing ${p.bearing}, Slow z orientace ${p.orientation.modes.orienteeringSlow}; Foraging ${p.orientation.modes.foraging}, Stalking ${p.orientation.modes.stalking}, Vigilance ${p.orientation.modes.vigilance}. Původní Skill Test bude uložen do historie až při dokončení epizody.</p>`:''}${delayText}${trekComplicationText}${complicationText}${scentText}${p.trackingMemory?`<p><b>Tracking</b> · ${esc(p.trackingMemory.trail)} · ${p.trackingMemory.roll!==null?'(d100: '+p.trackingMemory.roll+') · ':''}SV ${p.trackingMemory.sv}, upravené ${p.trackingMemory.score?.adjustedSV??p.trackingMemory.sv}, Spoor ${p.trackingMemory.score?.spoorStars??'—'} ★ · ${p.trackingMemory.sourceMode==='reuse'?'pokračování stejné stopy':'nový hod'}.</p>`:''}${p.navigationState&&p.navigationState!=='clear'?`<p><strong>Pokračující problém orientace:</strong> ${esc(p.navigationState)}; historické úspěchy jej samy neodstraní.</p>`:''}${p.navigationRecovered?'<p>GM potvrdil skutečný návrat na správnou trasu.</p>':''}${p.encounterDetails?.length?`<p><b>Setkání GM:</b> ${p.encounterDetails.map(x=>'Setkání '+(x.i+1)+' · '+(x.externalToGM?(x.disposition==='reported-to-gm'?'ohlášeno GM na konci intervalu':x.disposition==='adjudicated'?'GM řeší mimo aplikaci':'bez dalšího vyhodnocení'):'vzdálenost '+x.distance.sightingFeet+' ft, '+(x.nonhostile?'klidné setkání':'Surprise '+x.surprise.winner+' / '+x.surprise.decision))).join('; ')}</p>`:''}${p.encounter?`<p>Encounter ${p.encounter.format==='hmk-episode-encounter-minute-v1'?`(minutová GM varianta · d100 ${p.encounter.d100}; podklad HMK d10 TN ${p.encounter.tn}; pravděpodobnost ${(p.encounter.chance*100).toLocaleString('cs-CZ',{maximumFractionDigits:2})} %; počet ${p.encounter.count})`:`(d10 ${p.encounter.roll}; TN ${p.encounter.tn}; ${p.encounter.found?'setkání':'bez setkání'})`}${p.encounterDetails?.some(x=>x.disposition==='reported-to-gm')?' · oznámeno GM na konci intervalu':p.encounter.resolved?' · GM vyřízeno':''}.</p>`:''}${p.skillLinks?.length?`<p>Skill Tests:</p>${p.skillLinks.map(x=>`<p><b>${esc(x.title)}</b> · ${esc(x.body||'Doložený výsledek')}</p>`).join('')}`:''}</article>`;}).join('');
  return `<section class="hc-calendar hc-episode-chronicle"><h2>${personalId?'Osobní zápis cestování':'Kronika časových epizod'}</h2><p class="hc-hint">Skutečné minuty, vzdálenost z HMK LPW, individuální END, Weariness a historické důkazy; čtením se nic nepřičítá podruhé. Dřívější historické doklady zůstávají dostupné v původní evidenci GM.</p>${html||'<p>Zatím neexistuje dokončená epizoda.</p>'}</section>`;
 }
 function campaignCalendarView(){
@@ -22442,7 +22456,7 @@ document.addEventListener('change',async e=>{if(e.target.matches?.('form[data-li
   }catch(err){alert('Import katalogu selhal: '+err.message)}finally{e.target.value=''}
   return;
  }
- if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(combatInitiativeSequence)throw Error('Import zálohy během běžící Initiative by mohl přepsat nedokončený boj a jeho trvalé následky. Nejprve bezpečně ukončete střetnutí.');if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=normalizeLegacyCustomPrices(validate(JSON.parse(await f.text())));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;if(combatInitiativeSequence)throw Error('Během načítání zálohy začala Initiative; nelze přepsat rozpracovaný boj.');const old=data;data=imported;if(!save({restoreBackup:true})){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}selected=null;encounterSelection.clear();persistEncounterDraft();if(combatInitiativeSequence)persistInitiativeSequence(null);view='characters';notice='Import byl dokončen.';render() }catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
+ if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(combatInitiativeSequence)throw Error('Import zálohy během běžící Initiative by mohl přepsat nedokončený boj a jeho trvalé následky. Nejprve bezpečně ukončete střetnutí.');if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=normalizeLegacyCustomPrices(validate(JSON.parse(await f.text())));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;if(combatInitiativeSequence)throw Error('Během načítání zálohy začala Initiative; nelze přepsat rozpracovaný boj.');const old=data;data=imported;if(!save({restoreBackup:true})){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}clearTimeEpisodeDraft();selected=null;encounterSelection.clear();persistEncounterDraft();if(combatInitiativeSequence)persistInitiativeSequence(null);view='characters';notice='Import byl dokončen.';render() }catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
 
 
 // HMK UI v2: source-grounded character attributes and editable equipment records.
@@ -25521,8 +25535,8 @@ function episodeDieCount93849(form,name){
   const elapsed=Number(form.elements.namedItem('minutes')?.value||0);
   if(!Number.isSafeInteger(elapsed)||elapsed<1||elapsed>10080)return 0;
   const v=episodeFormSnapshotCountOnly93849(form);
-  const carried=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
-   v.length?v:null,true);
+  const carried=participantTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
+   v);
   const stop=episodeConfirmedMovementStop93868(form,elapsed);
   const moving=actualGroupMovement93868({minutes:elapsed,incomingDelay:carried,atMinute:stop});
   return moving===0?0:form.elements.namedItem('doubleTime')?.checked?Math.ceil(moving/60):1;
@@ -26522,6 +26536,11 @@ function episodePreviewFromForm(form,clock){
  episodeAssertScopedSkillInputs(v);
  if(!people.length)throw Error('Vyberte aspoň jednu postavu.');
  const kind=v.kind,minutes=Number(v.minutes),guideId=v.guideId;
+ const equipmentDelayIn=kind==='travel'?participantTravelDelayCarry(data.journal,campaignKey(clock),clock.minute,members):0;
+ const waitingForComplication=kind==='travel'&&minutes>0&&equipmentDelayIn>=minutes;
+ if(waitingForComplication&&['orientationProofId','droverProofId','trackingProofId',
+  'navigationRecoveryAwarenessProofId','hazardEvidenceId'].some(field=>episodePinnedSkillFields.has(field)))
+  throw Error('Čekání po komplikaci: zrušte rozpracovanou skupinu a znovu založte její řádek. Starší návrh obsahuje hody, které v tomto úseku bez pohybu nepatří do kroniky.');
  const generalStop93869=episodeGeneralStopProof93869(v,clock);
  const actualActivityMinutes93869=effectiveActivityMinutes93869(minutes,generalStop93869);
  // Equipment F/CF is a GM-managed damaged item, never an automatic clock duty.
@@ -26570,7 +26589,7 @@ function episodePreviewFromForm(form,clock){
   activeProfileIds:clock.characterIds||[]
  }):[];
  if(!members.includes(guideId))throw Error('Průvodce musí být mezi účastníky.');
- if(kind==='travel')episodeRequireTravelOperator93865(guideId,members,'Orienteering · průvodce');
+ if(kind==='travel'&&!waitingForComplication)episodeRequireTravelOperator93865(guideId,members,'Orienteering · průvodce');
  // A documented indoor PC safe stay does not require irrelevant new
  // outdoor weather dice. Other participants still require witnessed weather
  // unless the GM separately certifies real climate shelter for everyone.
@@ -26579,7 +26598,7 @@ function episodePreviewFromForm(form,clock){
  const d6=String(v.precipitationD6??'').trim();
  // An original Survival CF immediately opens its actual follow-on hazard.
  // Preserve the value-test receipt; never reroll the primary d100.
- const orientationCF=(kind==='travel'&&v.orientationUse==='new'||kind==='forage')&&
+ const orientationCF=(kind==='travel'&&!waitingForComplication&&v.orientationUse==='new'||kind==='forage')&&
   episodeSkillProof(data.journal.find(j=>j.id===v.orientationProofId),'Survival',guideId,campaignKey(clock),clock.minute)?.level==='CF';
  if(orientationCF&&(!String(v.survivalD10||'').trim()||!Number.isInteger(Number(v.survivalD10))||Number(v.survivalD10)<1||Number(v.survivalD10)>10))
   throw Error('Survival CF: navazuje povinný Survival Hazard. Doložte skutečný d10 (1–10); původní Survival test je uložen.');
@@ -26615,7 +26634,7 @@ function episodePreviewFromForm(form,clock){
  const skillAtMinute=(id,skill,actorId=guideId)=>episodeSkillProof(data.journal.find(j=>j.id===id),skill,
   actorId,campaignKey(clock),clock.minute,{requireSV:true});
  let orientation=null,trackingMemory=null;
- if(kind==='travel'){
+ if(kind==='travel'&&!waitingForComplication){
   const base=trekMovement({topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
    progress:0,slow:0,bearing:0,loaded:false,progressD10:[],continuousPrecipitation:!!precipitation?.slowMode});
   const forced=pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute,members);
@@ -26687,7 +26706,7 @@ function episodePreviewFromForm(form,clock){
 
   }
  const modes=orientation?.modes||{progress:0,bearing:0,orienteeringSlow:0,foraging:0,stalking:0};
- const forcedBearing=kind==='travel'?pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute,members):0;
+ const forcedBearing=kind==='travel'&&!waitingForComplication?pendingTrackingCFBearing(data.journal,campaignKey(clock),clock.minute,members):0;
  if(kind==='travel')for(const node of form.querySelectorAll('[data-episode-tracking]'))
   node.hidden=modes.stalking!==1;
  const travelForagingPanel=form.querySelector('[data-episode-trek-foraging]');
@@ -26780,20 +26799,20 @@ function episodePreviewFromForm(form,clock){
  const injured=travelHealth.some(p=>p.injured)||animalHealth.some(a=>a.injured);
  const equipmentSlowIn=kind==='travel'?lastEquipmentSlowCarry(data.journal,campaignKey(clock),clock.minute,members)+
   foragingShortNextWatch93876(data.journal,campaignKey(clock),clock.minute,members):0;
- const equipmentDelayIn=kind==='travel'?independentTravelDelayCarry(data.journal,campaignKey(clock),clock.minute,members,true):0;
  // Dunes Slow is a separate, documented choice. It must be included once in
  // the movement count, but NOT again in equipmentBaseSlow: the append-only
  // episode validator deliberately adds it from its own witnessed flag.
  const equipmentBaseSlow=Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow+
   Number(wearied)+Number(injured)+Number(precipitation?.slowMode);
  const computedSlow=equipmentBaseSlow+Number(equipmentSlowIn>0)+Number(!!v.dunesSlow);
- const gmExtraProgress=kind==='travel'?Number(v.gmExtraProgress||0):0;
+ const gmExtraProgress=kind==='travel'&&!waitingForComplication?Number(v.gmExtraProgress||0):0;
  if(!Number.isSafeInteger(gmExtraProgress)||gmExtraProgress<0||gmExtraProgress>1)throw Error('GM: volný Progress musí být 0 nebo 1 (HMK 146).');
  const spare=Math.max(0,modes.progress+gmExtraProgress-computedSlow);
  // HMK 146/148: movement dice belong to THIS watch, even when the
  // previously witnessed Survival SV is valid for immediate continuation.
  // Retain historic replay for older receipts but never mint new reused dice.
- const pvals=String(v.progressD10||'').trim(),dvals=String(v.directionD10||'').trim();
+ const pvals=waitingForComplication?'':String(v.progressD10||'').trim();
+ const dvals=waitingForComplication?'':String(v.directionD10||'').trim();
  const progressD10=pvals?pvals.split(',').map(x=>Number(x.trim())):[];
  const directionD10=dvals?dvals.split(',').map(x=>Number(x.trim())):[];
  if(kind==='travel'&&progressD10.length!==spare)throw Error('Přebytek Progress vyžaduje '+spare+' skutečných d10. Zadejte je oddělené čárkami.');
@@ -26845,7 +26864,8 @@ function episodePreviewFromForm(form,clock){
   previousCarry:carry,mapScale:Number(v.mapScale),
   movementMinutes:kind==='travel'?actualGroupMovement93868({minutes,incomingDelay:equipmentDelayIn,atMinute:incidentStop93868}):null,
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
-  encByActor,forcedBearing,trackingBearingPolicy:EPISODE_TRACKING_BEARING_POLICY_93904,
+  encByActor,forcedBearing,waitingForComplication,
+  trackingBearingPolicy:waitingForComplication?null:EPISODE_TRACKING_BEARING_POLICY_93904,
   walkingHandlerIds:mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:mixedFootMemberIds93858,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
@@ -26916,11 +26936,11 @@ function episodePreviewFromForm(form,clock){
  if(animalHealth.length)result.animalHealth=animalHealth;
  result.movementRolls={progressD10,directionD10};
  result.movementRollSources={progress:null,direction:null};
- result.navigationState=episodeNavigationState(lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered,lostPriority:true});
+ result.navigationState=episodeNavigationState(lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered&&!waitingForComplication,lostPriority:true});
  result.navigationPartyScope='v93.699';
  result.navigationContinuityPolicy93907=EPISODE_NAVIGATION_EVIDENCE_POLICY_93907;
- result.navigationRecovered=!!v.navigationRecovered;
- result.navigationRecoveryAwarenessProofId=(v.navigationRecovered&&
+ result.navigationRecovered=!!v.navigationRecovered&&!waitingForComplication;
+ result.navigationRecoveryAwarenessProofId=(result.navigationRecovered&&
   episodeNavigationState(lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members))==='misdirection')?
   String(v.navigationRecoveryAwarenessProofId||'').trim()||null:null;
  result.navigationRecoveryRule='special-bearing-and-awareness-v93.780';
@@ -27069,7 +27089,7 @@ function episodePreviewFromForm(form,clock){
    if(accident)validateDeferredEpisodeEvent93868(accident.eventWindow93868,{startMinute:clock.minute,minutes,
     atMinute:accident.hazardAtMinute,kind:'accident',incomingDelay:equipmentDelayIn});
    const now=incident?incident.idleMinutes:relevant?.hazard==='equipment'?0:
-    failedComplication?minutes-obstacleMinute:Number(raw('hazardDelayNow')||0);
+    failedComplication?minutes-obstacleMinute:waitingForComplication?0:Number(raw('hazardDelayNow')||0);
    // Equipment F/CF is inventory repair work, never next-travel delay.
    const future=relevant?.hazard==='complication'&&
      ['long-delay','irreparable'].includes(outcome)?minutes:0;
@@ -27081,7 +27101,7 @@ function episodePreviewFromForm(form,clock){
     relevant.automationVersion='v93.681';
    }
    const delay={...episodeMinuteDelay({minutes,incoming,current:incident||relevant?now:0,future,persistCarry:true}),
-    method:incident?'gm-incident-foraging-v93.876':'gm-complication-foraging-v93.876'};
+    method:incident?TREK_PARTICIPANT_INCIDENT_944:TREK_PARTICIPANT_DELAY_944};
    result.travelPartyScope='v93.763'; // New receipts isolate travel consequences by actual participants.
    result.equipmentBaseSlow=equipmentBaseSlow;
    result.equipmentSlowCarryIn=equipmentSlowIn;
@@ -27442,7 +27462,9 @@ function renderEpisodeEndStatus(form,result,weather){
  const overview=root.querySelector('[data-episode-overview]');
  if(overview)overview.innerHTML='<p class="hc-hint" data-episode-build-version="'+esc(APP_VERSION)+'">Spuštěná verze: v'+esc(APP_VERSION)+'</p><strong>'+esc(String(result.minutes))+' minut · '+esc(result.kind)+'</strong><p>Od '+esc(displayCampaignMinute(result.startMinute))+' do '+esc(displayCampaignMinute(result.endMinute))+'</p>'+
   (result.kind==='travel'?'<p><strong>'+esc(String(result.distanceMeters))+' m</strong> · END a únava v detailu.</p>':'<p>Čas a následky při závěrečném potvrzení.</p>')+
-  (result.travelDelay?.applied?'<p><b>Zdržení '+result.travelDelay.applied+' min</b> · pohyb '+result.travelDelay.movementMinutes+' min.</p>':'')+
+  (result.travelDelay?.applied||result.travelDelay?.carryOut?'<p><b>Zdržení '+result.travelDelay.applied+
+   ' min</b> · pohyb '+result.movementMinutes+' min · zbývající zdržení '+result.travelDelay.carryOut+' min.</p>':'')+
+  (result.waitingForComplication?'<p>Celý úsek zabírá předchozí zdržení. Nové Orienteering a pohybové hody přijdou až s dalším pohybem.</p>':'')+
   '<p>Počasí: '+esc(weather.area)+'</p>'+ (result.weatherShelteredPCs?.length?'<p><strong>PC/NPC v zajištěném zázemí:</strong> '+esc(result.weatherShelteredPCs.map(id=>character(id)?.name||id).join(', '))+'. Nejsou přidávány nové běžné expozice; zdravotní termíny pokračují.</p>':'');
  const proofList=root.querySelector('[data-episode-evidence]');
  if(proofList){
@@ -27694,6 +27716,10 @@ function showEpisodeIndependentDeadlines(form){
 }
 function episodePlannedTasks(form){
  const v=episodeFormSnapshot(form),tasks=[];
+ const rawMinutes=Number(v.minutes);
+ const carriedDelay=v.kind==='travel'&&v.memberIds?.length?participantTravelDelayCarry(
+  data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,v.memberIds):0;
+ const hasTravelMovement=Number.isSafeInteger(rawMinutes)&&rawMinutes>carriedDelay;
  const add=(name,detail,field,skill=null,actorId=null)=>{
   if(!form.elements.namedItem(field)||String(v[field]||'').trim())return;
   tasks.push({name,detail,field,skill,actorId});
@@ -27702,7 +27728,7 @@ function episodePlannedTasks(form){
   add('Počasí · teplota','Doložte první skutečný meteorologický d10.','temperatureD10');
   add('Počasí · srážky','Doložte druhý meteorologický d10.','precipitationD10');
  }
- if((v.kind==='travel'&&v.orientationUse!=='reuse')||v.kind==='forage')
+ if((v.kind==='travel'&&hasTravelMovement&&v.orientationUse!=='reuse')||v.kind==='forage')
   add('Orienteering · Survival · '+(character(v.guideId)?.name||'průvodce'),
    'Vykonejte a uložte skutečný Survival Success Value test průvodce.',
    'orientationProofId','Survival',v.guideId);
@@ -27726,10 +27752,6 @@ function episodePlannedTasks(form){
  // movement. A prospective travel setup is not proof that an END roll is due.
  // A genuine Complication can consume travel minutes; equipment repair cannot.
  const orientationReady=v.orientationUse==='reuse'||!!v.orientationProofId;
- const rawMinutes=Number(v.minutes);
- const carriedDelay=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
-  v.memberIds?.length?v.memberIds:null);
- const hasTravelMovement=Number.isSafeInteger(rawMinutes)&&rawMinutes>Math.max(0,carriedDelay);
  if(v.kind==='travel'&&orientationReady&&hasTravelMovement)
   for(const id of v.memberIds||[])if(!(v.transportedMemberIds||[]).includes(id)&&
    (!incap.has(id)||incap.get(id).minute>data.campaignClock?.minute))
@@ -28960,7 +28982,9 @@ function updateEpisodePreview(form){
  show('[data-episode-landscape-terrain]',outdoor);
  show('[data-episode-weather-geography]',true);
  show('[data-episode-manual-season]',!campaignTRDate(data.campaignClock,data.campaignClock.minute));
- show('[data-episode-section="skills"]',isTravel||isTracking||kind==='forage');
+ const waitingForComplication=travel&&v.memberIds?.length&&Number(v.minutes)>0&&
+  participantTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds)>=Number(v.minutes);
+ show('[data-episode-section="skills"]',(isTravel&&!waitingForComplication)||isTracking||kind==='forage');
  show('[data-episode-weather-roll]',episodeEvaluationRequested);
  // Other indoor activities still display the chosen global/local weather without irrelevant terrain choices.
  show('[data-episode-section="rolls"]',episodeEvaluationRequested&&(isTravel||isTracking||kind==='forage'||kind==='watch'));
@@ -28987,9 +29011,9 @@ function updateEpisodePreview(form){
  for(const name of ['mode_progress','mode_bearing']){const input=form.elements.namedItem(name);if(input&&input.closest('label'))input.closest('label').hidden=kind==='forage';}
  show('[data-episode-skill-links]',episodeEvaluationRequested&&outdoor);
  show('[data-episode-final-confirm]',episodeEvaluationRequested);
- show('[data-episode-navigation]',isTravel);
+ show('[data-episode-navigation]',isTravel&&!waitingForComplication);
  const orientProof=data.journal.find(j=>j.id===v.orientationProofId);
- const survivalCF=(travel&&v.orientationUse==='new'||kind==='forage')&&
+ const survivalCF=(travel&&!waitingForComplication&&v.orientationUse==='new'||kind==='forage')&&
   (orientProof?.skillTestProof?.a?.level||orientProof?.skillTestProof?.result?.level)==='CF';
  show('[data-episode-survival-hazard]',survivalCF);
  const rollPanel=form.querySelector('[data-episode-encounter-panel]');if(rollPanel)rollPanel.hidden=!v.checkEncounter;
@@ -30122,8 +30146,8 @@ document.addEventListener('click',e=>{
    if(!Number.isSafeInteger(elapsed)||elapsed<1||elapsed>10080)
     throw Error('Nejprve zadejte platnou délku cesty pro Endurance.');
    const snapshot=episodeFormSnapshot(form);
-   const incoming=independentTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
-    (snapshot.memberIds||[]).length?snapshot.memberIds:null,true);
+   const incoming=participantTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock?.minute,
+    snapshot.memberIds||[]);
    const movement=actualGroupMovement93868({minutes:elapsed,incomingDelay:incoming,
     atMinute:episodeConfirmedMovementStop93868(form,elapsed)});
    count=movement===0?0:hourly?Math.ceil(movement/60):1;
@@ -31044,12 +31068,7 @@ document.addEventListener('click',e=>{
    // episode baseline: unrelated independently committed events must survive.
    const committed=JSON.parse(storageBaseline);validate(committed);data=committed;episodeStageBaseline=null;
   }
-  sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowSelectedGroupId=null;
-  sharedTimeWindowActivePlanId=null;sharedTimeWindowPlans=[];sharedEpisodeAutoRun93772=false;episodeQueueAction=false;
-  episodeEvaluationRequested=false;episodeEvaluatedIdentity=null;episodeCurrentGuidedStep=null;
-  episodePendingSkillRequest=null;episodeActiveSkillRequestId=null;episodeSkillReturnPending=false;
-  episodePinnedSkillFields.clear();episodeOutstandingSkillTasks=[];timeEpisodeDraft=episodeFreshDraft();episodeDraftEpoch=uuid();
-  discardEpisodeDraftSidecar();notice='Návrh společného intervalu bezpečně zrušen. Potvrzená data zůstala zachována.';render();
+  clearTimeEpisodeDraft();notice='Návrh společného intervalu bezpečně zrušen. Potvrzená data zůstala zachována.';render();
  }catch(error){alert('Návrh nelze bezpečně zrušit: '+error.message);}
 },true);
 // A stuck disabled Stage button must have a reachable, fail-closed remedy.
