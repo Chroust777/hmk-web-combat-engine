@@ -329,7 +329,8 @@ export function applyConfirmedFrostAmputation({state,round,eventId,woundId,daySi
  requireRule(!s.extendedShock&&!s.wounds.some(x=>x.bleeding),
   'Před zákrokem musí skončit Extended Shock a veškeré krvácení');
  requireRule(!source.healing?.treated&& !s.wounds.some(x=>x.id!==source.id&&!x.healed&&
-  x.location===source.location&&['e','edge'].includes(aspectKey(x))),
+  x.location===source.location&&['e','edge'].includes(aspectKey(x))&&
+  (!limb.includes(site)||!x.side||!source.side||x.side===source.side)),
   'Frost amputace vyžaduje neošetřenou frost ránu; staré Edge zranění ve stejné lokaci vyžaduje samostatné Compound');
  if(limb.includes(site))requireRule(['left','right'].includes(source.side),
   'Amputace končetiny vyžaduje doloženou pravou nebo levou stranu');

@@ -151,6 +151,29 @@ export function beginTravelBloodStoppage({clock,state,patient,healer,party=[],wo
   startMinute:clock.minute,dueMinute:term.dueMinute,method,campaignId:campaignId(clock)});
  return {state:s,dueMinute:term.dueMinute};
 }
+export function travelBloodStoppageEML({clock,state,patient,healer,party,wound:w,plan}){
+ check(plan&&healer?.id===plan.healerId,'Léčitel se od zahájení změnil');
+ const h=availableHealer({patient,wound:w,healer,party});
+ // Actual, immutable treatment-start receipts across ALL campaign members;
+ // not a manually entered approximation and not just this patient's sheet.
+ const claims=new Set();
+ for(const actor of party){
+  const medical=actor.id===patient.id?state:actor.hmk?.healthState;
+  for(const e of medical?.events??[]){
+   if(e.type!=='travel-blood-stoppage-start'||e.details?.healerId!==h.id||
+     e.details?.dueMinute!==clock.minute||e.details?.campaignId!==campaignId(clock))continue;
+   claims.add(actor.id+'::'+e.details.woundId);
+  }
+ }
+ const simultaneous=claims.size;
+ check(simultaneous>=1&&simultaneous<=100&&claims.has(patient.id+'::'+w.id),
+  'Souběžné ošetření musí mít skutečné potvrzené začátky pro celou kampaň');
+ const fatigue=combatFatigueTotals(healer.hmk?.healthState??initialCombatState()).total;
+ const bonus=plan.method==='cau'?30:plan.tourniquet?20:0;
+ const repeat=plan.method==='sta'?(w.staunchBonus??0):0;
+ check(integer(repeat,0,10),'Neplatný Staunch bonus');
+ return h.ml-fatigue+bonus+repeat+multipleBleederStaunchModifier(simultaneous);
+}
 /** At the exact deadline resolve either the attested 5-minute treatment or
  * an untreated five-minute Blood Loss. Physical d100 are NEVER generated. */
 export function completeTravelBleedingInterval({clock,state,patient,healer=null,party=[],
@@ -168,31 +191,10 @@ export function completeTravelBleedingInterval({clock,state,patient,healer=null,
  const s=structuredClone(state),target=s.wounds.find(x=>x.id===woundId);
  let stop=null,physicianSL=null,eml=null,healerId=null;
  if(mode==='stoppage'){
-  const plan=term.plan;
-  check(healer?.id===plan.healerId,'Léčitel se od zahájení změnil');
-  const h=availableHealer({patient,wound:w,healer,party});
-  // Actual, immutable treatment-start receipts across ALL campaign members;
-  // not a manually entered approximation and not just this patient's sheet.
-  const claims=new Set();
-  for(const actor of party){
-   const medical=actor.id===patient.id?s:actor.hmk?.healthState;
-   for(const e of medical?.events??[]){
-    if(e.type!=='travel-blood-stoppage-start'||e.details?.healerId!==h.id||
-      e.details?.dueMinute!==clock.minute||e.details?.campaignId!==campaignId(clock))continue;
-    claims.add(actor.id+'::'+e.details.woundId);
-   }
-  }
-  const simultaneous=claims.size;
-  check(simultaneous>=1&&simultaneous<=100&&claims.has(patient.id+'::'+woundId),
-   'Souběžné ošetření musí mít skutečné potvrzené začátky pro celou kampaň');
+  eml=travelBloodStoppageEML({clock,state:s,patient,healer,party,wound:w,plan:term.plan});
   check(integer(physicianRoll,1,100),'Chybí skutečný Physician d100');
-  const fatigue=combatFatigueTotals(healer.hmk?.healthState??initialCombatState()).total;
-  const bonus=plan.method==='cau'?30:plan.tourniquet?20:0;
-  const repeat=plan.method==='sta'?(w.staunchBonus??0):0;
-  check(integer(repeat,0,10),'Neplatný Staunch bonus');
-  eml=h.ml-fatigue+bonus+repeat+multipleBleederStaunchModifier(simultaneous);
   physicianSL=slName(successLevel(physicianRoll,eml));
-  stop=bloodStoppageResult(SL[physicianSL]);healerId=h.id;
+  stop=bloodStoppageResult(SL[physicianSL]);healerId=healer.id;
  }else check(physicianRoll===null,'Bez Treatment nesmí vzniknout fiktivní Physician Roll');
  const requiresLoss=!stop||stop.advanceRoll;
  check(requiresLoss===integer(strengthRoll,1,100),

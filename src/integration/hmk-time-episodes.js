@@ -14,7 +14,7 @@ import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-o
 import {allocateTrekModes} from './hmk-trekking-correction.js';
 import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js';
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 import {incidentMinutes93863} from './hmk-incident-window-93863.js';
@@ -929,6 +929,15 @@ export function validateTimeEpisodes(journal=[]){
    must(e.encounter.resolved===true||e.interruption?.kind==='encounter'&&e.encounter.resolved===false&&
     e.encounterDetails.length===1&&e.encounterDetails[0].awaitingFollowup===true,
     'Encounter má nevyřešené jednotlivé události.');
+  }
+  if(e.trackingScent?.observationRoll!==undefined){
+   const scent=e.trackingScent,settings=e.settings||{};
+   must(scent.animalId===settings.trackingScentAnimalId&&scent.roll===Number(settings.trackingScentD100)&&
+    scent.observationRoll===Number(settings.trackingScentObservationD100)&&
+    scent.trackingModifier===(e.trackingMemory?.modifier?.delta||0),'Scent Observation ztratilo původní údaje epizody.');
+   const expected=episodeAnimalScentTracking93936({...scent,gmPresent:settings.trackingScentPresent===true});
+   must(scent.observationLevel===expected.observationLevel&&scent.adjustedSV===expected.adjustedSV&&
+    scent.spoorStars===expected.spoorStars&&scent.needsAwareness===false,'Scent Observation neodpovídá potvrzenému d100.');
   }
   if(e.trackingFollowup){
    const t=e.trackingFollowup,m=e.trackingMemory;

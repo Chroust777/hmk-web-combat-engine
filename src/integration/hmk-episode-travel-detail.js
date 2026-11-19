@@ -228,7 +228,7 @@ export function episodeTrackingFollowup({adjustedSV,criticalFailure=false,awaren
  * supplies the values; each additional point of SV above 9 grants one Spoor star.
  * A GM-confirmed presence and d100 are indispensable; no automatic or fabricated roll.
  */
-export function episodeAnimalScentTracking93936({animalId,name,breed,awarenessML,scentIndex,roll,trackingModifier=0,gmPresent=false}={}){
+export function episodeAnimalScentTracking93936({animalId,name,breed,awarenessML,scentIndex,roll,trackingModifier=0,gmPresent=false,observationRoll=null}={}){
  requireTrue(typeof animalId==='string'&&!!animalId&&typeof name==='string'&&!!name&&
   typeof breed==='string'&&breed.length>0&&
   Number.isSafeInteger(awarenessML)&&awarenessML>=1&&awarenessML<=100&&
@@ -239,9 +239,15 @@ export function episodeAnimalScentTracking93936({animalId,name,breed,awarenessML
  const sl=successLevel(roll,awarenessML),level=['CF','F','S','CS'][sl];
  const rawSV=successValue({ml:awarenessML,sl});
  const adjustedSV=rawSV+scentIndex+trackingModifier;
+ const needsObservation=adjustedSV===3||adjustedSV===4;
+ requireTrue(observationRoll===null||needsObservation&&die(observationRoll,100),
+  'Scent Observation: další Awareness d100 patří pouze výsledku SV 3–4.');
+ const observationLevel=observationRoll===null?null:['CF','F','S','CS'][successLevel(observationRoll,awarenessML)];
+ const observation=observationLevel?{observationRoll,observationLevel}:{};
  return Object.freeze({format:'hmk-animal-scent-tracking-v1',animalId,name,breed,awarenessML,scentIndex,
-  roll,level,rawSV,trackingModifier,adjustedSV,spoorStars:Math.max(0,adjustedSV-4),
-  needsAwareness:adjustedSV>=3&&adjustedSV<=4,sourcePages:[147,353,355],
+  roll,level,rawSV,trackingModifier,adjustedSV,spoorStars:needsObservation?
+   Number(observationLevel==='S'||observationLevel==='CS'):Math.max(0,adjustedSV-4),
+  needsAwareness:needsObservation&&observationRoll===null,...observation,sourcePages:[147,353,355],
   independentAnimalTest:true,humanTrackingBonus:0});
 }
 /** Printed p.149 Cold/Heat Hazard Rolls; the GM supplies actual Area AV,

@@ -6,24 +6,29 @@
 import {successLevel} from '../rules/tests.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 const SELECTOR='form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
- 'form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course]';
+ 'form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
+ '.hmk-weather-care form#hmk-frost-amputation-form';
 const SELECTIONS={
  fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
  herbs:['singlePotencyRoll','actorId'],
  blood:['method','healerId','hasWater','hasNeedleThread','hasHeatedTool','tourniquet'],
  shock:[],
+ frost:['wound','healerId'],
+ bloodComplete:[],
  trauma:['restfulShelter','arcaneBonus','physicianStars'],
  alchemy:[]
 };
 const title={fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
- blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
+ frost:'Frost Amputation · hody v pořadí',bloodComplete:'Blood Stoppage a případný Blood Loss',blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
 const value=(form,name)=>form.elements.namedItem(name)?.value||'';
 const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n))&&Number(n)>=1&&Number(n)<=max;
 const stageKey=(step)=>step.key;
-function kindOf(form){return form.matches('[data-hmk-fishing-catch]')?'fishing':
+function kindOf(form){return form.id==='hmk-frost-amputation-form'?'frost':form.matches('[data-weather-blood-complete]')?'bloodComplete':form.matches('[data-hmk-fishing-catch]')?'fishing':
  form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
  form.matches('[data-weather-shock-followup]')?'shock':form.matches('[data-weather-trauma-course]')?'trauma':'alchemy';}
 function fieldsOf(form,kind){
+ if(kind==='frost')return ['physicianRoll','amputationRoll','shockRoll'];
+ if(kind==='bloodComplete')return ['physicianRoll','strengthRoll'].filter(name=>form.elements.namedItem(name));
  if(kind==='fishing')return ['conditionsD100','catchD10'];
  if(kind==='herbs')return [...form.querySelectorAll('input[name^="dice_"]')].map(n=>n.name);
  if(kind==='blood')return ['bandageD6Rolls'];
@@ -35,7 +40,26 @@ function fieldsOf(form,kind){
 function stepsFor(form,kind){
  const result=[];
  const add=(key,faces,label,fieldName=key,seq=null)=>result.push({key,faces,label,fieldName,seq});
- if(kind==='fishing'){
+ if(kind==='bloodComplete'){
+  if(value(form,'mode')==='loss')add('strengthRoll',100,'Blood Loss · Strength d100');
+  else if(form.dataset.hmkStoppageEml!==''){
+   const eml=Number(form.dataset.hmkStoppageEml),roll=value(form,'physicianRoll');
+   if(Number.isFinite(eml)){
+    add('physicianRoll',100,'Blood Stoppage · Physician d100');
+    if(die(roll,100)&&successLevel(Number(roll),eml)!==3)add('strengthRoll',100,'Blood Loss · Strength d100');
+   }
+  }
+ }else if(kind==='frost'){
+  if(form.dataset.hmkFrostTreatmentEml==='')return result;
+  const eml=Number(form.dataset.hmkFrostTreatmentEml),roll=value(form,'physicianRoll');
+  if(!Number.isFinite(eml))return result;
+  add('physicianRoll',100,'Physician · Treatment d100');
+  if(die(roll,100)){
+   if(successLevel(Number(roll),eml)===0&&form.dataset.hmkFrostTriangle==='yes')
+    add('amputationRoll',100,'G5 Edge · Strength d100');
+   add('shockRoll',100,'Location Shock d100');
+  }
+ }else if(kind==='fishing'){
   if(value(form,'conditionsMode')==='roll')add('conditionsD100',100,'Conditions d100');
   const origin=form.querySelector('h4')?.textContent||'';
   const sourceSV=Number((origin.match(/\bSV\s*(-?\d+)/i)||[])[1]);
@@ -150,6 +174,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   groupConfirmedDieControls93928(input,gen,accept);
   submit.before(wrapper);
   const accepted=new Map();let generated=null;
+  const mustHaveSteps=kind==='frost'||kind==='bloodComplete';
   function syncUnderlying(){
    const steps=stepsFor(form,kind),activeKeys=new Set(steps.map(stageKey));
    for(const name of allNames){
@@ -180,6 +205,14 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
    !die(accepted.get(step.key).value,step.faces));}
   function repaint(){
    const steps=stepsFor(form,kind),next=pending(),done=!next;
+   if(kind==='frost'){
+    const strength=form.elements.namedItem('amputationStrengthML');
+    const needsStrength=steps.some(step=>step.key==='amputationRoll');
+    if(strength){
+     const label=strength.closest('label');if(label)label.hidden=!needsStrength||strength.readOnly;
+     const details=strength.closest('details');if(details){details.hidden=!needsStrength||strength.readOnly;if(!details.hidden)details.open=true;}
+    }
+   }
    wrapper.hidden=!steps.length;wrapper.classList.toggle('hmk-chain-complete-93918',done);
    const position=next?steps.findIndex(x=>x.key===next.key):steps.length;
    prompt.textContent=next?'ČERVENÝ AKTIVNÍ KROK '+(position+1)+'/'+steps.length+
@@ -187,7 +220,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
     'Všechny právě požadované kostky jsou jednotlivě potvrzeny.';
    input.max=String(next?.faces||100);input.disabled=done;gen.disabled=done;
    accept.disabled=done||!die(input.value,next?.faces||0);
-   reset.hidden=!accepted.size;submit.disabled=!done||submit.dataset.hmkExternalDisabled93918==='yes';
+   reset.hidden=!accepted.size;submit.disabled=!done||(mustHaveSteps&&!steps.length)||submit.dataset.hmkExternalDisabled93918==='yes';
    receipt.textContent=accepted.size?'Potvrzené skutečné hody: '+steps.filter(x=>accepted.has(x.key)).map(x=>
     x.label+' = '+accepted.get(x.key).value+' ('+(accepted.get(x.key).origin==='software'?'generátor':'ručně')+')').join('; '):
     'Žádný hod zatím nebyl potvrzen.';
@@ -217,6 +250,9 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   const guard=event=>{
    if(event.target!==form)return;
    syncUnderlying();const step=pending();
+   if(!step&&mustHaveSteps&&!stepsFor(form,kind).length){
+    event.preventDefault();event.stopImmediatePropagation();return;
+   }
    if(!step&&!(kind==='fishing'&&value(form,'conditionsMode')==='gm'&&!value(form,'gmCondition')))return;
    event.preventDefault();event.stopImmediatePropagation();
    receipt.textContent='Uložení zablokováno: '+(step?'nejprve jednotlivě potvrďte červený hod '+step.label+'.':
