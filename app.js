@@ -358,6 +358,7 @@ import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
 import {riderImpactAtRound} from './src/rules/mounted.js';
 import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './src/integration/hmk-medical-origin.js';
 import {prepareGMHealthOverride,gmWoundConsequenceAssessment,validateGMHealthOverrideEvidence} from './src/integration/hmk-gm-health-override.js';
+import {extendedShockAidEpisode,extendedShockAids,bestExtendedShockAid,validateExtendedShockAidJournal} from './src/integration/hmk-extended-shock-aid-93965.js?v=93.965';
 import {weatherPhysicianCandidates} from './src/integration/hmk-weather-healer.js';
 import {activeFearSources} from './src/integration/hmk-concurrent-fear.js';
 import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedAstralReembodiment,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,verifiedImmersionComa952,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext,shockFollowupReadiness,applyExtendedShockCourse,applyComaCourse,dueInjuryMorale,unresolvedInjuryMishaps,specialActionReadiness,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,applyConfirmedSpecialAftermath,applyConfirmedMoraleReaction,applyConfirmedBraveExpiry,beginConfirmedEncounter} from './src/integration/persistent-combat-state.js?v=93.952';
@@ -386,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.964';
+const APP_VERSION='93.965';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -693,6 +694,7 @@ function validate(d){
  assertFiniteState93897(d);
  validateGMHealthOverrideEvidence(d?.characters||[],d?.journal||[],d?.trash||[]);
  validateGlobalActionLedger(d);
+ validateExtendedShockAidJournal(d?.journal||[]);
  validateSkillTimedWork591(d);
  validateTrainingInterruption93902(d?.journal||[]);validateAnimalTrainingCalendar590(d);
  validateLogbookVisibility(d);validateChroniclePresentation93889(d);
@@ -13601,7 +13603,7 @@ function hskWeatherTraumaCourseForm(actorId){
  <form data-weather-trauma-course data-hmk-trauma-hr="${esc(String(course.hr))}" data-hmk-trauma-hb="${esc(String(hb))}" data-hmk-trauma-fatigue="${esc(String(combatFatigueTotals(state).total))}"><input type="hidden" name="kind" value="${kind}">
  <input type="hidden" name="sourceId" value="${esc(course.sourceId)}">
  <label>Skutečný Course d100<input name="roll" type="number" min="1" max="100" required></label>
- ${kind==='extended-shock'?'<label>Skutečný Physician SV – počet hvězd (0 bez ošetření)<input name="physicianStars" type="number" min="0" max="10" value="0" required></label>':
+ ${kind==='extended-shock'?`<label>Physician SV · nejvyšší doložený počet hvězd<input name="physicianStars" type="number" min="0" max="10" value="${physicianCourseStars965(actor)}" required></label>`:
  '<label>Klidné chráněné prostředí<select name="restfulShelter"><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label><label>Nový skutečný d10 pouze pokud Coma pokračuje<input name="periodD10" type="number" min="1" max="10" placeholder="Nevyplňovat při ukončení"></label>'}
  <label>Doložený Arcane Recovery bonus (0 pokud není)<input name="arcaneBonus" type="number" min="0" max="100" value="0" required></label>
  <button type="submit">Dokončit jediný ${kind==='coma'?'Coma':'Extended Shock'} Course</button>
@@ -15072,8 +15074,10 @@ document.addEventListener('submit',event=>{
   const number=(name,min,max)=>{const n=Number(value(name));if(value(name)===''||!Number.isSafeInteger(n)||n<min||n>max)throw Error('Neplatný '+name);return n;};
   const roll=number('roll',1,100),arcaneBonus=number('arcaneBonus',0,100);
   const round=Math.max(1,s.lastRound||1),eventId=uuid();
+  const aid=kind==='extended-shock'?extendedShockAidContext965(actor).best:null;
+  const physicianStars=kind==='extended-shock'?Math.max(aid?.skillTestProof.a.svTier.stars||0,number('physicianStars',0,10)):null;
   const result=kind==='extended-shock'?applyExtendedShockCourse({state:s,round,eventId,
-   healingBase:readiness.healingBase,roll,physicianStars:number('physicianStars',0,10),
+   healingBase:readiness.healingBase,roll,physicianStars,
    arcaneBonus,elapsedHoursSinceOnset:readiness.nextHours,gmConfirmed:true}):
    applyComaCourse({state:s,round,eventId,healingBase:readiness.healingBase,roll,
     periodD10:value('periodD10')===''?null:number('periodD10',1,10),
@@ -15081,6 +15085,7 @@ document.addEventListener('submit',event=>{
     arcaneBonus,gmConfirmed:true});
   const newEvent=result.state.events.at(-1);
   if(!newEvent||newEvent.id!==eventId)throw Error('Chybí pravidlový důkaz Course');
+  if(aid&&physicianStars===aid.skillTestProof.a.svTier.stars)newEvent.details.physicianAidReceiptId=aid.id;
   newEvent.details.physicalDice={format:'hmk-manual-dice-proof-v1',source:'HMK p.179',
    rolls:[{id:'courseD100',faces:100,value:roll},...(kind==='coma'&&value('periodD10')!==''?
     [{id:'nextComaD10',faces:10,value:Number(value('periodD10'))}]:[])]};
@@ -21652,7 +21657,7 @@ document.addEventListener('submit',e=>{
     const narcotic=narcoticEvidence({journal:data.journal,campaignId:campaignKey(data.campaignClock),
       minute:data.campaignClock?.minute??0,targetId:c.id});
     transition=applyConfirmedShockRecovery({state:persistentStateOf(c),round,eventId,sl:v.sl,timingConfirmed:v.timingConfirmed==='yes',characterId:c.id,actorId:combatClock.actorId,turnEnded:v.turnEnded==='yes',timelineId:combatInjuryTimelineId,elapsedMinutesSinceOriginal:v.elapsedMinutes===''?null:Number(v.elapsedMinutes),comaLocationShock:v.comaLocationShock===''?null:Number(v.comaLocationShock),comaInjuryLevel:v.comaInjuryLevel===''?null:Number(v.comaInjuryLevel),initialComaD10:v.initialComaD10===''?null:Number(v.initialComaD10),shockML:Number(v.shockML),roll:Number(v.roll),herbalBonus:narcotic.bonus,herbalProof:narcotic});}
-   else if(f.id==='combat-extended-course-form'){confirmCalendarElapsed(c.id,'extended-shock',Number(v.elapsedHoursSinceOnset)*60);transition=applyExtendedShockCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),physicianStars:Number(v.physicianStars),arcaneBonus:Number(v.arcaneBonus),elapsedHoursSinceOnset:Number(v.elapsedHoursSinceOnset),gmConfirmed:v.gmConfirmed==='yes'});}
+   else if(f.id==='combat-extended-course-form'){confirmCalendarElapsed(c.id,'extended-shock',Number(v.elapsedHoursSinceOnset)*60);transition=applyExtendedShockCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),physicianStars:physicianCourseStars965(c,Number(v.physicianStars)),arcaneBonus:Number(v.arcaneBonus),elapsedHoursSinceOnset:Number(v.elapsedHoursSinceOnset),gmConfirmed:v.gmConfirmed==='yes'});}
    else if(f.id==='combat-coma-course-form'){confirmCalendarElapsed(c.id,'coma',(persistentStateOf(c).coma?.elapsedDays+Number(v.daysElapsed))*DAY_MINUTES);transition=applyComaCourse({state:persistentStateOf(c),round,eventId,healingBase:Number(v.healingBase),roll:Number(v.roll),periodD10:Number(v.periodD10),daysElapsed:Number(v.daysElapsed),restfulShelter:v.restfulShelter==='yes',arcaneBonus:Number(v.arcaneBonus),gmConfirmed:v.gmConfirmed==='yes'});}
    else transition=applyConfirmedFatigue({state:persistentStateOf(c),round,eventId,kind:v.kind,delta:Number(v.delta)});
   }
@@ -23218,18 +23223,59 @@ function gmShockStatePanel(c){
  ${locked?'<p class="notice">Během aktivní Initiative nelze přepsat stav účastníka.</p>':''}
  <output role="status" aria-live="polite"></output></form></details></section>`;
 }
+function extendedShockAidContext965(patient){
+ const clock=data.campaignClock;
+ const state=patient&&persistentStateOf(patient);
+ const episodeId=patient&&clock?extendedShockAidEpisode(state,getCampaignAnchor(clock,'extended-shock',patient.id)):null;
+ const aids=episodeId?extendedShockAids(data.journal,campaignKey(clock),patient.id,episodeId):[];
+ return {state,clock,episodeId,aids,best:bestExtendedShockAid(aids)};
+}
+function extendedShockHealers965(patient,wound,context){
+ if(!context.episodeId||combatInitiativeSequence||!calendarMemberIds(context.clock,data.characters).some(actor=>actor.id===patient.id))return [];
+ const unavailable=new Set([patient.id,...context.aids.map(row=>row.characterId),
+  ...busyWeatherHealers().map(operation=>operation.healerId)]);
+ const party=calendarMemberIds(context.clock,data.characters).filter(actor=>!unavailable.has(actor.id));
+ return weatherPhysicianCandidates({patient,wound,party,requireHigherTreatmentIndex:false});
+}
+function extendedShockAidPanel965(patient,wound,context){
+ if(!context.state.extendedShock)return '';
+ if(!context.clock||!context.episodeId)return '<p class="hc-hint">Pomoc při Extended Shock vyžaduje doložený začátek šoku a aktivní kalendář.</p>';
+ const choices=extendedShockHealers965(patient,wound,context);
+ const bonus=(context.best?.skillTestProof.a.svTier.stars||0)*5;
+ return `<details><summary>Zvolit léčitele pro Extended Shock${context.best?' · doložený bonus +'+bonus:''}</summary>
+ <p class="hc-hint">Physician SV pomáhá pacientovi při Course Rollu. Samotná rána čeká na Treatment až po skončení šoku a krvácení.</p>
+ ${context.aids.length?`<ul>${context.aids.map(row=>`<li>${esc(character(row.characterId)?.name||'Léčitel')} · ${row.skillTestProof.a.svTier.stars} ★</li>`).join('')}</ul>`:''}
+ ${choices.length?`<form data-extended-shock-aid965 class="hc-fields" novalidate>
+ <input type="hidden" name="patientId" value="${esc(patient.id)}">
+ <input type="hidden" name="woundId" value="${esc(wound.id)}">
+ <input type="hidden" name="episodeId" value="${esc(context.episodeId)}">
+ <label>Léčitel<select name="healerId" required><option value="">Vyberte léčitele</option>
+ ${choices.map(healer=>`<option value="${esc(healer.id)}">${esc(healer.name)} · Physician ML ${healer.ml}</option>`).join('')}</select></label>
+ <fieldset data-extended-shock-aid-die disabled>${calendarDiceControls(100)}</fieldset>
+ <button type="submit">Potvrdit Physician SV</button><output role="alert"></output>
+ </form>`:`<p>${combatInitiativeSequence?'Během aktivní Initiative použijte bojový postup.':'Žádný další dostupný léčitel s Physician. Každý může pomoci tomuto pacientovi v této epizodě jednou.'}</p>`}</details>`;
+}
+function physicianCourseStars965(patient,manual=0){
+ const {best}=extendedShockAidContext965(patient);
+ return Math.max(manual,best?.skillTestProof.a.svTier.stars||0);
+}
 function gmWoundManagementPanel(c){
  const live=persistentStateOf(c),open=live.wounds.filter(w=>!w.healed),allowed=!combatInitiativeSequence?.order?.includes(c.id);
  const locations=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name])=>`<option value="${esc(code)}">${esc(name)} (${esc(code)})</option>`).join('');
  const label=w=>medicalWoundOptionLabel(c,w,live.wounds.findIndex(x=>x.id===w.id)+1).slice(c.name.length+3);
  const options=open.map(w=>`<option value="${esc(w.id)}">${esc(label(w))}</option>`).join('');
- const resumeWound=interruptedTreatmentWound(c);
+ const resumeWound=interruptedTreatmentWound(c),shockAid=extendedShockAidContext965(c);
+ const treatmentReady=!concurrentTreatmentBlockerText(concurrentTreatmentBlockers(live))&&
+  !unresolvedInjuryMishaps(live).length&&!dueInjuryMorale(live).length&&
+  !live.wounds.some(w=>w.healing?.infected);
  const woundRows=open.map(w=>{
   const items=gmWoundObligationSummary(c,w);
   const upcoming=items.procedures[0];
   const action=upcoming?`<button type="button" data-wound-treatment="${esc(w.id)}">Otevřít průběh ošetření</button>`:
-   (!w.healing||w.bleeding||w.healing?.nextHealingDay!=null||w.healing?.infected)?`<button type="button" data-wound-treatment="${esc(w.id)}">${w.id===resumeWound&&!concurrentTreatmentBlockerText(concurrentTreatmentBlockers(live))?'Zahájit nové ošetření':'Pokračovat ke zdravotnímu kroku'}</button>`:'';
-  return `<div class="list-row" data-gm-wound-row="${esc(w.id)}"><div><b>${esc(label(w))}</b><div class="tiny muted">${esc(items.details.join(' · ')||'Bez dalších doložených termínů')}</div><p data-wound-next-message role="status"></p></div><div>${action}<button type="button" class="danger" data-gm-select-wound="${esc(w.id)}" ${allowed?'':'disabled'}>Odstranit ránu (GM)</button></div></div>`;
+   (!w.healing||w.bleeding||w.healing?.nextHealingDay!=null||w.healing?.infected)?`<button type="button" data-wound-treatment="${esc(w.id)}">${w.id===resumeWound&&treatmentReady?'Zahájit nové ošetření':
+    !w.healing&&treatmentReady&&!(hskIsEnvironmentalWound(c,w.id)&&isNoncombatMedicalOrigin(live.shockFollowup?.domain))?
+     'Vybrat léčitele pro ránu':'Pokračovat ke zdravotnímu kroku'}</button>`:'';
+  return `<div class="list-row" data-gm-wound-row="${esc(w.id)}"><div><b>${esc(label(w))}</b><div class="tiny muted">${esc(items.details.join(' · ')||'Bez dalších doložených termínů')}</div><p data-wound-next-message role="status"></p></div><div>${action}${extendedShockAidPanel965(c,w,shockAid)}<button type="button" class="danger" data-gm-select-wound="${esc(w.id)}" ${allowed?'':'disabled'}>Odstranit ránu (GM)</button></div></div>`;
  }).join('');
  return `<section class="panel wide" id="hmk-wound-management" data-gm-wound-manager="${esc(c.id)}"><h3>Zranění · společná zdravotní evidence GM</h3>
  <p class="muted">Pro boj, cestování i jinou událost se používá tentýž zdravotní stav a kalendář. <b>Odstranit ránu úplně (GM)</b> znamená ukončit její doložené akutní i trvalé následky včetně Shock, Coma, Blood Loss, trvalé újmy a navázaných povinností; bez dalších polí pro Shock, Coma nebo Blood Loss. Běžné zhojení může trvalé následky ponechat. Historie původních událostí a hodů zůstává zachována.</p>
@@ -23276,6 +23322,56 @@ function gmWoundSyncForm(form){
   ].filter(Boolean).join(' ');
  }}
 }
+document.addEventListener('change',event=>{
+ const select=event.target;
+ if(!select?.matches?.('form[data-extended-shock-aid965] select[name="healerId"]'))return;
+ const form=select.form,dice=form.querySelector('[data-extended-shock-aid-die]');
+ dice.disabled=!select.value;
+ const die=form.elements.namedItem('die');
+ die.value='';
+ die.dispatchEvent(new Event('input',{bubbles:true}));
+ if(select.value)die.focus();
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(!form?.matches?.('[data-extended-shock-aid965]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const values=Object.fromEntries(new FormData(form)), output=form.querySelector('output');
+ try{
+  const patient=character(values.patientId),context=extendedShockAidContext965(patient);
+  const wound=context.state?.wounds.find(row=>row.id===values.woundId&&!row.healed);
+  if(!patient||!wound||!context.episodeId||context.episodeId!==values.episodeId||
+   !calendarMemberIds(context.clock,data.characters).some(actor=>actor.id===patient.id))
+   throw Error('Rána nebo epizoda Extended Shock už není v této kampani aktivní.');
+  const candidate=extendedShockHealers965(patient,wound,context).find(healer=>healer.id===values.healerId);
+  if(!candidate){markTravelBloodInput93787(form,form.elements.namedItem('healerId'));throw Error('Vyberte dostupného léčitele, který ještě pro tohoto pacienta neházel.');}
+  const healer=character(candidate.id),ctx=skillAutoFor(healer,'Physician');
+  const input=form.elements.namedItem('die');
+  if(!values.die||!input.checkValidity()){markTravelBloodInput93787(form,input);throw Error('Zadejte nebo vygenerujte skutečný d100.');}
+  const {result:a,die}=skillResolvedResult({mastery:candidate,form,dieKey:'die',condition:ctx.condition,trauma:ctx.trauma});
+  const generated=calendarRecoveryGenerated.get(form)?.value===die.roll;
+  const campaignId=campaignKey(context.clock),minute=context.clock.minute;
+  const receipt={id:uuid(),characterId:healer.id,calendarCampaignId:campaignId,campaignMinute:minute,
+   createdAt:stamp(),title:'Physician SV · pomoc při Extended Shock',
+   body:healer.name+' → '+patient.name+' · d100 ('+die.roll+') · '+a.level+' · '+a.svTier.stars+' ★',
+   skillTestProof:{type:'secondary-mastery-value-test',actorId:healer.id,skills:['Physician'],a,result:a,
+    conditions:ctx.condition,trauma:ctx.trauma,rollOrigins:[generated?'software':die.origin],
+    extendedShockAid93965:{patientId:patient.id,woundId:wound.id,episodeId:context.episodeId}}};
+  if(!mutate(()=>{
+   const current=character(patient.id),live=extendedShockAidContext965(current);
+   const activeWound=live.state?.wounds.find(row=>row.id===wound.id&&!row.healed);
+   if(!current||!activeWound||campaignKey(live.clock)!==campaignId||live.clock.minute!==minute||
+    live.episodeId!==context.episodeId||!extendedShockHealers965(current,activeWound,live).some(row=>row.id===healer.id))
+    throw Error('Čas, stav pacienta nebo dostupnost léčitele se mezitím změnily.');
+   data.journal.push(receipt);
+  }))return;
+  const row=[...document.querySelectorAll('[data-gm-wound-row]')].find(node=>node.dataset.gmWoundRow===wound.id);
+  const details=[...row?.querySelectorAll('details')||[]].find(node=>node.firstElementChild?.textContent.startsWith('Zvolit léčitele pro Extended Shock'));
+  if(details)details.open=true;
+  const status=row?.querySelector('[data-wound-next-message]');
+  if(status)status.textContent='Physician SV uložen · '+a.svTier.stars+' ★ · do Course Rollu se použije nejvyšší doložený bonus.';
+ }catch(error){if(output)output.textContent=error.message;}
+},true);
 function openWoundMedicalStep(actor,woundId){
  const clock=data.campaignClock,state=actor&&persistentStateOf(actor);
  const w=state?.wounds.find(x=>x.id===woundId&&!x.healed);
@@ -24901,8 +24997,8 @@ document.addEventListener('submit',e=>{
      throw Error('Coma a Extended Shock běží současně: výslovně vyberte splatný typ Course podle Kalendáře.');
     const readiness=guidedTraumaCourseReadiness({state:patientState,character:patient,kind:selectedCourse});
     if(!readiness.available)throw Error('Postava nemá aktivní Extended Shock ani Coma Course');
-    const exact=(label,min,max)=>{
-     const val=window.prompt(label,'');if(val===null)return null;
+    const exact=(label,min,max,initial='')=>{
+     const val=window.prompt(label,initial);if(val===null)return null;
      if(!/^\d+$/.test(val.trim())||!Number.isSafeInteger(Number(val))||Number(val)<min||Number(val)>max)
       throw Error('Neplatný ověřený čas či bonus: '+label);
      return Number(val);
@@ -24911,7 +25007,7 @@ document.addEventListener('submit',e=>{
     if(readiness.kind==='extended-shock'&&elapsedHoursSinceOnset===null)return;
     const daysElapsed=readiness.kind==='coma'?exact(`Kolik dní od předchozího Coma Course skutečně uplynulo? Očekává se ${readiness.nextDays}.`,1,10000):null;
     if(readiness.kind==='coma'&&daysElapsed===null)return;
-    const physicianStars=readiness.kind==='extended-shock'?exact('Ověřený počet hvězd nejvyšší Physician SV (0 pokud neproběhla pomoc léčitele)',0,10):null;
+    const physicianStars=readiness.kind==='extended-shock'?exact('Ověřený počet hvězd nejvyšší Physician SV (0 pokud neproběhla pomoc léčitele)',0,10,String(physicianCourseStars965(patient))):null;
     if(readiness.kind==='extended-shock'&&physicianStars===null)return;
     const arcaneBonus=exact('Ověřený bonus Arcane Recovery (0 pokud se nepoužívá)',0,100);
     if(arcaneBonus===null)return;
@@ -24925,7 +25021,7 @@ document.addEventListener('submit',e=>{
     if(!uiConfirm('Potvrzujete skutečné uplynutí požadovaného času a správnost podmínek Course podle HMK p.179?'))return;
     guidedTraumaSession=createGuidedTraumaCourse({state:persistentStateOf(patient),character:patient,
      eventId:uuid(),round:combatClock.round,timelineId:combatInjuryTimelineId,kind:readiness.kind,
-     elapsedHoursSinceOnset,daysElapsed,physicianStars,arcaneBonus,restfulShelter,timeConfirmed:true});
+     elapsedHoursSinceOnset,daysElapsed,physicianStars:physicianStars===null?null:physicianCourseStars965(patient,physicianStars),arcaneBonus,restfulShelter,timeConfirmed:true});
     guidedAttackLastOutcome=`${patient.name}: ${readiness.kind} · Healing Base ${readiness.healingBase}, EML ${guidedTraumaSession.context.rawEML}. Zadejte skutečný Course hod.`;
     writeGuidedDraft();render();return;
    }
