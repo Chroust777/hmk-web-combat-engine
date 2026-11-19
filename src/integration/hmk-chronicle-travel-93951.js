@@ -22,11 +22,12 @@ export function chronicleTravelParty(p, name) {
  const patients = unique([...(p.transportedMemberIds || proof.memberIds || []), mount?.patientId]);
  const severe = new Set((proof.originalHealth || []).filter(h =>
   h.immobile || h.comaActive || h.extendedShockActive || ['INC','UNC'].includes(h.shock)).map(h => h.id));
- const animals = unique([...(p.stableAnimalLoad || []).map(a=>a.id), ...(p.animals || []).map(a=>a.id),
+ const animals = unique([...(p.stableAnimalLoad || []).map(a=>a.id), ...(p.animals || []).map(a=>a.id), p.trackingScent?.animalId,
   ...(vehicle?.teamIds || s.transportTeamIds || []), ...(vehicle?.carriedAnimals || []).map(a=>a.animalId),
   mount?.mountId, p.mountRiding93823?.animalId, mixed?.mountAnimalId]).map(id => {
   const archived = (p.stableAnimalLoad || []).find(a=>a.id===id);
-  const animalName = archived?.name || (id===mount?.mountId ? mount.animalName : null) || name(id);
+  const animalName = archived?.name || (id===mount?.mountId ? mount.animalName : null) ||
+   (id===p.trackingScent?.animalId ? p.trackingScent.name : null) || name(id);
   const ridden = p.mountRiding93823?.animalId===id ? p.mountRiding93823.riderId : mixed?.mountAnimalId===id ? mixed.riderId : null;
   const rider = id===mount?.mountId ? mount.riderId : ridden || archived?.rider;
   const carried = vehicle?.carriedAnimals?.some(a=>a.animalId===id);
@@ -52,12 +53,14 @@ function scene(p, say, calendar) {
  const ground = road.includes(place)?'path':/forest|wood/.test(place)?'wood':/wetland|swamp/.test(place)?'marsh':
   /hill|mountain|alpine|rock/.test(place)?'hill':/grass|cropland|moor|heath/.test(place)?'open':null;
  const locale = {
-  path:['Cesta se stáčí a z očí mizí dřív, než je vidět její konec. Kdo po ní putuje, má z celé té dálky vždycky jen ten kus, který právě leží před ním.',
-   'Pruh cesty dělí krajinu vedví. Byť je na dohled jen nejbližší zákrut, právě za ním začíná všechno, co z ní ještě neznají.',
-   'Poutník by té cestě prve přisoudil sotva pár set kroků. Stačí však dojít k zákrutu, aby se před ním otevřel další kus a kraj si od něho vyžádal znovu tolik.'],
-  wood:['Mezi kmeny se dálka měří jinak než na volném prostranství. Co je na doslech, nemusí být na dohled, a za poslední řadou stromů je vždycky ještě jedna.',
-   'Les nedává rozhled zadarmo. Kde se kmeny rozestoupí, zahlédne člověk kus země, o kus dál se před ním větve zase zavřou.',
-   'Pod stromy je obzor blíž. Stačí několik kroků a místo, které bylo ještě před chvílí zřetelné, zakryjí jiné kmeny.'],
+  path:[
+   'Před poutníky se ukáže zákrut a za ním zas kus téže cesty. Kdo by z prvního pohledu soudil, že je cíl blízko, záhy by téhle krajině dlužil víc kroků, než si spočetl.',
+   'Cesta se vine krajem a sem tam se ztratí z očí. Teprve když družina dojde tam, kam před chvílí dohlédla, vydá jí kraj další kus pěšiny.',
+   'Za nejbližším zákrutem už poutník nevidí nic. Odtud se dá soudit jen tolik, že cesta vede dál. Zbytek si musí odměřit vlastní chůzí.'],
+  wood:[
+   'V lese stojí jeden kmen za druhým jako sloupy v dlouhé síni. Za nejbližší řadou se zdá být konec, ale kdo tam dojde, má před sebou další.',
+   'Stromy na chvíli ustoupí a vpustí mezi sebe kus obzoru. O pár kroků dál jej větve zase schovají. Kdo tudy putuje, má na rozhled jen tak dlouho, jak mu les dovolí.',
+   'Kde kraj zaroste stromy, dálku lépe odměří zvuk než oči. Člověk má co dělat, aby neztratil z dohledu i toho, kdo kráčí pár kroků před ním.'],
   marsh:['V mokřinách se nedá věřit každé rovné ploše. Tam, kde má zem pevnější spodek, je radno držet se jí, i kdyby vedla oklikou.',
    'Pevný kus země má tady větší cenu než přímá cesta. Měkký okraj mokřiny to připomene každému, kdo by se chtěl řídit jen očima.'],
   hill:['Za jedním svahem se zvedá další. Zespodu lze odhadnout výšku, ale až shora se ukáže, co leží na druhé straně.',
@@ -70,15 +73,15 @@ function scene(p, say, calendar) {
  const parts={day:'den',twilight:'šero',night:'noc'};
  const lit=(season&&seasons[season]?seasons[season]+' ':'')+(parts[time]||'');
  if(p.area)opening.push(lit&&time?say('place',[
-  `V kraji, jemuž říkají „${p.area}“, zastihne výpravu ${lit}.`,
-  `${time==='night'?'Tuto':time==='twilight'?'Toto':'Tento'} ${lit} tráví výprava v kraji zvaném „${p.area}“.`
+  `Píše se o kraji jménem „${p.area}“. Právě tam družinu zastihne ${lit}.`,
+  `V kronice té výpravy patří ${time==='night'?'tato':time==='twilight'?'toto':'tento'} ${lit} kraji jménem „${p.area}“.`
  ]):`Kraj kolem výpravy nese jméno „${p.area}“.`);
  else if(light)opening.push(time==='night'?'Je noc. Dálka patří tmě a zblízka dávají věci znát spíš zvukem než tvarem.':time==='twilight'?'Za šera ještě zbývá dost světla na jednotlivé tvary, ale dálka už splývá.':'Je den a kraj leží před výpravou v plném světle.');
  if(locale&&(p.kind==='travel'||['wood','open'].includes(ground)))opening.push(say('ground',locale));
  const wet=p.precipitation?.precipitation||p.weather?.precipitation;
  const weather={
-  rain:['Déšť se vpíjí do země. Jeho šum brzo přehluší drobné zvuky, podle nichž jinak člověk pozná, co má za zády.',
-   'Pod deštěm bledne dálka. Všechno, co je nízko při zemi, slyšet sotva na několik kroků.',
+  rain:['Za deště má kraj jediný hlas. Co by za sucha zaslechli i zdaleka, k nim skrz šum kapek doléhá, teprve když je to nablízku.',
+   'Déšť přetáhne přes dálku šedý závoj. Kraj, který by za dobrého dne přehlédli jediným pohledem, se jim teď ukazuje po částech.',
    'Kapky stírají ostrou mez mezi blízkým a vzdáleným. Na takový déšť si člověk přivyká pomalu, neboť jej má stále před očima i za krkem.'],
   snow:['Padá sníh. Před očima přibývá bílého a známky, které po sobě zanechal včerejšek, pod ním pomalu mizí.',
    'Sněžení je tiché a vytrvalé v každé chvíli, kdy se člověk zadívá do dálky. Co se před okamžikem rýsovalo zřetelně, má teď měkčí obrys.'],
@@ -157,7 +160,7 @@ function company(p, party, name, say, priorInjuries) {
    const injured=patients.filter(id=>severe.has(id)&&priorInjuries.has(id));
    if (cannotWalk&&injured.length===patients.length) lines.push(say('injured-passenger',[
     many?'Po dřívějších zraněních vlastními silami tu cestu neujdou.':'Po dřívějším zranění vlastními silami tu cestu neujde.',
-    many?'Už před tímto přesunem utrpěli zranění a nyní sami jít nemohou.':'Od dřívějšího zranění se na vlastní nohy spolehnout nedá. Teď za ně ukrajují cestu kola a družina může držet pospolu.',
+    many?'Už před tímto přesunem utrpěli zranění a nyní sami jít nemohou.':'Kvůli staré ráně už vlastní nohy na cestu nestačí. Díky povozu však může družina putovat pospolu.',
     many?'Utrpěli zranění už dříve; na vlastní nohy se teď spolehnout nemohou.':'Zranění je starší než tahle cesta, ale teprve tady je znát, jakou váhu má kousek místa na povoze. Družina může pokračovat společně.'
    ]));
    else if (cannotWalk) lines.push(say('immobile',[
@@ -255,7 +258,7 @@ function aftermath(p, name, hazard, say) {
  const lines=[];
  const details=p.hazardDetails?.length?p.hazardDetails:(p.hazardDetail?[p.hazardDetail]:[]);
  for (const h of details.filter(d=>d.hazard==='equipment'||(!d.hazard&&p.survivalHazard==='equipment'))) {
-  const item=h.itemName&&h.itemName!==h.itemId?`Výstroj jménem „${h.itemName}“`:'Část výstroje';
+  const item=h.itemName&&h.itemName!==h.itemId?`Kus výstroje („${h.itemName}“)`:'Část výstroje';
   lines.push(say('broken:'+h.itemId,[`${item} vypovídá službu.`,`${item} si žádá pozornost; na cestě už neslouží tak, jak má.`]));
   if(['no-delay','short-delay'].includes(h.result)) lines.push(h.repairProofId&&h.workerId?
    say('repair:'+h.itemId,[`O opravu se úspěšně postará ${name(h.workerId)}.`,`Výstroj dává znovu do pořádku ${name(h.workerId)}.`]):
@@ -311,15 +314,15 @@ function aftermath(p, name, hazard, say) {
    metres===1000?'kilometr':metres%1000?'kilometru':metres<5000?'kilometry':'kilometrů';
   lines.push(say('distance',[
    `Za ten čas výprava urazí ${value} ${magnitude}.`,
-   `Na konci úseku má družina za sebou ${value} ${magnitude} cesty.`,
-   `Na konci úseku má družina za sebou ${value} ${magnitude}.`
+   `Když si poutníci sečtou, oč pokročili, napočítají ${value} ${magnitude}.`,
+   `O ${value} ${magnitude} je teď družina dál.`
   ]));
  }
  const tired=(p.actors||[]).filter(a=>a.delta>0).map(a=>a.id);
  if(tired.length) lines.push(say('weariness',[
-  `Únava doléhá na tyto účastníky výpravy: ${list(tired.map(name))}.`,
-  `Na konci úseku ubude sil. Únavu cítí ${list(tired.map(name))}.`,
-  `Cesta si vybírá daň; ${list(tired.map(name))} ${tired.length===1?'pociťuje':'pociťují'} větší únavu.`
+  `${list(tired.map(name))} ${tired.length===1?'si z cesty odnáší':'si z cesty odnášejí'} tíhu, kterou půjde složit teprve s odpočinkem.`,
+  `Cesta si bere svou daň. ${list(tired.map(name))} už ${tired.length===1?'má':'mají'} citelně méně sil.`,
+  `${list(tired.map(name))} ${tired.length===1?'poznává':'poznávají'}, kolik sil stála tahle cesta.`
  ]));
  return lines.join(' ');
 }
@@ -350,9 +353,11 @@ export function chronicleRollStories(entry,p,tests,name){
    'Družina musí znovu uvážit, kudy míří. Dál se podle prvního odhadu spoléhat nemůže.'
   ])};
   if(/survival hazard/.test(skill))return {kind:'aftermath',test,before:'Do putování zasáhne další nesnáz.'};
-  if(/endurance/.test(skill))return {kind:'aftermath',test,before:failed?
-   `Na konci úseku už ${who||'výprava'} nemá tolik sil nazbyt.`:
-   `Zkoušku vytrvalosti na konci úseku ustojí ${who||'výprava'}.`};
+  if(/endurance/.test(skill))return {kind:'aftermath',test,endurance:true,before:passage(entry.id,'endurance',[
+   'Teprve když mají kus cesty za sebou, ukáže se, komu ještě zbývají síly.',
+   'Pak přijde řada na to, oč se žádná výprava nemůže podělit ze zásob. Každý musí obstát s vlastními silami.',
+   'Chvíli se dá jít z vůle, i když tělo prosí o klid. Jak dlouho to vydrží, se ukáže každému po jeho.'
+  ])};
   if(p.orientation?.droverSkillId===test.id||/animalcraft|riding/.test(skill)){
    const riding=/riding/.test(skill);
    const before=riding?`${who||'Jezdec'} se musí spolehnout na souhru se zvířetem pod sedlem.`:
@@ -361,7 +366,7 @@ export function chronicleRollStories(entry,p,tests,name){
   }
   if(/survival|orienteer/.test(skill))return {kind:p.kind==='travel'?'travel':'activity',test,
    before:say([`${who||'Průvodce'} čte tvář kraje a hledá v ní oporu pro další cestu.`,`${who||'Průvodce'} musí posoudit, kterému znamení v krajině lze věřit.`]),
-   after:failed?'Odhad tentokrát neobstojí.':level?'Úsudek v této chvíli obstojí.':''};
+   after:failed?say(['Kraj tentokrát nedá odpověď, o niž by se výprava mohla opřít.','Znamení však zůstávají nejasná a jistotu z nich vyčíst nelze.']):level?say(['Tentokrát se lze o ten úsudek opřít.','Z toho, co kraj prozradí, si lze udělat dobrý obrázek.']):''};
   if(/tracking/.test(skill))return {kind:'activity',test,before:`${who||'Stopař'} pátrá po tom, co po sobě na zemi zanechal někdo jiný.`};
   if(/forag|sběr|potrav|zásob/.test(skill))return {kind:'activity',test,before:who?`S hledáním se potýká ${who}.`:'Teprve výsledek ukáže, co kraj vydá.'};
   if(/awareness|observation/.test(skill))return {kind:'activity',test,before:`${who||'Výprava'} obrací pozornost k okolí a k tomu, co v něm lze postřehnout.`};
@@ -369,7 +374,10 @@ export function chronicleRollStories(entry,p,tests,name){
    `${who||'Družina'} se pokouší vyváznout z nesnáze, která se před výpravou otevřela.`,
    `S nastalou obtíží se musí vypořádat ${who||'výprava'}.`
   ])};
-  return {kind:'activity',test,before:who?`Svůj díl práce má i ${who}.`:'Na vykonané práci záleží i tento pokus.'};
+  return {kind:'activity',test,before:who?say([
+   `Svůj díl práce bere na sebe ${who}.`,
+   `Teď přijde chvíle, kdy výprava spoléhá na to, co svede ${who}.`
+  ]):'Také tady se ukáže, co výprava svede.'};
  });
 }
 

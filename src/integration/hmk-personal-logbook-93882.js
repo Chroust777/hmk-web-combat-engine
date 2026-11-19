@@ -1,4 +1,4 @@
-import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js';
+import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js?v=93.954';
 import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */
@@ -118,15 +118,18 @@ export function personalEpisodeActivities(p){
  if(!tasks.length)tasks.push('přesun po trase');
  return 'Cestování – '+[...new Set(tasks)].join(' · ');
 }
-export function personalEpisodeRoles(p,name){
+export function personalEpisodeRoles(p,name,animalKind=()=>''){
  const {people,guide,drover,patients,severe,animals,conveyance}=chronicleTravelParty(p,name);
  const vehicle=conveyance==='cart'?'kára':conveyance==='wagon'?'vůz':'';
  return [
   ...people.map(id=>{
    const tags=[];
-   if(id===guide)tags.push('průvodce');
+   if(id===guide&&p.kind==='travel')tags.push('průvodce');
+   if(id===p.trackingMemory?.trackerId)tags.push('sleduje stopu');
+   if(p.kind==='watch')tags.push('drží hlídku');
+   if(p.kind==='forage')tags.push('hledá zásoby');
    if(patients.includes(id)){
-    tags.push(vehicle?'převoz · '+vehicle:'převoz v sedle');
+    tags.push(vehicle?'převoz · '+vehicle:animals.some(a=>a.passenger===id)?'převoz v sedle':'přepravovaná osoba');
     if(severe.has(id))tags.push('nemůže jít vlastními silami');
    }else{
     const mounts=animals.filter(a=>a.rider===id);
@@ -138,7 +141,7 @@ export function personalEpisodeRoles(p,name){
    }
    return tags.length?`${name(id)} — ${tags.join('; ')}`:name(id);
   }),
-  ...animals.map(a=>`${a.name} — ${a.carried?'převážené zvíře':a.team?'tažné zvíře':a.passenger?'převoz osoby v sedle':a.rider?'jezdecké zvíře':a.handler?'vedeno za uzdu':'doprovázející zvíře'}`)
+  ...animals.map(a=>`${a.name}${animalKind(a.id)?' ('+animalKind(a.id)+')':''} — ${a.carried?'převážené zvíře':a.team?'tažné zvíře':a.passenger?'převoz osoby v sedle':a.rider?'jezdecké zvíře':a.handler?'vedeno za uzdu':a.id===p.trackingScent?.animalId?'sleduje pach':'doprovázející zvíře'}`)
  ];
 }
 // Descriptive manuscript prose, not a new game event. Every adjective comes from
@@ -296,11 +299,15 @@ const daylightPeriod=p=>{
  return txt(p?.settings?.lightPeriod||'');
 };
 export function personalEpisodeWeather(p){
- const w=p?.weather||{},season=namesSeason[w.season||p?.settings?.season]||'období neuvedeno';
- const precipitation=w.hasPrecipitation===true?(p?.precipitation?.precipitation==='rain'?'déšť':p?.precipitation?.precipitation==='snow'?'sněžení':'srážky'):
-   w.hasPrecipitation===false?'bez srážek':'srážky neuvedeny';
- const day=daylightPeriod(p),light=({day:'den',night:'noc',twilight:'soumrak'})[day]||'světlo neuvedeno';
- return `Roční období: ${season.charAt(0).toUpperCase()+season.slice(1)} · ${precipitation} · ${light}`;
+ const w=p?.weather||{}, season=namesSeason[w.season||p?.settings?.season];
+ const type=p?.precipitation?.precipitation||w.precipitation;
+ const rain={rain:'déšť',snow:'sněžení',sleet:'déšť se sněhem',none:'bez srážek'}[type]||
+  (w.hasPrecipitation===true?'srážky':w.hasPrecipitation===false?'bez srážek':'');
+ const period=daylightPeriod(p);
+ const light={day:'den',night:'noc',twilight:'šero'}[period];
+ const temperature=p?.precipitation?.hazard??(period==='night'?w.nightHazard:period?w.daylightHazard:null);
+ const extreme={cold:'silný chlad',heat:'velké horko'}[temperature];
+ return [season?`Roční období: ${season[0].toUpperCase()+season.slice(1)}`:'',rain,extreme,light].filter(Boolean).join(' · ');
 }
 export function personalEpisodeFlavor(entry,p){
  const season=txt(p?.weather?.season||p?.settings?.season).toLowerCase();
