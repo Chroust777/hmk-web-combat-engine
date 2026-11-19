@@ -356,7 +356,7 @@ import {markDeadlyAimStart,verifiedDeadlyAim} from './src/integration/hmk-deadly
 import {applyConfirmedWeaponWQ,applyConfirmedAreaStrike,applyConfirmedMountedControl,applyConfirmedMountedCharge} from './src/integration/hmk-combat-aftereffects.js';
 import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
 import {riderImpactAtRound} from './src/rules/mounted.js';
-import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './src/integration/hmk-medical-origin.js';
+import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock} from './src/integration/hmk-medical-origin.js';
 import {prepareGMHealthOverride,gmWoundConsequenceAssessment,validateGMHealthOverrideEvidence} from './src/integration/hmk-gm-health-override.js';
 import {extendedShockAidEpisode,extendedShockAids,bestExtendedShockAid,validateExtendedShockAidJournal} from './src/integration/hmk-extended-shock-aid-93965.js?v=93.965';
 import {weatherPhysicianCandidates} from './src/integration/hmk-weather-healer.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.969';
+const APP_VERSION='93.970';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -13533,9 +13533,9 @@ function hskVerifiedNoncombatShockML(actor){
 
 
 function hskWeatherShockFollowup(actorId){
- const actor=character(actorId),state=actor&&persistentStateOf(actor),q=state?.shockFollowup;
- if(!q||!isNoncombatMedicalOrigin(q.domain))return '';
- const clock=data.campaignClock,minute=clock?.minute;
+ const actor=character(actorId),clock=data.campaignClock,minute=clock?.minute;
+ const state=actor&&projectLegacyGrimShock(persistentStateOf(actor),clock,actor.id),q=state?.shockFollowup;
+ if(!q||state.coma?.active||!isNoncombatMedicalOrigin(q.domain))return '';
  const originValid=Number.isSafeInteger(q.originMinute)&&q.originMinute>=0;
  const dueMinute=originValid?(q.phase==='after-all-bleeding-stopped'?q.originMinute:q.kind==='UNC'?q.originMinute+10:q.originMinute):null;
  const shockML=hskVerifiedNoncombatShockML(actor);
@@ -13545,8 +13545,9 @@ function hskWeatherShockFollowup(actorId){
  const comaCause=verifiedNoncombatComaCause({actor,state,shockFollowup:q});
  const comaWoundIndex=state.wounds.findIndex(w=>w.id===comaCause.woundId);
  const comaWoundLabel=comaWoundIndex>=0?medicalWoundOptionLabel(actor,state.wounds[comaWoundIndex],comaWoundIndex+1):'Poranění z nehody';
- return `<section class="panel wide hmk-weather-shock-followup"><h3>${immersionComa?'Cold Water':q.domain==='gm-health'?'GM':q.domain==='travel-accident'?'Accident':'Weather'} Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
- <p class="hc-hint">Samostatný Shock Reroll po ${immersionComa?'ponoření do studené vody':q.domain==='gm-health'?'doloženém rozhodnutí GM':'cestovní události'}. Původ ${originValid?esc(displayCampaignMinute(q.originMinute)):'není časově doložen; GM musí nejprve v Kalendáři potvrdit výchozí minutu'}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
+ const grim=state.events.some(e=>e.id===q.sourceId&&e.type==='grim-wound-shock');
+ return `<section class="panel wide hmk-weather-shock-followup"><h3>${grim?'Grim Wound':immersionComa?'Cold Water':q.domain==='gm-health'?'GM':q.domain==='travel-accident'?'Accident':'Weather'} Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
+ <p class="hc-hint">Samostatný Shock Reroll po ${grim?'denním Grim Wound Shock':immersionComa?'ponoření do studené vody':q.domain==='gm-health'?'doloženém rozhodnutí GM':'cestovní události'}. Původ ${originValid?esc(displayCampaignMinute(q.originMinute)):'není časově doložen; GM musí nejprve v Kalendáři potvrdit výchozí minutu'}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
  <form data-weather-shock-followup data-shock-eml="${esc(String(Number.isFinite(eml)?eml:''))}" data-shock-coma-ready="${(comaCause.ready||immersionComa)&&canRoll?'yes':'no'}" data-shock-coma-mode="${immersionComa?'immersion':'injury'}"><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
  <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${canRoll?'':'disabled title="Shock ještě není splatný nebo chybí ověřená ML"'}></label>
@@ -15374,7 +15375,7 @@ document.addEventListener('submit',event=>{
  try{
   const actor=currentMedicalPatient952(form),clock=data.campaignClock,sourceId=form.elements.namedItem('sourceId').value;
   if(!actor||!clock||combatInitiativeSequence)throw Error('Shock vyžaduje aktivní Kalendář mimo Combat Initiative');
-  const state=persistentStateOf(actor),q=state.shockFollowup;
+  const state=projectLegacyGrimShock(persistentStateOf(actor),clock,actor.id),q=state.shockFollowup;
   if(!isNoncombatMedicalOrigin(q?.domain)||q.sourceId!==sourceId)throw Error('Původní Weather Shock neodpovídá postavě a zdroji');
   if(!Number.isSafeInteger(q?.originMinute))throw Error('GM musí nejdříve časově ukotvit počátek Shocku');
   const elapsed=clock.minute-q.originMinute,due=q.phase==='after-all-bleeding-stopped'?0:q.kind==='UNC'?10:0;
@@ -19898,7 +19899,8 @@ document.addEventListener('click',e=>{
  if(t.dataset.calLink&&t.dataset.calKind==='malnutrition-course'){
   // Nutrition's original executor moved into the Provisions calendar tab.
   // Opening the overview would otherwise appear to have lost the roll form.
-  calendarLanding=false;activeCalendarSection='provisions';view='calendar';render();
+  calendarLanding=false;activeCalendarSection='provisions';provisionScope='person';
+  provisionGuideActorId=t.dataset.calLink;view='calendar';render();
   const matches=[...document.querySelectorAll('[data-malnutrition-course]')];
   const form=matches.find(f=>f.elements.namedItem('actorId')?.value===t.dataset.calLink&&
     f.elements.namedItem('episodeId')?.value===t.dataset.calSource);
@@ -22175,7 +22177,7 @@ document.addEventListener('submit',e=>{
    const medicalRound=environmentalCare?Math.max(1,combatClock.round||1,medicalState.lastRound||0):combatClock.round;
    args={state:medicalState,round:medicalRound,eventId:uuid(),woundId:parts.slice(1).join('::'),daySinceInjury:Number(v.daySinceInjury),locationShock:Number(v.locationShock),shockML:Number(v.shockML),roll:Number(v.roll),gmConfirmed:true};
    confirmCalendarWoundDay(c.id,args.woundId,args.daySinceInjury);
-   r=applyConfirmedGrimWoundShock(args);
+   r=applyConfirmedGrimWoundShock({...args,originMinute:environmentalCare?data.campaignClock?.minute:null});
   }else{
    c=character(v.targetId);
    const environmentalCare=view==='sheet'&&activeSheetSection==='hazards'&&c?.id===selected;
