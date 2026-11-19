@@ -166,9 +166,13 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
    must(whole(end,0,50),'Cestující postava potřebuje doložené END.');
    const raw=endRollByActor[id],rolls=Array.isArray(raw)?raw:[raw];
    const count=doubleTime?Math.ceil(activeMinutes/60):1;
-   must(rolls.length===count&&rolls.every(r=>whole(r,1,10)),doubleTime?
-    'Double Time vyžaduje samostatný skutečný END d10 za každou započatou hodinu pohybu ('+count+' hodů).':
-    'Každá cestující postava potřebuje skutečný END SR d10.');
+   if(rolls.length!==count||!rolls.every(r=>whole(r,1,10))){
+    const error=new Error(doubleTime?
+     'Double Time vyžaduje samostatný skutečný END d10 za každou započatou hodinu pohybu ('+count+' hodů).':
+     'Chybí platný END SR d10.');
+    error.travelEndInput={actorId:id,count};
+    throw error;
+   }
    const srs=rolls.map(roll=>expeditionSecondaryRoll({endurance:end,roll,
     riding:!onFoot&&(conveyance==='mount'||conveyance==='cart'||conveyance==='wagon')}));
    const baseUnits=doubleTime?srs.reduce((total,sr,i)=>{
