@@ -308,7 +308,7 @@ export function personalEpisodeWeather(p){
  const precipitation=w.hasPrecipitation===true?(p?.precipitation?.precipitation==='rain'?'déšť':p?.precipitation?.precipitation==='snow'?'sněžení':'srážky'):
    w.hasPrecipitation===false?'bez srážek':'srážky neuvedeny';
  const day=daylightPeriod(p),light=({day:'den',night:'noc',twilight:'soumrak'})[day]||'světlo neuvedeno';
- return `${season} · ${precipitation} · ${light}`;
+ return `Roční období: ${season.charAt(0).toUpperCase()+season.slice(1)} · ${precipitation} · ${light}`;
 }
 export function personalEpisodeFlavor(entry,p){
  const season=txt(p?.weather?.season||p?.settings?.season).toLowerCase();

@@ -33,7 +33,7 @@ function inRange(field){
  const raw=String(field.value).trim(),n=Number(raw),faces=values[field.name];
  return WHOLE.test(raw)&&Number.isSafeInteger(n)&&n>=1&&n<=faces;
 }
-function due(form,field){
+function due(form,field,skipPrimary){
  if(!visible(field))return false;
  if(field.name.startsWith('roll10')){
   const side=field.name.endsWith('B')?'B':'A';
@@ -42,14 +42,14 @@ function due(form,field){
   // HMK: an untrained secondary skill automatically fails, without d10.
   if(/Neosvojená|SR\s*=\s*F/i.test(hint))return false;
  }
- if((field.name==='rollA'||field.name==='rollB')&&form.querySelector('[data-hmk-skill-no-roll="'+field.name+'"]')?.checked)return false;
+ if((field.name==='rollA'||field.name==='rollB')&&skipPrimary(form,field.name))return false;
  return true;
 }
 function focusField(field){
  if(!field)return;
  try{field.focus({preventScroll:true});field.closest('label')?.scrollIntoView({block:'center',behavior:'smooth'});}catch{}
 }
-export function decorateSkillWorkbenchRolls93916(root,secureDie){
+export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>false){
  if(!root||typeof secureDie!=='function')return {forms:0,fields:0};
  installTabFocus();
  for(const [id,item] of controllers)if(!item.form.isConnected){
@@ -78,7 +78,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie){
     generator.setAttribute('data-hmk-skill-auto-die-93916','');generator.textContent='⚄ Generovat hod d'+faces;
     field.after(generator);
     generator.addEventListener('click',()=>{
-     if(generator.disabled||!due(form,field))return;
+     if(generator.disabled||!due(form,field,skipPrimary))return;
      try{
       const val=secureDie(faces);
       if(!Number.isSafeInteger(val)||val<1||val>faces)throw Error('Generátor nevrátil platné d'+faces);
@@ -104,18 +104,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie){
     refresh();
    });
   }
-  // The original HMK engine decides whether a primary d100 is unnecessary
-  // because the result is a forced automatic CF. Explicit GM selection here
-  // only skips the UI die; it never asserts that CF is actually permitted.
-  if(form.id!=='skill-tiebreak-form')for(const name of ['rollA',...(form.id==='skill-secondary-form'?['rollB']:[])]){
-   const field=form.elements.namedItem(name);if(!field)continue;
-   const label=document.createElement('label');label.className='tiny hmk-skill-forced-cf-93916';
-   const box=document.createElement('input');box.type='checkbox';box.setAttribute('data-hmk-skill-no-roll',name);
-   label.append(box,document.createTextNode(' Bez hodu pouze při pravidlovém automatickém CF (ověří původní vyhodnocení)'));
-   field.closest('label')?.after(label);
-   box.addEventListener('change',()=>{clear(true);refresh();focusField(pending()?.field);});
-  }
-  function active(){return ordered.filter(field=>due(form,field));}
+  function active(){return ordered.filter(field=>due(form,field,skipPrimary));}
   function pending(){return active().map(f=>state.get(f.name)).find(x=>x.accepted!==String(x.field.value)||!inRange(x.field));}
   function clear(keepValues=false){
    for(const entry of state.values()){
@@ -127,6 +116,9 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie){
    const list=active(),now=pending();
    for(const entry of state.values()){
     const on=list.includes(entry.field),current=on&&entry===now;
+    if((entry.field.name==='rollA'||entry.field.name==='rollB')&&skipPrimary(form,entry.field.name)){
+     entry.field.value='';entry.accepted=null;delete entry.field.dataset.hmkAutoDice;
+    }
     entry.field.readOnly=!current;
     entry.field.closest('label')?.classList.toggle('hmk-simple-current-93915',current);
     entry.field.closest('label')?.classList.toggle('hmk-simple-done-93915',on&&!current&&entry.accepted===String(entry.field.value)&&inRange(entry.field));
@@ -144,7 +136,6 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie){
   reset.addEventListener('click',()=>{clear();refresh();focusField(pending()?.field);});
   form.addEventListener('change',event=>{
    if(state.has(event.target.name))return;
-   if(event.target.hasAttribute('data-hmk-skill-no-roll'))return;
    // A change of rule choice, primary skill, defender, or SR activity invalidates
    // all earlier confirmations. Original handlers run on document afterward.
    clear(true);queueMicrotask(refresh);
