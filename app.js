@@ -239,7 +239,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,lastNavigationEvidenceBefore,EPISODE_NAVIGATION_EVIDENCE_POLICY_93907,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -382,7 +382,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.944';
+const APP_VERSION='93.945';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1554,6 +1554,7 @@ function syncWeatherHealerFields(form){
   dexField.value=untreated||!usesDex?'0':healer?.dexSecondary===null?'':healer?String(healer.dexSecondary):'';
   dexField.readOnly=true;
  }
+ if(form.id==='hmk-treatment-form')refreshBandageTreatmentGuide(form);
  const status=form.querySelector('[data-weather-healer-status]');
  if(status)status.textContent=untreated?'Neošetřená rána: bez léčitele, bez skutečného Physician hodu a bez posunu času.':
   !options.length?'Nikdo z členů kampaně nemá nyní způsobilou Physician dovednost. Ránu lze ponechat skutečně neošetřenou.':
@@ -2859,6 +2860,10 @@ function episodeSetupIssue(form){
   }
  }
 
+ if(!v.checkEncounter&&!String(v.encounterWaiver||'').trim())
+  return {field:'encounterWaiver',message:'Encounter lze vynechat po uvedení, proč je prostředí pro skupinu bezpečné.'};
+ if(v.checkEncounter&&v.environOverride&&v.environOverride!=='auto'&&String(v.environReason||'').trim().length<8)
+  return {field:'environReason',message:'Uveďte alespoň 8 znaků k doložení zvolené kategorie prostředí pro Encounter.'};
  if(!v.weatherSource)return {field:'weatherSource',message:'Vyberte globální počasí nebo vlastní počasí epizody.'};
  if(v.weatherSource==='local'&&!episodeIndoorWeatherNotRequired(v,data.campaignClock)&&!String(v.area||'').trim())
   return {field:'area',message:'Pojmenujte oblast, pro kterou platí počasí epizody.'};
@@ -3236,7 +3241,11 @@ function timeEpisodePageHTML(clock,participants){
   <label class="hc-check" data-episode-weather-geography><input name="aridDesert" type="checkbox"> Pouštní podmínky</label>
  <label data-episode-weather-roll>Teplota (d10)<span class="hc-episode-die"><input name="temperatureD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="temperatureD10">⚄ d10</button></span></label>
  <label data-episode-weather-roll>Srážky (d10)<span class="hc-episode-die"><input name="precipitationD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="precipitationD10">⚄ d10</button></span></label>
- </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p></details>
+ </div></div><p data-episode-weather-selected class="hc-episode-weather-outcome" role="status"></p>
+ <details data-episode-encounter-setup><summary>Prostředí pro náhodná setkání</summary><details class="hc-episode-reference"><summary>GM výjimka · vynechat náhodné setkání jen v bezpečném prostředí</summary><label class="hc-check"><input name="checkEncounter" type="checkbox" checked> Provést kontrolu setkání podle skutečného prostředí ${episodeRuleHelp('Random Encounter','HMK 150 používá speciální d10 a TN podle prostředí a dne/noci (2/1, 4/1, 1/1, 9/9). Tato domluvená GM varianta převádí hustotu setkání na přesnou délku v minutách a jedním d100 určuje počet setkání; v dlouhé epizodě mohou být i dvě nebo více. Noční divočina má oproti denní poloviční četnost. Nejedná se o doslovný HMK hod d10.')}</label><p class="hc-hint">Základní kontrola probíhá automaticky při vyhodnocení. Odškrtnutí je výjimečné rozhodnutí GM a vyžaduje odůvodnění.</p><label data-episode-encounter-waiver hidden>Proč se Encounter nekontroluje (GM výjimka)<textarea name="encounterWaiver" rows="2" maxlength="250" placeholder="Např. skutečně bezpečná uzavřená místnost."></textarea></label></details><div class="hmk-trek-grid"><input name="environ" type="hidden" value="highway"><p class="hc-hint" data-episode-auto-environ role="status">Prostředí Encounteru se určuje automaticky z vybrané cesty / krajiny.</p>
+ <label>Výjimka typu prostředí (jen pokud trasa není běžná)<select name="environOverride"><option value="auto">Automaticky podle cesty a osídlení</option><option value="highway">Highway · cesta spojující osídlené oblasti</option><option value="rural">Rural · pole, pastviny, vesnice</option><option value="wilderness">Wilderness · odlehlá příroda i se stezkou</option><option value="underworld">Underworld · skutečné jeskyně / ruiny</option></select></label>
+ <label data-episode-encounter-override-reason hidden>Proč platí jiná kategorie prostředí?<input name="environReason" maxlength="180" placeholder="Např. nezpevněná cesta leží v odlehlé divočině"></label>
+</div></details></details>
 
  <fieldset class="hc-episode-party-panel hmk-transport-compact"><legend>3 · Zvířata a doprava <span class="hc-episode-section-party" data-episode-section-party="transport"></span></legend>
  <div class="hmk-transport-heading"><label class="hmk-transport-primary" data-episode-travel-geography>Způsob dopravy <select name="conveyance" data-hmk-transport-conveyance><option value="foot">Pěšky</option><option value="mount">Jízda na zvířeti</option><option value="cart">Kára</option><option value="wagon">Vůz</option></select></label><span class="hmk-transport-heading-status" data-episode-transport-quick-status role="status">Zvolte způsob dopravy a zvířata ze Stáje.</span></div><div class="hc-episode-members" data-episode-legacy-members hidden aria-hidden="true">${characterRows}</div><label data-episode-legacy-guide hidden aria-hidden="true">Průvodce / osoba provádějící orientaci<select name="guideId">${participants.map(c=>option(c.id,c.name)).join('')}</select></label>
@@ -3378,10 +3387,7 @@ function timeEpisodePageHTML(clock,participants){
  </div></details></details><details class="hc-episode-suboptions hc-episode-roll-group"><summary>Únava a srážky</summary><label>Srážky · stav v této minutové epizodě (d6) ${episodeRuleHelp('Srážkový d6','HMK 144: denní teplota a srážky vzniknou ze dvou d10. D6 popisuje doloženou souvislost srážek během aktuální epizody, ne nezávislý hod každou minutu. Pokud se počasí během činnosti změní, GM zahájí novou epizodu přesně v minutě změny. Další rozdělení dne není povinné.')}<span class="hc-episode-die"><input name="precipitationD6" type="number" min="1" max="6" placeholder="1–6"><button type="button" data-episode-die="precipitationD6">⚄ d6</button></span></label>
  <p class="hc-hint">Hod (d6: 1) znamená nepřetržité srážky; ostatní hodnoty nepřidávají Slow. U převzatého globálního počasí se denní d10 nepřehazují.</p>
  <div class="hc-episode-dice-by-person"><strong>END SR (d10) · individuálně při cestování</strong> ${episodeRuleHelp('END SR','Každá postava má vlastní hod d10 proti TN = podlaha(END/2); při jízdě a vozidle +2. Výsledná únava se počítá za zadané minuty, zaokrouhlí dolů a nevyčerpaná část se bezpečně přenese. Jednotlivé END hody jsou doložené skutečnými d10. HMK 62,149.')}<p>Každá postava má vlastní skutečný hod; TN odpovídá jejímu END. Hod se nepřebírá od průvodce.</p>
- ${participants.map(c=>`<label data-episode-end-person="${esc(c.id)}">${esc(c.name)} · END SR (d10; při Double Time za každou hodinu)<span class="hc-episode-die"><input name="end_${esc(c.id)}" type="text" inputmode="numeric" placeholder="1–10; Double Time: 1,9,4,8"><button type="button" data-episode-die="end_${esc(c.id)}">⚄ d10</button></span></label>`).join('')}</div></details></div><details class="hc-episode-suboptions hc-episode-roll-group hc-episode-encounter"><summary>Náhodná setkání</summary><details class="hc-episode-reference"><summary>GM výjimka · vynechat náhodné setkání jen v bezpečném prostředí</summary><label class="hc-check"><input name="checkEncounter" type="checkbox" checked> Provést kontrolu setkání podle skutečného prostředí ${episodeRuleHelp('Random Encounter','HMK 150 používá speciální d10 a TN podle prostředí a dne/noci (2/1, 4/1, 1/1, 9/9). Tato domluvená GM varianta převádí hustotu setkání na přesnou délku v minutách a jedním d100 určuje počet setkání; v dlouhé epizodě mohou být i dvě nebo více. Noční divočina má oproti denní poloviční četnost. Nejedná se o doslovný HMK hod d10.')}</label><p class="hc-hint">Základní kontrola probíhá automaticky při vyhodnocení. Odškrtnutí je výjimečné rozhodnutí GM a vyžaduje odůvodnění.</p><label data-episode-encounter-waiver hidden>Proč se Encounter nekontroluje (GM výjimka)<textarea name="encounterWaiver" rows="2" maxlength="250" placeholder="Např. skutečně bezpečná uzavřená místnost."></textarea></label></details><div data-episode-encounter-panel><div class="hmk-trek-grid"><input name="environ" type="hidden" value="highway"><p class="hc-hint" data-episode-auto-environ role="status">Prostředí Encounteru se určuje automaticky z vybrané cesty / krajiny.</p>
- <label>Výjimka typu prostředí (jen pokud trasa není běžná)<select name="environOverride"><option value="auto">Automaticky podle cesty a osídlení</option><option value="highway">Highway · cesta spojující osídlené oblasti</option><option value="rural">Rural · pole, pastviny, vesnice</option><option value="wilderness">Wilderness · odlehlá příroda i se stezkou</option><option value="underworld">Underworld · skutečné jeskyně / ruiny</option></select></label>
- <label data-episode-encounter-override-reason hidden>Proč platí jiná kategorie prostředí?<input name="environReason" maxlength="180" placeholder="Např. nezpevněná cesta leží v odlehlé divočině"></label>
- <input type="hidden" name="encounterPeriod" value="day">
+ ${participants.map(c=>`<label data-episode-end-person="${esc(c.id)}">${esc(c.name)} · END SR (d10; při Double Time za každou hodinu)<span class="hc-episode-die"><input name="end_${esc(c.id)}" type="text" inputmode="numeric" placeholder="1–10; Double Time: 1,9,4,8"><button type="button" data-episode-die="end_${esc(c.id)}">⚄ d10</button></span></label>`).join('')}</div></details></div><details class="hc-episode-suboptions hc-episode-roll-group hc-episode-encounter"><summary>Náhodná setkání</summary><div data-episode-encounter-panel><div class="hmk-trek-grid"> <input type="hidden" name="encounterPeriod" value="day">
 <input type="hidden" name="encounterD100" value=""><input type="hidden" name="encounterD100Sub" value=""><input type="hidden" name="encounterRollContext" value=""><input type="checkbox" name="encounterFine" checked hidden aria-hidden="true">
  <p class="hc-episode-encounter-summary" data-episode-encounter-summary role="status">Pravděpodobnost a výsledek automatických kostek se zobrazí před závěrečným potvrzením.</p></div>
  <label data-episode-old-encounter-choice>Jak bude doložen kladný Encounter?<select name="encounterResolution"><option value="">— čeká na rozhodnutí GM —</option><option value="detailed">Podrobný výsledek · vzdálenost + Surprise pro každé setkání</option><option value="no-consequence">GM potvrdil: bez dalšího vyhodnocení</option><option value="resolved">GM vyřešil mimo Cestování (pouze externí doklad)</option></select></label>
@@ -10560,7 +10566,6 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',e=>{
  const form=e.target?.closest?.('.hmk-weather-care form');
  if(!form)return;
- if(['healerId','wound','untreated'].includes(e.target.name))refreshBandageTreatmentGuide(form);
  if(['healerId','wound','untreated'].includes(e.target.name))syncWeatherHealerFields(form);
  syncWeatherCareFormGuidance(form);
  const controls=weatherCareFocusableControls(form);
@@ -18520,6 +18525,20 @@ document.addEventListener('submit',e=>{
   }))notice='Direction Hazard byl doložen pro konkrétní hlídku. Historický hod, čas a případná chybná poloha zůstávají zachovány.';
  }catch(err){if(out)out.textContent='Direction Hazard: '+(err.message||err);}
 },true);
+document.addEventListener('change',e=>{
+ if(e.target?.name!=='nonhostile')return;
+ const form=e.target.closest('[data-episode-encounter-gm-93902]');
+ if(!form)return;
+ for(const name of ['foeWatchfulness','foeIsBeast','partySkill','partyRoll','partyEML','foeSkill','foeRoll','foeEML','decision']){
+  const control=form.elements.namedItem(name);
+  control.disabled=e.target.checked;
+  control.closest('label').hidden=e.target.checked;
+  if(e.target.checked){
+   if(control.type==='checkbox')control.checked=false;
+   else control.value='';
+  }
+ }
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;if(!form?.matches?.('[data-episode-encounter-gm-93902]'))return;
  e.preventDefault();e.stopImmediatePropagation();
@@ -18760,11 +18779,14 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
   break;
  }
  case 'treatment':case 'healing':case 'infection':case 'grim':{
+  const targetWound=s?.wounds?.find(w=>w.id===sourceId);
+  const frostTreatment=kind==='treatment'&&targetWound?.aspect==='frost'&&targetWound.severity==='G';
   if(hskIsEnvironmentalWound(actor,sourceId)){
    if(view!=='sheet'||activeSheetSection!=='hazards'||selected!==actor.id){selected=actor.id;view='sheet';activeSheetSection='hazards';render();}
-   weatherCareActiveSection=kind==='treatment'?'treatment':kind==='healing'?'healing':kind==='infection'?'infection':'grim';syncWeatherCarePanel();
+   weatherCareActiveSection=frostTreatment?'frost':kind;syncWeatherCarePanel();
   }
-  form=document.getElementById(kind==='treatment'?'hmk-treatment-form':kind==='healing'?'hmk-healing-roll-form':kind==='infection'?'hmk-infection-course-form':'hmk-grim-shock-form');
+  form=document.getElementById(frostTreatment?'hmk-frost-amputation-form':
+   kind==='treatment'?'hmk-treatment-form':kind==='healing'?'hmk-healing-roll-form':kind==='infection'?'hmk-infection-course-form':'hmk-grim-shock-form');
   choose(form,'wound',actor.id+'::'+sourceId);
   if(form)refreshCalendarHealingFields(form);
   choose(form,'endurance',attrs.end);choose(form,'will',attrs.wil);break;
@@ -18826,6 +18848,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText){
  case 'psyche-interval':case 'psyche-recovery':form=q(kind==='psyche-interval'?'form[data-hmk-calendar-psyche-schedule]':'form[data-hmk-calendar-psyche-roll]').find(f=>f.elements.namedItem('characterId')?.value===actor.id&&(!sourceId||encodeURIComponent(f.elements.namedItem('trait')?.value||'')===sourceId.split(':')[0]));break;
  default:break;
  }
+ if(form?.id==='hmk-frost-amputation-form')kind='frost-amputation';
  if(form){
   // The follow-up tab keeps its real rule forms in a hidden source container.
   // Merely scrolling to that hidden form was a false handoff. Select the exact
@@ -25797,6 +25820,8 @@ function episodeIdentityMismatch(form){
 }
 function episodeLockIdentityControls(form){
  const locked=episodeEvaluationRequested&&!!episodeEvaluatedIdentity;
+ for(const name of ['checkEncounter','encounterWaiver','environOverride','environReason'])
+  form.elements.namedItem(name).disabled=locked;
  for(const name of EPISODE_IMMUTABLE_FIELDS){
   for(const node of form.querySelectorAll('[name="'+name+'"]')){
    const deferred=['trackingTrail','trackingUse','trackingActorId'].includes(name)&&episodeDeferredTrackingTrailAllowed(form);
@@ -26169,6 +26194,11 @@ function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock,form=document.querySelector('#hmk-time-episode-form');
  if(form&&(/hazard/i.test(field)||/Complication/i.test(field))){try{episodeHazardRequireConfirmed93840(form)}catch(err){alert(err.message);return false;}}
  if(!episodeEvaluationRequested||!clock||!character(actorId))return false;
+ if(form&&/^hazardCompProof_/.test(field)&&!episodeLearnedSkill93867(actorId,skill)){
+  episodeShowSetupError(form,{field:'hazardComplicationSkill',message:
+   (character(actorId)?.name||'Účastník')+' nemá osvojený '+skill+'. Zvolte jinou dovednost podle překážky nebo test jednoho člena, který ji umí.'});
+  return false;
+ }
  if(field==='droverProofId'&&!episodeLearnedSkill93867(actorId,skill)){
   notice='Nelze otevřít Drover '+skill+': '+(character(actorId)?.name||'Vybraný drover')+' nemá osvojený '+skill+' ML. Nepoužívejte Acrobatics ani jiný náhradní hod. Zrušte pouze nedokončený návrh a založte platnou dopravu, nebo nejprve opravte doložený skutečný stav role. Potvrzené hody v historii zůstávají.';
   render();return false;
@@ -26212,6 +26242,13 @@ function episodeStartSkillRequest(field,skill,actorId){
  const allowed=episodeNextSkillStep(form);
  if(!allowed||allowed.field!==field||allowed.skill!==skill||allowed.actorId!==actorId){
   alert('Dokončete nejprve právě zobrazený pravidlový krok. Předchozí hod ani jeho ID se nesmějí přeskočit.');return false;
+ }
+ const pending=episodePendingSkillRequest;
+ if(pending?.status==='waiting'&&pending.episodeEpoch===episodeDraftEpoch&&
+    /^hazardCompProof_/.test(pending.field)&&!episodeLearnedSkill93867(pending.actorId,pending.skill)){
+  episodePendingSkillRequest=null;
+  episodeActiveSkillRequestId=null;
+  episodeSkillReturnPending=false;
  }
  const previous=episodePendingSkillRequest;
  if(previous?.status==='waiting'&&previous.episodeEpoch===episodeDraftEpoch){
@@ -26465,7 +26502,7 @@ function episodeOrientationReuseCheck(form,clock,sky){
  * An explicit GM waiver is allowed; every eligible episode otherwise evaluates a check. */
 function episodeEnsureEncounterRoll(form,clock,sky){
  const v=episodeFormSnapshot(form);
- if(!episodeEvaluationRequested||!['travel','tracking','forage','watch'].includes(v.kind)||!v.checkEncounter)return;
+ if(!episodeEvaluationRequested||!v.checkEncounter)return;
  const minutes=Number(v.minutes);
  if(!Number.isSafeInteger(minutes)||minutes<1||minutes>10080)return;
  const light=sky?.intervals?.minutesByPeriod;
@@ -26633,7 +26670,9 @@ function episodePreviewFromForm(form,clock){
   fullMoon:actualPeriod==='night'&&!!v.orientationMoon,afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow});
  const skillAtMinute=(id,skill,actorId=guideId)=>episodeSkillProof(data.journal.find(j=>j.id===id),skill,
   actorId,campaignKey(clock),clock.minute,{requireSV:true});
- let orientation=null,trackingMemory=null;
+ const priorNavigationRow=participantNavigationEvidence(data.journal,campaignKey(clock),clock.minute,members);
+ const priorNavigation=episodeNavigationState(priorNavigationRow);
+ let orientation=null,trackingMemory=null,navigationRecovered=false;
  if(kind==='travel'&&!waitingForComplication){
   const base=trekMovement({topography:v.topography,terrain:v.terrain,conveyance:v.conveyance,
    progress:0,slow:0,bearing:0,loaded:false,progressD10:[],continuousPrecipitation:!!precipitation?.slowMode});
@@ -26641,9 +26680,7 @@ function episodePreviewFromForm(form,clock){
   // HMK p148: a Lost party only notices its error after earning a *new*
   // one-time Bearing Mode beyond the ordinary terrain / Tracking requirement.
   // A GM checkbox alone must never erase Lost in the next watch.
-  const priorNavigation=episodeNavigationState(lastNavigationEvidenceBefore(
-   data.journal,campaignKey(clock),clock.minute,members));
-  const lostRecoveryBearing=v.navigationRecovered&&priorNavigation==='lost'?1:0;
+  const lostBearingTarget=lostRecoveryBearingTarget(base.requiredBearing,forced);
   // A prior Misdirection is noticed by the guide's real Awareness test,
   // retried in this watch (HMK p148); a GM checkbox alone is not a roll.
   const recoveryAwareness=v.navigationRecovered&&priorNavigation==='misdirection'?
@@ -26659,26 +26696,27 @@ function episodePreviewFromForm(form,clock){
   if(v.orientationUse==='new'&&requirement.present&&!drover)
    throw Error('Drover Test: cesta vyžaduje '+requirement.skill+' Skill Test postavy '+
     (character(requirement.actorId)?.name||'Drover')+' (HMK 141, 145).');
-  orientation=computeEpisodeOrientation({mode:v.orientationUse||'new',currentSkill:skillAtMinute(v.orientationProofId,'Survival'),
+  const orientationInput={mode:v.orientationUse||'new',currentSkill:skillAtMinute(v.orientationProofId,'Survival'),
    previous,minute:clock.minute,context,priority:v.orientationPriority||'pace',
    allocationMode:v.orientationAllocation||'auto',lowChoice:v.orientationLowChoice||'slow',
    manualModes:Object.fromEntries(['bearing','progress','foraging','stalking','vigilance'].map(k=>[k,Number(v['mode_'+k])])),
-   requiredBearing:base.requiredBearing+lostRecoveryBearing,continuousPrecipitation:!!precipitation?.slowMode,
+   requiredBearing:base.requiredBearing,continuousPrecipitation:!!precipitation?.slowMode,
    familiar:!!v.orientationFamiliar,torchlight:actualPeriod==='night'&&!!v.orientationTorch,fullMoon:actualPeriod==='night'&&!!v.orientationMoon,
    afterSnowfall:actualPeriod==='night'&&!!v.orientationSnow,
    droverSkill:drover,droverActorId:requirement.actorId,animalsPresent:requirement.present,requiredDroverSkill:requirement.skill,
-   forcedTrackingBearing:forced});
-  // Expose the already verified Survival stars before checking Lost recovery.
-  // Otherwise a still-unassigned manual Bearing throws before the one
-  // authoritative allocation chooser can appear, trapping the GM in a
-  // validation error with every mode input/confirmation disabled.
+   forcedTrackingBearing:forced};
+  orientation=computeEpisodeOrientation(orientationInput);
+  navigationRecovered=!!recoveryAwareness;
+  if(priorNavigation==='lost'&&orientation.sourceMode==='new'&&
+     orientation.stars+forced>=lostBearingTarget){
+   if(orientation.allocationMode==='auto')
+    orientation=computeEpisodeOrientation({...orientationInput,requiredBearing:lostBearingTarget});
+   navigationRecovered=orientation.modes.bearing>=lostBearingTarget;
+  }
+  // The allocation chooser displays the verified stars and actual modes.
   form.dataset.episodeOrientationStars=String(orientation?.stars??0);
   form.dataset.episodeOrientationSv=String(orientation?.adjustment?.adjustedSV??'');
   form.dataset.episodeOrientationModes=JSON.stringify(orientation?.modes||{});
-  if(lostRecoveryBearing&&orientation.stars+forced<base.requiredBearing+1)
-   throw Error('Lost (HMK 148): tento test nedal dost ★ na zvláštní Bearing. Zrušte pokus o návrat na trasu a pokračujte ve stavu Lost se stejným hodem.');
-  if(lostRecoveryBearing&&orientation.modes.bearing<base.requiredBearing+1)
-   throw Error('Lost (HMK 148): pro návrat na správnou trasu musíte v novém Orienteering skutečně získat a přidělit zvláštní Bearing Mode navíc k povinným Bearing. Pouhé potvrzení GM nestačí.');
  }
  // Tracking light penalty varies (-1 twilight / -3 night). Re-evaluate
  // ONLY when actual Tracking is performed, never block ordinary movement.
@@ -26788,7 +26826,7 @@ function episodePreviewFromForm(form,clock){
  // HMK p.141: one selected horse gives ONE confirmed rider. Every other
  // healthy member of this group is walking; no unassigned second saddle is
  // inferred from the Stable or from an earlier trip. Foot travel is the
- // party's speed ceiling, and walking END must use the actual gait.
+ // party's pace starts from the slowest column, and END uses the actual gait.
  const mixedFootMemberIds93858=healthyMountRide93823?
   members.filter(id=>id!==healthyMountRide93823.riderId):[];
  if(healthyMountRide93823){
@@ -26840,8 +26878,8 @@ function episodePreviewFromForm(form,clock){
  const end=Object.fromEntries(people.map(c=>[c.id,c.hmk?.attributes?.end]));
  const carry=Object.fromEntries(members.map(id=>[id,lastTimeEpisodeCarry(data.journal,campaignKey(clock),id)]));
  if(kind==='travel'&&members.some(id=>!(v.transportedMemberIds||[]).includes(id)&&!Number.isSafeInteger(end[id])))throw Error('Některá aktivně cestující postava nemá doložené END.');
- if(kind==='travel'&&!v.checkEncounter&&!String(v.encounterWaiver||'').trim())throw Error('Encounter nelze vynechat bez výslovného odůvodnění GM.');
- const encounterEnabled=['travel','tracking','forage','watch'].includes(kind)&&!!v.checkEncounter;
+ if(!v.checkEncounter&&!String(v.encounterWaiver||'').trim())throw Error('Encounter nelze vynechat bez výslovného odůvodnění GM.');
+ const encounterEnabled=!!v.checkEncounter;
  if(encounterEnabled&&v.environOverride&&v.environOverride!=='auto'&&String(v.environReason||'').trim().length<8)
   throw Error('Encounter: změna prostředí oproti automatice vyžaduje doložený důvod GM (alespoň 8 znaků).');
  const encounterD100=encounterEnabled?Number(v.encounterD100):null;
@@ -26853,6 +26891,7 @@ function episodePreviewFromForm(form,clock){
  const medAtEnd=episodeEvaluationRequested?episodeTimedMedical(form):null;
  const inactiveByActor=Object.fromEntries((medAtEnd?.incapacitations||[]).filter(x=>members.includes(x.actorId))
   .map(x=>[x.actorId,x]));
+ const walkingHandlerIds=mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:mixedFootMemberIds93858;
  const result=calculateTimeEpisode({minute:clock.minute,minutes,kind,topography:v.topography,terrain:v.terrain,
   conveyance:v.conveyance,progress:modes.progress+gmExtraProgress,bearing:modes.bearing,extraSlow:Number(v.extraSlow||0)+Number(modes.orienteeringSlow||0)+taskSlow+Number(equipmentSlowIn>0),
   wearied,injured,loaded:actualLoaded,continuousPrecipitation:!!precipitation?.slowMode,
@@ -26866,7 +26905,7 @@ function episodePreviewFromForm(form,clock){
   doubleTime:!!v.doubleTime,loadBypass:!!v.loadBypass,dunesSlow:!!v.dunesSlow,
   encByActor,forcedBearing,waitingForComplication,
   trackingBearingPolicy:waitingForComplication?null:EPISODE_TRACKING_BEARING_POLICY_93904,
-  walkingHandlerIds:mountedPassenger93816?.handlerPosition==='leading'?[mountedPassenger93816.handlerId]:mixedFootMemberIds93858,
+  walkingHandlerIds,mixedPacePolicy:walkingHandlerIds.length?EPISODE_MIXED_PACE_93945:null,
   previousDistanceFraction:lastTimeEpisodeDistanceFraction(data.journal,campaignKey(clock),clock.minute,kind==='travel'?members:null),
   encounterLightMinutes:lightMinutes,inactiveByActor,transportedMemberIds:kind==='travel'?(v.transportedMemberIds||[]):[]});
  if(Object.keys(unusedEndDice93868).length)result.unusedEndDice93868={
@@ -26936,12 +26975,12 @@ function episodePreviewFromForm(form,clock){
  if(animalHealth.length)result.animalHealth=animalHealth;
  result.movementRolls={progressD10,directionD10};
  result.movementRollSources={progress:null,direction:null};
- result.navigationState=episodeNavigationState(lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members),result.direction,{recovered:!!v.navigationRecovered&&!waitingForComplication,lostPriority:true});
+ result.navigationState=episodeNavigationState(priorNavigationRow,result.direction,{recovered:navigationRecovered,lostPriority:true});
  result.navigationPartyScope='v93.699';
- result.navigationContinuityPolicy93907=EPISODE_NAVIGATION_EVIDENCE_POLICY_93907;
- result.navigationRecovered=!!v.navigationRecovered&&!waitingForComplication;
+ result.navigationContinuityPolicy93907=EPISODE_PARTICIPANT_NAVIGATION_93945;
+ result.navigationRecovered=navigationRecovered;
  result.navigationRecoveryAwarenessProofId=(result.navigationRecovered&&
-  episodeNavigationState(lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members))==='misdirection')?
+  priorNavigation==='misdirection')?
   String(v.navigationRecoveryAwarenessProofId||'').trim()||null:null;
  result.navigationRecoveryRule='special-bearing-and-awareness-v93.780';
  // Every episode, including Rest/Foraging/Watch, carries an explicit false
@@ -27049,8 +27088,7 @@ function episodePreviewFromForm(form,clock){
   const reoriented=result.hazardDetails.some(h=>h.hazard==='misdirection'&&h.result==='reoriented');
   result.navigationReorientedInWatch=reoriented;
   if(reoriented)result.navigationState=episodeNavigationState(
-   lastNavigationEvidenceBefore(data.journal,campaignKey(clock),clock.minute,members),
-   result.direction,{recovered:!!v.navigationRecovered,redirected:true,lostPriority:true});
+   priorNavigationRow,result.direction,{recovered:navigationRecovered,redirected:true,lostPriority:true});
  }
   if(kind==='forage'&&result.hazardDetails.some(h=>h.hazard==='complication'&&
    ['short-delay','long-delay','irreparable','reroute'].includes(h.result))){
@@ -27129,21 +27167,7 @@ function episodePreviewFromForm(form,clock){
    result.equipmentSlowCarryRule='moving-minutes-v93.876-foraging';
    result.medicalTravelStop=confirmedStop?{minute:Math.min(...previewIncap.map(x=>x.minute)),
     movementMinutes:result.movementMinutes}:null;
-   if(mountedPassenger93816?.handlerPosition==='leading'||mixedFootMemberIds93858.length){
-    // HMK 141: if a mounted rider is accompanied by a walking guide/member,
-    // the party goes no faster than walking pace. Never treat a second
-    // selected pack animal as proof that an unassigned party member rides.
-    const footRate=trekMovementTableRow({topography:v.topography,terrain:v.terrain}).foot;
-    if(!Number.isFinite(footRate)||footRate<=0)throw Error('Smíšená doprava: pěší člen se tímto terénem nemůže pohybovat. Zvolte schůdnou trasu.');
-    if(result.motion.finalLPW>footRate){
-      result.motion.finalLPW=footRate;
-      result.motion.kilometres=footRate*4*result.movementMinutes/240;
-      result.motion.leagues=footRate*result.movementMinutes/240;
-    }
-    if(mountedPassenger93816?.handlerPosition==='leading')result.transportProof.mount.footPaceCapLPW=footRate;
-    if(mixedFootMemberIds93858.length)result.mountRiding93823.footPaceCapLPW=footRate;
-  }
-  const metres=result.motion.finalLPW*4000*result.movementMinutes/240+result.distanceFractionIn;
+    const metres=result.motion.finalLPW*4000*result.movementMinutes/240+result.distanceFractionIn;
    result.distanceMeters=Math.floor(metres+1e-10);
    result.distanceKilometres=result.distanceMeters/1000;
    result.distanceFractionOut=Math.min(.9999999999,Math.max(0,metres-result.distanceMeters));
@@ -27993,8 +28017,8 @@ function updateEpisodeTaskFocus(form){
  const kind=form.elements.namedItem('kind')?.value;
  const travel=kind==='travel';
  // First the setup, then only the concrete mandatory rule step.
- // Indoor actions must not inherit a visible roll panel from the previous group.
- section.hidden=!(episodeEvaluationRequested&&['travel','tracking','forage','watch'].includes(kind));
+ // A group sees its own roll panel as soon as evaluation starts.
+ section.hidden=!episodeEvaluationRequested;
  const groups={
   motion:section.querySelectorAll('[data-episode-travel-rolls] > .hc-episode-roll-group:first-child'),
   fatigue:section.querySelectorAll('[data-episode-travel-rolls] > .hc-episode-roll-group:nth-child(2)'),
@@ -28102,6 +28126,7 @@ function updateEpisodeTaskFocus(form){
  const visibleRequiredAreas=new Set([active]);
  if(issue)visibleRequiredAreas.add(episodeTaskArea(issue));
  if(accidentMinuteOpen)visibleRequiredAreas.add('hazard');
+ if(active==='none')visibleRequiredAreas.add('encounter');
  for(const [key,nodes] of Object.entries(groups))for(const node of nodes){
   if(visibleRequiredAreas.has(key)){if(node.dataset.episodeFocusHidden==='true'){node.hidden=false;delete node.dataset.episodeFocusHidden;}
    // An unrelated earlier task may have left this subpanel closed.
@@ -28911,10 +28936,15 @@ function updateEpisodePreview(form){
   if(tableOut)try{
    const row=trekMovementTableRow({topography:v.topography,terrain:v.terrain});
    const bearing=trekBearingRequirement({topography:v.topography,terrain:v.terrain,continuousPrecipitation:false});
-   const selected=row[v.conveyance];
+   const mountedPatients=(v.transportedMemberIds||[]).length>0;
+   const hasWalkers=v.conveyance==='mount'&&(mountedPatients?
+    v.transportMountHandlerPosition!=='mounted':(v.memberIds||[]).length>1);
+   const pace=slowestEpisodeConveyance(v.topography,v.terrain,v.conveyance,hasWalkers);
+   const selected=row[pace];
    tableOut.textContent='Trek Movement (HMK 146) · '+selected+' lig na 240 referenčních minut · '+
     (bearing.conditional?'Bearing 1 při souvislých srážkách':
      bearing.requiredBearing?'Bearing '+bearing.requiredBearing+' za každého počasí':'bez povinného Bearing')+
+    (hasWalkers?' · tempo podle nejpomalejšího způsobu dopravy':'')+
     ' · skutečná vzdálenost a únava se přepočítají na zadané minuty.';
    tableOut.hidden=false;
   }catch{tableOut.hidden=true;}
@@ -28979,18 +29009,18 @@ function updateEpisodePreview(form){
  const transportSelect=form.querySelector('[data-hmk-transport-conveyance]');
  if(transportSelect?.closest('label'))transportSelect.closest('label').hidden=!travel;
  show('[data-episode-weather-topography]',true);
- show('[data-episode-landscape-terrain]',outdoor);
+ show('[data-episode-landscape-terrain]',true);
  show('[data-episode-weather-geography]',true);
  show('[data-episode-manual-season]',!campaignTRDate(data.campaignClock,data.campaignClock.minute));
  const waitingForComplication=travel&&v.memberIds?.length&&Number(v.minutes)>0&&
   participantTravelDelayCarry(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds)>=Number(v.minutes);
  show('[data-episode-section="skills"]',(isTravel&&!waitingForComplication)||isTracking||kind==='forage');
  show('[data-episode-weather-roll]',episodeEvaluationRequested);
- // Other indoor activities still display the chosen global/local weather without irrelevant terrain choices.
- show('[data-episode-section="rolls"]',episodeEvaluationRequested&&(isTravel||isTracking||kind==='forage'||kind==='watch'));
+ // Encounter can also be evaluated while this group stays in the same place.
+ show('[data-episode-section="rolls"]',episodeEvaluationRequested);
  const rollsSummary=form.querySelector('[data-episode-section="rolls"]>summary');
  if(rollsSummary){
-  const title=travel?'5 · Pohyb, únava a náhodná setkání':kind==='tracking'?'5 · Srážky, sledování stop a případná setkání':kind==='forage'?'5 · Foraging a volitelná setkání':'5 · Volitelná kontrola setkání';
+  const title=travel?'5 · Pohyb, únava a náhodná setkání':kind==='tracking'?'5 · Srážky, sledování stop a náhodná setkání':kind==='forage'?'5 · Foraging a náhodná setkání':'5 · Náhodná setkání';
   rollsSummary.innerHTML=esc(title)+' <span class="hc-episode-section-party" data-episode-section-party="rolls"></span>';
  }
  // The shared precipitation d6 is also required during stand-alone Tracking.
@@ -29016,10 +29046,10 @@ function updateEpisodePreview(form){
  const survivalCF=(travel&&!waitingForComplication&&v.orientationUse==='new'||kind==='forage')&&
   (orientProof?.skillTestProof?.a?.level||orientProof?.skillTestProof?.result?.level)==='CF';
  show('[data-episode-survival-hazard]',survivalCF);
- const rollPanel=form.querySelector('[data-episode-encounter-panel]');if(rollPanel)rollPanel.hidden=!v.checkEncounter;
+ const rollPanel=form.querySelector('[data-episode-encounter-panel]');if(rollPanel)rollPanel.hidden=false;
  const oldEncounterChoice=form.querySelector('[data-episode-old-encounter-choice]');
  if(oldEncounterChoice)oldEncounterChoice.hidden=!!sharedTimeWindowDraft&&sharedTimeWindowPlans.length>0&&sharedFixedMode93773();
- show('[data-episode-encounter-waiver]',!v.checkEncounter&&(isTravel||isTracking||kind==='forage'||kind==='watch'));
+ show('[data-episode-encounter-waiver]',!v.checkEncounter);
  const encounterSummary=form.querySelector('[data-episode-encounter-summary]');
  if(encounterSummary){
   try{const detail=episodeEncounterProbability(form,data.campaignClock,sky);
@@ -29119,12 +29149,15 @@ function updateEpisodePreview(form){
 
  const autoTrackingLight=form.elements.namedItem('trackingLight');
  if(autoTrackingLight)autoTrackingLight.value=sky?.period||'day';
- const navigationPrev=v.memberIds?.length?lastNavigationEvidenceBefore(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds):null;
+ const navigationPrev=v.memberIds?.length?participantNavigationEvidence(data.journal,campaignKey(data.campaignClock),data.campaignClock.minute,v.memberIds):null;
+ const recoveryToggle=form.elements.namedItem('navigationRecovered');
+ if(recoveryToggle)recoveryToggle.closest('label').hidden=episodeNavigationState(navigationPrev)!=='misdirection';
  const navRecoveryRow=form.querySelector('[data-episode-navigation-recovery-awareness]');
  if(navRecoveryRow)navRecoveryRow.hidden=!(episodeNavigationState(navigationPrev)==='misdirection'&&!!v.navigationRecovered);
  const navigationText=form.querySelector('[data-episode-navigation-text]');if(navigationText){
   const state=episodeNavigationState(navigationPrev);
-  navigationText.innerHTML='Přetrvávající stav družiny: <span class="hc-help-term" tabindex="0" data-hmk-help="Možnosti: clear = správný směr, misdirection = odchýlení od trasy, lost = ztracení. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení.">'+esc(state)+'</span>. Možnosti: clear = správná trasa; misdirection = odchýlení; lost = ztracení. Změna stavu vyžaduje skutečný pravidlový následek nebo rozhodnutí GM.';
+  const guidance=state==='lost'?' Nový Orienteering při automatickém přidělení využije volnou hvězdu na zvláštní Bearing. V ručním režimu ji přidělte k Bearing sami.':'';
+  navigationText.innerHTML='Přetrvávající stav družiny: <span class="hc-help-term" tabindex="0" data-hmk-help="Možnosti: clear = správný směr, misdirection = odchýlení od trasy, lost = ztracení. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení.">'+esc(state)+'</span>. Možnosti: clear = správná trasa; misdirection = odchýlení; lost = ztracení. Změna stavu vyžaduje skutečný pravidlový následek nebo rozhodnutí GM.'+esc(guidance);
  }
  if(v.weatherSource==='local'&&String(v.area||'').trim()){
   const existing=activeAreaWeather(data.journal,campaignKey(data.campaignClock),Math.floor(data.campaignClock.minute/1440),v.area);
@@ -29352,14 +29385,13 @@ function updateEpisodePreview(form){
    row.hidden=!episodeEvaluationRequested||Number(row.dataset.episodeStationaryForageRow)>=count;
  }
  const directionInput=form.elements.namedItem('directionD10');if(directionInput)directionInput.disabled=!travel;
- const encounter=form.querySelector('[data-episode-encounter-panel]');if(encounter)encounter.hidden=!v.checkEncounter;
+ const encounter=form.querySelector('[data-episode-encounter-panel]');if(encounter)encounter.hidden=false;
 
 
  const boundaryPreview=form.querySelector('[data-episode-dated-boundaries]');
  if(boundaryPreview&&sky){
   const cuts=[...new Set([...sky.plan.dateChanges,...sky.plan.lightChanges])].sort((a,b)=>a-b);
-  const isOutdoor=['travel','tracking','forage','watch'].includes(v.kind);
-  if(isOutdoor&&cuts.length){
+  if(cuts.length){
    const upcoming=cuts.map(minute=>{
     const next=sky.plan.rows.find(r=>r.start===minute);
     const isMidnight=sky.plan.dateChanges.includes(minute);
@@ -29839,7 +29871,7 @@ function initializeTimeEpisodeForm(form){
   orientationUse:'Orienteering je situační Survival test. Jeho výsledek SV přiděluje výhody Progress, Bearing, Foraging, Stalking a Vigilance.',
   hazardDelayNow:'Minuty zdržení odečtené od pohybu; při Complication F/CF se počítají automaticky od skutečné minuty překážky. Příští povinnosti se přenesou do nové epizody.',
 
-  checkEncounter:'Ve výchozím stavu automaticky kontrolováno každou venkovní epizodu. Odškrtnutí je pouze pro GM doloženou bezpečnou výjimku.',
+  checkEncounter:'Ve výchozím stavu automaticky kontrolováno při každé činnosti. Odškrtnutí je pouze pro GM doloženou bezpečnou výjimku.',
   confirmed:'Dokončení epizody je samo potvrzením GM; všechny povinné hody, zdroje a zdravotní následky musí být doloženy. Další checkbox není potřebný.'
  };
  // HMK 149/185: the weather input names include the actor ID. Tooltip text
@@ -30013,6 +30045,17 @@ document.addEventListener('click',e=>{
    const proof=form.elements.namedItem('hazardMinuteOrigin93868');if(proof&&!proof.value)proof.value='manual';
   }else {episodeEquipmentSync93843(form);episodeEquipmentValidateConfirm93843(form)}
  }catch(err){episodeShowSetupError(form,{field:'hazardAtMinute',message:err.message});return;}
+ const complication={...episodeFormSnapshot(form),...episodeHazardRead93840(form)};
+ if(Number(complication.survivalD10)>=7&&complication.hazardComplicationDecision==='test'&&complication.hazardComplicationSkill){
+  const actors=complication.hazardComplicationScope==='party'?complication.memberIds:[complication.hazardWorkerId||complication.guideId];
+  const missing=(actors||[]).filter(id=>id&&!episodeLearnedSkill93867(id,complication.hazardComplicationSkill));
+  if(missing.length){
+   episodeShowSetupError(form,{field:'hazardComplicationSkill',message:
+    complication.hazardComplicationSkill+' nemá '+missing.map(id=>character(id)?.name||'účastník').join(', ')+
+    '. Vyberte dovednost odpovídající překážce nebo test jednoho člena, který ji umí.'});
+   return;
+  }
+ }
  const state=episodeHazardState93840(form);
  state.values=episodeHazardRead93840(form);state.context=episodeHazardContext93840(form);state.confirmed=true;
  form.elements.namedItem('hazardChoices93840').value=JSON.stringify({context:state.context,values:state.values,
