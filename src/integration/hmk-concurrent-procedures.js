@@ -11,10 +11,16 @@ const number=(v,min=0,max=1000000000)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const id=(v)=>typeof v==='string'&&v.length>0&&v.length<=200;
 const forms=new Set(['hmk-treatment-form','hmk-frost-amputation-form']);
 const typeNames=new Set(['start','finish','cancel']);
+export function concurrentTreatmentBlockers(state){
+ return {bleeding:(state?.wounds||[]).filter(w=>w.bleeding),shock:!!state?.extendedShock};
+}
+export function concurrentTreatmentBlockerText({bleeding,shock}){
+ return [bleeding.length?'aktivní krvácení':'',shock?'Extended Shock':''].filter(Boolean).join(' a ');
+}
 export function validateConcurrentProcedures(clock){
  const rows=clock?.concurrentProcedures??[];
  requireFact(Array.isArray(rows)&&rows.length<=30000,'Neplatná souběžná evidence');
- const keys=new Set(),started=new Map(),terminal=new Set();
+ const keys=new Set(),started=new Map(),terminal=new Map();
  for(const r of rows){
   requireFact(r&&typeNames.has(r.type)&&id(r.id)&&!keys.has(r.id)&&id(r.startId)&&
    number(r.minute)&&r.minute<=clock.minute,'Neplatný nebo duplicitní zápis souběžné procedury');
@@ -34,7 +40,7 @@ export function validateConcurrentProcedures(clock){
    // same minutes. This is a LOCAL resource constraint, never a global
    // block on another actor, patient, clock view or emergency export.
    requireFact(![...started.values()].some(x=>x.healerId===p.healerId&&
-    x.startMinute<p.endMinute&&p.startMinute<x.endMinute),
+    x.startMinute<p.endMinute&&p.startMinute<Math.min(x.endMinute,terminal.get(x.id)?.minute??x.endMinute)),
     'Vybraný léčitel již v tomto čase provádí jiný zákrok; vyberte jiného léčitele nebo pozdější termín');
    started.set(r.id,{...p,scope,id:r.id});
   }else{
@@ -43,7 +49,7 @@ export function validateConcurrentProcedures(clock){
    requireFact(r.type==='cancel'||r.minute===p.endMinute,'Dokončení musí odpovídat skutečnému konci zákroku');
    requireFact(r.type!=='finish'||(id(r.resultEventId)&&r.resultEventId===p.eventId),
     'Dokončení musí použít původní uložený hod a ID');
-   terminal.add(r.startId);
+   terminal.set(r.startId,r);
   }
  }
  return true;

@@ -1,5 +1,5 @@
 import {medicalOriginOfWound,isNoncombatMedicalOrigin} from './hmk-medical-origin.js';
-import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentProceduresAppendOnly} from './hmk-concurrent-procedures.js';
+import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentProceduresAppendOnly,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './hmk-concurrent-procedures.js';
 /**
  * HMK v1.2 p.178–182: absolute campaign-time *evidence*, not an alternative
  * combat or healing rules engine. Only GM-confirmed time is authoritative.
@@ -403,9 +403,10 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  for(let i=unknown.length-1;i>=0;i--)if(unknown[i].kind==='treatment'&&busy.has(unknown[i].characterId+'::'+unknown[i].woundId))unknown.splice(i,1);
  for(const op of running){
   const patient=characters.find(c=>c.id===op.characterId);
+  const blocker=concurrentTreatmentBlockerText(concurrentTreatmentBlockers(patient?.hmk?.healthState));
   all.push({id:'concurrent-treatment:'+op.startId,characterId:op.characterId,
    name:patient?.name??op.characterId,kind:'concurrent-treatment',woundId:op.woundId,
-   startId:op.startId,description:'Dokončení časovaného Treatment (bez nového hodu)',
+   startId:op.startId,description:blocker?'Přerušit ošetření a řešit '+blocker:'Dokončení časovaného Treatment (bez nového hodu)',
    minute:op.endMinute,anchorMinute:op.startMinute,
    status:op.endMinute<=clock.minute?'due':'future'});
  }
