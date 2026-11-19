@@ -152,7 +152,7 @@ export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,esc
  // seven rolling days. Historical completed events remain on their dates.
  const inWeek=p=>(p.dueMinute>=clock.minute&&p.dueMinute<=weekEnd)||
    (['gm','activity'].includes(p.origin)&&!p.resolution&&p.endMinute>clock.minute&&p.minute<=weekEnd);
- const actionable=all.filter(p=>(p.origin==='hml'||(p.origin==='gm'&&p.requiresAction))&&inWeek(p)&&p.status==='due');
+ const actionable=all.filter(p=>(p.origin==='hml'||(p.origin==='gm'&&p.requiresAction))&&p.dueMinute<=clock.minute&&p.status==='due');
  const upcoming=all.filter(p=>inWeek(p)&&!actionable.includes(p)&&p.origin!=='history'&&p.origin!=='passive'&&
   !['resolved','cancelled'].includes(p.status));
  const weeklyUnknown=agenda.unknown;

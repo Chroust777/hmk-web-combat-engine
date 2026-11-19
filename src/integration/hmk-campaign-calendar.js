@@ -207,8 +207,10 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
    unknown.push({characterId:c.id,name:c.name,kind:'bleeding',
     description:'Bojový Bleeder – Blood Loss / Stoppage vyžaduje ověřenou bojovou osu',
     reason:'Combat má svou původní časovou osu; 60 kol se nesmí odhadnout z Kalendáře'});
-  if(isNoncombatMedicalOrigin(s.shockFollowup?.domain)){
-   const q=s.shockFollowup;
+  // Coma Course owns recovery, including legacy saves with a stale reroll.
+  const pendingReroll=s.coma?.active?null:s.shockFollowup;
+  if(isNoncombatMedicalOrigin(pendingReroll?.domain)){
+   const q=pendingReroll;
    // A GM may establish an unconscious NPC without an active campaign clock.
    // NEVER coerce the undetermined source minute (null) to minute 0/10.
    if(q.domain==='gm-health'&&!(Number.isSafeInteger(q.originMinute)&&q.originMinute>=0)){
@@ -225,7 +227,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
       q.kind==='UNC'?'Cestovní Shock Reroll – po 10 minutách':'Cestovní Shock Reroll – GM potvrdí další skutečnou akci',
      minute:dueMinute,anchorMinute:q.originMinute,status:dueMinute<=clock.minute?'due':'future'});
    }
-  }else if(s.shockFollowup)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',
+  }else if(pendingReroll)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',
    description:'Povinný Shock Reroll v bojové časové ose',reason:'Před posunem času dokončete Shock Follow-up'});
   if(s.extendedShock){add(c,'extended-shock','Extended Shock Course (4 h)',s.extendedShock.elapsedHours+4,null,'hours',isNoncombatMedicalOrigin(s.extendedShock.domain)?{route:'hazards',originDomain:s.extendedShock.domain}:{});}
   if(s.coma?.active&&s.coma.nextCourseDays!=null){add(c,'coma','Coma Course (d10 dní)',s.coma.elapsedDays+s.coma.nextCourseDays,null,'days',isNoncombatMedicalOrigin(s.coma.domain)?{route:'hazards',originDomain:s.coma.domain}:{});}

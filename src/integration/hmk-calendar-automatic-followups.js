@@ -125,7 +125,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    push(c,'treatment',w.id,'Nová rána – Treatment nebo doložené bez ošetření (HMK 178–179)',clock.minute,
     isNoncombatMedicalOrigin(medicalOriginOfWound(w,s.events))?'hazards':'combat',{woundId:w.id});
   }
-  if(s?.shockFollowup&&!isNoncombatMedicalOrigin(s.shockFollowup.domain)){
+  if(s?.shockFollowup&&!s.coma?.active&&!isNoncombatMedicalOrigin(s.shockFollowup.domain)){
    const pending=s.shockFollowup;
    if(pending.kind==='UNC'&&pending.phase==='after-ten-minutes'){
     // HMK p169: an unconscious subject rerolls after ten actual minutes.

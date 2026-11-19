@@ -300,6 +300,7 @@ export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySin
  else if(s.shock===incoming&&s.shock==='INC')s.shock='UNC';
  else if(rank[incoming]>rank[s.shock])s.shock=incoming;
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.shockFollowup=null;for(const x of s.wounds)x.nextAdvanceRound=null;}
+ else if(s.coma?.active||s.extendedShock)s.shockFollowup=null;
  else if(s.shock!=='NONE'){
   if(['INC','UNC'].includes(s.shock))s.posture.prone=true;
   s.shockFollowup={kind:s.shock,originRound:round,dueRound:round+(s.shock==='UNC'?120:1),phase:s.shock==='UNC'?'after-ten-minutes':'end-next-turn',timelineId:s.encounterTimelineId??null};

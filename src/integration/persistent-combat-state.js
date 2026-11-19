@@ -676,6 +676,7 @@ export function shockFollowupReadiness({state,round,characterId=null,actorId=nul
  validateCombatState(state);
  if(!['STN','INC','UNC'].includes(state.shock))return {due:false,reason:'no-recoverable-shock'};
  if(state.extendedShock)return {due:false,reason:'extended-shock-course-only'};
+ if(state.coma?.active)return {due:false,reason:'coma-course-only'};
  const q=state.shockFollowup??null;
  if(!q)return {due:false,reason:'legacy-state-needs-gm-timing-evidence'};
  if(!whole(round,1,9999))return {due:false,reason:'invalid-round'};
@@ -714,6 +715,7 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
  sl=parsedSL(sl);
  requireCond(['STN','INC','UNC'].includes(s.shock),'Postava nemá zotavitelný Shock State');
  requireCond(!s.extendedShock,'Během Extended Shock se provádějí pouze Course Rolls (HMK str.179)');
+ requireCond(!s.coma?.active,'Během Coma se provádí Coma Course Roll (HMK str.179)');
  let verifiedRoll=null;
  if(shockML!==null||roll!==null){
   requireCond(whole(shockML,0,200)&&whole(roll,1,100),'Vyžadován platný Shock ML a skutečný d100');
