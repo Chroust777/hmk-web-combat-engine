@@ -118,7 +118,7 @@ export function validateTransportVehicleHistory93756(data){
    stableAnimalIds:ep.settings?.stableAnimalIds||[],transportedMemberIds:ep.transportedMemberIds||[],
    patientLoadLb:p.patientLoadLb,otherLoadLb:p.otherLoadLb,gmCoLocated:p.gmCoLocated},false);
   insist(JSON.stringify(p)===JSON.stringify(expected),'původní vozidlo, posádka nebo hmotnost byly změněny.');
-  if(ep.transportProof?.mass)validateTransportMassEvidence93816(ep.transportProof.mass,ep.memberIds,ep.transportedMemberIds||[],p.patientLoadLb,p.otherLoadLb);
+  if(ep.transportProof?.mass)validateTransportMassEvidence93816(ep.transportProof.mass,ep.travelOccupancy93956?.vehicleMemberIds||ep.memberIds,ep.transportedMemberIds||[],p.patientLoadLb,p.otherLoadLb);
  }
  return true;
 }

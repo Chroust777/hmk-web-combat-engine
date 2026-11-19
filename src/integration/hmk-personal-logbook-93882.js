@@ -1,4 +1,4 @@
-import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js?v=93.954';
+import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js?v=93.956';
 import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */

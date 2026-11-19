@@ -22,7 +22,8 @@ export function recordedTravelRide93823(data,campaignId,animalId){
  const currentOccupants=ids=>ids.filter(id=>validId(id)&&!laterTravelOf(id));
  const e=row.calendarTimeEpisode,proof=e.transportProof?.mount;
  const minute=e.endMinute??row.campaignMinute;
- if(e.settings?.conveyance!=='mount')return {format:TRAVEL_RIDING_FORMAT_93823,sourceId:row.id,minute,occupants:[],handlerId:null,handlerPosition:'none',loadLb:0,kind:'other'};
+ const riding=e.travelOccupancy93956?.riders.find(r=>r.animalId===animalId)||e.mountRiding93823;
+ if(e.settings?.conveyance!=='mount'&&riding?.animalId!==animalId)return {format:TRAVEL_RIDING_FORMAT_93823,sourceId:row.id,minute,occupants:[],handlerId:null,handlerPosition:'none',loadLb:0,kind:'other'};
  if(proof?.mountId===animalId){
   const passengers=[proof.patientId];
   if(proof.handlerPosition==='mounted'&&proof.handlerId&&proof.handlerId!==proof.patientId)passengers.push(proof.handlerId);
@@ -31,7 +32,6 @@ export function recordedTravelRide93823(data,campaignId,animalId){
    handlerId:proof.handlerId&&!laterTravelOf(proof.handlerId)?proof.handlerId:null,handlerPosition:proof.handlerPosition,
    loadLb:(occupants.includes(proof.patientId)?proof.patientLb:0)+(occupants.includes(proof.handlerId)&&proof.handlerPosition==='mounted'?proof.handlerLb:0),kind:'patient'};
  }
- const riding=e.mountRiding93823;
  if(riding?.format===TRAVEL_RIDING_FORMAT_93823&&riding.animalId===animalId){
   return {format:TRAVEL_RIDING_FORMAT_93823,sourceId:row.id,minute,occupants:currentOccupants([riding.riderId]),
    handlerId:laterTravelOf(riding.riderId)?null:riding.riderId,handlerPosition:laterTravelOf(riding.riderId)?'none':'mounted',

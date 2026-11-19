@@ -1,3 +1,4 @@
+import {travelCompanionAssignment93956} from './hmk-mixed-transport-93859.js';
 /** v93.812 — read-only, live checklist of actual HMK p.122 transport gear.
  * Never creates a proof, guesses a roll, or silently considers a catalog item
  * a mounted item: only inventory/stable immutable receipts count as ownership.
@@ -55,6 +56,8 @@ export function planTravelEquipment93812(data,cid,v){
  const invalid=team.filter(a=>!canPull(a));
  const riding=mode==='mount'?resolveTravelMount93837(all,v.stableAnimalIds||[],v.travelRideAnimalId||''):null;
  let operative=mode==='mount'?(riding.animal?[riding.animal]:[]):team.length?team:pullers;
+ const extraMounts=selected.filter(a=>a.id!==riding?.animal?.id&&!team.some(x=>x.id===a.id)&&
+  travelCompanionAssignment93956(v['packHandler_'+a.id]||'').position==='mounted');
  const listGear=[];
  const addGear=(animal,names,description)=>{
   const p=stableHubProjection(data,cid,animal.id);
@@ -72,17 +75,11 @@ export function planTravelEquipment93812(data,cid,v){
  if(mode==='mount'){
   checks.push(riding.animal?good('animals','Jízdní zvíře vybráno',riding.animal.name+' · '+riding.animal.spec.name):
    bad('animals','Vybrat vhodné jízdní zvíře',riding.reason));
-  for(const a of selected.filter(a=>a.id!==riding.animal?.id)){
+  for(const a of selected.filter(a=>a.id!==riding.animal?.id&&!extraMounts.includes(a))){
    checks.push(info('companion:'+a.id,a.name+' · doprovází skupinu',
     isRidingAnimal93837(a)?'Toto zvíře není vybráno pro aktuálního jezdce.':'Není jezdeckým zvířetem; může cestovat se skupinou jako tažné nebo nákladní zvíře. Jízda na jiném doloženém koni není blokována.'));
   }
-  for(const a of operative){
-   addGear(a,['Bit & bridle'],'Povinná uzda pro jízdní zvíře (HMK 122)');
-   addGear(a,['Blanket, horse'],'Povinná podložka/deka (HMK 122)');
-   addGear(a,['Saddle, riding','Saddle, war'],'Povinné sedlo, stačí jeden z uvedených typů (HMK 122)');
-   checks.push(info('rider:'+a.id,a.name+' · jezdec se vybírá v Pochodu',
-    'Jezdce a jeho aktuální hmotnost počítá Pochod; Stáj má pouze výstroj a náklad. Žádné samostatné nasedání se nevyžaduje.'));
-  }
+
  }else{
   checks.push(pullers.length>=required?good('animals','Dostupná tažná zvířata',pullers.map(a=>a.name).join(', ')):
    bad('animals','Chybí vhodná tažná zvířata',`${mode==='cart'?'Kára: 1':'Vůz: 2'} × Palfrey, cart horse (180d/ks), nebo vůl (96d/ks). Jiné druhy HMK pro tuto kapacitu neuvádí.`));
@@ -111,6 +108,12 @@ export function planTravelEquipment93812(data,cid,v){
    bad('weight','Doložit tělesnou hmotnost a inventář','Aplikace počítá hmotnost cestujících automaticky z Character Creation → Appearance a skutečného Inventáře. Chybějící údaje opravte v kartě postavy.'));
   checks.push(v.transportCoLocated?good('gm','GM potvrdil sestavu','Poloha, postroje, cestující a váhy potvrzeny.'):
    bad('gm','Potvrdit společné použití (GM)','Zaškrtněte potvrzení použití konkrétního vozidla, spřežení a skutečného nákladu.'));
+ }
+ for(const a of [...(mode==='mount'?operative:[]),...extraMounts]){
+  if(!isRidingAnimal93837(a)){checks.push(bad('packHandler_'+a.id,a.name+' · nepoužitelné sedlo','Zvolte skutečné jezdecké zvíře, nebo zvířeti určete pěšího vodiče.'));continue;}
+  addGear(a,['Bit & bridle'],'Povinná uzda pro jízdní zvíře (HMK 122)');
+  addGear(a,['Blanket, horse'],'Povinná podložka/deka (HMK 122)');
+  addGear(a,['Saddle, riding','Saddle, war'],'Povinné sedlo, stačí jeden z uvedených typů (HMK 122)');
  }
  return {checks,gear:listGear,mode,required};
 }

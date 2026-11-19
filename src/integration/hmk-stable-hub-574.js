@@ -4,7 +4,7 @@
  * GM attestation is required where HMK provides no feeding/resale price table.
  */
 import {VEHICLES_TACK_P122} from '../rules/conveyance-printed-p122.js';
-import {recordedTravelRide93823} from './hmk-travel-riding-93823.js';
+import {recordedTravelRide93823} from './hmk-travel-riding-93823.js?v=93.956';
 import {mountLoadENC,mountPersonalFatigue} from '../rules/gear-load.js';
 import {strengthEncumbranceModifier} from '../rules/encumbrance.js';
 import {filledWaterForItem} from './hmk-physical-water-ledger.js';

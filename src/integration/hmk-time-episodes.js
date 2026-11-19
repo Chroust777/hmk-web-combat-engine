@@ -1,3 +1,4 @@
+import {travelOccupancy93956,travelOccupancyContext93956} from './hmk-mixed-transport-93859.js';
 import {verifyPassiveWeatherResistance} from './hmk-weather-passive-93820.js';
 import {validateEquipmentTimeWork93844, EQUIPMENT_TIME_POLICY_93844} from './hmk-equipment-time-work-93844.js';
 import {validateSharedTimeWindowJournal93767,assertSharedEpisodeOverlaps93768} from './hmk-shared-time-window-93767.js';
@@ -61,18 +62,19 @@ export function episodeEncounterByMinutes({minutes,environ='rural',night=false,d
 }
 
 export const EPISODE_MIXED_PACE_93945='hmk-slowest-conveyance-v93.945';
-export function slowestEpisodeConveyance(topography,terrain,conveyance,hasWalkers){
- if(!hasWalkers||conveyance==='foot')return conveyance;
+export function slowestEpisodeConveyance(topography,terrain,conveyance,hasWalkers,hasOtherMounts=false){
+ if(!hasWalkers&&!hasOtherMounts||conveyance==='foot')return conveyance;
  const rates=trekMovementTableRow({topography,terrain});
- must(rates.foot>0&&rates[conveyance]>0,'Smíšená doprava: zvolte terén schůdný pro celou skupinu.');
- return rates.foot<=rates[conveyance]?'foot':conveyance;
+ const types=[conveyance,...(hasOtherMounts?['mount']:[]),...(hasWalkers?['foot']:[])];
+ must(types.every(type=>rates[type]>0),'Smíšená doprava: zvolte terén průchodný pro všechny způsoby dopravy.');
+ return types.reduce((slowest,type)=>rates[type]<=rates[slowest]?type:slowest);
 }
 export function calculateTimeEpisode({minute,minutes,kind='travel',topography='flat',terrain='paved-road',conveyance='foot',
  progress=0,bearing=0,extraSlow=0,wearied=false,injured=false,loaded=false,continuousPrecipitation=false,progressD10=[],directionD10=[],
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
  encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
-  forcedBearing=0,trackingBearingPolicy=null,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[],walkingHandlerIds=[],waitingForComplication=false,mixedPacePolicy=null}={}){
+  forcedBearing=0,trackingBearingPolicy=null,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[],walkingHandlerIds=[],waitingForComplication=false,mixedPacePolicy=null,hasOtherMounts=false}={}){
  must(trackingBearingPolicy===null||trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904,
   'Neznámá pravidlová verze Tracking CF Bearing.');
  must(whole(minute,0,1e9)&&whole(minutes,1,10080)&&minute+minutes<=1e9,'Epizoda potřebuje 1–10 080 skutečných minut.');
@@ -104,7 +106,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
  let motion=null,distanceMeters=0,actors=[],direction=null,survivalHazard=null;
  if(kind==='travel'){
   must(mixedPacePolicy===null||mixedPacePolicy===EPISODE_MIXED_PACE_93945,'Neznámý výpočet tempa smíšené dopravy.');
-  const paceConveyance=mixedPacePolicy?slowestEpisodeConveyance(topography,terrain,conveyance,walkingHandlerIds.length>0):conveyance;
+  const paceConveyance=mixedPacePolicy?slowestEpisodeConveyance(topography,terrain,conveyance,walkingHandlerIds.length>0,hasOtherMounts):conveyance;
   if(trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904)
    must(!forcedBearing||bearing>=1,'Tracking CF musí v nové epizodě přidat bezplatný Bearing Mode.');
   // HMK printed rate is leagues per four-hour WATCH.  A freely timed GM episode
@@ -499,10 +501,11 @@ export function episodeWeatherContextKey(sourceId,weather){
   weather.temperatureD10,weather.precipitationD10,weather.alpine,weather.aridDesert]);
 }
 export function episodeMovementContext({guideId,memberIds,area,topography,terrain,conveyance,weatherSourceId,minute,
- familiar=false,torchlight=false,fullMoon=false,afterSnowfall=false,nightOverride=null}={}){
+ familiar=false,torchlight=false,fullMoon=false,afterSnowfall=false,nightOverride=null,transportOccupancy=null}={}){
  return {guideId,memberIds:normalizedIds(memberIds),area:String(area||'').trim(),
   topography,terrain,conveyance,weatherSourceId:weatherSourceId??null,
-  night:nightOverride===null?(minute%1440<360||minute%1440>=1200):!!nightOverride,familiar,torchlight,fullMoon,afterSnowfall};
+  night:nightOverride===null?(minute%1440<360||minute%1440>=1200):!!nightOverride,familiar,torchlight,fullMoon,afterSnowfall,
+  ...(transportOccupancy?{transportOccupancy}:{})};
 }
 export function lastEpisodeBefore(journal=[],campaignId,minute,memberIds=null){
  // Historical callers can request the campaign's latest episode. Navigation
@@ -770,7 +773,8 @@ export function validateTimeEpisodes(journal=[]){
     weatherSourceId:episodeWeatherContextKey(e.weatherSourceId,e.weather),minute:e.startMinute,
     nightOverride:e.settings?.lightPeriod?e.settings.lightPeriod==='night':null,
     familiar:!!e.settings?.orientationFamiliar,torchlight:!!e.settings?.orientationTorch,
-    fullMoon:!!e.settings?.orientationMoon,afterSnowfall:!!e.settings?.orientationSnow});
+    fullMoon:!!e.settings?.orientationMoon,afterSnowfall:!!e.settings?.orientationSnow,
+    transportOccupancy:travelOccupancyContext93956(e.travelOccupancy93956)});
    must(JSON.stringify(expectedContext)===JSON.stringify(memo.context),
     'Situační okolnosti a členové epizody neodpovídají doloženému SV.');
    const linked=journal.find(x=>x.id===memo.skillId);
@@ -1497,19 +1501,39 @@ export function validateTimeEpisodes(journal=[]){
      'Únava zvířat nebyla přepočtena na skutečný čas pohybu.');
    }
   }
+  const occupancy=e.travelOccupancy93956;
+  if(occupancy){
+   const loads=e.stableAnimalLoad||[];
+   const roles=travelOccupancy93956({v:{...e.settings,memberIds:e.memberIds,conveyance:e.conveyance,
+    transportedMemberIds:e.transportedMemberIds},roster:loads,droverId:occupancy.primaryDroverId});
+   const confirmedRiders=occupancy.riders.map(r=>({animalId:r.animalId,riderId:r.riderId}));
+   must(JSON.stringify(roles)===JSON.stringify({...occupancy,riders:confirmedRiders}),
+    'Rozdělení dopravy nesouhlasí s účastníky a jejich potvrzenými rolemi.');
+   must(e.orientation?.sourceMode!=='new'||e.orientation.droverActorId===occupancy.primaryDroverId,
+    'Doložený Drover nesouhlasí s obsazením dopravy.');
+   for(const ride of occupancy.riders){
+    const load=loads.find(a=>a.id===ride.animalId);
+    must(load?.rider===ride.riderId&&load.loadLb===ride.totalLb&&load.enc===ride.enc&&load.loaded===(ride.enc>=20)&&
+     ride.riderLb>0&&ride.gearAndCargoLb>=0&&ride.totalLb===Math.round((ride.riderLb+ride.gearAndCargoLb)*1000)/1000&&
+     Number.isSafeInteger(ride.enc)&&ride.enc>=0&&ride.moveAfterLoad>0,'Náklad sedla nesouhlasí s dokladem jízdy.');
+   }
+   const mixed=occupancy.walkingMemberIds.length||(['cart','wagon'].includes(e.conveyance)&&occupancy.riders.length);
+   must(!!mixed===!!e.mixedPacePolicy,'Doklad smíšené dopravy chybí nebo přebývá.');
+  }
   if(e.mixedPacePolicy!==undefined){
-   must(e.mixedPacePolicy===EPISODE_MIXED_PACE_93945&&e.kind==='travel'&&e.conveyance==='mount',
+   must(e.mixedPacePolicy===EPISODE_MIXED_PACE_93945&&e.kind==='travel'&&(e.conveyance==='mount'||!!occupancy),
     'Neplatný doklad tempa smíšené dopravy.');
    const mount=e.transportProof?.mount;
-   const walking=mount?.handlerPosition==='leading'?[mount.handlerId]:e.mountRiding93823?.walkingMemberIds||[];
-   must(walking.length>0&&JSON.stringify(walking)===JSON.stringify(e.walkingHandlerIds),
+   const walking=occupancy?.walkingMemberIds||(mount?.handlerPosition==='leading'?[mount.handlerId]:e.mountRiding93823?.walkingMemberIds||[]);
+   const otherMounts=!!occupancy?.riders.length&&['cart','wagon'].includes(e.conveyance);
+   must((walking.length||otherMounts)&&JSON.stringify(walking)===JSON.stringify(e.walkingHandlerIds||[]),
     'Pěší doprovod neodpovídá přiděleným rolím přepravy.');
-   const conveyance=slowestEpisodeConveyance(e.topography,e.terrain,e.conveyance,true);
+   const conveyance=slowestEpisodeConveyance(e.topography,e.terrain,e.conveyance,walking.length>0,otherMounts);
    const lostTime=e.direction?.direction==='lost-time';
    const dice=e.movementRolls.progressD10;
    const expected=trekMovement({topography:e.topography,terrain:e.terrain,conveyance,progress:e.progress,
     slow:e.slow+Number(lostTime),loaded:e.motion.loaded,bearing:e.bearing,
-    progressD10:lostTime&&dice.length?dice.slice(1):dice,
+    progressD10:lostTime?dice.slice(Math.max(0,e.progress-e.slow)-Math.max(0,e.progress-e.slow-1)):dice,
     continuousPrecipitation:!!e.precipitation?.slowMode,doubleTime:!!e.doubleTime&&!lostTime});
    must(['baseLPW','remainingSlow','spareProgress','progressSuccess','finalLPW'].every(key=>expected[key]===e.motion[key]),
     'Tempo smíšené dopravy musí použít nejpomalejší způsob dopravy před uplatněním Slow a Progress.');

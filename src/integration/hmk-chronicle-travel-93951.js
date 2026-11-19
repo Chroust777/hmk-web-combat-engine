@@ -14,7 +14,7 @@ function passage(seed, topic, variants) {
 
 export function chronicleTravelParty(p, name) {
  const s = p.settings || {}, proof = p.transportProof || {}, vehicle = proof.vehicle, mount = proof.mount;
- const mixed = p.mixedTransport93859 || p.mountRiding93823?.mixedRoles93859;
+ const mixed = p.travelOccupancy93956 || p.mixedTransport93859 || p.mountRiding93823?.mixedRoles93859;
  const conveyance = vehicle?.conveyance || proof.conveyance || p.conveyance || s.conveyance;
  const people = unique(p.memberIds || []);
  const guide = s.guideId || p.orientation?.guideId;
@@ -28,12 +28,12 @@ export function chronicleTravelParty(p, name) {
   const archived = (p.stableAnimalLoad || []).find(a=>a.id===id);
   const animalName = archived?.name || (id===mount?.mountId ? mount.animalName : null) ||
    (id===p.trackingScent?.animalId ? p.trackingScent.name : null) || name(id);
-  const ridden = p.mountRiding93823?.animalId===id ? p.mountRiding93823.riderId : mixed?.mountAnimalId===id ? mixed.riderId : null;
+  const ridden = mixed?.riders?.find(r=>r.animalId===id)?.riderId || (p.mountRiding93823?.animalId===id ? p.mountRiding93823.riderId : mixed?.mountAnimalId===id ? mixed.riderId : null);
   const rider = id===mount?.mountId ? mount.riderId : ridden || archived?.rider;
   const carried = vehicle?.carriedAnimals?.some(a=>a.animalId===id);
   const team = (vehicle?.teamIds || s.transportTeamIds || []).includes(id);
   const handler = carried || team || rider ? null : id===mount?.mountId && mount.handlerPosition==='leading' ? mount.handlerId :
-   mixed?.handlers?.find(a=>a.animalId===id)?.handlerId || s['packHandler_'+id];
+   mixed?.handlers?.find(a=>a.animalId===id)?.handlerId || (s['packHandler_'+id]?.startsWith('ride:')?null:s['packHandler_'+id]);
   return {id, name:animalName, rider, handler, carried, team, passenger:id===mount?.mountId ? mount.patientId : null};
  });
  // The sole loose animal in a walking party can be attributed to its Drover.
