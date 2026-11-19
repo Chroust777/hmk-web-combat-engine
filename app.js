@@ -347,7 +347,7 @@ import {liveSpatialEvade} from './src/integration/hmk-spatial-evasion.js';
 import {baseMove} from './src/rules/movement.js';
 import {projectChronicleMovement} from './src/integration/hmk-chronicle-movement-556.js';
 import {projectChronicleConditions,CHRONICLE_FATIGUE_HELP} from './src/integration/hmk-chronicle-conditions-557.js';
-import {projectChronicleHealth_558,HR_HELP_558} from './src/integration/hmk-chronicle-health-558.js';
+import {projectChronicleHealth_558,HR_HELP_558} from './src/integration/hmk-chronicle-health-558.js?v=93.971';
 import {successLevel} from './src/rules/tests.js';
 import {createLiveGuidedMelee,createLiveGuidedMissile,createLiveGuidedDeadlyMelee} from './src/integration/hmk-guided-live-attack-inputs.js';
 import {verifiedDeadlyHelplessReason} from './src/integration/hmk-deadly-attack.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.970';
+const APP_VERSION='93.971';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5676,9 +5676,9 @@ const JOURNAL_LN_RANGES={sk:'1–5',fa:'6–8',nk:'9–10',sh:'1–3',ua:'4–6'
 function journalWoundCareButton(actor,wound,label){
  if(!wound.id||wound.healed)return '';
  return ` <button type="button" class="secondary journal-wound-care" data-wound-treatment="${esc(wound.id)}"
-  data-wound-patient="${esc(actor.id)}" aria-label="${esc('Přejít k péči · '+label)}">Péče</button>`;
+  data-wound-patient="${esc(actor.id)}" aria-label="${esc('Léčba · '+label)}">Léčba</button>`;
 }
-function hmkAnimalWoundAnatomyHTML(c,{care=false}={}){
+function hmkAnimalWoundAnatomyHTML(c,{showUnmapped=false}={}){
  const breed=c?.hmk?.verifiedMountedBreed,anatomy=verifiedMountedAnimalAnatomy(breed);
  if(!anatomy)return '';
  const state=persistentStateOf(c),wounds=state.wounds||[];
@@ -5698,7 +5698,7 @@ function hmkAnimalWoundAnatomyHTML(c,{care=false}={}){
   return `<tr><th scope="row" ${journalHelpData('Location',help)}>${esc(loc.code.toUpperCase())}</th>`+
    `<td>${esc(loc.name)}</td><td>${esc(loc.zone)}</td><td>${esc(loc.ln)}</td>`+
    `<td>${esc(String(loc.shock))}</td><td>${symbol?esc(String(symbol.bleeds)):'—'}</td>`+
-   `<td>${at.length?at.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',help+' Zranění: '+formatWound(w))}>${esc(formatWound(w))}</span>${care?journalWoundCareButton(c,w,loc.name+' · '+formatWound(w)):''}`).join(' · '):'—'}</td></tr>`;
+   `<td>${at.length?at.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',help+' Zranění: '+formatWound(w))}>${esc(formatWound(w))}</span>`).join(' · '):'—'}</td></tr>`;
  }).join('');
  const unknown=wounds.filter(w=>!anatomy.locations.some(loc=>loc.code===w.location));
  return `<section class="journal-book-section journal-body-locations" data-hmk-animal-body-locations="${esc(c.id)}">`+
@@ -5709,8 +5709,8 @@ function hmkAnimalWoundAnatomyHTML(c,{care=false}={}){
   `<div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><thead><tr>`+
   `<th>LOC</th><th>Lokace</th><th>ZN</th><th>LN</th><th>SHK</th><th>●</th><th>Zranění</th>`+
   `</tr></thead><tbody>${rows}</tbody></table></div>`+
-  (unknown.length?(care?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>
-   ${unknown.map(w=>`<div>${esc(formatWound(w))}${journalWoundCareButton(c,w,formatWound(w))}</div>`).join('')}</details>`:
+  (unknown.length?(showUnmapped?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>
+   ${unknown.map(w=>`<div>${esc(formatWound(w))}</div>`).join('')}</details>`:
    `<p class="notice error">${unknown.length} ran má neověřenou zvířecí lokalitu; nelze je přiřadit.</p>`):'')+
   `</section>`;
 }
@@ -5730,15 +5730,14 @@ function hmkTravelEncounterHintHTML(c){
   `Po potvrzení další časové epizody tato nápověda zmizí; příslušný historický záznam zůstane zachován.</p></section>`;
 }
 function journalBodyLocationsHTML(c){
- if(c?.hmk?.verifiedMountedBreed)return hmkAnimalWoundAnatomyHTML(c,{care:true});
+ if(c?.hmk?.verifiedMountedBreed)return hmkAnimalWoundAnatomyHTML(c,{showUnmapped:true});
  const inv=data.inventory.filter(x=>x.characterId===c.id);
  const worn=inv.filter(x=>x.slot==='worn'&&x.snapshot?.category==='armor');
  const suit=identifyWornPrintedSuit(data.inventory,c.id);
  const coverage=armourCoverageReport(c);
  const state=persistentStateOf(c);
  // Prefer the single authoritative Combat State record over its legacy display mirror.
- const actualWounds=new Set(state.wounds||[]);
- const wounds=[...actualWounds,...(c.hmk?.injuries||[])]
+ const wounds=[...(state.wounds||[]),...(c.hmk?.injuries||[])]
   .filter((w,i,all)=>!w?.id||all.findIndex(x=>x?.id===w.id)===i)
   .filter(w=>w?.healed!==true); // Keep healed wounds in Combat State history, not the active anatomy column.
  const codes=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name,shock])=>({code,name,shock}));
@@ -5844,7 +5843,7 @@ function journalBodyLocationsHTML(c){
    if(group)group.wounds.push(w);else groups.push({side,wounds:[w]});
   }
   groups.sort((a,b)=>(['L','R','','?'].indexOf(a.side))-( ['L','R','','?'].indexOf(b.side)));
-  const injuryMarkup=groups.map(g=>`<span class="journal-wound-side-group">${g.side?`<strong class="journal-wound-side" data-hmk-help="${g.side==='L'?'Levá anatomická strana':g.side==='R'?'Pravá anatomická strana':'Strana končetiny u původní rány není doložena'}" tabindex="0">${g.side}:</strong> `:''}${g.wounds.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',woundMeaning(w))}>${esc(woundName(w))}</span>${actualWounds.has(w)?journalWoundCareButton(c,w,[name,g.side,woundName(w)].filter(Boolean).join(' · ')):''}`).join(' · ')}</span>`).join(' <span aria-hidden="true">|</span> ');
+  const injuryMarkup=groups.map(g=>`<span class="journal-wound-side-group">${g.side?`<strong class="journal-wound-side" data-hmk-help="${g.side==='L'?'Levá anatomická strana':g.side==='R'?'Pravá anatomická strana':'Strana končetiny u původní rány není doložena'}" tabindex="0">${g.side}:</strong> `:''}${g.wounds.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',woundMeaning(w))}>${esc(woundName(w))}</span>`).join(' · ')}</span>`).join(' <span aria-hidden="true">|</span> ');
   const materials=worn.filter(x=>x.snapshot?.properties?.coveredLocations?.includes(code)).map(x=>String(x.snapshot.properties.material||'').toLowerCase());
   const metal=materials.some(m=>['p','plate'].includes(m))?'black':materials.some(m=>['m','mail','s','scale'].includes(m))?'grey':null;
   const avcell=k=>{
@@ -5866,7 +5865,7 @@ function journalBodyLocationsHTML(c){
  const areaAVHelp=weightedAreaAV.ready
   ?'Vážená Area AV (HMK s.133): '+weightedAreaAV.value+' (nezaokrouhlený součet '+weightedAreaAV.raw.toFixed(2)+'). Výpočet z ověřené oblečené výstroje. Cold Hazard používá min(Area AV, 4) plus skutečné bonusy; Heat Hazard používá max(Area AV, 1) podle okolností (HMK s.149).'
   :'Váženou Area AV nelze bezpečně určit: '+weightedAreaAV.reason+'. Zkontrolujte ověření oblečené výstroje v Arsenal & Gear. Nejde o automatickou nulovou ochranu.';
- return `<section class="journal-book-section journal-body-locations"><div class="journal-anatomy-expanded" data-chronicle-injuries><div class="journal-book-title">${journalTerm('Body Locations · Armour / Injuries')} <span class="journal-wound-count" aria-label="Aktivní rány: ${wounds.length}">Rány: ${wounds.length}</span> <span class="journal-weighted-area-av" tabindex="0" ${journalHelpData('Area AV',areaAVHelp)}>(${esc(areaAVLabel)})</span></div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name"><col class="journal-col-zn"><col class="journal-col-ln">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-bleed"><col class="journal-col-shk"><col class="journal-col-amp"><col class="journal-col-injuries"></colgroup><thead><tr><th>${journalTerm('LOC')}</th><th>${journalTerm('Location')}</th><th>${journalTerm('ZN')}</th><th>${journalTerm('LN')}</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${journalTerm(k)}</th>`).join('')}<th class="journal-symbol-cell">${journalTerm('●')}</th><th class="journal-shk">${journalTerm('SHK')}</th><th class="journal-symbol-cell">${journalTerm('▽')}</th><th>${journalTerm('Injuries')}</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">HMK s.111, 133, 167–169 a Character Sheet (2. strana, PDF s.436): ZN = Zone Number, LN = Location Number. AV v rámečku = Rigid (E/P Glancing Blow). Šedá / černá výplň značí volitelné pravidlo Metal Armour (Scale/Mail / Plate). ● = možné krvácení dle severity a aspektu zásahu; ▽ = možné amputace při G5 edge. Najetím / fokusem zobrazíš vysvětlení. SHK v tmavém poli = Location Shock. Předběžně odvozené hodnoty AV vyžadují potvrzení GM. Štít držený v ruce se nepřičítá jako pasivní AV těla; jeho Block se řeší při konkrétní obraně. Označení aktivních ran: L = levá, R = pravá (značení originálního HMK Character Sheet); ? = strana končetiny nebyla doložena. Více ran v jedné skupině zůstává samostatnými ranami (Compound Injury se vyhodnocuje v Combat). Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}${actualWounds.has(w)?journalWoundCareButton(c,w,w.description||w.location||'Nepřiřazená rána'):''}</div>`).join('')}</details>`:''}</div></section>`;
+ return `<section class="journal-book-section journal-body-locations"><div class="journal-anatomy-expanded" data-chronicle-injuries><div class="journal-book-title">${journalTerm('Body Locations · Armour / Injuries')} <span class="journal-wound-count" aria-label="Aktivní rány: ${wounds.length}">Rány: ${wounds.length}</span> <span class="journal-weighted-area-av" tabindex="0" ${journalHelpData('Area AV',areaAVHelp)}>(${esc(areaAVLabel)})</span></div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name"><col class="journal-col-zn"><col class="journal-col-ln">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-bleed"><col class="journal-col-shk"><col class="journal-col-amp"><col class="journal-col-injuries"></colgroup><thead><tr><th>${journalTerm('LOC')}</th><th>${journalTerm('Location')}</th><th>${journalTerm('ZN')}</th><th>${journalTerm('LN')}</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${journalTerm(k)}</th>`).join('')}<th class="journal-symbol-cell">${journalTerm('●')}</th><th class="journal-shk">${journalTerm('SHK')}</th><th class="journal-symbol-cell">${journalTerm('▽')}</th><th>${journalTerm('Injuries')}</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">HMK s.111, 133, 167–169 a Character Sheet (2. strana, PDF s.436): ZN = Zone Number, LN = Location Number. AV v rámečku = Rigid (E/P Glancing Blow). Šedá / černá výplň značí volitelné pravidlo Metal Armour (Scale/Mail / Plate). ● = možné krvácení dle severity a aspektu zásahu; ▽ = možné amputace při G5 edge. Najetím / fokusem zobrazíš vysvětlení. SHK v tmavém poli = Location Shock. Předběžně odvozené hodnoty AV vyžadují potvrzení GM. Štít držený v ruce se nepřičítá jako pasivní AV těla; jeho Block se řeší při konkrétní obraně. Označení aktivních ran: L = levá, R = pravá (značení originálního HMK Character Sheet); ? = strana končetiny nebyla doložena. Více ran v jedné skupině zůstává samostatnými ranami (Compound Injury se vyhodnocuje v Combat). Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</div></section>`;
 }
 function journalConvocationsHTML(c){
  const arc=c.hmk?.arcane||{},primary=arc.primaryConvocation??c.hmk?.creation?.values?.pvarPrimary??null;
@@ -6014,6 +6013,7 @@ function journalChronicleStatusHTML(c,state){
  const health=projectChronicleHealth_558({actorId:c.id,state,now,
   campaignId:inCampaign?campaignKey(clock):null,agenda:healthAgenda,
   auralShockLevels:c.hmk?.arcane?.auralShockLevels,displayMinute:displayCampaignMinute});
+ const woundsById=new Map(wounds.map(w=>[w.id,w]));
  const healthHTML=health.rows.length?`<details class="journal-health-courses" aria-label="Aktivní zdravotní průběhy a další termíny">
   <summary class="journal-health-courses__caption">Zdravotní průběhy · aktuální stav a splatnost <span class="journal-health-courses__count">(${health.rows.length})</span></summary>
   ${health.rows.map(row=>`<div class="journal-health-course" data-health-course="${esc(row.id)}">
@@ -6021,6 +6021,7 @@ function journalChronicleStatusHTML(c,state){
    <div class="journal-health-course__impact">${esc(row.impact)}</div>
    <div class="journal-health-course__due">${esc(row.time||'Termín není doložen')}</div>
    ${row.detail?`<div class="journal-health-course__detail">${esc(row.detail)}</div>`:''}
+   ${row.woundId&&woundsById.has(row.woundId)?journalWoundCareButton(c,woundsById.get(row.woundId),row.label):''}
   </div>`).join('')}
   ${health.issues.length?`<div class="journal-health-course__warning">Neověřené zdravotní termíny: ${esc(health.issues.slice(0,3).join('; '))}</div>`:''}
  </details>`:'';

@@ -8461,12 +8461,7 @@ form[data-skill-weather-skin] [hidden]{display:none!important}
  line-height:.85;
 }
 
-.content-sheet .journal-body-locations .journal-wound-care {
-  display: inline-block;
-  max-width: 100%;
-  min-width: 0;
-  padding: .15em .32em;
-  font-size: inherit;
-  line-height: 1.2;
-  vertical-align: middle;
+.content-sheet .journal-health-course .journal-wound-care {
+  margin-top: .4rem;
+  border-radius: 0;
 }
