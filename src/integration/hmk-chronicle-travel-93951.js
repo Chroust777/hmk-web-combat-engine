@@ -1,4 +1,4 @@
-import {literaryChronicleIntro} from './hmk-chronicle-literary-93892.js?v=93.959';
+import {literaryChronicleIntro} from './hmk-chronicle-literary-93892.js?v=93.960';
 /** Czech travel prose built from the committed episode, with stable variation. */
 const list = values => new Intl.ListFormat('cs').format(values);
 const unique = values => [...new Set(values.filter(Boolean))];
@@ -13,132 +13,124 @@ function passage(seed, topic, variants) {
 }
 
 export function chronicleTravelParty(p, name) {
- const s = p.settings || {}, proof = p.transportProof || {}, vehicle = proof.vehicle, mount = proof.mount;
- const mixed = p.travelOccupancy93956 || p.mixedTransport93859 || p.mountRiding93823?.mixedRoles93859;
- const conveyance = vehicle?.conveyance || proof.conveyance || p.conveyance || s.conveyance;
- const people = unique(p.memberIds || []);
- const guide = s.guideId || p.orientation?.guideId;
- const drover = p.orientation?.droverActorId || s.droverActorId || mixed?.primaryDroverId;
- const patients = unique([...(p.transportedMemberIds || proof.memberIds || []), mount?.patientId]);
- const severe = new Set((proof.originalHealth || []).filter(h =>
-  h.immobile || h.comaActive || h.extendedShockActive || ['INC','UNC'].includes(h.shock)).map(h => h.id));
- const animals = unique([...(p.stableAnimalLoad || []).map(a=>a.id), ...(p.animals || []).map(a=>a.id), p.trackingScent?.animalId,
-  ...(vehicle?.teamIds || s.transportTeamIds || []), ...(vehicle?.carriedAnimals || []).map(a=>a.animalId),
-  mount?.mountId, p.mountRiding93823?.animalId, mixed?.mountAnimalId]).map(id => {
-  const archived = (p.stableAnimalLoad || []).find(a=>a.id===id);
-  const animalName = archived?.name || (id===mount?.mountId ? mount.animalName : null) ||
-   (id===p.trackingScent?.animalId ? p.trackingScent.name : null) || name(id);
-  const ridden = mixed?.riders?.find(r=>r.animalId===id)?.riderId || (p.mountRiding93823?.animalId===id ? p.mountRiding93823.riderId : mixed?.mountAnimalId===id ? mixed.riderId : null);
-  const rider = id===mount?.mountId ? mount.riderId : ridden || archived?.rider;
-  const carried = vehicle?.carriedAnimals?.some(a=>a.animalId===id);
-  const team = (vehicle?.teamIds || s.transportTeamIds || []).includes(id);
-  const handler = carried || team || rider ? null : id===mount?.mountId && mount.handlerPosition==='leading' ? mount.handlerId :
-   mixed?.handlers?.find(a=>a.animalId===id)?.handlerId || (s['packHandler_'+id]?.startsWith('ride:')?null:s['packHandler_'+id]);
-  return {id, name:animalName, rider, handler, carried, team, passenger:id===mount?.mountId ? mount.patientId : null};
+ const s=p.settings||{}, proof=p.transportProof||{}, vehicle=proof.vehicle, mount=proof.mount;
+ const occupancy=p.travelOccupancy93956;
+ const mixed=occupancy||p.mixedTransport93859||p.mountRiding93823?.mixedRoles93859;
+ const conveyance=vehicle?.conveyance||proof.conveyance||p.conveyance||s.conveyance;
+ const wheeled=['cart','wagon'].includes(conveyance);
+ const people=unique(p.memberIds||[]);
+ const member=id=>people.includes(id)?id:null;
+ const guide=member(s.guideId||p.orientation?.guideId);
+ const drover=member(mixed?.primaryDroverId||p.orientation?.droverActorId||s.droverActorId);
+ const patients=unique([...(p.transportedMemberIds||[]),...(proof.memberIds||[]),mount?.patientId,
+  ...(p.actors||[]).filter(a=>a.endNotRequired?.reason==='transported').map(a=>a.id)]).filter(member);
+ const severe=new Set((proof.originalHealth||[]).filter(h=>
+  h.immobile||h.comaActive||h.extendedShockActive||h.fatigue>=40||['INC','UNC','KIA'].includes(h.shock)).map(h=>h.id));
+ const stopped=new Map((p.actors||[]).flatMap(a=>{
+  const stop=a.earlyIncapacity||a.endNotRequired;
+  return member(a.id)&&['INC','UNC','KIA'].includes(stop?.shock)?[[a.id,stop]]:[];
+ }));
+ const departed=id=>!stopped.has(id)||(stopped.get(id).activeMovementMinutes??(stopped.get(id).minute-p.startMinute))>0;
+ const teamIds=vehicle?.teamIds||s.transportTeamIds||[];
+ const animals=unique([...(p.stableAnimalLoad||[]).map(a=>a.id),...(p.animals||[]).map(a=>a.id),p.trackingScent?.animalId,
+  ...teamIds,...(vehicle?.carriedAnimals||[]).map(a=>a.animalId),mount?.mountId,p.mountRiding93823?.animalId,mixed?.mountAnimalId,
+  ...(mixed?.riders||[]).map(a=>a.animalId),...(mixed?.handlers||[]).map(a=>a.animalId)]).map(id=>{
+  const archived=(p.stableAnimalLoad||[]).find(a=>a.id===id);
+  const secured=id===mount?.mountId;
+  const carried=!!vehicle?.carriedAnimals?.some(a=>a.animalId===id);
+  const team=teamIds.includes(id)&&!carried;
+  const assignment=String(s['packHandler_'+id]||'');
+  const riderEvidence=mixed?.riders?.find(r=>r.animalId===id)?.riderId||
+   (mixed?.mountAnimalId===id?mixed.riderId:null)||(p.mountRiding93823?.animalId===id?p.mountRiding93823.riderId:null);
+  const rider=carried||team?null:member(secured?(mount.handlerPosition==='leading'?null:mount.riderId||mount.handlerId):
+   riderEvidence||(!occupancy&&(assignment.startsWith('ride:')?assignment.slice(5):archived?.rider)));
+  const handler=carried||team||rider?null:member(secured&&mount.handlerPosition==='leading'?mount.handlerId:
+   mixed?.handlers?.find(a=>a.animalId===id)?.handlerId||(!occupancy&&!assignment.startsWith('ride:')?assignment:''));
+  return {id,name:archived?.name||(secured?mount.animalName:null)||(id===p.trackingScent?.animalId?p.trackingScent.name:null)||name(id),
+   rider:patients.includes(rider)?null:rider,handler:patients.includes(handler)?null:handler,
+   carried,team,passenger:secured?member(mount.patientId):null};
  });
- // The sole loose animal in a walking party can be attributed to its Drover.
- // In a larger herd, only an individual recorded assignment is authoritative.
- const loose = animals.filter(a=>!a.team && !a.carried && !a.rider && !a.passenger);
- if (conveyance==='foot' && people.includes(drover) && loose.length===1 && !loose[0].handler) loose[0].handler=drover;
- return {people, guide, drover, patients, severe, animals, conveyance};
+ // A historical walking Drover can only be attributed to one unassigned animal.
+ const loose=animals.filter(a=>!a.team&&!a.carried&&!a.rider&&!a.passenger);
+ if(!occupancy&&conveyance==='foot'&&drover&&departed(drover)&&!patients.includes(drover)&&loose.length===1&&!loose[0].handler)
+  loose[0].handler=drover;
+ const walkers=new Set(), aboard=new Set();
+ if(p.kind==='travel'){
+  const riders=new Set(animals.map(a=>a.rider).filter(Boolean));
+  const handlers=new Set(animals.map(a=>a.handler).filter(Boolean));
+  for(const id of people){
+   if(riders.has(id)||patients.includes(id)||!departed(id))continue;
+   if(handlers.has(id)||mixed?.walkingMemberIds?.includes(id)||
+    (!occupancy&&(!conveyance||conveyance==='foot'||(conveyance==='mount'&&riders.size>0))))walkers.add(id);
+   else if(wheeled&&(occupancy?.vehicleMemberIds?.includes(id)||!occupancy))aboard.add(id);
+  }
+ }
+ return {people,guide,drover,patients,severe,animals,conveyance,walking:walkers,aboard,stopped};
 }
 
-function company(p, party, name, say, priorInjuries) {
- const {people, guide, drover, patients, severe, animals, conveyance} = party;
- const lines = [];
- const team = animals.filter(a=>a.team), carried = animals.filter(a=>a.carried);
- const riders = animals.filter(a=>a.rider && !a.passenger);
- const leads = animals.filter(a=>a.handler);
- const named = ids => list(ids.map(name));
- const passageName = beasts => list(beasts.map(x=>`„${x.name}“`));
- const sameGuide=team.length>0 && guide===drover && p.movementMinutes!==0;
- if (!sameGuide && p.movementMinutes!==0 && people.includes(guide) && !patients.includes(guide) && !leads.some(a=>a.handler===guide)) {
-  lines.push(say('guide',[
-   `Směr udával ${name(guide)}.`,`O tom, kudy dál, rozhodoval ${name(guide)}.`,
-   `Průvodcem družiny byl ${name(guide)}.`,`Cestu družině ukazoval ${name(guide)}.`
-  ]));
- }
- for (const handler of unique(leads.map(a=>a.handler))) {
-  const group = leads.filter(a=>a.handler===handler);
-  const who = name(handler), beasts=passageName(group);
-  const guides=handler===guide&&p.movementMinutes!==0;
-  lines.push(guides?say('guide-on-reins:'+handler,[
-   `${who} měl dvojí starost. Výpravě ukazoval směr a za uzdu vedl ${beasts}.`,
-   `Směr určoval ${who}, a přitom pěšky vedl za uzdu ${beasts}.`,
-   `${who} vedl pěšky za uzdu ${beasts}. Když přišlo na volbu směru, ostatní se řídili tím, kam ukázal.`
-  ]):say('lead:'+handler,[
-   `${who} šel pěšky a vedl za uzdu ${beasts}.`,
-   `Uzdu držel ${who}. ${beasts} ${group.length===1?'kráčel':'kráčeli'} po boku.`,
-   `${who} zůstal na vlastních nohou. Za uzdu vedl ${beasts} a držel se tempa výpravy.`
-  ]));
- }
- for (const a of riders) lines.push(say('ride:'+a.id,[
-  `${name(a.rider)} jel na zvířeti jménem „${a.name}“.`,
-  `Zatímco výprava putovala dál, ${name(a.rider)} zůstával v sedle zvířete jménem „${a.name}“.`,
-  `„${a.name}“ nesl svého jezdce. V sedle byl ${name(a.rider)}.`,
-  `V sedle zvířete jménem „${a.name}“ jel ${name(a.rider)}.`
+export function ledAnimalDescription(animal,animalKind=()=>'',{reins=true}={}){
+ const kind=animalKind(animal.id);
+ const object={
+  'tažný kůň':'tažného koně','jezdecký kůň':'jezdeckého koně','kůň':'koně',
+  'lehký válečný kůň':'lehkého válečného koně','válečný kůň':'válečného koně','těžký válečný kůň':'těžkého válečného koně',
+  'válečný poník':'válečného poníka','vůl':'vola','mezek':'mezka','osel':'osla','velbloud':'velblouda','slon':'slona',
+  'strážní pes':'strážního psa','lovecký pes':'loveckého psa','pes krysař':'psa krysaře','dravý pták':'dravého ptáka'
+ }[kind]||'zvíře';
+ const lead=reins?(kind.includes('kůň')||['válečný poník','mezek','osel'].includes(kind)?'za uzdu ':
+  /pes|pták/.test(kind)?'':'za uzdu '):'';
+ return lead+object+' jménem '+animal.name;
+}
+
+function company(p,party,name,say,priorInjuries,animalKind){
+ const {people,guide,drover,patients,severe,animals,conveyance,walking,aboard}=party;
+ const lines=[];
+ const team=animals.filter(a=>a.team);
+ const wheeled=['cart','wagon'].includes(conveyance);
+ const ground=conveyance==='cart'?'na káře':'na voze';
+ const halted=p.movementMinutes===0;
+ const named=ids=>list(ids.map(name));
+ const beasts=rows=>list(rows.map(a=>'„'+a.name+'“'));
+ const guides=guide&&!patients.includes(guide)&&!halted&&
+  (walking.has(guide)||aboard.has(guide)||animals.some(a=>a.rider===guide));
+ if(guides&&(!wheeled||guide!==drover))lines.push(say('guide',[
+  'Cestu výpravě ukazuje '+name(guide)+'.','O dalším směru rozhoduje '+name(guide)+'.'
  ]));
- if (['cart','wagon'].includes(conveyance)) {
-  const cart = conveyance==='cart', title=cart?'Káru':'Vůz', aboard=cart?'na káře':'na voze';
-  lines.push(team.length && p.movementMinutes===0?
-   `V zápřahu ${cart?'káry':'vozu'} ${team.length===1?'je':'jsou'} ${passageName(team)}.`:
-   team.length?say('team',[
-   `${title} ${team.length===1?'táhl':'táhli'} ${passageName(team)}.`,
-   `V zápřahu ${cart?'káry':'vozu'} ${team.length===1?'šel':'šli'} ${passageName(team)}.`,
-   `Do zápřahu ${cart?'káry':'vozu'} ${team.length===1?'patřil':'patřili'} ${passageName(team)}.`,
-   `Zapřaženo je na cestu a ${cart?'káru':'vůz'} ${team.length===1?'táhl':'táhli'} ${passageName(team)}.`
-  ]):`Družinu na této cestě provází ${cart?'kára':'vůz'}.`);
-  if (team.length && people.includes(drover) && !patients.includes(drover)) lines.push(sameGuide?say('guide-and-drover',[
-   `${name(drover)} držel dohromady zápřah i směr cesty. Na každém z nich závisel postup druhých.`,
-   `Kudy se mělo jet dál a jak vést spřežení, o tom rozhodoval ${name(drover)}.`,
-   `Směr družině udával ${name(drover)} a zároveň dohlížel na zápřah.`
-  ]):say('drover',[
-   `O spřežení se staral ${name(drover)}.`,`Spřežení měl na starosti ${name(drover)}.`,`Dohled nad zápřahem připadl na ${name(drover)}.`
-  ]));
-  if (patients.length) {
-   const many = patients.length>1, who = named(patients);
-   const cannotWalk = patients.every(id=>severe.has(id));
-   lines.push(p.movementMinutes===0?`Místo ${aboard} má ${who}.`:say('wagon-passenger',[
-    `${aboard[0].toUpperCase()+aboard.slice(1)} ${many?'jeli':'jel'} ${who}.`,
-    `${who} ${many?'jeli':'jel'} ${aboard}.`,
-    `Místo ${aboard} tentokrát připadlo na ${who}.`,
-    `Družina počítá i s převozem. ${who} ${many?'mají':'má'} místo ${aboard}.`
+ if(wheeled){
+  const vehicle=conveyance==='cart'?'káru':'vůz';
+  if(team.length)lines.push('V zápřahu '+(conveyance==='cart'?'káry':'vozu')+' '+(team.length===1?'je ':'jsou ')+beasts(team)+'.');
+  if(drover&&!halted&&!patients.includes(drover)&&aboard.has(drover))lines.push(name(drover)+' řídí '+vehicle+
+   (guides&&drover===guide?' a zároveň udává směr výpravy.':'.'));
+  const passengers=[...aboard].filter(id=>id!==drover);
+  if(passengers.length)lines.push('Místo '+ground+' '+(passengers.length===1?'má ':'mají ')+named(passengers)+'.');
+  const cartPatients=patients.filter(id=>!animals.some(a=>a.passenger===id));
+  if(cartPatients.length)lines.push((cartPatients.length===1?'Převáženou osobou je ':'Převáženými osobami jsou ')+named(cartPatients)+
+   '. Výprava pro převoz používá '+(conveyance==='cart'?'káru.':'vůz.'));
+  const carried=animals.filter(a=>a.carried);
+  if(carried.length)lines.push('Mezi přepravovanými '+(carried.length===1?'je také zvíře ':'jsou také zvířata ')+beasts(carried)+'.');
+ }
+ if(!halted){
+  for(const id of walking){
+   const led=animals.filter(a=>a.handler===id);
+   const lead=led.length?list(led.map(a=>ledAnimalDescription(a,animalKind))):'';
+   if(lead)lines.push(say('lead:'+id,[
+    name(id)+' jde pěšky a vede '+lead+'.',
+    'Pěšky postupuje '+name(id)+'. Při tom vede '+lead+'.'
    ]));
-   const injured=patients.filter(id=>severe.has(id)&&priorInjuries.has(id));
-   if (cannotWalk&&injured.length===patients.length) lines.push(say('injured-passenger',[
-    many?'Po dřívějších zraněních tu cestu vlastními silami ujít nemohli.':'Stará rána mu nedovolovala ujít tu cestu vlastními silami.',
-    many?'Už před tímto přesunem utrpěli zranění a nyní sami jít nemohou.':'Kvůli staré ráně už vlastní nohy na cestu nestačily. Díky povozu však mohla družina putovat pospolu.',
-    many?'Utrpěli zranění už dříve; na vlastní nohy se už spolehnout nemohli.':'Zranění je starší než tahle cesta, ale teprve tady je znát, jakou váhu má kousek místa na povoze. Družina může pokračovat společně.'
-   ]));
-   else if (cannotWalk) lines.push(say('immobile',[
-    `${many?'Vlastními silami tuto cestu ujít nedokážou.':'Vlastními silami tuto cestu ujít nedokáže.'}`,
-    `${many?'Na vlastní nohy se teď spolehnout nemohou.':'Na vlastní nohy se teď spolehnout nemůže.'}`,
-    `${many?'Bez převozu by se na cestu vydat nemohli.':'Bez převozu by se na cestu vydat nedalo.'}`
-   ]));
-   else if(patients.some(id=>severe.has(id))){
-    const immobile=patients.filter(id=>severe.has(id));
-    lines.push(`${named(immobile)} ${immobile.length===1?'nemůže':'nemohou'} pokračovat pěšky.`);
-   }
   }
-  if (carried.length) lines.push(`${aboard[0].toUpperCase()+aboard.slice(1)} ${carried.length===1?'vezou také zvíře':'vezou také zvířata'} ${passageName(carried)}.`);
+  const otherWalkers=people.filter(id=>walking.has(id)&&!animals.some(a=>a.handler===id));
+  if(otherWalkers.length)lines.push(named(otherWalkers)+(otherWalkers.length===1?' jde':' jdou')+' pěšky.');
  }
- for (const a of animals.filter(a=>a.passenger)) lines.push(say('mount-passenger:'+a.id,[
-  `V sedle zvířete jménem „${a.name}“ je ${name(a.passenger)}${a.rider?'; o doprovod v sedle se stará '+name(a.rider):''}.`,
-  `${name(a.passenger)} cestuje v sedle zvířete jménem „${a.name}“${a.rider?'; v sedle jel i '+name(a.rider):''}.`,
-  `Zvíře jménem „${a.name}“ slouží k převozu. V sedle ${a.rider?'jedou '+named([a.passenger,a.rider]):'je '+name(a.passenger)}.`
- ]));
- if (!['cart','wagon'].includes(conveyance)) for (const id of patients.filter(id=>severe.has(id))){
-  lines.push(priorInjuries.has(id)?`${name(id)} po dřívějším zranění nemůže jít vlastními silami.`:
-   `${name(id)} vlastními silami tu cestu ujít nedokáže.`);
+ for(const animal of animals){
+  if(animal.passenger){
+   lines.push('V sedle zvířete jménem '+animal.name+' má místo '+name(animal.passenger)+
+    (animal.rider?' a v sedle je také '+name(animal.rider):'')+'.');
+  }else if(animal.rider)lines.push(name(animal.rider)+(halted?' zůstává':' jede')+' v sedle zvířete jménem '+animal.name+'.');
  }
- const free = animals.filter(a=>!a.carried && !a.team && !a.rider && !a.passenger && !a.handler);
- if (free.length) lines.push(`S družinou ${free.length===1?'jde i zvíře':'jdou i zvířata'} ${passageName(free)}.`);
- if (p.movementMinutes!==0 && (!conveyance || conveyance==='foot') && !animals.length)
-  lines.push(say('foot',['Družina se vydala pěšky.','Poutníci měří cestu vlastními kroky.','Dál se jde po vlastních nohou.']));
- if (patients.length && !['cart','wagon'].includes(conveyance) && !animals.some(a=>a.passenger))
-  lines.push(`${named(patients)} ${patients.length===1?'je převáženou osobou':'jsou převáženi'}.`);
- if (p.kind==='travel' && Number(p.movementMinutes)===0 && p.minutes>0)
-  lines.push(say('halt',['V tu chvíli cesta stojí. Vzdálenost neubývá.','Družina zůstává na místě, ač čas běží dál.','Ubíhá čas; z cesty však neubude ani krok.']));
+ for(const id of patients.filter(id=>severe.has(id)))lines.push(name(id)+
+  (priorInjuries.has(id)?' kvůli dřívějšímu zranění nemůže pokračovat pěšky.':' nemůže tuto cestu ujít vlastními silami.'));
+ const free=animals.filter(a=>!a.carried&&!a.team&&!a.rider&&!a.passenger&&!a.handler);
+ if(free.length)lines.push('K výpravě patří také '+(free.length===1?'zvíře ':'zvířata ')+beasts(free)+'.');
+ if(halted&&p.minutes>0&&!party.stopped.size)lines.push('V tomto úseku výprava zůstává na místě.');
  return lines.join(' ');
 }
 
@@ -284,14 +276,14 @@ function aftermath(p, name, hazard, say, {narratedHazard=false,narratedDirection
  return lines.join(' ');
 }
 
-export function composeTravelChronicle(entry, p, {name, hazard, calendar, priorInjuries=new Set(),flow}={}) {
+export function composeTravelChronicle(entry, p, {name, hazard, calendar, priorInjuries=new Set(),flow,animalKind}={}) {
  const seed=entry?.id || `${p.startMinute}:${p.endMinute}:${p.kind}`;
  const say=(topic, variants)=>passage(seed,topic,variants);
  const getName=name || (()=>'Nejmenovaný účastník');
  const party=chronicleTravelParty(p,getName);
  const story=[
   ['intro',literaryChronicleIntro(entry,p,calendar).join('\n\n')],
-  ['travel',p.kind==='travel'?company(p,party,getName,say,priorInjuries):''],
+  ['travel',p.kind==='travel'?company(p,party,getName,say,priorInjuries,animalKind):''],
   ['activity',pursuits(p,getName,say,flow)],
   ['aftermath',aftermath(p,getName,hazard,say,flow)]
  ].filter(([,text])=>text);
@@ -300,28 +292,28 @@ export function composeTravelChronicle(entry, p, {name, hazard, calendar, priorI
 
 const actionPhrases={
  survival:[
-  'hledal v kraji pevný bod, od něhož by se dalo odměřit, kudy dál.',
-  'zkoumal, kam ve skutečnosti vedl průchod před výpravou. Z dálky každá cesta slibovala víc, než bylo možné zjistit zblízka.',
-  'musel poskládat několik nepatrných znamení, dřív než se výprava rozhodla, kudy dál.'
+  'hledá v kraji pevný bod, od něhož by se dalo odměřit, kudy dál.',
+  'zkoumá, kam ve skutečnosti vede průchod před výpravou. Z dálky každá cesta slibovala víc, než bylo možné zjistit zblízka.',
+  'musí poskládat několik nepatrných znamení, dřív než se výprava rozhodne, kudy dál.'
  ],
  tracking:[
-  'se skláněl k zemi. Jediný otisk mnoho nepověděl, ale ten správný mohl promluvit spolu s dalšími.',
-  'hledal pokračování stopy tam, kde v kraji zůstávaly jen útržky cizího pohybu.'
+  'se sklání k zemi. Jediný otisk mnoho nepověděl, ale ten správný může promluvit spolu s dalšími.',
+  'hledá pokračování stopy tam, kde v kraji zůstávaly jen útržky cizího pohybu.'
  ],
- awareness:['se zaposlouchal do okolí a hledal v jeho známých zvucích cokoli nezvyklého.',
-  'propátrával pohledem místa, která se dala při zběžném pohledu snadno minout.'],
- foraging:['se pustil do hledání zásob. Při té práci měl nejmenší kout krajiny často větší cenu než širý rozhled.',
-  'hledal, kde by se dalo přilepšit zásobám výpravy.'],
- agility:['se snažil zvládnout nesnadný pohyb, při němž záleželo na jistotě těla.'],
- climbing:['se pokusil překonat místo, kde pouhý krok nestačil a pohyb musely vést i ruce.'],
- timbercraft:['hledal způsob, jak si poradit s dřevem nebo porostem, který bránil v postupu.'],
- swimming:['se pokusil zdolat vodu vlastními silami.'],
- hideworking:['se pokusil dát koženou výstroj do pořádku.','se té práce ujal. Záleželo na tom, zda se mu podaří vrátit poškozené kůži pevnost.','se pustil do opravy kůže. Teprve při práci mělo vyjít najevo, zda lze závadu napravit.'],
- woodworking:['se ujal opravy dřevěné výstroje.','se pokusil dát dřevěnou součást do pořádku.'],
- textilecraft:['se pokusil napravit poškozenou látku.','se ujal opravy tkané výstroje.'],
- metalcraft:['se ujal práce na kovové součásti.','se pokusil napravit závadu na kovové výstroji.'],
- stealth:['se pokusil projít tiše a ponechat okolí co nejméně znamení o svém pohybu.'],
- endurance:['musel obstát v námaze, kterou si ta chvíle vyžádala.']
+ awareness:['se zaposlouchává do okolí a hledá v jeho známých zvucích cokoli nezvyklého.',
+  'prohledává pohledem místa, která se dala při zběžném pohledu snadno minout.'],
+ foraging:['se pouští do hledání zásob. Při té práci má i nejmenší kout krajiny cenu.',
+  'hledá, kde by se dalo přilepšit zásobám výpravy.'],
+ agility:['se snaží zvládnout nesnadný pohyb, při němž záleželo na jistotě těla.'],
+ climbing:['se pokouší překonat místo, kde pouhý krok nestačil a pohyb musí vést i ruce.'],
+ timbercraft:['hledá způsob, jak si poradit s dřevem nebo porostem, který bránil v postupu.'],
+ swimming:['se pokouší zdolat vodu vlastními silami.'],
+ hideworking:['se pokouší dát koženou výstroj do pořádku.','se ujímá práce. Záleží na tom, zda se podaří vrátit poškozené kůži pevnost.','se pouští do opravy kůže. Teprve při práci mělo vyjít najevo, zda lze závadu napravit.'],
+ woodworking:['se ujímá opravy dřevěné výstroje.','se pokouší dát dřevěnou součást do pořádku.'],
+ textilecraft:['se pokouší napravit poškozenou látku.','se ujímá opravy tkané výstroje.'],
+ metalcraft:['se ujímá práce na kovové součásti.','se pokouší napravit závadu na kovové výstroji.'],
+ stealth:['se pokouší projít tiše a ponechat okolí co nejméně znamení o svém pohybu.'],
+ endurance:['musí obstát v námaze, kterou si ta chvíle vyžádala.']
 };
 const outcomes={
  general:{CS:'Úkon se podařil i v tom, co na něm bylo nejtěžší.',S:'Tentokrát to stačilo.',
@@ -366,40 +358,40 @@ function travelSkillBeat(entry,p,test,name,party,context=''){
  const say=(topic,choices)=>passage(entry.id,topic+':'+test.id,choices);
  const verdict=outcomes.general[test.level];
  if(context==='weather'){
-  const exposure=p.weatherExposure.filter(x=>x.id===test.actorId&&x.exposed);
+  const exposure=p.weatherExposure.filter(x=>x.exposed&&(x.proofId?x.proofId===test.id:x.id===test.actorId));
   const heat=exposure.some(x=>x.kind==='heat'),cold=exposure.some(x=>x.kind==='cold');
-  const before=who+(heat&&!cold?' musel snášet žár, který nepolevoval ani s ubývajícími silami.':
-   cold&&!heat?' se musel vypořádat s chladem, který si hledal cestu pod šat.':' musel obstát v námaze, kterou přineslo počasí.');
+  const before=who+(heat&&!cold?' čelí žáru, který putování provází.':
+   cold&&!heat?' se musí vypořádat s chladem, který si hledal cestu pod šat.':' musí obstát v námaze, kterou přineslo počasí.');
   return {kind:'weather',test,before,after:verdict};
  }
  if(/^endurance · cestovní sr/.test(skill)){
   const actor=p.actors?.find(a=>a.id===test.actorId);
   const delta=Number(actor?.delta);
   return {kind:'endurance',test,before:say('výdrž',[
-   who+' ke konci úseku poznal, kolik sil si ta cesta vyžádala.',
-   'Když se úsek chýlil ke konci, přišla na řadu výdrž. '+who+' se musel spolehnout na síly, které mu ještě zbývaly.'
+   who+' ke konci úseku poznává, kolik sil si ta cesta vyžádala.',
+   'Když se úsek chýlil ke konci, přišla na řadu výdrž. '+who+' se musí spolehnout na síly, které ještě zbývají.'
   ]),after:Number.isFinite(actor?.after)?'Cestovní únava '+(delta>0?'stoupla na':delta<0?'klesla na':'zůstala na')+' '+actor.after+'.':verdict};
  }
  if(!context&&(p.orientation?.droverSkillId===test.id||/animalcraft|riding/.test(skill))){
   const riding=/riding/.test(skill);
   const beasts=party.animals.filter(a=>riding?a.rider===test.actorId:a.handler===test.actorId||(a.team&&party.drover===test.actorId));
   const names=list(beasts.map(a=>'„'+a.name+'“'));
-  const before=riding?who+' se v sedle '+(names?'zvířete jménem '+names+' ':'')+'spoléhal na souhru se zvířetem.':
+  const before=riding?who+' se v sedle '+(names?'zvířete jménem '+names+' ':'')+'spoléhá na souhru se zvířetem.':
    names?who+say('otěže',[
-    ' při vedení '+names+' hledal míru mezi pevným pokynem a trpělivostí, kterou nešlo uspěchat.',
-    ' vedl '+names+' a musel vycítit, kdy přitáhnout a kdy povolit.'
-   ]):who+' se soustředil na vedení zvířat, od něhož se odvíjel další postup.';
+    ' při vedení '+names+' hledá míru mezi pevným pokynem a trpělivostí, kterou nešlo uspěchat.',
+    ' vede '+names+' a musí vycítit, kdy přitáhnout a kdy povolit.'
+   ]):who+' se soustředí na vedení zvířat, od něhož se odvíjel další postup.';
   return {kind:p.kind==='travel'?'travel':'activity',test,before,after:outcomes.animal[test.level]};
  }
  const family=skillFamily(skill);
  const before=family?who+' '+say(family,actionPhrases[family]):context==='complication'&&skill.includes('animalcraft')?
-  who+' se pokusil provést zvířata nesnadným místem.':'';
+  who+' se pokouší provést zvířata nesnadným místem.':'';
  return {kind:family==='survival'&&p.kind==='travel'?'travel':'activity',test,before,
   after:before?(outcomes[family]?.[test.level]||verdict):''};
 }
 
 /** Attach each roll to its cause by receipt ID, independently of storage order. */
-export function chronicleRollStories(entry,p,tests,name,hazard){
+export function chronicleRollStories(entry,p,tests,name,hazard,formatMinute){
  const party=chronicleTravelParty(p,name);
  const sections=[];
  const remaining=new Set(tests);
@@ -408,17 +400,24 @@ export function chronicleRollStories(entry,p,tests,name,hazard){
  const details=p.hazardDetails?.length?p.hazardDetails:(p.hazardDetail?[p.hazardDetail]:[]);
  const hazardKinds=['equipment','complication','accident'];
  const incidents=details.filter(h=>hazardKinds.includes(h.hazard||p.survivalHazard));
- const directionIds=details.filter(h=>h.hazard==='misdirection').map(h=>h.directionProofId).filter(Boolean);
+ const directionIds=unique([...details.filter(h=>h.hazard==='misdirection').map(h=>h.directionProofId),p.navigationRecoveryAwarenessProofId]);
+ const trackingAwareness=p.trackingFollowup?.awarenessSkillId;
  const followups=h=>h.hazard==='equipment'||(!h.hazard&&p.survivalHazard==='equipment')?
   [h.repairProofId||h.evidenceId]:[h.complicationProofId,...(h.complicationProofIds||[]),h.evidenceId];
  const incidentIds=new Set(incidents.flatMap(followups).filter(Boolean));
  const isEnd=test=>/^endurance · cestovní sr/i.test(test.skill);
  const isHazard=test=>/^survival hazard/i.test(test.skill);
  const isDirection=test=>/^direction hazard/i.test(test.skill);
- const isWeather=test=>/^endurance$/i.test(test.skill)&&p.weatherExposure?.some(x=>x.exposed&&x.id===test.actorId);
- const main=take(test=>!isEnd(test)&&!isHazard(test)&&!isDirection(test)&&!isWeather(test)&&!incidentIds.has(test.id)&&!directionIds.includes(test.id));
+ const isWeather=test=>p.weatherExposure?.some(x=>x.exposed&&(x.proofId?x.proofId===test.id:
+  /^endurance$/i.test(test.skill)&&x.id===test.actorId));
+ const main=take(test=>!isEnd(test)&&!isHazard(test)&&!isDirection(test)&&!isWeather(test)&&!incidentIds.has(test.id)&&!directionIds.includes(test.id)&&(!trackingAwareness||test.id!==trackingAwareness));
  const opening=main.map(test=>travelSkillBeat(entry,p,test,name,party));
- sections.push(...opening.filter(beat=>beat.kind==='travel'),...opening.filter(beat=>beat.kind==='activity'));
+ sections.push(...opening.filter(beat=>beat.kind==='travel'));
+ for(const beat of opening.filter(beat=>beat.kind==='activity')){
+  sections.push(beat);
+  if(beat.test?.id===p.trackingMemory?.skillId&&trackingAwareness)
+   sections.push(...byIds([trackingAwareness]).map(test=>travelSkillBeat(entry,p,test,name,party)));
+ }
  const [hazardRoll]=take(isHazard);
  const primary=p.survivalHazard||hazard?.hazard;
  const recordedIncidents=incidents.length?incidents:hazardKinds.includes(primary)?[{hazard:primary}]:[];
@@ -451,7 +450,7 @@ export function chronicleRollStories(entry,p,tests,name,hazard){
   for(const [position,test] of linked.entries()){
    const beat=travelSkillBeat(entry,p,test,name,party,'complication');
    const who=travelerName(test,name);
-   const repair=beat.before||who+' se ujal opravy.';
+   const repair=beat.before||who+' se ujímá opravy.';
    sections.push({...beat,kind:'hazard',before:kind==='equipment'?repair:beat.before,
     after:position===linked.length-1?(injuries?.length?'Nehoda po sobě zanechala zranění:':outcome||beat.after):beat.after,
     injuries:position===linked.length-1?injuries:undefined,suggestion:position===linked.length-1?suggestion:undefined});
@@ -474,6 +473,14 @@ export function chronicleRollStories(entry,p,tests,name,hazard){
   sections.push({...beat,kind:'direction',after:[beat.after,i===awareness.length-1?directionEnd:''].filter(Boolean).join(' ')});
  }
  sections.push(...take(isWeather).map(test=>travelSkillBeat(entry,p,test,name,party,'weather')));
+ for(const [id,stop] of party.stopped){
+  const time=formatMinute&&Number.isSafeInteger(stop.minute)?' V zápisu je uveden čas '+formatMinute(stop.minute)+'.':'';
+  const consequence=stop.shock==='KIA'?'Při tomto úseku umírá '+name(id)+'.':
+   stop.activeMovementMinutes===0||stop.minute===p.startMinute?
+    name(id)+' v tomto úseku od počátku nemůže pokračovat vlastními silami.':
+    name(id)+' během úseku ztrácí schopnost pokračovat vlastními silami.';
+  sections.push({kind:'hazard',text:consequence+time});
+ }
  sections.push(...take(isEnd).map(test=>travelSkillBeat(entry,p,test,name,party)));
  // Older records can link an extra proof to an incident without a usable role.
  sections.push(...take(()=>true).map(test=>travelSkillBeat(entry,p,test,name,party)));

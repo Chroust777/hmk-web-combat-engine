@@ -1,5 +1,5 @@
-import {chronicleTravelParty} from './hmk-chronicle-travel-93951.js?v=93.959';
-import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js?v=93.959';
+import {chronicleTravelParty,ledAnimalDescription} from './hmk-chronicle-travel-93951.js?v=93.960';
+import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js?v=93.960';
 /** Character Notes & Logbook: read-only, concise projections of already committed
  * HMK evidence. Never infer a roll, apply a rule, or mutate the authoritative log. */
 const txt = value => String(value ?? '').trim();
@@ -126,32 +126,46 @@ export function personalEpisodeActivities(p){
  if(!tasks.length)tasks.push('přesun po trase');
  return 'Cestování – '+[...new Set(tasks)].join(' · ');
 }
-export function personalEpisodeRoles(p,name,animalKind=()=>''){
- const {people,guide,drover,patients,severe,animals,conveyance}=chronicleTravelParty(p,name);
- const vehicle=conveyance==='cart'?'kára':conveyance==='wagon'?'vůz':'';
+export function personalEpisodeRoles(p,name,animalKind=()=>'',formatMinute){
+ const {people,guide,drover,patients,severe,animals,conveyance,walking,aboard,stopped}=chronicleTravelParty(p,name);
+ const ground=conveyance==='cart'?'na káře':conveyance==='wagon'?'na voze':'';
+ const halted=p.movementMinutes===0;
  return [
   ...people.map(id=>{
    const tags=[];
-   if(id===guide&&p.kind==='travel')tags.push('průvodce');
+   const patient=patients.includes(id),stop=stopped.get(id);
+   const mount=animals.find(a=>a.passenger===id);
+   if(id===guide&&p.kind==='travel'&&!patient)tags.push('průvodce výpravy');
    if(id===p.trackingMemory?.trackerId)tags.push('sleduje stopu');
    if(p.kind==='watch')tags.push('drží hlídku');
    if(p.kind==='forage')tags.push('hledá zásoby');
-   if(patients.includes(id)){
-    tags.push(vehicle?'převoz · '+vehicle:animals.some(a=>a.passenger===id)?'převoz v sedle':'přepravovaná osoba');
+   if(patient){
+    tags.push(mount?'převoz v sedle zvířete jménem '+mount.name:ground?'převoz '+ground:'přepravovaná osoba');
     if(severe.has(id))tags.push('nemůže jít vlastními silami');
    }else{
     const mounts=animals.filter(a=>a.rider===id);
     const led=animals.filter(a=>a.handler===id);
-    if(mounts.length)tags.push('v sedle · '+mounts.map(a=>a.name).join(', '));
-    if(led.length)tags.push('vede za uzdu · '+led.map(a=>a.name).join(', '));
-    if(id===drover&&animals.some(a=>a.team))tags.push('má na starosti zápřah');
-    if(!tags.length&&p.kind==='travel'&&(!conveyance||conveyance==='foot'||conveyance==='mount'))tags.push('pěší doprovod');
+    if(mounts.length)tags.push('v sedle zvířete jménem '+mounts.map(a=>a.name).join(', '));
+    if(led.length)tags.push((halted?'':'jde pěšky · ')+'vede '+led.map(a=>ledAnimalDescription(a,animalKind)).join(', '));
+    else if(walking.has(id)&&!halted)tags.push('jde pěšky');
+    if(aboard.has(id))tags.push(id===drover?(halted?'má na starosti zápřah':(conveyance==='cart'?'řídí káru':'řídí vůz')):'cestuje '+ground);
    }
-   return tags.length?`${name(id)} — ${tags.join('; ')}`:name(id);
+   if(stop){
+    const when=formatMinute&&Number.isSafeInteger(stop.minute)?' ('+formatMinute(stop.minute)+')':'';
+    tags.push((stop.shock==='KIA'?'úmrtí v úseku':stop.activeMovementMinutes===0||stop.minute===p.startMinute?
+     'bez schopnosti vlastního pohybu od začátku':'během úseku ztrácí schopnost pohybu')+when);
+   }
+   return tags.length?name(id)+' — '+tags.join(' · '):name(id);
   }),
-  ...animals.map(a=>`${a.name}${animalKind(a.id)?' ('+animalKind(a.id)+')':''} — ${a.carried?'převážené zvíře':a.team?'tažné zvíře':a.passenger?'převoz osoby v sedle':a.rider?'jezdecké zvíře':a.handler?'vedeno za uzdu':a.id===p.trackingScent?.animalId?'sleduje pach':'doprovázející zvíře'}`)
+  ...animals.map(a=>{
+   const species=animalKind(a.id);
+   const role=a.carried?'převážené zvíře':a.team?'tažné zvíře v zápřahu':a.passenger?'převoz osoby v sedle':
+    a.rider?'jezdecké zvíře':a.handler?'vedené zvíře':a.id===p.trackingScent?.animalId?'sleduje pach':'doprovázející zvíře';
+   return a.name+(species?' ('+species+')':'')+' — '+role;
+  })
  ];
 }
+
 // Descriptive manuscript prose, not a new game event. Every adjective comes from
 // the episode's environment; anything merely illustrative stays in the flavor layer.
 const ACTIVITY_PASSAGES={

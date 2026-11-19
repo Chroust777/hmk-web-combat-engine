@@ -64,7 +64,7 @@ const PLACES={
   'Mezi kmeny se otevíraly jen úzké průhledy a každá vzdálenost měla klamavou míru.',
   'Kořeny a nízké větve rozdělovaly cestu na krátké úseky, které nebylo možné posoudit jediným pohledem.',
   'Les přijímal kroky do svého ticha a vracel cestujícím jen útržky světla.',
-  'Pod korunami stromů byla dálka skrytá; směr bylo třeba hledat mezi drobnými znaky země.',
+  'Pod korunami stromů byla dálka skrytá. Směr bylo třeba hledat mezi drobnými znaky země.',
   'Stíny kmenů kreslily na podkladu nepravidelnou síť, v níž se skutečná stezka snadno ztrácela.',
   'Když se les sevřel kolem trasy, staly se i nepatrné změny povrchu důležitějšími než daleký obzor.'
  ],
@@ -187,12 +187,22 @@ export function literaryChronicleIntro(entry,p,{month=null,monthName=null}={}){
   :choose(SEASONS[season]||SEASONS.unknown,key+':season');
  const climate=str(p?.weather?.climate||p?.settings?.climate).toLowerCase();
  const climateText=CLIMATES[climate]?choose(CLIMATES[climate],key+':climate'):'';
- const terrainText=choose(ground,key+':terrain');
  const weather=weatherGroup(p), light=daylight(p);
+ const terrain=terrainGroup(p);
+ const forestAtNight=[
+  'Mezi kmeny se za tmy ztrácely i blízké obrysy. Z okolí doléhalo víc, než bylo možné zahlédnout.',
+  'Noc pod korunami zhoustla. Stezku bylo možné rozeznat po krátkých úsecích.'
+ ];
+ const forestByDay=[
+  ...ground,
+  'Pod korunami stromů se světlo tříštilo o větve. Stezka se dala sledovat po jednotlivých znameních, daleký obzor tu mnoho nepověděl.'
+ ];
+ const terrainText=choose(terrain==='forest'&&light==='night'?forestAtNight:
+  terrain==='forest'&&light==='day'?forestByDay:ground,key+':terrain');
  const seasonText=season==='unknown'&&!month?'':first;
  const area=str(p?.area||p?.settings?.area);
  const before=[terrainText,seasonText,climateText,area?'Bylo to v kraji zvaném „'+area+'“.':''].filter(Boolean);
- const rainInForest=weather==='rain'&&terrainGroup(p)==='forest';
+ const rainInForest=weather==='rain'&&terrain==='forest';
  const weatherText=rainInForest?choose(WEATHER.rain,key+':weather'):
   weather==='rain'?choose([
    'Déšť se táhl přes kraj v šedé cloně. Z dálky nechal na pohled sotva tolik, kolik bylo třeba k příštímu kroku.',
