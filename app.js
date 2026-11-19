@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.966';
+const APP_VERSION='93.967';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5664,7 +5664,12 @@ const JOURNAL_ANATOMICAL_LOCATIONS=[['sk','Skull',5],['fa','Face',4],['nk','Neck
 // zone die ranges and location die ranges. ZN is merged across zone rows.
 const JOURNAL_ZN_GROUPS={sk:['Head','1',3],sh:['Arms','2–3',5],tx:['Torso','4–7',3],th:['Legs','8–10',4]};
 const JOURNAL_LN_RANGES={sk:'1–5',fa:'6–8',nk:'9–10',sh:'1–3',ua:'4–6',el:'7',fo:'8–9',ha:'10',tx:'1–4',ab:'5–7',pv:'8–10',th:'1–4',kn:'5',ca:'6–8',ft:'9–10'};
-function hmkAnimalWoundAnatomyHTML(c){
+function journalWoundCareButton(actor,wound,label){
+ if(!wound.id||wound.healed)return '';
+ return ` <button type="button" class="secondary journal-wound-care" data-wound-treatment="${esc(wound.id)}"
+  data-wound-patient="${esc(actor.id)}" aria-label="${esc('Přejít k péči · '+label)}">Péče</button>`;
+}
+function hmkAnimalWoundAnatomyHTML(c,{care=false}={}){
  const breed=c?.hmk?.verifiedMountedBreed,anatomy=verifiedMountedAnimalAnatomy(breed);
  if(!anatomy)return '';
  const state=persistentStateOf(c),wounds=state.wounds||[];
@@ -5684,7 +5689,7 @@ function hmkAnimalWoundAnatomyHTML(c){
   return `<tr><th scope="row" ${journalHelpData('Location',help)}>${esc(loc.code.toUpperCase())}</th>`+
    `<td>${esc(loc.name)}</td><td>${esc(loc.zone)}</td><td>${esc(loc.ln)}</td>`+
    `<td>${esc(String(loc.shock))}</td><td>${symbol?esc(String(symbol.bleeds)):'—'}</td>`+
-   `<td>${at.length?at.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',help+' Zranění: '+formatWound(w))}>${esc(formatWound(w))}</span>`).join(' · '):'—'}</td></tr>`;
+   `<td>${at.length?at.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',help+' Zranění: '+formatWound(w))}>${esc(formatWound(w))}</span>${care?journalWoundCareButton(c,w,loc.name+' · '+formatWound(w)):''}`).join(' · '):'—'}</td></tr>`;
  }).join('');
  const unknown=wounds.filter(w=>!anatomy.locations.some(loc=>loc.code===w.location));
  return `<section class="journal-book-section journal-body-locations" data-hmk-animal-body-locations="${esc(c.id)}">`+
@@ -5695,7 +5700,9 @@ function hmkAnimalWoundAnatomyHTML(c){
   `<div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><thead><tr>`+
   `<th>LOC</th><th>Lokace</th><th>ZN</th><th>LN</th><th>SHK</th><th>●</th><th>Zranění</th>`+
   `</tr></thead><tbody>${rows}</tbody></table></div>`+
-  (unknown.length?`<p class="notice error">${unknown.length} ran má neověřenou zvířecí lokalitu; nelze je přiřadit.</p>`:'')+
+  (unknown.length?(care?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>
+   ${unknown.map(w=>`<div>${esc(formatWound(w))}${journalWoundCareButton(c,w,formatWound(w))}</div>`).join('')}</details>`:
+   `<p class="notice error">${unknown.length} ran má neověřenou zvířecí lokalitu; nelze je přiřadit.</p>`):'')+
   `</section>`;
 }
 function hmkTravelEncounterHintHTML(c){
@@ -5714,14 +5721,15 @@ function hmkTravelEncounterHintHTML(c){
   `Po potvrzení další časové epizody tato nápověda zmizí; příslušný historický záznam zůstane zachován.</p></section>`;
 }
 function journalBodyLocationsHTML(c){
- if(c?.hmk?.verifiedMountedBreed)return hmkAnimalWoundAnatomyHTML(c);
+ if(c?.hmk?.verifiedMountedBreed)return hmkAnimalWoundAnatomyHTML(c,{care:true});
  const inv=data.inventory.filter(x=>x.characterId===c.id);
  const worn=inv.filter(x=>x.slot==='worn'&&x.snapshot?.category==='armor');
  const suit=identifyWornPrintedSuit(data.inventory,c.id);
  const coverage=armourCoverageReport(c);
  const state=persistentStateOf(c);
  // Prefer the single authoritative Combat State record over its legacy display mirror.
- const wounds=[...(state.wounds||[]),...(c.hmk?.injuries||[])]
+ const actualWounds=new Set(state.wounds||[]);
+ const wounds=[...actualWounds,...(c.hmk?.injuries||[])]
   .filter((w,i,all)=>!w?.id||all.findIndex(x=>x?.id===w.id)===i)
   .filter(w=>w?.healed!==true); // Keep healed wounds in Combat State history, not the active anatomy column.
  const codes=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name,shock])=>({code,name,shock}));
@@ -5827,8 +5835,7 @@ function journalBodyLocationsHTML(c){
    if(group)group.wounds.push(w);else groups.push({side,wounds:[w]});
   }
   groups.sort((a,b)=>(['L','R','','?'].indexOf(a.side))-( ['L','R','','?'].indexOf(b.side)));
-  const injuryText=groups.map(g=>`${g.side?g.side+': ':''}${g.wounds.map(w=>[woundName(w),w.description].filter(Boolean).join(' · ')).join('; ')}`).join(' | ');
-  const injuryMarkup=groups.map(g=>`<span class="journal-wound-side-group">${g.side?`<strong class="journal-wound-side" data-hmk-help="${g.side==='L'?'Levá anatomická strana':g.side==='R'?'Pravá anatomická strana':'Strana končetiny u původní rány není doložena'}" tabindex="0">${g.side}:</strong> `:''}${g.wounds.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',woundMeaning(w))}>${esc(woundName(w))}</span>`).join(' · ')}</span>`).join(' <span aria-hidden="true">|</span> ');
+  const injuryMarkup=groups.map(g=>`<span class="journal-wound-side-group">${g.side?`<strong class="journal-wound-side" data-hmk-help="${g.side==='L'?'Levá anatomická strana':g.side==='R'?'Pravá anatomická strana':'Strana končetiny u původní rány není doložena'}" tabindex="0">${g.side}:</strong> `:''}${g.wounds.map(w=>`<span class="journal-wound-meaning" tabindex="0" ${journalHelpData('Injury',woundMeaning(w))}>${esc(woundName(w))}</span>${actualWounds.has(w)?journalWoundCareButton(c,w,[name,g.side,woundName(w)].filter(Boolean).join(' · ')):''}`).join(' · ')}</span>`).join(' <span aria-hidden="true">|</span> ');
   const materials=worn.filter(x=>x.snapshot?.properties?.coveredLocations?.includes(code)).map(x=>String(x.snapshot.properties.material||'').toLowerCase());
   const metal=materials.some(m=>['p','plate'].includes(m))?'black':materials.some(m=>['m','mail','s','scale'].includes(m))?'grey':null;
   const avcell=k=>{
@@ -5850,7 +5857,7 @@ function journalBodyLocationsHTML(c){
  const areaAVHelp=weightedAreaAV.ready
   ?'Vážená Area AV (HMK s.133): '+weightedAreaAV.value+' (nezaokrouhlený součet '+weightedAreaAV.raw.toFixed(2)+'). Výpočet z ověřené oblečené výstroje. Cold Hazard používá min(Area AV, 4) plus skutečné bonusy; Heat Hazard používá max(Area AV, 1) podle okolností (HMK s.149).'
   :'Váženou Area AV nelze bezpečně určit: '+weightedAreaAV.reason+'. Zkontrolujte ověření oblečené výstroje v Arsenal & Gear. Nejde o automatickou nulovou ochranu.';
- return `<section class="journal-book-section journal-body-locations"><div class="journal-anatomy-expanded" data-chronicle-injuries><div class="journal-book-title">${journalTerm('Body Locations · Armour / Injuries')} <span class="journal-wound-count" aria-label="Aktivní rány: ${wounds.length}">Rány: ${wounds.length}</span> <span class="journal-weighted-area-av" tabindex="0" ${journalHelpData('Area AV',areaAVHelp)}>(${esc(areaAVLabel)})</span></div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name"><col class="journal-col-zn"><col class="journal-col-ln">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-bleed"><col class="journal-col-shk"><col class="journal-col-amp"><col class="journal-col-injuries"></colgroup><thead><tr><th>${journalTerm('LOC')}</th><th>${journalTerm('Location')}</th><th>${journalTerm('ZN')}</th><th>${journalTerm('LN')}</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${journalTerm(k)}</th>`).join('')}<th class="journal-symbol-cell">${journalTerm('●')}</th><th class="journal-shk">${journalTerm('SHK')}</th><th class="journal-symbol-cell">${journalTerm('▽')}</th><th>${journalTerm('Injuries')}</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">HMK s.111, 133, 167–169 a Character Sheet (2. strana, PDF s.436): ZN = Zone Number, LN = Location Number. AV v rámečku = Rigid (E/P Glancing Blow). Šedá / černá výplň značí volitelné pravidlo Metal Armour (Scale/Mail / Plate). ● = možné krvácení dle severity a aspektu zásahu; ▽ = možné amputace při G5 edge. Najetím / fokusem zobrazíš vysvětlení. SHK v tmavém poli = Location Shock. Předběžně odvozené hodnoty AV vyžadují potvrzení GM. Štít držený v ruce se nepřičítá jako pasivní AV těla; jeho Block se řeší při konkrétní obraně. Označení aktivních ran: L = levá, R = pravá (značení originálního HMK Character Sheet); ? = strana končetiny nebyla doložena. Více ran v jedné skupině zůstává samostatnými ranami (Compound Injury se vyhodnocuje v Combat). Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}</div>`).join('')}</details>`:''}</div></section>`;
+ return `<section class="journal-book-section journal-body-locations"><div class="journal-anatomy-expanded" data-chronicle-injuries><div class="journal-book-title">${journalTerm('Body Locations · Armour / Injuries')} <span class="journal-wound-count" aria-label="Aktivní rány: ${wounds.length}">Rány: ${wounds.length}</span> <span class="journal-weighted-area-av" tabindex="0" ${journalHelpData('Area AV',areaAVHelp)}>(${esc(areaAVLabel)})</span></div><div class="journal-anatomy-wrap"><table class="journal-anatomy-table"><colgroup><col class="journal-col-code"><col class="journal-col-name"><col class="journal-col-zn"><col class="journal-col-ln">${['b','e','p','f'].map(()=>'<col class="journal-col-av">').join('')}<col class="journal-col-bleed"><col class="journal-col-shk"><col class="journal-col-amp"><col class="journal-col-injuries"></colgroup><thead><tr><th>${journalTerm('LOC')}</th><th>${journalTerm('Location')}</th><th>${journalTerm('ZN')}</th><th>${journalTerm('LN')}</th>${['b','e','p','f'].map(k=>`<th class="journal-av">${journalTerm(k)}</th>`).join('')}<th class="journal-symbol-cell">${journalTerm('●')}</th><th class="journal-shk">${journalTerm('SHK')}</th><th class="journal-symbol-cell">${journalTerm('▽')}</th><th>${journalTerm('Injuries')}</th></tr></thead><tbody>${rows}</tbody></table></div><p class="journal-anatomy-note">HMK s.111, 133, 167–169 a Character Sheet (2. strana, PDF s.436): ZN = Zone Number, LN = Location Number. AV v rámečku = Rigid (E/P Glancing Blow). Šedá / černá výplň značí volitelné pravidlo Metal Armour (Scale/Mail / Plate). ● = možné krvácení dle severity a aspektu zásahu; ▽ = možné amputace při G5 edge. Najetím / fokusem zobrazíš vysvětlení. SHK v tmavém poli = Location Shock. Předběžně odvozené hodnoty AV vyžadují potvrzení GM. Štít držený v ruce se nepřičítá jako pasivní AV těla; jeho Block se řeší při konkrétní obraně. Označení aktivních ran: L = levá, R = pravá (značení originálního HMK Character Sheet); ? = strana končetiny nebyla doložena. Více ran v jedné skupině zůstává samostatnými ranami (Compound Injury se vyhodnocuje v Combat). Nepřiřazené rány: ${unknown.length}.</p>${unknown.length?`<details class="journal-unmapped-wounds"><summary>Nepřiřazená zranění (${unknown.length})</summary>${unknown.map(w=>`<div>${esc([w.location??w.loc??'—',w.severity??w.injuryLevel??w.description??''].filter(Boolean).join(' · '))}${actualWounds.has(w)?journalWoundCareButton(c,w,w.description||w.location||'Nepřiřazená rána'):''}</div>`).join('')}</details>`:''}</div></section>`;
 }
 function journalConvocationsHTML(c){
  const arc=c.hmk?.arcane||{},primary=arc.primaryConvocation??c.hmk?.creation?.values?.pvarPrimary??null;
@@ -19470,7 +19477,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
    (form.querySelector('input[name="abe"]:not([type="hidden"]):not([readonly]),input[name="aberrance"]:not([type="hidden"]):not([readonly])')||
     form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
    kind==='injury-mishap'?(form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
-   kind==='bleeding'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name="physicianRoll"]:not([type="hidden"]),select[name="healerId"]')||form.querySelector('button[type="submit"]')):
+   kind==='bleeding'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name="physicianRoll"]:not([type="hidden"]),select[name="healerId"],input[name="strengthRoll"]')||form.querySelector('button[type="submit"]')):
    kind==='skill-fall'?form.elements.namedItem('heightFt'):
    form.querySelector('input:not([type="hidden"]):is([name="roll"],[name="courseD100"],[name="followRoll"],[name="enduranceD10"],[name="physicianRoll"])'));
   // Calendar/Travel rule links must land on the REAL original input and
@@ -23426,9 +23433,8 @@ function openWoundMedicalStep(actor,woundId,{healerId}={}){
  const inHealth=kind==='bleeding'?hskIsEnvironmentalWound(actor,source):
   kind==='extended-shock'?courseEnvironmental:weather||kind==='weather-shock';
  overlay=null;
- if(isStableAnimalProfile93813(actor)&&(inHealth||scheduled?.minute>clock?.minute)){
-  if(scheduled?.minute>clock?.minute)hskWeatherHealthLastReceipt={actorId:actor.id,
-   message:scheduled.description+' · '+displayCampaignMinute(scheduled.minute)+'. Otevři splatný krok z Kalendáře tlačítkem Kontrola.'};
+ const stablePatient=isStableAnimalProfile93813(actor)&&(inHealth||scheduled?.minute>clock?.minute);
+ if(stablePatient){
   openHealthPatient952(actor);
  }else{
   selected=actor.id;
@@ -23436,7 +23442,10 @@ function openWoundMedicalStep(actor,woundId,{healerId}={}){
   else{if(!combatInitiativeSequence)encounterSelection.add(actor.id);view='encounter';}
   render();
  }
- const row=[...document.querySelectorAll('[data-gm-wound-row]')].find(el=>el.dataset.gmWoundRow===w.id);
+ const rows=[...document.querySelectorAll('[data-gm-wound-row]')];
+ const row=rows.find(el=>el.dataset.gmWoundRow===(kind==='injury-mishap'?mishap.woundId:source))||
+  rows.find(el=>el.dataset.gmWoundRow===w.id);
+ const targetPanel=row||(stablePatient?document.querySelector('[data-stable-health-patient]'):null);
  const message=row?.querySelector('[data-wound-next-message]');
  let canBeginStoppage=false;
  if(kind==='bleeding'&&inHealth&&clock&&scheduled?.minute===clock.minute+5){
@@ -23445,12 +23454,18 @@ function openWoundMedicalStep(actor,woundId,{healerId}={}){
   }
  }
  if(scheduled?.minute>clock?.minute&&!canBeginStoppage){
-  if(message){
-   message.textContent=scheduled.description+' · '+displayCampaignMinute(scheduled.minute)+'.';
-   const next=document.createElement('button');next.type='button';
-   next.textContent=kind==='extended-shock'?'Posunout čas k Extended Shock Course':'Posunout čas k této kontrole';
-   next.dataset.medicalNextMinute=String(scheduled.minute);next.dataset.medicalNextActor=actor.id;next.dataset.medicalNextWound=w.id;
-   message.after(next);next.classList.add('hmk-medical-required-target');next.focus();next.scrollIntoView({block:'center'});
+  if(targetPanel){
+   const term=scheduled.description+' · '+displayCampaignMinute(scheduled.minute)+'.';
+   if(message)message.textContent=term;
+   let next=targetPanel.querySelector(`[data-medical-next-minute="${scheduled.minute}"]`);
+   if(!next){
+    next=document.createElement('button');next.type='button';
+    next.textContent=kind==='extended-shock'?'Posunout čas k Extended Shock Course':'Posunout čas k této kontrole';
+    next.dataset.medicalNextMinute=String(scheduled.minute);next.dataset.medicalNextActor=actor.id;next.dataset.medicalNextWound=w.id;
+    if(message)message.after(next);
+    else{next.textContent+=' · '+term;targetPanel.prepend(next);}
+   }
+   next.classList.add('hmk-medical-required-target');next.focus();next.scrollIntoView({block:'center'});
   }
   return;
  }
@@ -23458,13 +23473,13 @@ function openWoundMedicalStep(actor,woundId,{healerId}={}){
   if(message){message.textContent=kind==='extended-shock'?
    'V kalendáři chybí splatný doložený termín Extended Shock. Zkontrolujte počátek a následující Course v Přehledu kampaně.':
    'Další krok závisí na zdravotním stavu a doloženém termínu v Přehledu kampaně.';
-   message.scrollIntoView({block:'center'});}
+   message.classList.add('hmk-medical-required-target');message.scrollIntoView({block:'center'});}
  }
 }
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-wound-treatment]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
- const actor=character(button.closest('[data-gm-wound-manager]')?.dataset.gmWoundManager);
+ const actor=character(button.dataset.woundPatient||button.closest('[data-gm-wound-manager]')?.dataset.gmWoundManager);
  const healerId=button.closest('[data-gm-wound-row]')?.querySelector('[data-wound-treatment-healer]')?.value;
  openWoundMedicalStep(actor,button.dataset.woundTreatment,{healerId});
 },true);
