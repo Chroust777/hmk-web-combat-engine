@@ -263,16 +263,39 @@ const DP_COLUMNS=Object.freeze([
  ['Background Skills','Background'],['Occupation Skills','Occupation'],['Optional Skills','Optional'],
  ['Veteran Skills','Veteran'],['Sunsign Skills','Sunsign'],['Native Language / Religion','Native'],
  ['GM Bonus Languages','GM Bonus']]);
-export function groupedSkillTableHTML(character,{editing=false}={}){
- const list=calculateSheetSkills(character),mode=perceptionMode(character);
- const names=new Set(list.map(x=>x.name)),expected=SKILL_DEFINITIONS.map(x=>x.name);
+export function chronicleSenseRows(character){
+ return gmSenseRows(character).filter(row=>row.score!==null||row.ml!==null).flatMap(sense=>[
+  {name:sense.attribute,group:'Physical',ml:sense.score===null?null:sense.score*5,
+   basis:sense.key.toUpperCase()+' '+(sense.score??'—')+' × 5',sense,attributeTest:true},
+  {name:sense.skill,group:'Physical',ml:sense.ml,sb:sense.sb,
+   basis:(sense.proof?sense.key.toUpperCase():'PER')+' + WIL',sense}
+ ]);
+}
+function chronicleSenseEdit(row,character){
+ const {sense,attributeTest}=row;
+ if(attributeTest){
+  if(!character.hmk?.creation?.attributeProof?.per)return '';
+  const req=physicalDiceRequirement(character.hmk.ageGroup,character.kind||'PC');
+  return `<label class="tiny">Vlastní d6
+   <input name="sheet_sense_dice_${sense.key}" type="text" inputmode="numeric" aria-label="${E(row.name)} · fyzické d6" placeholder="${req.count}× d6">
+   <small>${sense.proof?'Uloženo: '+E(sense.proof.rolls.join(', ')):'Výchozí hodnota z PER'}</small></label>`;
+ }
+ if(!(sense.sb>0&&sense.ml>0))return '';
+ return `<label class="tiny">Doplňkové DP <input class="sheet-dp-input" name="sheet_sense_dp_${sense.key}" type="number" min="0" max="100" step="1" required aria-label="${E(row.name)} · doplňkové DP" value="${E(sense.dp)}"></label>`;
+}
+export function groupedSkillTableHTML(character,{editing=false,includeChronicleSenses=false}={}){
+ const calculated=calculateSheetSkills(character),mode=perceptionMode(character);
+ const senses=includeChronicleSenses?chronicleSenseRows(character):[];
+ const list=[...calculated.filter(row=>!senses.some(sense=>sense.name===row.name)),...senses];
+ const names=new Set(calculated.map(x=>x.name)),expected=SKILL_DEFINITIONS.map(x=>x.name);
  if(expected.some(n=>!names.has(n)))throw Error('Chybí základní Skill definice');
- const Eattr=x=>x.perceptionParent?'Sdílené SM • Sight / Sound / Odour':`${x.primary?.toUpperCase()??'—'} (${x.primaryValue??'?'}) + ${x.secondary?.toUpperCase()??'—'} (${x.secondaryValue??'?'})`;
+ const Eattr=x=>x.basis??(x.perceptionParent?'Sdílené SM • Sight / Sound / Odour':`${x.primary?.toUpperCase()??'—'} (${x.primaryValue??'?'}) + ${x.secondary?.toUpperCase()??'—'} (${x.secondaryValue??'?'})`);
  const detailHeaders=['Skill','SB: atributy','SB','Base SM',...DP_COLUMNS.map(x=>x[1]),'DP Σ','SM','ML / Boost'];
  const detailGroups=GROUPED_SKILLS.map(group=>{
   const rows=list.filter(x=>x.group===group).sort((a,b)=>a.name.localeCompare(b.name,'en'));
   const compact=rows.map(x=>`<tr><th scope="row">${E(x.name)}${x.subskillOf?` <span class="tiny muted">↳ ${E(x.subskillOf)}</span>`:''}</th><td>${E(Eattr(x))}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong></td></tr>`).join('');
   const detailed=rows.map(x=>{
+   if(x.sense)return `<tr><th scope="row">${E(x.name)}</th><td>${E(x.basis)}${editing&&x.attributeTest?chronicleSenseEdit(x,character):''}</td><td>${E(x.sb??'—')}</td><td colspan="${DP_COLUMNS.length+3}">${editing&&!x.attributeTest?chronicleSenseEdit(x,character):''}</td><td><strong>${E(x.ml??'—')}</strong></td></tr>`;
    const dp=DP_COLUMNS.map(([stage])=>{
     const n=x.dp.find(d=>d.stage===stage)?.dp??0;
     const origin=character.hmk?.creation?.skillDP?.[stage]?.[x.name];
@@ -311,7 +334,8 @@ export function characterCalculationHTML(character,{editing=false,embedded=false
  const h=character.hmk??{},c=creationOf(character),skills=calculateSheetSkills(character);
  if(!h.creation){
   const rows=h.skills??[];const Erow=x=>E(x??'');
-  const tableRows=rows.map((r,i)=>`<tr><td>${Erow(r.group)}</td><td>${Erow(r.name)}</td><td>${Erow(r.sb)}</td><td>${editing?`<input class="sheet-inline-input" type="number" name="sheet_legacy_ml_${i}" aria-label="ML ${Erow(r.name)}" min="0" max="200" step="1" required value="${Erow(r.ml)}">`:Erow(r.ml)}</td></tr>`).join('');
+  const senses=embedded?chronicleSenseRows(character):[];
+  const tableRows=rows.map((r,i)=>senses.some(x=>x.name===r.name)?'':`<tr><td>${Erow(r.group)}</td><td>${Erow(r.name)}</td><td>${Erow(r.sb)}</td><td>${editing?`<input class="sheet-inline-input" type="number" name="sheet_legacy_ml_${i}" aria-label="ML ${Erow(r.name)}" min="0" max="200" step="1" required value="${Erow(r.ml)}">`:Erow(r.ml)}</td></tr>`).join('')+senses.map(row=>`<tr><td>Physical</td><td>${E(row.name)}</td><td>${E(row.sb??'—')}</td><td>${E(row.ml??'—')}${editing?chronicleSenseEdit(row,character):''}</td></tr>`).join('');
   if(embedded)return `<div class="journal-edit-skills-surface journal-edit-skills-surface--legacy"><p class="muted">Starší ruční profil: ${editing?'lze upravovat aktuální ML. Tento profil nemá doložené jednotlivé vývojové DP.':'přehled dostupných dovedností.'}</p><div class="table-scroll"><table class="catalog-spec"><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th></tr></thead><tbody>${tableRows}</tbody></table></div></div>`;
   return `<section class="panel wide"><h3>Character Sheet · Skills</h3><p class="muted">Starší ruční profil: ${editing?'lze upravovat aktuální ML. Tento profil nemá doložené jednotlivé vývojové DP.':'přehled dostupných dovedností.'}</p><div class="table-scroll"><table class="catalog-spec"><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th></tr></thead><tbody>${tableRows}</tbody></table></div></section>`;
  }
@@ -344,7 +368,7 @@ export function characterCalculationHTML(character,{editing=false,embedded=false
  const proofHTML=proof.length?`<details><summary>Pravidlové doklady: původ, Folk, Wealth, Mysteries</summary>${proof.map(x=>`<p class="tiny">${x}</p>`).join('')}</details>`:'';
  const intro=`<p class="muted">${c.status==='auto-generated'?'Všech 14 kroků bylo dokončeno automaticky; všechny hody zadal generátor a v historii jsou výslovně označeny jako softwarové. Nevyžaduje se další potvrzení uživatele.':c.status==='review-required'?'Všech 14 hlavních kroků prošlo průvodcem, ale postava stále vyžaduje ověření GM.':'Rozpracováno: krok '+c.step+'/14.'} Všechny ověřené atributy jsou přímo v dosavadním HMK profilu, který čte Combat.</p>`;
  const proofBlock=`<details class="skill-proof-collapsible"><summary>Pravidlové doklady a nastavení Perception (rozbalit)</summary>${editing?'':perceptionModePanelHTML(character)}${proofHTML}<p class="tiny">HMK p.45–49: SB = průměr dvou atributů se zaokrouhlením podle pořadí; ML = SB × SM a případné Mastery Boosts. Perception lze měnit přes samostatný GM formulář; každá změna přepočítá všechny navázané Skill Bases. Ostatní nedokončené specializace vyžadují GM review. Tento přehled nepřepisuje historické ručně zadané Skills.</p></details>`;
- if(embedded)return `<div class="hsk-character-skills journal-edit-skills-surface">${intro}${legacyNotice}${invokerLegacyNotice}${cityLanguageNote}${groupedSkillTableHTML(character,{editing})}${proofBlock}</div>`;
+ if(embedded)return `<div class="hsk-character-skills journal-edit-skills-surface">${intro}${legacyNotice}${invokerLegacyNotice}${cityLanguageNote}${groupedSkillTableHTML(character,{editing,includeChronicleSenses:true})}${proofBlock}</div>`;
  return `<section class="panel wide hsk-character-skills" aria-labelledby="hmk-sheet-skills-title"><h3 id="hmk-sheet-skills-title">Character Sheet · Dovednosti (Skills)</h3>${intro}${legacyNotice}${invokerLegacyNotice}${cityLanguageNote}${groupedSkillTableHTML(character,{editing})}${proofBlock}</section>`;
 }
 

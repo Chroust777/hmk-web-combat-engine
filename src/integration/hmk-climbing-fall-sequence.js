@@ -21,6 +21,9 @@ const skillML=(actor,skill)=>{
  must(a.length===1&&Number.isSafeInteger(a[0].ml)&&a[0].ml>0,`Postava nemá ověřenou dovednost ${skill}`);
  return a[0].ml;
 };
+export function passiveRepeatFallAvailable(state,afterPriorImpact){
+ return afterPriorImpact===true&&['INC','UNC'].includes(state.shock);
+}
 function heightImpact(ft){
  must(Number.isSafeInteger(ft)&&ft>=6&&ft<=1000,'Falling Routine p.67 vyžaduje doložený pád vyšší než 5 stop');
  if(ft<=10)return -2;if(ft<=20)return 2;if(ft<=30)return 4;
@@ -34,39 +37,48 @@ const limbs=new Set(['sh','ua','el','fo','ha','th','kn','ca','ft']);
  * This uses the same armour, fatigue, skill and Injury functions as the commit.
  */
 export function inspectClimbingFallingStep({actor,inventory,state,fallHeightFt,surface,slope='sheer',
- direction='front',row,round=1,timelineId='skill-falling-preview'}={}){
+ direction='front',row,round=1,timelineId='skill-falling-preview',afterPriorImpact=false}={}){
  must(actor?.id&&Array.isArray(inventory)&&state,'Pro náhled chybí postava, inventář nebo stav');
  validateCombatState(state);
  must(Object.hasOwn(surfaces,surface)&&['sheer','steep','very-steep'].includes(slope),
   'Pro náhled nejprve vyberte doložený povrch a sklon');
  must(['front','rear','side'].includes(direction),'Pro náhled vyberte skutečný směr dopadu');
+ const passive=passiveRepeatFallAvailable(state,afterPriorImpact);
+ must(!row?.passive||passive,'Pasivní dopad patří pouze po předchozím zásahu téhož pádu se stavem INC nebo UNC.');
+ if(passive)must(row?.fallingD100==null,'Při pasivním dopadu se nepoužije d100.');
  const needed=[];
- const dice={impactD10:10,zoneD10:10,locationD10:10,fallingD100:100};
+ const dice={impactD10:10,zoneD10:10,locationD10:10,...(passive?{}:{fallingD100:100})};
  for(const [field,faces] of Object.entries(dice)){
   if(row?.[field]===null||row?.[field]===undefined)needed.push(field);
   else must(die(row[field],faces),'Neplatný '+field+' (přípustné 1–'+faces+')');
  }
- must(Object.hasOwn(adjustment,row?.technique),'Zvolte Jumping, Acrobatics nebo Swimming');
- must(row.technique!=='Swimming'||surface==='water','Swimming lze použít pouze při dopadu do vody');
- const load=resolveCombatantLoad({character:actor,inventory});
- must(load.ready&&load.encReady&&load.bulkReady,'Nelze určit skutečné ENC/Bulk: '+(load.issues||[]).join('; '));
- const injury=projectLiveInjuries({state,round,test:row.technique.toLowerCase(),
-  usedArms:['left','right'],timelineId});
- must(injury.ready,'Nelze ověřit oslabení z ran: '+(injury.reason||''));
- must(!injury.unusable&&!['INC','UNC','KIA'].includes(state.shock),
-  'INC/UNC/KIA nebo nepoužitelná končetina vyžadují samostatné vyhodnocení dalšího Falling Test; nelze je označit za normální d100');
- const rawEML=skillML(actor,row.technique)-combatFatigueTotals(state).total+
-  load.agilityAndMeleePenalty+injury.modifier;
- const eml=effectiveMasteryLevel(rawEML);
+ let rawEML=null,eml=null,rolledSL=null,sl=null;
+ if(passive){
+  if(row?.passive!==true)needed.push('GM rozhodnutí o pasivním dopadu');
+ }else{
+  must(Object.hasOwn(adjustment,row?.technique),'Zvolte Jumping, Acrobatics nebo Swimming');
+  must(row.technique!=='Swimming'||surface==='water','Swimming lze použít pouze při dopadu do vody');
+  const load=resolveCombatantLoad({character:actor,inventory});
+  must(load.ready&&load.encReady&&load.bulkReady,'Nelze určit skutečné ENC/Bulk: '+(load.issues||[]).join('; '));
+  const injury=projectLiveInjuries({state,round,test:row.technique.toLowerCase(),
+   usedArms:['left','right'],timelineId});
+  must(injury.ready,'Nelze ověřit oslabení z ran: '+(injury.reason||''));
+  must(!injury.unusable&&!['INC','UNC','KIA'].includes(state.shock),
+   'INC/UNC/KIA nebo nepoužitelná končetina vyžadují samostatné vyhodnocení dalšího Falling Test; nelze je označit za normální d100');
+  rawEML=skillML(actor,row.technique)-combatFatigueTotals(state).total+
+   load.agilityAndMeleePenalty+injury.modifier;
+  eml=effectiveMasteryLevel(rawEML);
+  if(needed.length)return {ready:false,needed,rawEML,eml,technique:row.technique};
+  rolledSL=successLevel(row.fallingD100,rawEML);
+  const finalSL=stunnedImpairedSL(rolledSL,{stunned:state.shock==='STN',isImpairedTest:true});
+  sl=levelNames[finalSL];
+ }
  if(needed.length)return {ready:false,needed,rawEML,eml,technique:row.technique};
- const rolledSL=successLevel(row.fallingD100,rawEML);
- const finalSL=stunnedImpairedSL(rolledSL,{stunned:state.shock==='STN',isImpairedTest:true});
- const sl=levelNames[finalSL];
  const loc=humanLocation(row.zoneD10,row.locationD10);
  const armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:loc.location,
   aspect:'b',direction,mode:'auto',rigidStatus:'unknown'});
  must(armour.ready,'Skutečná ochrana zbroje neověřena: '+(armour.reason||'?'));
- const fullImpact=row.impactD10+heightImpact(fallHeightFt)+surfaces[surface]+adjustment[row.technique][sl];
+ const fullImpact=row.impactD10+heightImpact(fallHeightFt)+surfaces[surface]+(passive?0:adjustment[row.technique][sl]);
  const strikeImpact=slope==='steep'&&['S','CS'].includes(sl)?0:
   slope==='sheer'?fullImpact:Math.floor(fullImpact/2);
  const effectiveImpact=strikeImpact-armour.armourValue;
@@ -77,7 +89,7 @@ export function inspectClimbingFallingStep({actor,inventory,state,fallHeightFt,s
   compoundCompatible(w,{location:loc.location,aspect:'b',area:false}));
  const needsCompound=!!base.injury&&existing.length>0;
  const needsShock=effectiveImpact>0;
- return {ready:true,needed:[],rawEML,eml,sl,rolledSL:levelNames[rolledSL],stunnedPenalty:state.shock==='STN'?1:0,repeatRequired:sl==='CF'&&row.technique!=='Swimming',
+ return {ready:true,needed:[],rawEML,eml,sl,rolledSL:passive?null:levelNames[rolledSL],stunnedPenalty:state.shock==='STN'?1:0,repeatRequired:!passive&&sl==='CF'&&row.technique!=='Swimming',passive,
   location:loc.location,side:loc.side,locationShock:loc.locationShock,
   armourValue:armour.armourValue,strikeImpact,effectiveImpact,
   injury:base.injury?base.injury.severity+base.injury.level:null,
@@ -104,7 +116,7 @@ export function prepareClimbingFallingSequence({actor,inventory,state,fallHeight
  for(let i=0;i<rows.length;i++){
   const r=rows[i];
   const step=inspectClimbingFallingStep({actor,inventory,state:current,fallHeightFt,
-   surface,slope,direction,row:r,round,timelineId});
+   surface,slope,direction,row:r,round,timelineId,afterPriorImpact:i>0});
   must(step.ready,'Zásah '+(i+1)+': chybí fyzické hody '+step.needed.join(', '));
   must(step.needsShock?die(r.shockD100,100):r.shockD100==null,
    'Zásah '+(i+1)+': Shock d100 '+(step.needsShock?'je povinný po účinném Impact':'není povolen, protože účinný Impact ≤ 0'));
@@ -116,7 +128,7 @@ export function prepareClimbingFallingSequence({actor,inventory,state,fallHeight
   const armour={armourValue:step.armourValue};
   const eml=step.rawEML;
   const rollProof=(key,faces)=>({faces,value:r[key],source:r.rollOrigins?.[key]==='cryptographic-software-die'?'cryptographic-software-die':'GM-entered-physical-die',field:key});
-  const physicalDice=[rollProof('impactD10',10),rollProof('zoneD10',10),rollProof('locationD10',10),rollProof('fallingD100',100),
+  const physicalDice=[rollProof('impactD10',10),rollProof('zoneD10',10),rollProof('locationD10',10),...(step.passive?[]:[rollProof('fallingD100',100)]),
    ...(r.shockD100==null?[]:[rollProof('shockD100',100)]),
    ...(r.compoundD10==null?[]:[rollProof('compoundD10',10)])];
   const result=woundFromFall({state:current,character:actor,round,timelineId,eventId:eventId+':impact:'+i,
@@ -125,12 +137,13 @@ export function prepareClimbingFallingSequence({actor,inventory,state,fallHeight
    physicalDice,...(originMinute!==null?{injuryOrigin:MEDICAL_ORIGIN.FALL,originMinute,medicalSourceId:eventId+':impact:'+i}:{})});
   current=result.state;
   proofs.push({index:i,location:loc.location,side:loc.side,impact:strikeImpact,effectiveImpact:result.effectiveImpact,
-   armourValue:armour.armourValue,fallingTechnique:r.technique,fallingD100:r.fallingD100,fallingEML:eml,
+   armourValue:armour.armourValue,fallingTechnique:step.passive?null:r.technique,fallingD100:r.fallingD100,fallingEML:eml,
+   ...(step.passive?{gmRuling:'passive-impact-no-mitigation',impactModifier:0}:{}),
    level:sl,rolledLevel:step.rolledSL,stunnedPenalty:step.stunnedPenalty,injury:result.injury,shock:result.shockSL,physicalDice});
-  if(step.repeatRequired)must(i+1<rows.length,'CF v testu dopadu: HMK str.67 vyžaduje opakovat kroky 1–4 pro DALŠÍ zranění');
+  if(step.repeatRequired&&current.shock!=='KIA')must(i+1<rows.length,'CF v testu dopadu: HMK str.67 vyžaduje opakovat kroky 1–4 pro DALŠÍ zranění');
   else must(i===rows.length-1,'Tento výsledek dopadu nevyžaduje další zranění.');
  }
- const last=proofs.at(-1);const standing=limbs.has(last.location)&&fallHeightFt<=(last.fallingTechnique==='Acrobatics'?20:10);
+ const last=proofs.at(-1);const standing=!last.gmRuling&&limbs.has(last.location)&&fallHeightFt<=(last.fallingTechnique==='Acrobatics'?20:10);
  current=structuredClone(current);current.posture.prone=current.posture.prone||(surface!=='water'&&!standing);
  // Even when impact is fully absorbed, the fall and posture are durable events.
  current.events.push({id:eventId+':complete',type:'skill-physical-fall',round,details:{
