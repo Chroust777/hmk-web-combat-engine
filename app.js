@@ -2,14 +2,14 @@ import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.000';
 import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof,weaponWorkshopTN} from './src/integration/hmk-fletching-work.js?v=94.001';
 import {JEWELLERY_D_PER_OZ,GEM_D,jewelcraftWork994} from './src/integration/hmk-jewelcraft-work.js?v=93.994';
-import {readingCondition,readingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=94.002';
+import {readingCondition,readingSource,externalReadingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=94.003';
 import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=94.002';
-import {writingScripts,writingDictationFactor,writingIsText,validWritingPlan,writingFixedSubject,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=94.002';
+import {WRITING_LANGUAGES,writingScripts,writingDictationFactor,writingIsText,validWritingPlan,writingFixedSubject,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=94.003';
 import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.002';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.003';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -221,7 +221,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.002';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.003';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -320,7 +320,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.002';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.003';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -394,7 +394,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.002';
+const APP_VERSION='94.003';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5167,11 +5167,35 @@ function readingContext994(actor,source,name=source.language){
  const ctx=skillAutoFor(actor,name);
  return {modifier:ctx.modifier,slPenalty:ctx.trauma.slPenalty??0,forcedCF:ctx.trauma.injury?.forcedCF===true};
 }
+function readingConditionField(selected='pristine',locked=false){
+ const options={pristine:'Nepoškozená',degraded:'Opotřebená · −1 SV',damaged:'Poškozená · −2 SV',
+  modern:'Určit hodem · novověká',middle:'Určit hodem · střední',ancient:'Určit hodem · starověká'};
+ return `<label>Stav předlohy<select name="condition" ${locked?'disabled':''}>${Object.entries(options).map(([value,label])=>
+  `<option value="${value}" ${value===selected?'selected':''}>${esc(label)}</option>`).join('')}</select></label>`;
+}
+function readingRegistrationHTML(actor){
+ const skills=[...new Set([...SKILL_DEFINITIONS.map(s=>s.name),...availableMasteries(actor).map(s=>s.name)])]
+  .sort((a,b)=>a.localeCompare(b,'cs'));
+ const language=WRITING_LANGUAGES.find(name=>availableMasteries(actor).some(skill=>skill.name===name))||WRITING_LANGUAGES[0];
+ return `<details><summary>Zapsat nalezenou nebo získanou předlohu</summary>
+ <form class="hsk-form-grid" data-script-reading="register">
+  <label>Název předlohy<input name="bookName" maxlength="120" required></label>
+  <label>Druh předlohy<select name="bookFormat"><option value="missive">Dopis</option><option value="text">Text</option><option value="cipher">Šifra</option></select></label>
+  <label>Jazyk předlohy<select name="bookLanguage">${WRITING_LANGUAGES.map(name=>`<option ${name===language?'selected':''}>${esc(name)}</option>`).join('')}</select></label>
+  <label>Písmo předlohy<select name="bookScript">${writingScripts(language).map(name=>`<option>${esc(name)}</option>`).join('')}</select></label>
+  <label>Rozsah v přepočtu na strany 10″ × 14″<input name="bookPages" type="number" min="1" max="10000" value="1" required></label>
+  <label>Čitelnost podle Scribing<select name="bookLegibility">${[0,-5,-10,-15,-20].map(n=>`<option value="${n}">${n} k EML</option>`).join('')}</select></label>
+  <label data-reading-subject hidden>Předmětová dovednost<select name="bookSubject" disabled><option value="">Bez Insight</option>${skills.map(name=>`<option>${esc(name)}</option>`).join('')}</select></label>
+  <label data-reading-insight hidden>Počet hvězd Insight<input name="bookInsight" type="number" min="0" max="5" value="0" disabled required></label>
+  ${readingConditionField()}<input type="hidden" name="readingDice">
+  <button type="submit">Přidat do předloh kampaně</button><output role="status"></output>
+ </form></details>`;
+}
 function readingHTML994(actor){
  if(!data.campaignClock)return '';
  const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute,rows=readingRows(data.journal,cid,actor.id);
  const masteries=new Map(availableMasteries(actor).map(x=>[x.name,x.ml]));
- const sources=data.journal.filter(row=>row.calendarCampaignId===cid&&(row.calendarSkillProjectComplete591?.kind==='writing'||row.calendarScriptCopy?.stage==='done'))
+ const sources=data.journal.filter(row=>row.calendarCampaignId===cid&&(row.calendarReadingSource||row.calendarSkillProjectComplete591?.kind==='writing'||row.calendarScriptCopy?.stage==='done'))
   .map(row=>readingSource(data.journal,row.id,cid)).filter(Boolean);
  const active=rows.filter(row=>row.calendarScriptReading.stage==='start'&&!readingStages(rows,row).done)
   .map(row=>sources.find(x=>x.id===row.calendarScriptReading.sourceId)?.originalId);
@@ -5179,11 +5203,12 @@ function readingHTML994(actor){
   !active.includes(source.originalId)&&readingCanStart(rows,source,masteries.get(source.language)));
  const numOptions=n=>Array.from({length:n+1},(_,i)=>`<option value="${i}">${i} ★</option>`).join('');
  return `<section class="hsk-timed-project-591" aria-label="Reading"><h3>Reading · HMK 83, 132</h3>
- ${eligible.length?`<form class="hsk-form-grid" data-script-reading="start">
- <label>Předloha ke čtení<select name="sourceId" required>${eligible.map(x=>`<option value="${esc(x.id)}" data-pages="${x.pages}" data-cipher="${x.purpose==='cipher'?'yes':'no'}">${esc(x.name)} · ${esc(x.language)} · ${esc(x.script)} · čitelnost ${x.legibility}</option>`).join('')}</select></label>
- <label>Počet stran 10″ × 14″<input name="pages" type="number" min="1" max="10000" step="1" value="${eligible[0].pages}" ${eligible[0].purpose==='cipher'?'readonly':''} required></label>
+ ${readingRegistrationHTML(actor)}
+ ${eligible.length?`<form class="hsk-form-grid" data-script-reading="start" data-reading-external="${eligible[0].external?'yes':'no'}">
+ <label>Předloha ke čtení<select name="sourceId" required>${eligible.map(x=>`<option value="${esc(x.id)}" data-pages="${x.pages}" data-condition="${esc(x.external?x.condition:'')}" data-cipher="${x.purpose==='cipher'?'yes':'no'}">${esc(x.name)} · ${esc(x.language)} · ${esc(x.script)} · čitelnost ${x.legibility}</option>`).join('')}</select></label>
+ <label>Počet stran 10″ × 14″<input name="pages" type="number" min="1" max="10000" step="1" value="${eligible[0].pages}" ${eligible[0].external||eligible[0].purpose==='cipher'?'readonly':''} required></label>
  <label data-reading-key ${eligible[0].purpose==='cipher'?'':'hidden'}>Klíč k šifře<select name="cipherKey" ${eligible[0].purpose==='cipher'?'':'disabled'}><option value="no">Pokus bez klíče</option><option value="yes">Klíč k této šifře je k dispozici</option></select></label>
- <label>Stav předlohy<select name="condition"><option value="pristine">Nepoškozená</option><option value="degraded">Opotřebená · −1 SV</option><option value="damaged">Poškozená · −2 SV</option><option value="modern">Určit hodem · novověká</option><option value="middle">Určit hodem · střední</option><option value="ancient">Určit hodem · starověká</option></select></label>
+ ${readingConditionField(eligible[0].condition,eligible[0].external)}
  <input type="hidden" name="readingDice"><button type="submit">Zahájit čtení</button><output role="status"></output></form>`:
  '<p>Vyžaduje dokončenou předlohu a znalost jejího jazyka a písma. Další pokus po dokončení vyžaduje +10 Language ML.</p>'}
  ${rows.filter(row=>row.calendarScriptReading.stage==='start').map(row=>{
@@ -5248,11 +5273,28 @@ function readingHTML994(actor){
 document.addEventListener('change',event=>{
  const field=event.target,form=field.closest?.('[data-script-reading]');
  if(!form)return;
+ if(form.dataset.scriptReading==='register'){
+  const fields=form.elements;
+  if(field.name==='bookLanguage')fields.bookScript.replaceChildren(...writingScripts(field.value).map(name=>new Option(name,name)));
+  if(field.name==='bookFormat'){
+   const text=field.value==='text',cipher=field.value==='cipher',subject=fields.bookSubject,insight=fields.bookInsight;
+   subject.disabled=!text;
+   subject.closest('label').hidden=!text;
+   insight.disabled=!text&&!cipher;
+   insight.closest('label').hidden=insight.disabled;
+   if(insight.disabled)insight.value='0';
+  }
+  return;
+ }
  if(field.name==='sourceId'){
   const option=field.selectedOptions[0],pages=form.elements.namedItem('pages'),key=form.elements.namedItem('cipherKey');
   const cipher=option?.dataset.cipher==='yes';
   pages.value=option?.dataset.pages??1;
-  pages.readOnly=cipher;
+  const condition=form.elements.namedItem('condition'),fixed=option?.dataset.condition;
+  pages.readOnly=cipher||!!fixed;
+  condition.disabled=!!fixed;
+  condition.value=fixed||'pristine';
+  form.dataset.readingExternal=fixed?'yes':'no';
   key.closest('[data-reading-key]').hidden=!cipher;
   key.disabled=!cipher;
   key.value='no';
@@ -5273,6 +5315,20 @@ document.addEventListener('submit',event=>{
  const value=name=>form.elements.namedItem(name)?.value;
  try{
   if(!actor||!Number.isSafeInteger(now)||!calendarMemberIds(data.campaignClock,data.characters).some(x=>x.id===actor.id))throw Error('Vyber čtenáře z aktuální kampaně.');
+  if(stage==='register'){
+   const format=value('bookFormat');
+   const stored=externalReadingSource({
+    name:value('bookName'),format,language:value('bookLanguage'),script:value('bookScript'),
+    pages:Number(value('bookPages')),legibility:Number(value('bookLegibility')),
+    subject:format==='text'?value('bookSubject'):format==='cipher'?'Mathematics':'',
+    insight:format==='missive'?0:Number(value('bookInsight')),conditionChoice:value('condition'),
+    conditionRoll:value('readingDice')?Number(value('readingDice')):null
+   });
+   if(!mutate(()=>data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:now,
+    createdAt:stamp(),title:'Zapsaná předloha · '+stored.name,body:'Rozsah '+stored.pages+' str.',calendarReadingSource:stored})))
+    throw Error('Předlohu se nepodařilo uložit.');
+   return;
+  }
   const rows=readingRows(data.journal,cid,actor.id),start=rows.find(x=>x.id===value('startId')&&x.calendarScriptReading.stage==='start');
   const source=readingSource(data.journal,stage==='start'?value('sourceId'):start?.calendarScriptReading.sourceId,cid);
   if(!source)throw Error('Chybí předloha v aktuální kampani.');
@@ -5284,7 +5340,7 @@ document.addEventListener('submit',event=>{
   if(stage==='start'){
    if(!languageML||!scriptML)throw Error('Čtenář musí znát jazyk a písmo.');
    readingContext994(actor,source);
-   const conditionChoice=value('condition'),conditionRoll=rolls[0]??null;
+   const conditionChoice=source.external?source.condition:value('condition'),conditionRoll=rolls[0]??null;
    Object.assign(proof,{sourceId:source.id,languageML,pages:Number(value('pages')),conditionChoice,conditionRoll,condition:readingCondition(conditionChoice,conditionRoll),
     ...(source.purpose==='cipher'?{hasCipherKey:value('cipherKey')==='yes'}:{})});
   }else if(stage==='test'){

@@ -16,6 +16,7 @@ const scriptsByLanguage={
  Pálithàner:['Lakíse','Runic'],Quârphic:['Runic'],Shôrka:['Lakíse'],Târkáiner:['Runic','Lakíse'],Tríerzi:['Lakíse'],
  Mengólan:['Períka'],Sináin:['Selénian'],Kúzhan:['Khrúni']
 };
+export const WRITING_LANGUAGES=Object.freeze(Object.keys(scriptsByLanguage).map(name=>'Language ('+name+')'));
 export function writingScripts(language){
  const name=/^Language \((.+)\)$/.exec(language)?.[1];
  return (Object.hasOwn(scriptsByLanguage,name)?scriptsByLanguage[name]:[]).map(script=>'Script ('+script+')');

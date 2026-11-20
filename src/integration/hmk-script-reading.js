@@ -1,4 +1,5 @@
 /** HMK 83, 132: Reading, physical condition and timed reflection. */
+import {writingScripts} from './hmk-scribing-work.js?v=94.003';
 import {copySource} from './hmk-script-copy.js?v=94.002';
 import {resolveSkillTest,adjustSkillResultForTrauma} from './hmk-skill-test-engine.js?v=93.986';
 import {automaticCriticalFailure} from './hmk-skill-consequence-resolution.js';
@@ -20,9 +21,24 @@ export function readingCondition(choice,roll=null){
  const [pristine,degraded]=eraThresholds[choice];
  return roll<=pristine?'pristine':roll<=degraded?'degraded':'damaged';
 }
+export function externalReadingSource({name,format,language,script,pages,legibility,subject,insight,conditionChoice,conditionRoll}){
+ require(typeof name==='string'&&name.trim().length>0&&name.trim().length<=120,'zadejte název předlohy do 120 znaků.');
+ require(['missive','text','cipher'].includes(format)&&writingScripts(language).includes(script)&&whole(pages,1,10000),
+  'zadejte platný druh, rozsah, jazyk a odpovídající písmo.');
+ require([0,-5,-10,-15,-20].includes(legibility)&&whole(insight,0,5)&&typeof subject==='string'&&subject.length<=120&&
+  (format==='cipher'?subject==='Mathematics':format==='missive'?subject===''&&insight===0:!insight||!!subject.trim()),
+  'čitelnost musí odpovídat Scribing. Insight vyžaduje předmětovou dovednost.');
+ return {name:name.trim(),format,language,script,pages,legibility,subject:subject.trim(),insight,conditionChoice,conditionRoll,
+  condition:readingCondition(conditionChoice,conditionRoll)};
+}
 export function readingSource(journal,id,campaignId){
  const row=journal.find(x=>x.id===id&&x.calendarCampaignId===campaignId);
  if(!row)return null;
+ if(row.calendarReadingSource){
+  const source=row.calendarReadingSource;
+  return {...source,id,originalId:id,text:source.format!=='missive',external:true,
+   ...(source.format==='cipher'?{purpose:'cipher'}:{})};
+ }
  const copy=row.calendarScriptCopy;
  const start=copy?.stage==='done'?journal.find(x=>x.id===copy.startId&&x.calendarCampaignId===campaignId):null;
  const origin=start?.calendarScriptCopy.sourceId??id;
@@ -102,6 +118,10 @@ export function knownReadingInsights(rows,journal,source){
 export function validateReadingJournal(journal){
  const seen=[];
  for(const row of journal){
+  const external=row.calendarReadingSource;
+  if(external)require(typeof row.id==='string'&&!!row.id&&typeof row.calendarCampaignId==='string'&&!!row.calendarCampaignId&&
+   typeof row.characterId==='string'&&!!row.characterId&&whole(row.campaignMinute,0)&&!seen.some(entry=>entry.id===row.id)&&
+   !row.calendarScriptReading&&matches(external,externalReadingSource(external)),'neplatný zápis externí předlohy.');
   const receipt=row.calendarScriptReading;
   if(receipt){
    require(whole(row.campaignMinute,0)&&typeof row.characterId==='string'&&typeof row.calendarCampaignId==='string','chybí čas nebo čtenář.');
@@ -112,6 +132,7 @@ export function validateReadingJournal(journal){
      readingSource(seen,x.calendarScriptReading.sourceId,row.calendarCampaignId)?.originalId===source?.originalId&&!readingStages(rows,x).done);
     require(source&&!occupied&&whole(receipt.pages,1,10000)&&whole(receipt.languageML,1,1000)&&
      readingCanStart(rows,source,receipt.languageML)&&
+     (!source.external||receipt.pages===source.pages&&receipt.conditionChoice===source.condition&&receipt.conditionRoll===null)&&
      (source.purpose==='cipher'?typeof receipt.hasCipherKey==='boolean'&&receipt.pages===source.pages:receipt.hasCipherKey===undefined)&&readingCondition(receipt.conditionChoice,receipt.conditionRoll)===receipt.condition,
      'nesouhlasí předloha, stav, stránky nebo podmínky pro opakování.');
    }else{
@@ -153,6 +174,6 @@ export function validateReadingJournal(journal){
  }
 }
 export function assertReadingAppendOnly(before,after){
- const current=new Map(after.filter(x=>x.calendarScriptReading).map(x=>[x.id,x]));
- for(const row of before)if(row.calendarScriptReading)require(matches(row,current.get(row.id)),'uložený doklad nelze měnit.');
+ const current=new Map(after.filter(x=>x.calendarScriptReading||x.calendarReadingSource).map(x=>[x.id,x]));
+ for(const row of before)if(row.calendarScriptReading||row.calendarReadingSource)require(matches(row,current.get(row.id)),'uložený doklad nelze měnit.');
 }

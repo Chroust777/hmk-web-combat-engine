@@ -79,7 +79,7 @@ function stepsFor(form,kind){
   if(value(form,'jewelTime')==='dice')for(let i=0;i<3;i++)add('jewel'+i,6,'Doba výroby d6 '+(i+1)+'/3','jewelDice',i);
  }else if(kind==='reading'){
   const stage=form.dataset.scriptReading,count=Number(form.dataset.readingCount||0);
-  if(stage==='start'&&['ancient','middle','modern'].includes(value(form,'condition')))add('condition',100,'Stav předlohy d100','readingDice');
+  if((stage==='register'||stage==='start'&&form.dataset.readingExternal!=='yes')&&['ancient','middle','modern'].includes(value(form,'condition')))add('condition',100,'Stav předlohy d100','readingDice');
   if(stage==='test'&&count)add('readTest',100,'Language (Script) d100','readingDice');
   if(stage==='read'||stage==='reflect')for(let i=0;i<count;i++)add('reading'+i,stage==='read'?10:6,
    (stage==='read'?(form.dataset.readingCipher==='yes'?'Luštění d10 ':'Insight d10 '):'Rozjímání d6 ')+(i+1)+'/'+count,'readingDice',i);
