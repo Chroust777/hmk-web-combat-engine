@@ -2,7 +2,7 @@ import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFrom
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.972';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.976';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.980';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.979';
+const APP_VERSION='93.980';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12304,7 +12304,7 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
   const choices=options.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
   const trainingAnimals=bestiaryKnownAnimals().filter(a=>a.ownerId===x.id&&!stableBurden(data,campaignKey(data.campaignClock),a).exit);
   const trainingAnimalsHTML='<option value="">— zvolte vlastněné zvíře ze stáje —</option>'+trainingAnimals.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+' · '+esc(a.spec.name)+'</option>').join('');
-  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací fyzický d100 (povinný, pokud činnost vyžaduje nový hod)<input type="number" min="1" max="100" step="1" name="followRoll"></label><div data-animal-training-fields hidden><p>Animal Training CF · HMK 65. Výcvik skutečně trval šest měsíců; toto je dodatečné zdržení, nikoli nová Training Roll.</p><label>Skutečně cvičené zvíře ze stáje<select name="trainedAnimalId" required>'+trainingAnimalsHTML+'</select></label><label>Dodatečné měsíce · skutečný d3<input name="trainingD3" type="number" min="1" max="3" step="1"></label><div class="hsk-physical-d3-controls"><button type="button" class="secondary" data-animal-training-die>⚄ Vygenerovat d3</button><button type="button" class="secondary" data-animal-training-d3-confirm>Potvrdit d3</button><output data-animal-training-d3-status role="status" aria-live="polite">d3 ještě nebyl potvrzen.</output></div><label><input type="checkbox" name="trainingReduced"> Doložené zkrácení výcviku o 1 měsíc výměnou za bonusový Training Roll (jen SV ≥ 7, HMK 65)</label><label><input type="checkbox" name="animalTrainingConfirmed"> GM potvrzuje, že původní Animalcraft CF pochází z ukončené Animal Training Routine</label></div><div data-writing-routine-fields hidden><p>Writing Routine CF · HMK 132. Primární hod byl Language (Creativity SR), nikoli Script.</p><label>Rozsah písemnosti<select name="writingScope"><option value="missive">Missive · 10 minut</option><option value="tract">Tract · 5 dní</option><option value="treatise">Treatise · 1 měsíc</option><option value="disquisition">Disquisition · 4 měsíce</option></select></label><label><input type="checkbox" name="writingConfirmed"> GM potvrzuje doloženou Language Writing Routine a zvolený rozsah</label></div><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
+  return '<form class="hsk-critical-next" data-skill-critical-form><input type="hidden" name="origin" value="'+esc(originalId)+'"><input type="hidden" name="side" value="'+x.side+'"><h4>Pravidlový následek '+esc(x.result.level)+' · '+esc(x.skill)+' · '+esc(x.side)+'</h4><p>Vyberte skutečně prováděnou činnost. Automatický další test není povinný jen podle názvu dovednosti.</p><label>Konkrétní činnost<select name="activity" required><option value="">— vyberte skutečnou činnost —</option>'+choices+'</select></label><p class="hsk-followup-guidance" aria-live="polite"></p><label data-hsk-critical-technique hidden>Testovat pomocí<select name="technique" required></select><small class="hsk-critical-technique-note" aria-live="polite"></small></label><label>Pokračovací fyzický d100 (povinný, pokud činnost vyžaduje nový hod)<input type="number" min="1" max="100" step="1" name="followRoll" disabled></label><div data-animal-training-fields hidden><p>Animal Training CF · HMK 65. Výcvik skutečně trval šest měsíců; toto je dodatečné zdržení, nikoli nová Training Roll.</p><label>Skutečně cvičené zvíře ze stáje<select name="trainedAnimalId" required>'+trainingAnimalsHTML+'</select></label><label>Dodatečné měsíce · skutečný d3<input name="trainingD3" type="number" min="1" max="3" step="1"></label><div class="hsk-physical-d3-controls"><button type="button" class="secondary" data-animal-training-die>⚄ Vygenerovat d3</button><button type="button" class="secondary" data-animal-training-d3-confirm>Potvrdit d3</button><output data-animal-training-d3-status role="status" aria-live="polite">d3 ještě nebyl potvrzen.</output></div><label><input type="checkbox" name="trainingReduced"> Doložené zkrácení výcviku o 1 měsíc výměnou za bonusový Training Roll (jen SV ≥ 7, HMK 65)</label><label><input type="checkbox" name="animalTrainingConfirmed"> GM potvrzuje, že původní Animalcraft CF pochází z ukončené Animal Training Routine</label></div><div data-writing-routine-fields hidden><p>Writing Routine CF · HMK 132. Primární hod byl Language (Creativity SR), nikoli Script.</p><label>Rozsah písemnosti<select name="writingScope"><option value="missive">Missive · 10 minut</option><option value="tract">Tract · 5 dní</option><option value="treatise">Treatise · 1 měsíc</option><option value="disquisition">Disquisition · 4 měsíce</option></select></label><label><input type="checkbox" name="writingConfirmed"> GM potvrzuje doloženou Language Writing Routine a zvolený rozsah</label></div><button type="submit">Vyhodnotit pravidlový následek '+esc(x.result.level)+'</button><output class="hsk-followup-output" role="status"></output></form>';
  }).join('');
 }
 /** HMK 71 Fishing SV: catch is independent of any CF mishap.
@@ -14070,6 +14070,7 @@ document.addEventListener('change',event=>{
  const skill=side==='B'?proof?.skills?.[1]:proof?.skills?.[0]||proof?.skill;
  const res=side==='B'?proof?.b:proof?.a||proof?.result;
  const plan=criticalFollowupPlan(skill,event.target.value,res,hskFollowupContext(proof));
+ f.dataset.requiresFollowRoll=plan?.requiresRoll?'yes':'no';
  const techniques=plan?.test==='Fumble'?['Dexterity','Legerdemain']:plan?.test==='Stumble'?['Agility','Acrobatics']:plan?.requiresRoll?[plan.test]:[];
  const actor=character(side==='B'?proof?.opponentId:proof?.actorId);
  const choices=hskCriticalSkillChoices(actor,techniques);
@@ -14174,7 +14175,7 @@ document.addEventListener('submit',event=>{
    // Same validated mechanics as primary tests, but never replace the original critical test.
    const modifier=(ctx.condition?.modifier||0)+(ctx.trauma?.modifier||0);
    const eml=effectiveMasteryLevel(mastery.ml+modifier);
-   result=criticalFollowupResult(plan,roll,eml);
+   result={...criticalFollowupResult(plan,roll,eml),rollOrigin:f.elements.namedItem('followRoll').dataset.hmkAutoDice===raw?'software':'manual'};
    provisional=!!ctx.armourIsProvisional;
   }
   let trainingExtension=null,writingExtension=null;
