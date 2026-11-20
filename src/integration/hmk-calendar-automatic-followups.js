@@ -425,6 +425,18 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   const person=characters.find(c=>c.id===row.characterId);
   if(person)push(person,'brew-mature',row.id,'Brewing · dokončit zrání '+batch.projectName,batch.craftReadyMinute,'skills',{requiresAction:false});
  }
+ for(const row of journal){
+  const project=row.calendarSkillProjectStart591;
+  if(project?.kind!=='fletching'||row.calendarCampaignId!==clock.campaignId||
+   journal.some(x=>x.calendarSkillFletching996?.startId===row.id))continue;
+  const person=characters.find(c=>c.id===row.characterId);
+  if(!person)continue;
+  const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===row.id);
+  const allocation=journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===row.id)?.calendarSkillFletchingAllocation996;
+  const step=allocation?'potvrdit dokončení':source?'vyhodnotit výsledek':'provést Success Value';
+  push(person,'fletching-project',row.id,'Fletching · '+project.projectName+' · '+step,
+   allocation?.outcome.dueMinute??project.earliestMinute,'skills',{requiresAction:false});
+ }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an
  // unconditional extra d100. Restore this obligation from immutable journal.
  for(const tracking of pendingTrackingAwareness(journal,clock.campaignId??null)){

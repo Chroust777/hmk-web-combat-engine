@@ -1,3 +1,4 @@
+import {FLETCHING_ITEMS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=93.996';
 /** HârnMaster 1.2 pp.70,132: prospective scheduling of actual skill work.
  * Read-only arithmetic/validation. Never invents a roll or a project.
  * Existing unscheduled historical skill tests are unchanged.
@@ -41,6 +42,7 @@ export const TIMED_CRAFT_LABELS_599=Object.freeze({glassworking:'Glassworking ·
 
 export function timedSkillBaseMinutes591(kind,scope){
  if(CRAFT_WORK_600[kind])return CRAFT_WORK_600[kind][scope]?.hours*60??null;
+ if(kind==='fletching')return Object.hasOwn(FLETCHING_ITEMS,scope)?fletchingPlan(scope,1).workMinutes:null;
  if(kind==='jewelcraft'){const days=Number(scope);return Number.isSafeInteger(days)&&days>=1&&days<=10000?days*1440:null;}
  if(kind==='engineering')return Number.isFinite(ENGINEERING_DESIGN_DAYS[scope])?ENGINEERING_DESIGN_DAYS[scope]*1440:null;
  if(kind==='writing')return WRITING_WORK_MINUTES_591[scope]??null;
@@ -112,7 +114,11 @@ export function validateSkillTimedWork591(data){
    (p.kind!=='jewelcraft'||p.materialSourceConfirmed===true&&Number(p.scope)===p.jewelcraft994?.days&&
     JSON.stringify(jewelcraftWork994(p.jewelcraft994))===JSON.stringify(p.jewelcraft994))&&
    (!p.writingPlan||p.kind==='writing'&&validWritingPlan(p.writingPlan,p.actorId,p.scope))&&
-   (CRAFT_WORK_600[p.kind]?(()=>{
+   (p.kind==='fletching'?(()=>{
+    const f=p.fletching996,plan=fletchingPlan(p.scope,f?.workshop,f?.providerId,f?.hartbow);
+    return f.providerId!==p.actorId&&JSON.stringify(f)===JSON.stringify(plan)&&
+     p.earliestMinute===fletchingDue(p.scope,p.startMinute,f,0.7)&&p.baseDueMinute===fletchingDue(p.scope,p.startMinute,f);
+   })():CRAFT_WORK_600[p.kind]?(()=>{
     const exactCalendar=p.kind==='ceramics'&&p.craftExact994===true||p.kind==='brewing'&&p.brewing995===true;
     const options={exactCalendar,spiritMonths:p.brewing995===true?p.spiritMonths995:0};
     const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls,...options});
@@ -148,7 +154,8 @@ export function validateSkillTimedWork591(data){
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
    (s.p.kind==='writing'?(s.p.writingPlan?skill===s.p.writingPlan.language:/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)):
-    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
+    skill===({fletching:'Fletching',engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
+   (s.p.kind!=='fletching'||validFletchingProof(s.p,proof))&&
    (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
    (!CRAFT_WORK_600[s.p.kind]||row.campaignMinute>=s.p.earliestMinute),
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');
@@ -225,12 +232,34 @@ export function validateSkillTimedWork591(data){
   }
   ready.add(r.startId);
  }
+ const allocations=new Map(),finishedFletching=new Set();
+ for(const [index,row] of journal.entries()){
+  const draft=row.calendarSkillFletchingAllocation996,done=row.calendarSkillFletching996;
+  if(!draft&&!done)continue;
+  const startId=(draft||done).startId,start=starts.get(startId);
+  assert(start?.p.kind==='fletching'&&row.characterId===start.p.actorId&&row.calendarCampaignId===start.row.calendarCampaignId&&
+   Number.isSafeInteger(row.campaignMinute),'Fletching: projekt nebo postava nesouhlasí.');
+  if(draft){
+   const source=journalById.get(draft.sourceId),out=draft.outcome;
+   assert(!allocations.has(startId)&&source?.calendarSkillProjectSV591?.startId===startId&&
+    journal.indexOf(source)<index&&row.campaignMinute>=source.campaignMinute&&
+    JSON.stringify(out)===JSON.stringify(fletchingOutcome(start.p,source.skillTestProof,out?.timeStars,out?.rolls)),
+    'Fletching: výsledek neodpovídá původnímu SV, hvězdám nebo potvrzeným kostkám.');
+   allocations.set(startId,row);
+  }else{
+   const original=allocations.get(startId);
+   assert(!finishedFletching.has(startId)&&original&&original.id===done.allocationId&&
+    row.campaignMinute>=Math.max(original.campaignMinute,original.calendarSkillFletchingAllocation996.outcome.dueMinute),
+    'Fletching: dokončení před termínem nebo bez původního výsledku.');
+   finishedFletching.add(startId);
+  }
+ }
  return true;
 }
 export function assertSkillTimedAppendOnly591(before,after){
- const next=new Map((after?.journal||[]).filter(j=>j.calendarSkillProjectStart591||j.calendarSkillProjectSV591||j.calendarSkillProjectComplete591||j.calendarSkillBrewReady600).map(j=>[j.id,j]));
+ const next=new Map((after?.journal||[]).filter(j=>j.calendarSkillProjectStart591||j.calendarSkillProjectSV591||j.calendarSkillProjectComplete591||j.calendarSkillBrewReady600||j.calendarSkillFletchingAllocation996||j.calendarSkillFletching996).map(j=>[j.id,j]));
  for(const old of before?.journal||[]){
-  if(!(old.calendarSkillProjectStart591||old.calendarSkillProjectSV591||old.calendarSkillProjectComplete591||old.calendarSkillBrewReady600))continue;
+  if(!(old.calendarSkillProjectStart591||old.calendarSkillProjectSV591||old.calendarSkillProjectComplete591||old.calendarSkillBrewReady600||old.calendarSkillFletchingAllocation996||old.calendarSkillFletching996))continue;
   assert(next.has(old.id)&&JSON.stringify(next.get(old.id))===JSON.stringify(old),
    'Časovaný Skill Test: neměnný kalendářní doklad byl upraven nebo vymazán.');
  }
