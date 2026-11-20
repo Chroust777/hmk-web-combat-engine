@@ -7,8 +7,9 @@ import {successLevel} from '../rules/tests.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 const SELECTOR='form[data-skill-critical-form],form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
  'form[data-skill-cold-shock],form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
- 'form[data-fletching-finish="roll"],form[data-brew-start],form[data-brew-wine],form[data-jewelcraft-work],form[data-script-reading]:not([data-script-reading="done"]),form[data-script-copy="test"],form[data-hmk-scribing-work],form[data-parallel-cold-reroll],form[data-parallel-cold-course],.hmk-weather-care form#hmk-frost-amputation-form';
+ 'form[data-construction-roll],form[data-fletching-finish="roll"],form[data-brew-start],form[data-brew-wine],form[data-jewelcraft-work],form[data-script-reading]:not([data-script-reading="done"]),form[data-script-copy="test"],form[data-hmk-scribing-work],form[data-parallel-cold-reroll],form[data-parallel-cold-course],.hmk-weather-care form#hmk-frost-amputation-form';
 const SELECTIONS={
+ construction:[],
  fletching:['timeStars'],skillFollowup:['activity','technique'],
  fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
  herbs:['singlePotencyRoll','actorId'],
@@ -19,15 +20,16 @@ const SELECTIONS={
  trauma:['restfulShelter','arcaneBonus','physicianStars'],
  alchemy:[],brewStart:['scope'],brewWine:['workshopTN'],jewelcraft:['jewelTime'],reading:['sourceId','condition','timeStars','exchanged','useCreativity'],copy:[],writing:['timeStars','subjectSkill']
 };
-const title={fletching:'Výroba · potvrzení hodů',brewStart:'Brewing · doba zrání',brewWine:'Brewing · cena vína',jewelcraft:'Jewelcraft · doba výroby',reading:'Reading · potvrzení hodů',copy:'Opis · potvrzení d100',writing:'Insight a Scribing · HMK 83, 132',skillFollowup:'Navazující Skill Test',fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
+const title={construction:'Construction Roll · HMK 78, 91',fletching:'Výroba · potvrzení hodů',brewStart:'Brewing · doba zrání',brewWine:'Brewing · cena vína',jewelcraft:'Jewelcraft · doba výroby',reading:'Reading · potvrzení hodů',copy:'Opis · potvrzení d100',writing:'Insight a Scribing · HMK 83, 132',skillFollowup:'Navazující Skill Test',fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
  frost:'Frost Amputation · hody v pořadí',bloodComplete:'Blood Stoppage a případný Blood Loss',blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',immersion:'Cold Water Shock',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
 const value=(form,name)=>form.elements.namedItem(name)?.value||'';
 const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n))&&Number(n)>=1&&Number(n)<=max;
 const stageKey=(step)=>step.key;
-function kindOf(form){if(form.matches('[data-fletching-finish]'))return 'fletching';if(form.matches('[data-brew-start]'))return 'brewStart';if(form.matches('[data-brew-wine]'))return 'brewWine';if(form.matches('[data-jewelcraft-work]'))return 'jewelcraft';if(form.matches('[data-script-reading]'))return 'reading';if(form.matches('[data-script-copy]'))return 'copy';if(form.matches('[data-hmk-scribing-work]'))return 'writing';return form.matches('[data-skill-critical-form]')?'skillFollowup':form.id==='hmk-frost-amputation-form'?'frost':form.matches('[data-weather-blood-complete]')?'bloodComplete':form.matches('[data-hmk-fishing-catch]')?'fishing':
+function kindOf(form){if(form.matches('[data-construction-roll]'))return 'construction';if(form.matches('[data-fletching-finish]'))return 'fletching';if(form.matches('[data-brew-start]'))return 'brewStart';if(form.matches('[data-brew-wine]'))return 'brewWine';if(form.matches('[data-jewelcraft-work]'))return 'jewelcraft';if(form.matches('[data-script-reading]'))return 'reading';if(form.matches('[data-script-copy]'))return 'copy';if(form.matches('[data-hmk-scribing-work]'))return 'writing';return form.matches('[data-skill-critical-form]')?'skillFollowup':form.id==='hmk-frost-amputation-form'?'frost':form.matches('[data-weather-blood-complete]')?'bloodComplete':form.matches('[data-hmk-fishing-catch]')?'fishing':
  form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
  form.matches('[data-skill-cold-shock]')?'immersion':form.matches('[data-weather-shock-followup],[data-parallel-cold-reroll]')?'shock':form.matches('[data-weather-trauma-course],[data-parallel-cold-course]')?'trauma':'alchemy';}
 function fieldsOf(form,kind){
+ if(kind==='construction')return ['constructionDie'];
  if(kind==='fletching')return ['fletchingDice'];
  if(kind==='brewStart')return ['brewAgingDice'];
  if(kind==='brewWine')return ['wineDice'];
@@ -55,7 +57,8 @@ function needsGMComaHR(form){
 function stepsFor(form,kind){
  const result=[];
  const add=(key,faces,label,fieldName=key,seq=null)=>result.push({key,faces,label,fieldName,seq});
- if(kind==='fletching'){
+ if(kind==='construction')add('constructionDie',100,'Construction Roll d100');
+ else if(kind==='fletching'){
   if(form.dataset.fletchingFlaw==='6'){
    add('lost1',6,'Ztracené dny · d6 1/2','fletchingDice',0);
    add('lost2',6,'Ztracené dny · d6 2/2','fletchingDice',1);
