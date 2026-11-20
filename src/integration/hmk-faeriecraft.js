@@ -1,3 +1,4 @@
+import {FLETCHING_ITEMS} from './hmk-fletching-work.js?v=94.009';
 import {resolveSkillTest,testSecondaryRoll} from './hmk-skill-test-engine.js';
 
 export const FAERIE_SPAN=5*1440;
@@ -14,6 +15,44 @@ const integer=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const require=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
+export function faerieWorkshopKind(project){
+ const recipe=FLETCHING_ITEMS[project?.scope];
+ if(project?.kind==='fletching'&&recipe?.bow)return 'hartbow';
+ if(project?.kind==='weaponcraft'&&recipe?.name==='Longknife')return 'longknife';
+ return null;
+}
+export function faerieWorkshopState(journal,workshopId){
+ const start=journal.find(row=>row.calendarFaeriecraft?.stage==='start'&&row.calendarFaeriecraft.input.workshopId===workshopId);
+ return start?faerieState(journal,start.id):null;
+}
+export function faerieWorkshopPlan(row){
+ const project=row.calendarSkillProjectStart591,recipe=FLETCHING_ITEMS[project.scope],hartbow=faerieWorkshopKind(project)==='hartbow';
+ return {workshopId:row.id,item:project.projectName,skill:hartbow?'Fletching':'Weaponcraft',
+  durationMinutes:project.baseDueMinute-project.startMinute,
+  ...(hartbow?{bow:project.scope.includes(':compositeBow:')?'composite':'longbow',baseDraw:recipe.draw}:{})};
+}
+export function faerieWorkshopItem(catalog,allocation,spirit,startId,actorId){
+ const snapshot=structuredClone(catalog),p=snapshot.properties;
+ const isBow=p.missileType==='bow'||Number.isFinite(p.draw);
+ if(isBow){
+  p.quality=Math.max(0,p.quality+allocation.qualityDelta);
+  p.baseRangeFt=Math.max(0,p.baseRangeFt+allocation.rangeDeltaFt);
+  if(spirit?.success){
+   p.draw/=2;
+   snapshot.name='Hartbow · '+catalog.name.replace(/Draw [0-9.]+/,'Draw '+p.draw);
+  }
+ }else{
+  p.quality=Math.max(0,allocation.finalWQ);
+  for(const mode of [...p.verifiedModes,...(p.alternateStrikeModes||[])]){
+   if(Number.isFinite(allocation.impactDelta)&&Number.isFinite(mode.impactModifier))mode.impactModifier+=allocation.impactDelta;
+  }
+  p.verifiedModes[0].traits={...p.verifiedModes[0].traits,block:p.blockModifier??0,melee:spirit?.success?5:0};
+ }
+ if(spirit?.success)p.faeriecraft=isBow?'hartbow':'longknife';
+ return {id:'workshop-faerie:'+startId,characterId:actorId,sourceItemId:catalog.id,snapshot,
+  workshopCraftId:startId,quantity:1,currentWQ:p.quality,condition:spirit?.success?(isBow?'Faeriecraft · Draw '+p.draw:'Faeriecraft · +5 Melee'):'',slot:'carried'};
+}
+
 export function faerieState(journal,projectId){
  let project,entry,minutes=0,done,expired;
  for(const row of journal){
@@ -24,7 +63,7 @@ export function faerieState(journal,projectId){
   if(step.stage==='leave'||step.stage==='interrupt'||step.stage==='disturbance'&&!step.result.maintained){
    minutes+=step.result.credited;entry=null;
   }
-  if(step.stage==='finish')done=row;
+  if(step.stage==='finish'||step.stage==='workshop')done=row;
   if(step.stage==='expire')expired=row;
  }
  if(!project)return null;
@@ -38,6 +77,7 @@ export function faerieNext(state,now){
  if(state.done||state.expired)return null;
  const plan=state.project.calendarFaeriecraft.input;
  const craftDue=state.project.campaignMinute+plan.durationMinutes;
+ if(plan.workshopId&&(state.minutes>=FAERIE_TOTAL||state.readyMinute!==null&&now>=state.readyMinute))return null;
  if(state.minutes>=FAERIE_TOTAL)return {stage:'finish',minute:craftDue};
  if(state.readyMinute!==null&&now>=state.readyMinute)
   return {stage:'finish',minute:Math.max(craftDue,state.readyMinute)};
@@ -84,6 +124,13 @@ export function resolveFaerieStep(journal,row){
   require(!journal.some(x=>x.characterId===characterId&&x.calendarCampaignId===calendarCampaignId&&
    x.calendarFaeriecraft?.stage==='start'&&faerieNext(faerieState(journal,x.id),now)),
    'Nejprve uzavřete rozpracované Faeriecraft.');
+  if(input.workshopId){
+   const work=journal.find(x=>x.id===input.workshopId);
+   require(work?.calendarSkillProjectStart591?.faerieLinked===true&&faerieWorkshopKind(work.calendarSkillProjectStart591)&&
+    work.characterId===characterId&&work.calendarCampaignId===calendarCampaignId&&work.campaignMinute===now&&
+    Object.entries(faerieWorkshopPlan(work)).every(([key,v])=>input[key]===v)&&!faerieWorkshopState(journal,work.id),
+    'Reverie musí začít s původní zakázkou stejného výrobce ve stejné minutě.');
+  }
   const kind=productKind(input);
   if(kind==='hartbow')require(['composite','longbow'].includes(input.bow)&&integer(input.baseDraw,1,500),'Hartbow vyžaduje kompozitní luk nebo longbow a jeho základní Draw.');
   if(kind==='metal-armour')require(['mail','scale','plate'].includes(input.armour)&&Number.isFinite(input.baseWeight)&&input.baseWeight>0,'Vyberte kovovou zbroj a zadejte její základní hmotnost.');
@@ -107,7 +154,15 @@ export function resolveFaerieStep(journal,row){
   require(now>=state.deadline&&(state.readyMinute===null||state.readyMinute>state.deadline),'Pětidenní lhůta ještě běží nebo reverie byla dokončena.');
   return {credited:state.minutes+(state.entry?closeBlock(state,now):0)};
  }
- require(stage==='finish'&&state.readyMinute!==null&&now>=state.readyMinute&&
+ const plan=state.project.calendarFaeriecraft.input;
+ if(stage==='workshop'){
+  const allocation=journal.find(x=>x.id===input.allocationId),proof=allocation?.calendarSkillFletchingAllocation996;
+  require(plan.workshopId&&proof?.startId===plan.workshopId&&allocation.campaignMinute<=now&&proof.outcome.dueMinute<=now&&
+   state.readyMinute!==null&&now>=state.readyMinute,'Nejprve dokončete reverie i skutečnou dílenskou zakázku.');
+  require(integer(input.spiritML,0,1000)&&(input.spiritML===0?input.spiritDie===null:integer(input.spiritDie,1,10)),'Potvrďte skutečný Spirit d10.');
+  return {spirit:testSecondaryRoll({ml:input.spiritML,roll:input.spiritDie})};
+ }
+ require(!plan.workshopId&&stage==='finish'&&state.readyMinute!==null&&now>=state.readyMinute&&
   now>=state.project.campaignMinute+state.project.calendarFaeriecraft.input.durationMinutes,
  'Nejprve doložte 20 hodin reverie a dokončete dobu výroby.');
  return craftResult(state.project.calendarFaeriecraft.input,input);
@@ -116,7 +171,10 @@ export function resolveFaerieStep(journal,row){
 export function validateFaeriecraft(journal){
  const prior=[],ids=new Set();
  for(const row of journal){
-  if(!row.calendarFaeriecraft)continue;
+  if(!row.calendarFaeriecraft){
+   if(row.calendarSkillProjectStart591||row.calendarSkillFletchingAllocation996)prior.push(row);
+   continue;
+  }
   require(typeof row.id==='string'&&row.id&&!ids.has(row.id)&&
    same(resolveFaerieStep(prior,row),row.calendarFaeriecraft.result),'Faeriecraft: hody, návaznost nebo čas nesouhlasí s dokladem.');
   prior.push(row);ids.add(row.id);

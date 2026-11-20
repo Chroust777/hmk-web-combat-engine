@@ -1,6 +1,6 @@
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.007';
-import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof,weaponWorkshopTN} from './src/integration/hmk-fletching-work.js?v=94.001';
+import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof,weaponWorkshopTN} from './src/integration/hmk-fletching-work.js?v=94.009';
 import {JEWELLERY_D_PER_OZ,GEM_D,jewelcraftWork994} from './src/integration/hmk-jewelcraft-work.js?v=93.994';
 import {READING_CONDITION_RULES,readingCondition,readingSource,externalReadingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=94.006';
 import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=94.006';
@@ -9,7 +9,7 @@ import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFrom
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.008';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.009';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -45,7 +45,7 @@ import {PRINTED_STARTER_GEAR_P120,prepareStartingKit} from './src/integration/hm
 import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,interpretCharacterDescription} from './src/integration/hmk-generator-traits.js';
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
-import {FAERIE_CRAFTS,FAERIE_TOTAL,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.008';
+import {FAERIE_CRAFTS,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.009';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.986';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.007';
@@ -66,7 +66,7 @@ import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltSta
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign,engineeringDesignWorkMinutes} from './src/integration/hmk-engineering-design-548.js?v=94.007';
 import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=93.995';
-import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.007';
+import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.009';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -209,7 +209,7 @@ import {compoundCompatible,injuryFromEffectiveImpact} from './src/rules/injury.j
 import {resolveCombatantLoad,bulkForTest} from './src/integration/combatant-load.js';
 import {resolveGuidedReadiedMove,createGuidedReadiedGropeSession} from './src/integration/hmk-guided-readied-followup.js';
 import {resolveGuidedShieldUnsling,resolveGuidedWeaponStow,startGuidedBackpackGrope,completeGuidedBackpackGrope} from './src/integration/hmk-guided-item-grope.js';
-import {startGuidedCrossbowSpan,startGuidedMissileLoad,startGuidedMissileAim,performGuidedFreeMissileLoad,performGuidedNearbyFreeMissileLoad,previewGuidedTestedNearbyFreeMissileLoad,performGuidedTestedNearbyFreeMissileLoad,registerInitiallyLoadedCrossbow,verifiedMissileAimBonus,completeGuidedMissilePreparation,requireLoadedMissile,consumeLoadedMissile} from './src/integration/hmk-guided-missile-preparation.js';
+import {startGuidedCrossbowSpan,startGuidedMissileLoad,startGuidedMissileAim,performGuidedFreeMissileLoad,performGuidedNearbyFreeMissileLoad,previewGuidedTestedNearbyFreeMissileLoad,performGuidedTestedNearbyFreeMissileLoad,registerInitiallyLoadedCrossbow,verifiedMissileAimBonus,completeGuidedMissilePreparation,requireLoadedMissile,consumeLoadedMissile} from './src/integration/hmk-guided-missile-preparation.js?v=94.009';
 import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integration/hmk-guided-spatial-barriers.js';
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
 import {applyConfirmedTreatment,applyConfirmedFrostAmputation,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock} from './src/integration/hmk-healing-persistence.js';
@@ -222,7 +222,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.008';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.009';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -321,7 +321,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.008';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.009';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -395,7 +395,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.008';
+const APP_VERSION='94.009';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5529,7 +5529,7 @@ function fletchingStartFields996(actor,kind){
  ${weaponFields}
  <label>Výrobce hrotů<select name="fletchingProvider"><option value="">Hroty vyrábí sám</option>
  ${fletchingMakers996(actor).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · Metalcraft ML ${skillActorMastery(c,'Metalcraft').ml}</option>`).join('')}</select></label>
- <p data-hartbow-rule hidden>Hartbow · po d100 následuje povinný Spirit SR.</p>
+ <p data-hartbow-rule hidden>Ælrhin mohou ve stejné herní minutě otevřít Faeriecraft a zahájit reverie pro tuto zakázku. Spirit SR se provede až po uplynutí skutečné doby výroby.</p>
  <label hidden style="display:none"><input type="checkbox" name="leverTraining" disabled> Tvůrce se naučil vyrábět kúzhanskou páku</label>`;
 }
 function fletchingFinishHTML996(actor,now,kind){
@@ -5540,7 +5540,8 @@ function fletchingFinishHTML996(actor,now,kind){
   const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===j.id);
   if(!source)return '';
   const allocation=journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===j.id)?.calendarSkillFletchingAllocation996?.outcome;
-  const done=journal.some(x=>x.calendarSkillFletching996?.startId===j.id);
+  const done=journal.find(x=>x.calendarSkillFletching996?.startId===j.id);
+  const reverie=p.faerieLinked?faerieWorkshopState(journal,j.id):null;
   const item=FLETCHING_ITEMS[p.scope],sv=source.skillTestProof.a.sv,need=fletchingNeeds(p.scope,source.skillTestProof,0);
   const heading=`<h4>${esc(p.projectName)} · ${esc(item.name)} · SV ${sv} · ${esc(source.skillTestProof.a.level)}</h4>`;
   const hidden=`<input type="hidden" name="startId" value="${esc(j.id)}">`;
@@ -5559,10 +5560,16 @@ function fletchingFinishHTML996(actor,now,kind){
    (allocation.halfDraw?` · Hartbow, Draw ${item.draw} → ${item.draw/2}`:p.fletching996.hartbow?' · Spirit SR neuspěl, Draw zůstává '+item.draw:'')+
    (allocation.rolls.length?` · potvrzené hody [${allocation.rolls.join(', ')}]`:'');
   const junk=item.complexity&&allocation.achievedComplexity===null;
-  if(done)return `<article data-fletching-done>${heading}<p>${junk?'Uzavřeno':'Dokončeno'} · ${esc(description)}</p></article>`;
-  return `<form class="hsk-form-grid" data-fletching-finish="complete">${heading}${hidden}<p>${esc(description)}.</p>
+  if(done)return `<article data-fletching-done>${heading}<p>${junk?'Uzavřeno':'Dokončeno'} · ${esc(description+(done.calendarSkillFletching996.inventoryId?' · uloženo do Arsenal & Gear':'')+(reverie?.done?.body?' · '+reverie.done.body:''))}</p></article>`;
+  const eligible=reverie&&!reverie.expired&&reverie.readyMinute!==null&&now>=reverie.readyMinute;
+  const waiting=reverie&&!eligible&&!reverie.expired;
+  const spiritML=availableMasteries(actor).find(x=>x.name==='Spirit')?.ml??0;
+  const needsDie=!!eligible&&now>=allocation.dueMinute&&spiritML>0;
+  return `<form class="hsk-form-grid" data-fletching-finish="complete" ${needsDie?'data-faerie-roll':''}>${heading}${hidden}<p>${esc(description)}.</p>
    <p>Termín ${esc(displayCampaignMinute(allocation.dueMinute))}.${now<allocation.dueMinute?' Zbývá '+esc(chronicleRemainingTime(allocation.dueMinute-now))+'.':''}</p>
-   <button type="submit" ${now<allocation.dueMinute?'disabled':''}>${junk?'Uzavřít neúspěšnou zakázku':'Potvrdit dokončení výrobku'}</button><output role="status"></output></form>`;
+   ${waiting?'<p>Dokončete nebo uzavřete rozpracovanou reverie v časovaném projektu Faeriecraft.</p>':''}
+   ${needsDie?'<input type="hidden" name="spiritDie">':eligible&&!spiritML?'<p>Spirit už není osvojený. SR automaticky selže.</p>':''}
+   <button type="submit" ${now<allocation.dueMinute||waiting?'disabled':''}>${junk?'Uzavřít neúspěšnou zakázku':'Potvrdit dokončení výrobku'}</button><output role="status"></output></form>`;
  }).join('');
 }
 document.addEventListener('submit',event=>{
@@ -5586,14 +5593,39 @@ document.addEventListener('submit',event=>{
    if(!allocation||allocation.calendarSkillFletchingAllocation996.outcome.dueMinute>now)throw Error('Nejprve nechte v Kalendáři uplynout zbývající čas.');
    field='calendarSkillFletching996';details={startId,allocationId:allocation.id};
   }
-  mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
+  let artifact=null,reverieReceipt=null;
+  if(field==='calendarSkillFletching996'&&project.faerieLinked){
+   const kind=faerieWorkshopKind(project),outcome=allocation.calendarSkillFletchingAllocation996.outcome;
+   const reverie=faerieWorkshopState(journal,startId);
+   if(reverie&&!reverie.expired){
+    const spiritML=availableMasteries(character(selected)).find(x=>x.name==='Spirit')?.ml??0;
+    reverieReceipt={id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
+     title:'Faeriecraft · '+project.projectName,calendarFaeriecraft:{stage:'workshop',projectId:reverie.project.id,
+      input:{allocationId:allocation.id,spiritML,spiritDie:spiritML?Number(form.elements.namedItem('spiritDie')?.value):null}}};
+    const step=reverieReceipt.calendarFaeriecraft;
+    step.result=resolveFaerieStep(journal,reverieReceipt);
+    const spirit=step.result.spirit;
+    reverieReceipt.body='Spirit SR '+(spirit.roll??'—')+' · '+(spirit.success?(kind==='hartbow'?'S · poloviční Draw':'S · +5 Melee'):'F · běžný výrobek');
+    details.reverieResultId=reverieReceipt.id;
+   }
+   const catalog=findCatalogItem(kind==='longknife'?BUILTIN_ITEMS.find(i=>i.name==='Longknife')?.id:project.scope);
+   if(!catalog)throw Error('Chybí tištěná definice hotového výrobku.');
+   artifact=faerieWorkshopItem(catalog,outcome,reverieReceipt?.calendarFaeriecraft.result.spirit,startId,selected);
+   details.inventoryId=artifact.id;
+  }
+  mutate(()=>{
+   if(artifact&&data.inventory.some(item=>item.id===artifact.id))throw Error('Tento výrobek už byl předán.');
+   if(artifact)data.inventory.push(artifact);
+   if(reverieReceipt)data.journal.push(reverieReceipt);
+   data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
    title:TIMED_SKILL_LABELS_600[project.kind]+' · '+project.projectName,body:field==='calendarSkillFletching996'?
     (FLETCHING_ITEMS[project.scope].meleeWeapon?
      (()=>{const out=allocation.calendarSkillFletchingAllocation996.outcome;
       return `Výrobek dokončen. WQ ${out.finalWQ}${out.impactDelta===null?'':' · Impact '+(out.impactDelta>0?'+':'')+out.impactDelta}${out.salePriceD===null?' · cenu vadného kusu určí GM':' · prodejní hodnota '+out.salePriceD+' d'}.`;})():
      allocation.calendarSkillFletchingAllocation996.outcome.achievedComplexity===null?'Neúspěšná zakázka uzavřena.':'Výrobek dokončen.'):
     'Výsledek a termín potvrzeny.',
-   [field]:details}));
+   [field]:details});
+  });
  }catch(err){form.querySelector('output').textContent=err.message;}
 },true);
 function brewingFinishHTML995(actor,now){
@@ -5668,9 +5700,11 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
     `SV ${writing.result.sv}. Termín bez zkrácení ${displayCampaignMinute(writing.dueMinute)}.`;
    return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong> · ${esc(p.scope)}<p>${esc(message)}</p></div>`;
   }
+  const canLinkFaerie=p.faerieLinked&&isFaerieCrafter(actor)&&p.startMinute===now&&!faerieWorkshopState(data.journal,j.id);
+  const faerieLink=canLinkFaerie?'<button type="button" class="secondary" data-workshop-faerie-link="'+esc(j.id)+'">Zahájit Faeriecraft pro tuto zakázku</button>':'';
   const variation=p.writingPlan?.variation;
   const variant=variation?` · ${variation.pages} str. · doba ${variation.timePercent} %`:'';
-  return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong>${variant} · ${esc(TIMED_SKILL_NAMES_600[p.kind]||p.kind)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.scope)}<p>Začátek ${esc(displayCampaignMinute(p.startMinute))}. Nejčasnější možný test ${esc(displayCampaignMinute(p.earliestMinute))}${now<p.earliestMinute?' · zbývá '+esc(chronicleRemainingTime(p.earliestMinute-now)):''}. Základní dokončení ${esc(displayCampaignMinute(nowDue))}. ${linked?(p.kind==='brewing'?'SV kvality uložen; zrání čeká na potvrzení.':isWorkshopCraft(p.kind)?'SV uložen. Pokračujte výsledkem zakázky níže.':'SV již uložen.'):'Po skutečně uplynulé době proveď původní Success Value. Založení projektu není hod a nevytvoří inventář.'}</p></div>`;
+  return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong>${variant} · ${esc(TIMED_SKILL_NAMES_600[p.kind]||p.kind)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.scope)}<p>Začátek ${esc(displayCampaignMinute(p.startMinute))}. Nejčasnější možný test ${esc(displayCampaignMinute(p.earliestMinute))}${now<p.earliestMinute?' · zbývá '+esc(chronicleRemainingTime(p.earliestMinute-now)):''}. Základní dokončení ${esc(displayCampaignMinute(nowDue))}. ${linked?(p.kind==='brewing'?'SV kvality uložen; zrání čeká na potvrzení.':isWorkshopCraft(p.kind)?'SV uložen. Pokračujte výsledkem zakázky níže.':'SV již uložen.'):'Po skutečně uplynulé době proveď původní Success Value. Založení projektu není hod a nevytvoří inventář.'}</p>${faerieLink}</div>`;
  }).join('')||'<p class="tiny">Žádný otevřený projekt vybraného druhu.</p>'}</div>
  ${kind==='engineering'?engineeringFinishHTML(actor,now):kind==='brewing'?brewingFinishHTML995(actor,now):isWorkshopCraft(kind)?fletchingFinishHTML996(actor,now,kind):''}</section>`;
 }
@@ -5703,7 +5737,7 @@ function decorateTimedSkillProject591(root){
     provider.disabled=kind.value!=='fletching'||!item.projectiles;provider.closest('label').hidden=provider.disabled;
     provider.closest('label').style.display=provider.disabled?'none':'';
     if(provider.disabled)provider.value='';
-    const hartbow=!!item.bow&&canCraftHartbow996(character(selected));
+    const hartbow=!!faerieWorkshopKind({kind:kind.value,scope:scope.value})&&isFaerieCrafter(character(selected));
     create.querySelector('[data-hartbow-rule]').hidden=!hartbow;
     const lever=create.elements.namedItem('leverTraining');
     lever.disabled=!item.rareTransfer||isKuzhan996(character(selected));
@@ -5712,7 +5746,7 @@ function decorateTimedSkillProject591(root){
     leverLabel.hidden=lever.disabled;
     leverLabel.style.display=lever.disabled?'none':'';
     if(lever.disabled)lever.checked=false;
-    const plan=fletchingPlan(scope.value,1,provider.value,hartbow),now=data.campaignClock.minute;
+    const plan=fletchingPlan(scope.value,1,provider.value),now=data.campaignClock.minute;
     preview.textContent='Materiál '+plan.costD+' d · '+(item.meleeWeapon?'Test: '+TIMED_SKILL_NAMES_600[kind.value]+(item.secondary.length?' ('+item.secondary.join(' · ')+')':'')+' · ':item.complexity?'prodejní cena při dosažení cíle '+6*plan.costD+' d · ':'')+(item.months?item.months+' měsíců':plan.workMinutes/60+' pracovních hodin')+
      ' · nejčasnější SV '+displayCampaignMinute(fletchingDue(scope.value,now,plan,0.7))+' · základní termín '+displayCampaignMinute(fletchingDue(scope.value,now,plan))+'.';
     return;
@@ -6026,6 +6060,18 @@ document.addEventListener('submit',event=>{
   if(!mutate(()=>data.journal.push(row)))throw Error('Zápis loďařské zakázky se nepodařilo uložit.');
  }catch(error){out.textContent=error.message;}
 },true);
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-workshop-faerie-link]');
+ if(!button)return;
+ const id=button.dataset.workshopFaerieLink;
+ const row=data.journal.find(x=>x.id===id);
+ if(row?.characterId!==selected||row.calendarCampaignId!==campaignKey(data.campaignClock)||
+  row.campaignMinute!==data.campaignClock?.minute||!isFaerieCrafter(character(selected)))return;
+ skillSVChoice595={actorId:selected,kind:'timed',value:'faeriecraft'};
+ render();
+ const form=[...document.querySelectorAll('form[data-faerie-step="start"]')].find(x=>x.elements.projectId.value===id);
+ form?.elements.location.focus();
+},true);
 function faerieSecondarySkills(plan){
  if(plan.skill==='Fletching')return ['Woodworking',plan.bow==='composite'?'Hideworking':'Timbercraft'];
  if(plan.skill!=='Weaponcraft')return [];
@@ -6042,6 +6088,8 @@ function faeriecraftPanel(actor){
  const records=data.journal.filter(x=>x.characterId===actor.id&&x.calendarCampaignId===cid&&x.calendarFaeriecraft?.stage==='start');
  const states=records.map(x=>faerieState(data.journal,x.id));
  const active=states.find(state=>faerieNext(state,now)),masteries=availableMasteries(actor);
+ const workshops=data.journal.filter(x=>x.characterId===actor.id&&x.calendarCampaignId===cid&&x.campaignMinute===now&&
+  x.calendarSkillProjectStart591?.faerieLinked&&!faerieWorkshopState(data.journal,x.id));
  const crafts=masteries.filter(x=>x.ml>0&&Object.hasOwn(FAERIE_CRAFTS,x.name));
  const spirit=masteries.find(x=>x.name==='Spirit'&&x.ml>0);
  const outer=(stage,id,contents,label,queue=false)=>'<form class="hsk-critical-next" '+(queue?'data-faerie-roll ':'')+'data-faerie-step="'+stage+'"><input type="hidden" name="projectId" value="'+esc(id)+'">'+contents+
@@ -6053,14 +6101,16 @@ function faeriecraftPanel(actor){
  const history=states.filter(x=>x.done||x.expired).reverse().map(({done,expired,project})=>'<p><strong>'+esc(project.title)+'</strong> · '+esc((done||expired).body)+'</p>').join('');
  let html='';
  if(!active){
-  html=!spirit||!crafts.length?'<p>Postava potřebuje osvojený Spirit a odpovídající řemeslo.</p>':
+  const linked=workshops.length&&spirit?'<h4>Zahájené dílenské zakázky v této minutě</h4>'+workshops.map(row=>
+   outer('start',row.id,'<h5>'+esc(row.calendarSkillProjectStart591.projectName)+'</h5>'+entryFields,'Zahájit reverie pro tuto zakázku',true)).join(''):'';
+  html=linked+(!spirit||!crafts.length?'<p>Postava potřebuje osvojený Spirit a odpovídající řemeslo.</p>':
    outer('start','', '<label>Řemeslo<select name="craftSkill" required><option value="">Vyberte řemeslo</option>'+crafts.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select></label>'+
     '<label>Konkrétní výrobek<input name="item" required minlength="2" maxlength="120"></label>'+
     '<label>Doložená doba výroby od zahájení (herní hodiny včetně přestávek)<input name="hours" type="number" min="1" max="166666" required></label>'+
     '<fieldset data-faerie-product="hartbow" hidden disabled><legend>Hartbow</legend><label>Druh luku<select name="bow"><option value="composite">Kompozitní luk</option><option value="longbow">Longbow</option></select></label><label>Základní Draw<input name="baseDraw" type="number" min="1" max="500" required></label></fieldset>'+
     '<fieldset data-faerie-product="longknife" hidden disabled><legend>Výrobek Weaponcraft</legend><label>Druh výrobku<select name="armour"><option value="">Vagorsereq (Longknife)</option><option value="mail">Kroužková zbroj</option><option value="scale">Šupinová zbroj</option><option value="plate">Plátová zbroj</option></select></label><label hidden>Základní hmotnost (lb)<input name="baseWeight" type="number" min="0.01" step="any" required disabled></label></fieldset>'+
     '<p>Weaponcraft nabízí Vagorsereq (Longknife) a tři druhy kovových zbrojí. Masonry je určené pro samostatnou plastiku. Čas posouvá Kalendář.</p>'+entryFields,
-    'Potvrdit vstup do reverie a zahájit práci',true);
+    'Potvrdit vstup do reverie a zahájit práci',true));
  }else{
   const {project,entry,minutes,deadline,readyMinute}=active,plan=project.calendarFaeriecraft.input,next=faerieNext(active,now);
   const completed=readyMinute!==null&&now>=readyMinute||minutes>=FAERIE_TOTAL;
@@ -6087,6 +6137,7 @@ function faeriecraftPanel(actor){
   html+='</section>';
  }
  return '<section class="hsk-timed-project-591">'+title+'<p>Potvrďte Spirit SV při každém vstupu. Nasbírejte 20 hodin během pěti dnů v úsecích nejméně po čtyřech hodinách. Po dokončení práce následuje Craft SV a Spirit SR.</p>'+html+
+  (states.some(x=>x.project.calendarFaeriecraft.input.workshopId&&!x.done&&!x.expired&&!faerieNext(x,now))?'<p>Reverie pro dílenskou zakázku je hotová. Závěrečný Spirit SR nabídne její dílna po uplynutí termínu.</p>':'')+
   (history?'<details><summary>Uzavřené projekty Faeriecraft</summary>'+history+'</details>':'')+
   (active?'<details><summary>Doklady rozpracovaného projektu</summary>'+data.journal.filter(x=>x.calendarFaeriecraft?.projectId===active.project.id).map(x=>'<p>'+displayCampaignMinute(x.campaignMinute)+' · '+esc(x.body)+'</p>').join('')+'</details>':'')+'</section>';
 }
@@ -6109,10 +6160,15 @@ document.addEventListener('submit',event=>{
   const source=data.journal.find(x=>x.id===projectId),plan=source?.calendarFaeriecraft?.input;
   const input={};
   if(stage==='start'){
-   Object.assign(input,{skill:read('craftSkill'),item:read('item').trim(),durationMinutes:num('hours')*60});
+   const workshopId=read('projectId');
+   if(workshopId){
+    const workshop=data.journal.find(x=>x.id===workshopId);
+    if(!faerieWorkshopKind(workshop?.calendarSkillProjectStart591))throw Error('Vyberte odpovídající dílenskou zakázku.');
+    Object.assign(input,faerieWorkshopPlan(workshop));
+   }else Object.assign(input,{skill:read('craftSkill'),item:read('item').trim(),durationMinutes:num('hours')*60});
    skillActorMastery(actor,input.skill);
-   if(FAERIE_CRAFTS[input.skill]==='hartbow')Object.assign(input,{bow:read('bow'),baseDraw:num('baseDraw')});
-   if(input.skill==='Weaponcraft'&&read('armour'))Object.assign(input,{armour:read('armour'),baseWeight:num('baseWeight')});
+   if(!input.workshopId&&FAERIE_CRAFTS[input.skill]==='hartbow')Object.assign(input,{bow:read('bow'),baseDraw:num('baseDraw')});
+   if(!input.workshopId&&input.skill==='Weaponcraft'&&read('armour'))Object.assign(input,{armour:read('armour'),baseWeight:num('baseWeight')});
    for(const secondary of faerieSecondarySkills(input))skillActorMastery(actor,secondary);
   }
   if(stage==='start'||stage==='enter'){
@@ -8013,7 +8069,7 @@ function inventoryProvenanceReport(){
 // Explicit per-item reconciliation. No silent migration, including on backup import.
 function inventoryReconciliationCandidate(id){
  const x=data.inventory.find(v=>v.id===id);
- if(!x||!x.sourceItemId||!x.snapshot)return null;
+ if(!x||x.workshopCraftId||!x.sourceItemId||!x.snapshot)return null;
  const source=findCatalogItem(x.sourceItemId);
  if(!source||source.category!==x.snapshot.category)return null;
  if(source.name===x.snapshot.name&&sameCatalogProperties(source.properties,x.snapshot.properties)&&source.description===x.snapshot.description&&source.source===x.snapshot.source)return null;
@@ -9480,7 +9536,7 @@ function encounterPayload(){
 // v48: Explicitly flag drift between a character-owned snapshot and its source definition.
 // Snapshots are never rewritten silently: custom modifications may be intentional.
 function inventoryDefinitionDrift(x){
- if(!x.sourceItemId)return null;
+ if(x.workshopCraftId||!x.sourceItemId)return null;
  const source=findCatalogItem(x.sourceItemId);
  if(!source)return null; // Missing definitions have their own preflight warning.
  const snap=x.snapshot||{};
@@ -14905,8 +14961,9 @@ document.addEventListener('submit',event=>{
   if(isWorkshopCraft(kind)){
    const item=workshopCraftItem(kind,scope);
    if(!item)throw Error('Vyberte výrobek odpovídající vybranému projektu.');
+   if(item.name==='Longknife'&&!isFaerieCrafter(actor))throw Error('Vagorsereq mohou vyrábět pouze Ælrhin.');
    fletching=fletchingPlan(scope,Number(form.elements.namedItem('workshop').value),
-    form.elements.namedItem('fletchingProvider').value,!!item.bow&&canCraftHartbow996(actor),
+    form.elements.namedItem('fletchingProvider').value,false,
     Number(form.elements.namedItem('weaponToolQuality')?.value??0),[1,2].map(n=>form.elements.namedItem('weaponHelper'+n)?.value).filter(Boolean));
    if(item.meleeWeapon&&fletching.helperIds.some(id=>!weaponWorkOptions(actor,TIMED_SKILL_NAMES_600[kind]).some(h=>h.person.id===id)))
     throw Error('Pomocník musí být způsobilým členem kampaně s alespoň polovinou ML výrobce.');
@@ -14922,6 +14979,7 @@ document.addEventListener('submit',event=>{
    ...(writingPlan?{writingPlan}:{}),
    ...(engineeringRandomTime?{engineeringRandomTime:true}:{}),
    ...(fletching?{fletching996:fletching}:{}),
+   ...(fletching&&faerieWorkshopKind({kind,scope})?{faerieLinked:true}:{}),
    ...(kind==='ceramics'?{craftExact994:true}:{}),
    ...(brew?{brewing995:true,spiritMonths995:spiritMonths}:{}),
    ...(jewelcraft?{jewelcraft994:jewelcraft,materialSourceConfirmed:true}:{}),
@@ -17438,6 +17496,7 @@ function hskRequiredSR(form,primary){
  if(hskSRMode(form)!=='value')return '';
  if(primary==='Climbing')return 'climbing-difficult';
  const workshop=selectedFletchingProject996(form);
+ if(workshop?.faerieLinked)return '';
  if(primary==='Fletching'&&workshop?.fletching996.hartbow)return 'fletching-hartbow';
  if(primary==='Weaponcraft'&&FLETCHING_ITEMS[workshop?.scope]?.name==='Longknife'&&canCraftHartbow996(character(selected)))return 'weaponcraft-faerie';
  const writing=skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='writing';
@@ -17447,6 +17506,7 @@ function hskRequiredSR(form,primary){
  return primary===test.primary||(!test.primary&&isWritingLanguage(primary))?test.routineId:'';
 }
 function hskSelectedSRRoutine(form,primary,side='A'){
+ if(side==='A'&&selectedFletchingProject996(form)?.faerieLinked)return null;
  const id=hskRequiredSR(form,primary)||form.elements.namedItem('srActivity'+side)?.value||'';
  if(!id)return null;
  const routine=skillSecondaryRoutineById(id,primary,hskSRMode(form));
@@ -17475,7 +17535,8 @@ function hskConfigureSR(form,side='A'){
  const field=form.elements.namedItem('srActivity'+side);if(!field)return;
  const skill=form.elements.namedItem(side==='A'?'primary':'opponentSkill')?.value||'';
  const user=side==='A'?character(selected):character(form.elements.namedItem('opponentId')?.value);
- const available=skillSecondaryRoutines(skill,hskSRMode(form)).filter(r=>skillSecondaryRoutineEligible(r,user,availableMasteries(user)));
+ const available=side==='A'&&selectedFletchingProject996(form)?.faerieLinked?[]:
+  skillSecondaryRoutines(skill,hskSRMode(form)).filter(r=>skillSecondaryRoutineEligible(r,user,availableMasteries(user)));
  const prior=field.value;
  const required=hskRequiredSR(form,skill);
  field.innerHTML=(required?'':'<option value="">— běžná činnost: bez SR / TN —</option>')+available.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+' · HMK str. '+r.page+'</option>').join('');

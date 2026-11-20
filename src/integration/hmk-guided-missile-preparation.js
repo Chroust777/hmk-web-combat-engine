@@ -15,6 +15,11 @@ import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 
 const demand=(ok,message)=>{if(!ok)throw Error(message);};
 const weaponType=item=>item?.snapshot?.properties?.missileType??item?.snapshot?.properties?.verifiedModes?.[0]?.missileType;
+function validBowDraw(weapon){
+ const p=weapon.snapshot?.properties,draw=p?.draw;
+ return draw>0&&(Number.isSafeInteger(draw)||
+  p.faeriecraft==='hartbow'&&Number.isSafeInteger(draw*2));
+}
 const ammunitionType=item=>item?.snapshot?.properties?.projectileKind??item?.snapshot?.properties?.projectileType;
 const ammoFor={bow:'arrow',crossbow:'bolt',sling:'stone'};
 const checkedId=id=>{demand(typeof id==='string'&&id.length>0,'Chybí ID doložené akce');return id;};
@@ -125,7 +130,7 @@ export function startGuidedMissileLoad({id,sequence,states,inventory,actorId,wea
   const skills=(character?.hmk?.skills||[]).filter(x=>String(x.name).toLowerCase()==='archery'||x.id==='archery');
   const draw=w.snapshot?.properties?.draw;
   demand(character?.id===actorId&&Number.isSafeInteger(str)&&str>=1&&
-   skills.length===1&&Number.isSafeInteger(skills[0].ml)&&Number.isSafeInteger(draw)&&draw>0,
+   skills.length===1&&Number.isSafeInteger(skills[0].ml)&&validBowDraw(w),
    'Bow Load: chybí ověřené Archery ML, Strength nebo Draw luku');
   demand(skills[0].ml+str*5>=draw,
    'HMK str.108: Archery Pull nedosahuje Draw luku; nelze jej nabít');
@@ -161,7 +166,7 @@ export function startGuidedMissileAim({id,sequence,states,inventory,actorId,weap
   const skills=(character?.hmk?.skills||[]).filter(x=>String(x.name).toLowerCase()==='archery'||x.id==='archery');
   const draw=w.snapshot?.properties?.draw;
   demand(character?.id===actorId&&Number.isSafeInteger(str)&&str>0&&
-   skills.length===1&&Number.isSafeInteger(skills[0].ml)&&Number.isSafeInteger(draw)&&draw>0&&
+   skills.length===1&&Number.isSafeInteger(skills[0].ml)&&validBowDraw(w)&&
    skills[0].ml+str*5-draw>=75,
    'HMK str.163: Aim s lukem vyžaduje Archery Pull vyšší než Draw nejméně o 75');
  }
@@ -262,7 +267,7 @@ function freeLoadWitnessed({id,sequence,states,inventory,actorId,weaponId,ammoId
  if(type==='bow'){
   const str=character?.hmk?.attributes?.str,draw=weapon.snapshot?.properties?.draw;
   const skills=(character?.hmk?.skills||[]).filter(x=>String(x.name).toLowerCase()==='archery'||x.id==='archery');
-  demand(Number.isSafeInteger(str)&&str>0&&Number.isSafeInteger(draw)&&draw>0&&
+  demand(Number.isSafeInteger(str)&&str>0&&validBowDraw(weapon)&&
    skills.length===1&&Number.isSafeInteger(skills[0].ml)&&skills[0].ml+5*str>=draw,
    'Free Load luku: nelze obejít skutečný Archery Pull / Draw');
  }

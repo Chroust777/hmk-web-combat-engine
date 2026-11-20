@@ -116,6 +116,7 @@ export function fletchingOutcome(project,proof,timeStars,rolls){
 export function validFletchingProof(project,proof){
  const item=stock[project.scope],plan=project.fletching996;
  const sr=proof?.secondaryRollResult;
+ if(project.faerieLinked&&sr)return false;
  if(item.meleeWeapon){
   const helpers=proof?.weaponWorkHelpers??[];
   if(!Array.isArray(helpers)||helpers.some(helper=>!helper||!fieldValid(helper.ml,1,1000))||

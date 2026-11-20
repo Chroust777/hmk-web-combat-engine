@@ -15,7 +15,7 @@ import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.j
 import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.007';
 import {copySource,findCopyStages} from './hmk-script-copy.js?v=94.006';
 import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=94.006';
-import {faerieState,faerieNext} from './hmk-faeriecraft.js?v=94.008';
+import {faerieState,faerieNext,faerieWorkshopState} from './hmk-faeriecraft.js?v=94.009';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -438,6 +438,8 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   if(!person)continue;
   const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===row.id);
   const allocation=journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===row.id)?.calendarSkillFletchingAllocation996;
+  const reverie=project.faerieLinked?faerieWorkshopState(journal,row.id):null;
+  if(allocation&&reverie&&!reverie.expired&&faerieNext(reverie,clock.minute))continue;
   const step=allocation?'potvrdit dokončení':source?'vyhodnotit výsledek':'provést Success Value';
   push(person,'fletching-project',row.id,WORKSHOP_CRAFT_PROJECTS[project.kind].label+' · '+project.projectName+' · '+step,
    allocation?.outcome.dueMinute??source?.campaignMinute??project.earliestMinute,'skills',{requiresAction:false});

@@ -1,4 +1,5 @@
-import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=94.001';
+import {faerieWorkshopKind,faerieWorkshopState} from './hmk-faeriecraft.js?v=94.009';
+import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=94.009';
 /** HârnMaster 1.2 pp.70,132: prospective scheduling of actual skill work.
  * Read-only arithmetic/validation. Never invents a roll or a project.
  * Existing unscheduled historical skill tests are unchanged.
@@ -128,6 +129,7 @@ export function validateSkillTimedWork591(data){
    typeof row.calendarCampaignId==='string'&&row.calendarCampaignId.length>0&&
    Number.isSafeInteger(p.startMinute)&&p.startMinute>=0&&p.startMinute===row.campaignMinute&&
    p.baseMinutes===base&&
+   (p.faerieLinked===undefined||p.faerieLinked===true&&faerieWorkshopKind(p)&&p.fletching996?.hartbow===false)&&
    (p.engineeringRandomTime===undefined||p.kind==='engineering'&&typeof p.engineeringRandomTime==='boolean')&&
    (p.kind!=='jewelcraft'||p.materialSourceConfirmed===true&&Number(p.scope)===p.jewelcraft994?.days&&
     JSON.stringify(jewelcraftWork994(p.jewelcraft994))===JSON.stringify(p.jewelcraft994))&&
@@ -307,6 +309,14 @@ export function validateSkillTimedWork591(data){
    assert(!finishedFletching.has(startId)&&original&&original.id===done.allocationId&&
     row.campaignMinute>=Math.max(original.campaignMinute,original.calendarSkillFletchingAllocation996.outcome.dueMinute),
     'Fletching: dokončení před termínem nebo bez původního výsledku.');
+   if(start.p.faerieLinked){
+    const state=faerieWorkshopState(journal.slice(0,index),startId);
+    const link=state?.done;
+    assert(done.inventoryId==='workshop-faerie:'+startId&&
+     (state&&!state.expired?link?.id===done.reverieResultId&&
+      link?.calendarFaeriecraft?.input.allocationId===done.allocationId&&link.campaignMinute===row.campaignMinute:
+      done.reverieResultId===undefined),'Faeriecraft: dokončení musí odpovídat výrobku a dokladu Spirit SR.');
+   }
    finishedFletching.add(startId);
   }
  }
