@@ -1,6 +1,6 @@
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.000';
-import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof} from './src/integration/hmk-fletching-work.js?v=94.000';
+import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof,weaponWorkshopTN} from './src/integration/hmk-fletching-work.js?v=94.001';
 import {JEWELLERY_D_PER_OZ,GEM_D,jewelcraftWork994} from './src/integration/hmk-jewelcraft-work.js?v=93.994';
 import {readingCondition,readingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=93.994';
 import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=93.993';
@@ -65,7 +65,7 @@ import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltSta
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=93.995';
-import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.000';
+import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.001';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -221,7 +221,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.001';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -320,7 +320,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.000';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.001';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -394,7 +394,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.000';
+const APP_VERSION='94.001';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5387,9 +5387,24 @@ function fletchingMakers996(actor){
  return calendarMemberIds(data.campaignClock,registryCharacters93813(data.characters)).filter(c=>c.id!==actor.id&&
   availableMasteries(c).some(m=>m.name==='Metalcraft'&&m.ml>0));
 }
-function fletchingStartFields996(actor){
+function weaponWorkOptions(actor,skill){
+ const findSkill=person=>availableMasteries(person).find(entry=>entry.name===skill);
+ const ml=findSkill(actor)?.ml;
+ if(!ml)return [];
+ return calendarMemberIds(data.campaignClock,registryCharacters93813(data.characters)).filter(person=>
+  person.id!==actor.id&&!['INC','UNC','KIA'].includes(person.hmk?.healthState?.shock)).map(person=>({person,mastery:findSkill(person)}))
+  .filter(({mastery})=>mastery?.ml>0&&mastery.ml*2>=ml);
+}
+function fletchingStartFields996(actor,kind){
+ const isWeapon=Object.values(FLETCHING_ITEMS).some(item=>item.kind===kind&&item.meleeWeapon);
+ const helpers=isWeapon?weaponWorkOptions(actor,TIMED_SKILL_NAMES_600[kind]):[];
+ const weaponFields=isWeapon?`<label>Kvalita nástrojů <select name="weaponToolQuality">${[0,1,2,3].map(n=>`<option value="${n}">TQ +${n}</option>`).join('')}</select></label>
+  ${[1,2].map(n=>`<label>Pomocník ${n} · po celou dobu práce <select name="weaponHelper${n}"><option value="">Bez pomocníka</option>
+  ${helpers.map(({person,mastery})=>`<option value="${esc(person.id)}">${esc(person.name)} · ML ${mastery.ml}</option>`).join('')}</select></label>`).join('')}`:'';
+
  return `<label>Kvalita dílny<select name="workshop" required><option value="">Vyberte kvalitu dílny</option>
  ${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★ · TN ${n}</option>`).join('')}</select></label>
+ ${weaponFields}
  <label>Výrobce hrotů<select name="fletchingProvider"><option value="">Hroty vyrábí sám</option>
  ${fletchingMakers996(actor).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · Metalcraft ML ${skillActorMastery(c,'Metalcraft').ml}</option>`).join('')}</select></label>
  <p data-hartbow-rule hidden>Hartbow · po d100 následuje povinný Spirit SR.</p>
@@ -5407,17 +5422,18 @@ function fletchingFinishHTML996(actor,now,kind){
   const item=FLETCHING_ITEMS[p.scope],sv=source.skillTestProof.a.sv,need=fletchingNeeds(p.scope,source.skillTestProof,0);
   const heading=`<h4>${esc(p.projectName)} · ${esc(item.name)} · SV ${sv} · ${esc(source.skillTestProof.a.level)}</h4>`;
   const hidden=`<input type="hidden" name="startId" value="${esc(j.id)}">`;
-  if(!allocation)return `<form class="hsk-form-grid" data-fletching-finish="roll" data-fletching-flaw="${need.flaw?need.faces:0}" data-fletching-stars="${need.count}">
-   ${heading}${hidden}<p>Dílna TN ${p.fletching996.workshop}. ${need.flaw?(item.complexity?'SV je pod 3. Výroba selhala. Potvrďte dva d6 ztracených dní.':'Potvrďte d2 pro vadu výrobku.'):need.count?'Rozdělte hvězdy mezi zkrácení práce a Masterwork d10.':'Základní výrobek. Potvrďte výsledek a termín.'}</p>
+  if(!allocation)return `<form class="hsk-form-grid" data-fletching-finish="roll" data-fletching-flaw="${need.flaw&&!item.meleeWeapon?need.faces:0}" data-fletching-stars="${need.count}">
+   ${heading}${hidden}<p>Dílna TN ${item.meleeWeapon?weaponWorkshopTN(p.fletching996):p.fletching996.workshop}. ${need.flaw&&item.meleeWeapon?'Vada vychází přímo ze SV. Potvrďte výsledek a termín.':need.flaw?(item.complexity?'SV je pod 3. Výroba selhala. Potvrďte dva d6 ztracených dní.':'Potvrďte d2 pro vadu výrobku.'):need.count?'Rozdělte hvězdy mezi zkrácení práce a Masterwork d10.':'Základní výrobek. Potvrďte výsledek a termín.'}</p>
    ${need.count?`<label>Hvězdy na zkrácení času<select name="timeStars">${Array.from({length:Math.min(3,need.count)+1},(_,i)=>`<option value="${i}">${i} · −${i*10} %</option>`).join('')}</select></label>`:''}
    <input type="hidden" name="fletchingDice"><button type="submit">Uložit výsledek a termín</button><output role="status"></output></form>`;
   const signed=n=>n>0?'+'+n:String(n);
-  const effects=item.pull?`Pull ×${allocation.pull} · Draw +${allocation.drawBonusPct} %`+(allocation.flaw?' · vada '+allocation.flaw:''):`WQ ${signed(allocation.qualityDelta)} · ${item.projectiles?'Impact '+signed(allocation.impactDelta):'dosah '+signed(allocation.rangeDeltaFt)+' ft'}`;
+  const effects=item.meleeWeapon?
+   `WQ ${item.wq} → ${allocation.finalWQ} · ${allocation.impactDelta===null?'bez hodnoty Impact':'Impact '+signed(allocation.impactDelta)}${allocation.faerieLongknife?' · Faeriecraft +5 Melee':''}${allocation.salePriceD===null?' · cenu vadného kusu určí GM':' · prodejní hodnota '+allocation.salePriceD+' d'}`:item.pull?`Pull ×${allocation.pull} · Draw +${allocation.drawBonusPct} %`+(allocation.flaw?' · vada '+allocation.flaw:''):`WQ ${signed(allocation.qualityDelta)} · ${item.projectiles?'Impact '+signed(allocation.impactDelta):'dosah '+signed(allocation.rangeDeltaFt)+' ft'}`;
   const description=item.complexity?
    (allocation.achievedComplexity===null?`Zmetek · ztraceno ${allocation.lostDays} dní · materiál ${allocation.materialCostD} d`:
     `Complexity ${allocation.achievedComplexity} z cílových ${allocation.requestedComplexity} · ${allocation.successes} MWS · prodejní cena ${allocation.salePriceD} d`)+
    (allocation.rolls.length?` · potvrzené hody [${allocation.rolls.join(', ')}]`:''):
-   effects+` · hodnota ×${allocation.valueMultiplier}`+
+   effects+(allocation.salePriceD===null?'':` · hodnota ×${allocation.valueMultiplier}`)+
    (allocation.halfDraw?` · Hartbow, Draw ${item.draw} → ${item.draw/2}`:p.fletching996.hartbow?' · Spirit SR neuspěl, Draw zůstává '+item.draw:'')+
    (allocation.rolls.length?` · potvrzené hody [${allocation.rolls.join(', ')}]`:'');
   const junk=item.complexity&&allocation.achievedComplexity===null;
@@ -5450,7 +5466,10 @@ document.addEventListener('submit',event=>{
   }
   mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
    title:TIMED_SKILL_LABELS_600[project.kind]+' · '+project.projectName,body:field==='calendarSkillFletching996'?
-    (allocation.calendarSkillFletchingAllocation996.outcome.achievedComplexity===null?'Neúspěšná zakázka uzavřena.':'Výrobek dokončen.'):
+    (FLETCHING_ITEMS[project.scope].meleeWeapon?
+     (()=>{const out=allocation.calendarSkillFletchingAllocation996.outcome;
+      return `Výrobek dokončen. WQ ${out.finalWQ}${out.impactDelta===null?'':' · Impact '+(out.impactDelta>0?'+':'')+out.impactDelta}${out.salePriceD===null?' · cenu vadného kusu určí GM':' · prodejní hodnota '+out.salePriceD+' d'}.`;})():
+     allocation.calendarSkillFletchingAllocation996.outcome.achievedComplexity===null?'Neúspěšná zakázka uzavřena.':'Výrobek dokončen.'):
     'Výsledek a termín potvrzeny.',
    [field]:details}));
  }catch(err){form.querySelector('output').textContent=err.message;}
@@ -5500,7 +5519,7 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
     </fieldset>`:
    kind==='cookery'?'<label>Počet strávníků<input name="scope" type="number" min="1" step="1" value="5" required></label>':
    `<label>${isWorkshopCraft(kind)?'Výrobek':'Rozsah nebo stavba'}<select name="scope" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${esc(name)}">${esc(name)} · ${days} dnů</option>`).join('')}</select></label>`}
- ${isWorkshopCraft(kind)?fletchingStartFields996(actor):''}
+ ${isWorkshopCraft(kind)?fletchingStartFields996(actor,kind):''}
  ${kind==='writing'?writingPlanFields992(actor):''}
  ${kind==='brewing'?`<input type="hidden" name="brewAgingDice"><label data-brew-spirit-months hidden>Dodatečné zrání destilátu
  <select name="spiritMonths"><option value="0">Bez prodloužení</option>${[3,4,5,6].map(n=>`<option value="${n}">${n} měsíce navíc</option>`).join('')}</select></label>`:''}
@@ -5556,7 +5575,7 @@ function decorateTimedSkillProject591(root){
     leverLabel.style.display=lever.disabled?'none':'';
     if(lever.disabled)lever.checked=false;
     const plan=fletchingPlan(scope.value,1,provider.value,hartbow),now=data.campaignClock.minute;
-    preview.textContent='Materiál '+plan.costD+' d · '+(item.complexity?'prodejní cena při dosažení cíle '+6*plan.costD+' d · ':'')+(item.months?item.months+' měsíců':plan.workMinutes/60+' pracovních hodin')+
+    preview.textContent='Materiál '+plan.costD+' d · '+(item.meleeWeapon?'Test: '+TIMED_SKILL_NAMES_600[kind.value]+(item.secondary.length?' ('+item.secondary.join(' · ')+')':'')+' · ':item.complexity?'prodejní cena při dosažení cíle '+6*plan.costD+' d · ':'')+(item.months?item.months+' měsíců':plan.workMinutes/60+' pracovních hodin')+
      ' · nejčasnější SV '+displayCampaignMinute(fletchingDue(scope.value,now,plan,0.7))+' · základní termín '+displayCampaignMinute(fletchingDue(scope.value,now,plan))+'.';
     return;
    }
@@ -5572,7 +5591,8 @@ function decorateTimedSkillProject591(root){
     const timing=CRAFT_WORK_600[kind.value]?projectTiming600(kind.value,scope.value,now,{agingRolls:kind.value==='brewing'?Array(CRAFT_WORK_600.brewing[scope.value]?.agingDice||0).fill(1):[],exactCalendar:kind.value==='ceramics'}):null;
     const glassDay=kind.value==='glassworking'&&base%1440===0;
     const due=timing?.dueMinute??(glassDay?calendarDayStart600(now+base):now+skillTimedEarliest591(kind.value,base));
-    preview.textContent='Pracovní doba '+(base/60)+' h. Nejčasnější SV '+displayCampaignMinute(due)+(timing?.mode==='day'||glassDay?' · termín dle herního dne (od 00:00).':' · přesný čas.')+(kind.value==='brewing'?' Zrání se doloží samostatnými skutečnými hody při zahájení; SV hodnotí kvalitu po práci.':'')+' Záznam není automatickým zaplacením materiálu ani vytvořením výrobku.';
+    const material=printedCraftMaterialCost(kind.value,scope.value);
+    preview.textContent=(material===null?'':'Materiál '+material.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' d · ')+'Pracovní doba '+(base/60)+' h. Nejčasnější SV '+displayCampaignMinute(due)+(timing?.mode==='day'||glassDay?' · termín dle herního dne (od 00:00).':' · přesný čas.')+(kind.value==='brewing'?' Zrání se doloží samostatnými skutečnými hody při zahájení; SV hodnotí kvalitu po práci.':'')+' Záznam není automatickým zaplacením materiálu ani vytvořením výrobku.';
    }
   };
   if(!create.dataset.timedInit591){create.dataset.timedInit591='yes';kind.addEventListener('change',update);scope.addEventListener('change',update);if(scope.tagName==='INPUT')scope.addEventListener('input',update);create.querySelector('[data-hmk-writing-plan]')?.addEventListener('change',update);create.elements.namedItem('jewelTime')?.addEventListener('change',update);create.elements.namedItem('fletchingProvider')?.addEventListener('change',update);}
@@ -14580,7 +14600,10 @@ document.addEventListener('submit',event=>{
    const item=workshopCraftItem(kind,scope);
    if(!item)throw Error('Vyberte výrobek odpovídající vybranému projektu.');
    fletching=fletchingPlan(scope,Number(form.elements.namedItem('workshop').value),
-    form.elements.namedItem('fletchingProvider').value,!!item.bow&&canCraftHartbow996(actor));
+    form.elements.namedItem('fletchingProvider').value,!!item.bow&&canCraftHartbow996(actor),
+    Number(form.elements.namedItem('weaponToolQuality')?.value??0),[1,2].map(n=>form.elements.namedItem('weaponHelper'+n)?.value).filter(Boolean));
+   if(item.meleeWeapon&&fletching.helperIds.some(id=>!weaponWorkOptions(actor,TIMED_SKILL_NAMES_600[kind]).some(h=>h.person.id===id)))
+    throw Error('Pomocník musí být způsobilým členem kampaně s alespoň polovinou ML výrobce.');
    if(!availableMasteries(actor).some(m=>m.name===TIMED_SKILL_NAMES_600[kind])||item.kuzhan&&!isKuzhan996(actor)||
     item.rareTransfer&&!isKuzhan996(actor)&&!form.elements.namedItem('leverTraining').checked||fletching.providerId&&!fletchingMakers996(actor).some(c=>c.id===fletching.providerId))
     throw Error('Projekt vyžaduje způsobilého výrobce, původ a dílnu.');
@@ -14599,6 +14622,7 @@ document.addEventListener('submit',event=>{
    ...(recipe?{...confirmCraftStart600(kind,scope,start,agingRolls,{exactCalendar,spiritMonths}),materialSourceConfirmed:true}:{}),
    ...(TIMED_CRAFT_ITEMS_599[kind]?{
      craftItemName:TIMED_CRAFT_ITEMS_599[kind][scope].name,
+     printedMaterialCostD:printedCraftMaterialCost(kind,scope),
      craftItemPriceD:TIMED_CRAFT_ITEMS_599[kind][scope].priceD,
      craftItemWeightLb:TIMED_CRAFT_ITEMS_599[kind][scope].weightLb,
      materialSourceConfirmed:form.elements.namedItem('materialSourceConfirmed')?.checked===true
@@ -17101,7 +17125,9 @@ function hskRequiredSR(form,primary){
  // HMK 67: easy climbs use a Success Test; Climbing SV is the difficult climb.
  if(hskSRMode(form)!=='value')return '';
  if(primary==='Climbing')return 'climbing-difficult';
- if(primary==='Fletching'&&selectedFletchingProject996(form)?.fletching996.hartbow)return 'fletching-hartbow';
+ const workshop=selectedFletchingProject996(form);
+ if(primary==='Fletching'&&workshop?.fletching996.hartbow)return 'fletching-hartbow';
+ if(primary==='Weaponcraft'&&FLETCHING_ITEMS[workshop?.scope]?.name==='Longknife'&&canCraftHartbow996(character(selected)))return 'weaponcraft-faerie';
  const writing=skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='writing';
  return writing&&isWritingLanguage(primary)?'language-written':'';
 }
@@ -17524,6 +17550,14 @@ function hskOrienteeringSVHelpers93818(form,primary){
 function hskSVHelpers93818(form,primary){
  const orient=[form?.elements.namedItem('orientAssist1')?.value,form?.elements.namedItem('orientAssist2')?.value].filter(Boolean);
  if(orient.length)return hskOrienteeringSVHelpers93818(form,primary);
+ const project=selectedFletchingProject996(form);
+ if(project&&FLETCHING_ITEMS[project.scope].meleeWeapon){
+  return project.fletching996.helperIds.map(id=>{
+   const actor=character(id),mastery=skillActorMastery(actor,primary);
+   if(!actor||mastery.ml<1)throw Error('V evidenci chybí dovednost původního pomocníka.');
+   return {actor,mastery};
+  });
+ }
  return hskAlchemySVHelpers(form,primary);
 }
 function hskAlchemySVHelpers(form,primary){
@@ -17868,7 +17902,7 @@ document.addEventListener('submit',async event=>{
    const winner=comparison.winner==='a'?actor.name:comparison.winner==='b'?other.name:comparison.bothFailed?'Nikdo (oba testy neuspěly)':'Nikdo (remíza)';
    body+='\n\n'+hskResultText('B',b)+'\n\nVítěz: '+winner+' · Victory Stars: '+comparison.stars+' '+(comparison.stars?'★'.repeat(Math.min(10,comparison.stars)):'—')+
      (comparison.persuasionTie?'\nPersuasion: HMK str.138 vyžaduje rozhodnout i neúspěšnou remízu F/F nebo CF/CF.':'');
-  }else if(sv){if(a.helpers.length)body+='\n'+(hskOrienteeringAssistanceContext93818()?'Orienteering Assistance · HMK 145':'Alchemy Assistance · HMK 268')+' · '+a.helpers.map(x=>x.actor.name+' ML '+x.mastery.ml+' (Index '+x.mastery.index+')').join('; ')+' · bonus EML +'+a.result.assistance;body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
+  }else if(sv){if(a.helpers.length)body+='\n'+(hskOrienteeringAssistanceContext93818()?'Orienteering Assistance · HMK 145':selectedFletchingProject996(form)?.fletching996.helperIds?'Pomoc při výrobě · HMK 88':'Alchemy Assistance · HMK 268')+' · '+a.helpers.map(x=>x.actor.name+' ML '+x.mastery.ml+' (Index '+x.mastery.index+')').join('; ')+' · bonus EML +'+a.result.assistance;body+='\n\nIndex Primary ML '+a.result.index+' + SL modifier '+({'CF':-2,'F':-1,'S':0,'CS':1}[a.result.level])+
     ' + předepsaný SR bonus '+(a.result.secondarySVBonus||0)+' = SV '+a.result.sv+' · '+a.result.svTier.label+' · '+a.result.svTier.stars+' SV ★ '+(a.result.svTier.stars?'★'.repeat(Math.min(10,a.result.svTier.stars)):'—')+(a.result.level==='CF'?'\nPozor: CF může podle konkrétní činnosti způsobit další následek bez ohledu na hodnotu SV.':'');
   }else body+='\nUnopposed Victory Stars: '+a.result.unopposedStars+' '+(a.result.unopposedStars?'★'.repeat(a.result.unopposedStars):'—');
   const makingLock=sv&&selectedFletchingProject996(form)?.kind==='lockcraft';
@@ -17891,6 +17925,9 @@ document.addEventListener('submit',async event=>{
    preliminaryArmour:a.ctx.armourIsProvisional||b?.ctx.armourIsProvisional||false,stimulantA:a.ctx.stimulant??null,stimulantB:b?.ctx.stimulant??null,herbalCharmA:a.ctx.herbalCharm??null,herbalCharmB:b?.ctx.herbalCharm??null,darkvisionA:a.ctx.darkvision??null,darkvisionB:b?.ctx.darkvision??null,eruditionA:a.erudition??null,eruditionB:b?.erudition??null,footpadA:a.footpad??null,footpadB:b?.footpad??null,seductionConfirmed:opposed&&hskSelectedSeduction(form),emlRangeA:a.emlRange,emlRangeB:b?.emlRange||null,secondarySkills:a.secs.map(x=>x.name),secondarySkillsB:b?.secs.map(x=>x.name)||[],
    secondaryRollResult:a.sr,secondaryRollResultB:b?.sr||null,
    ...(secondaryProxy?{fletchingSecondaryProxy:secondaryProxy}:{}),
+   ...(sv&&selectedFletchingProject996(form)?.fletching996.helperIds?{
+    weaponWorkHelpers:a.helpers.map(x=>({actorId:x.actor.id,ml:x.mastery.ml}))
+   }:{}),
    ...(sv&&a.info.primary==='Alchemy'&&a.sr?.routineId==='alchemy-elixir'?{helpers:a.helpers.map(x=>({actorId:x.actor.id,skill:'Alchemy',ml:x.mastery.ml}))}:{}),
    ...(sv&&hskOrienteeringAssistanceContext93818()&&a.info.primary==='Survival'?{
     helpers:a.helpers.map(x=>({actorId:x.actor.id,skill:'Survival',ml:x.mastery.ml,index:x.mastery.index})),
@@ -20494,12 +20531,14 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   selected=actor.id;view='skills';activeSkillTab='value';skillSVChoice595={actorId:actor.id,kind:'timed',value:'construction'};render();
   form=q('form[data-construction-project]:not([data-construction-project="start"])').find(f=>f.elements.namedItem('startId')?.value===sourceId);
   break;
+ case 'printed-craft-project':
  case 'fletching-project':
   selected=actor.id;view='skills';activeSkillTab='value';skillSVChoice595={actorId:actor.id,kind:'timed',
    value:data.journal.find(j=>j.id===sourceId)?.calendarSkillProjectStart591?.kind??'fletching'};
   render();
   form=q('form[data-fletching-finish]').find(f=>f.elements.namedItem('startId')?.value===sourceId)||
    document.querySelector('#skill-value-form');
+  if(form?.id==='skill-value-form')choose(form,'timedProjectId',sourceId);
   break;
  case 'brew-mature':
   selected=actor.id;view='skills';activeSkillTab='value';skillSVChoice595={actorId:actor.id,kind:'timed',value:'brewing'};render();
@@ -20574,7 +20613,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
    kind==='writing-retry'?form.elements.namedItem('rollA'):
    kind==='shipwright-project'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name="timePct"]')||form.querySelector('button[type="submit"]')):
    kind==='construction-project'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled])')||form.querySelector('button[type="submit"]')):
-   kind==='fletching-project'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled])')||form.elements.namedItem('timeStars')||form.querySelector('input[name=roll10A]:not(:disabled):not([readonly]), input[name=rollA]:not(:disabled):not([readonly])')||form.querySelector('button[type=submit]')):
+   ['fletching-project','printed-craft-project'].includes(kind)?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled])')||form.elements.namedItem('timeStars')||form.querySelector('input[name=roll10A]:not(:disabled):not([readonly]), input[name=rollA]:not(:disabled):not([readonly])')||form.querySelector('button[type=submit]')):
    kind==='brew-mature'?(form.elements.namedItem('workshopTN')||form.querySelector('button[type="submit"]')):
    kind==='script-reading'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled])')||form.elements.namedItem('timeStars')||form.querySelector('button[type="submit"]')):
    kind==='script-copy'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled])')||form.elements.namedItem('timeStars')):

@@ -1,4 +1,4 @@
-import {isWorkshopCraft,WORKSHOP_CRAFT_PROJECTS} from './hmk-fletching-work.js?v=93.998';
+import {isWorkshopCraft,WORKSHOP_CRAFT_PROJECTS} from './hmk-fletching-work.js?v=94.001';
 /** Automatic HMK follow-up discovery. No dice, no guessed physical context.
  * Every obligation is derived from an actual persistent state or a committed
  * Skill Test. Calendar date is authoritative; combat rounds are not minutes.
@@ -438,7 +438,16 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   const allocation=journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===row.id)?.calendarSkillFletchingAllocation996;
   const step=allocation?'potvrdit dokončení':source?'vyhodnotit výsledek':'provést Success Value';
   push(person,'fletching-project',row.id,WORKSHOP_CRAFT_PROJECTS[project.kind].label+' · '+project.projectName+' · '+step,
-   allocation?.outcome.dueMinute??project.earliestMinute,'skills',{requiresAction:false});
+   allocation?.outcome.dueMinute??source?.campaignMinute??project.earliestMinute,'skills',{requiresAction:false});
+ }
+ for(const row of journal){
+  const project=row.calendarSkillProjectStart591;
+  if(!['glassworking','woodworking'].includes(project?.kind)||row.calendarCampaignId!==clock.campaignId||
+   journal.some(x=>x.calendarSkillProjectSV591?.startId===row.id))continue;
+  const person=characters.find(c=>c.id===row.characterId);
+  if(person)push(person,'printed-craft-project',row.id,
+   (project.kind==='glassworking'?'Glassworking':'Woodworking')+' · '+project.projectName+' · provést Success Value',
+   project.earliestMinute,'skills',{requiresAction:false});
  }
  for(const row of journal){
   const plan=row.calendarConstructionStart;

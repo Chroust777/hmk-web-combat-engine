@@ -1,4 +1,4 @@
-import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=93.998';
+import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=94.001';
 /** HârnMaster 1.2 pp.70,132: prospective scheduling of actual skill work.
  * Read-only arithmetic/validation. Never invents a roll or a project.
  * Existing unscheduled historical skill tests are unchanged.
@@ -23,6 +23,8 @@ export const TIMED_CRAFT_ITEMS_599=Object.freeze({
   hourglass:Object.freeze({name:'Hourglass',priceD:150,weightLb:0.3}),
   inkwell:Object.freeze({name:'Inkwell, 2 oz',priceD:30,weightLb:1}),
   lenses:Object.freeze({name:'Lenses',priceD:120,weightLb:0.1}),
+  vial4oz:Object.freeze({name:'Vial, 4 oz',priceD:4,weightLb:0.25}),
+  clearWindow:Object.freeze({name:'Window, plain, ft²',priceD:2,weightLb:3}),
   stainedWindow:Object.freeze({name:'Window, stained, ft²',priceD:12,weightLb:4})
  }),
  woodworking:Object.freeze({
@@ -35,7 +37,17 @@ export const TIMED_CRAFT_ITEMS_599=Object.freeze({
   chair:Object.freeze({name:'Chair',priceD:12,weightLb:7}),
   chest:Object.freeze({name:'Chest, 1×2×2 ft',priceD:18,weightLb:24}),
   table:Object.freeze({name:'Table, 4×2×6 ft',priceD:36,weightLb:47}),
-  wheelbarrow:Object.freeze({name:'Wheelbarrow',priceD:10,weightLb:24})
+  wheelbarrow:Object.freeze({name:'Wheelbarrow',priceD:10,weightLb:24}),
+  decoratedBox:Object.freeze({name:'Box, 12×8×6 in',priceD:2,weightLb:3}),
+  bucket3:Object.freeze({name:'Bucket, 3 gal',priceD:8,weightLb:10}),
+  cabinet:Object.freeze({name:'Cabinet',priceD:144,weightLb:60}),
+  cage27:Object.freeze({name:'Cage, 27 ft³',priceD:15,weightLb:40}),
+  cage1:Object.freeze({name:'Cage, 1 ft³',priceD:7,weightLb:4}),
+  trunk:Object.freeze({name:'Trunk, 1½×2×3½ ft',priceD:12,weightLb:40}),
+  wagon:Object.freeze({name:'Wagon, 4-wheel',priceD:220,weightLb:800}),
+  cartSled:Object.freeze({name:'Cart/Sled',priceD:80,weightLb:200}),
+  wheel:Object.freeze({name:'Wheel',priceD:18,weightLb:20}),
+  oxYoke:Object.freeze({name:'Yoke, Ox',priceD:3,weightLb:2})
  })
 });
 export const TIMED_CRAFT_LABELS_599=Object.freeze({glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91'});
@@ -54,11 +66,15 @@ export function timedSkillBaseMinutes591(kind,scope){
  if(kind==='glassworking'||kind==='woodworking'){
   const item=TIMED_CRAFT_ITEMS_599[kind]?.[scope];
   if(!item)return null;
-  // Glassworking: approximately one 24h day per 6d (only exact day
-  // multiples are offered). Woodworking: 10 working hours per 3d.
-  return kind==='glassworking'?(item.priceD/6)*1440:(item.priceD/3)*600;
+  // Glassworking: one 24-hour day per 6d. Woodworking: ten hours per 3d.
+  return kind==='glassworking'?item.priceD*240:item.priceD*200;
  }
  return null;
+}
+export function printedCraftMaterialCost(kind,scope){
+ const item=TIMED_CRAFT_ITEMS_599[kind]?.[scope];
+ if(!item)return null;
+ return kind==='glassworking'?item.priceD*5/12:item.weightLb/30;
 }
 export function skillTimedEarliest591(kind,baseMinutes){
  // Without optional randomization, up to 3 successful Maths dice AFTER the
@@ -115,8 +131,8 @@ export function validateSkillTimedWork591(data){
     JSON.stringify(jewelcraftWork994(p.jewelcraft994))===JSON.stringify(p.jewelcraft994))&&
    (!p.writingPlan||p.kind==='writing'&&validWritingPlan(p.writingPlan,p.actorId,p.scope))&&
    (isWorkshopCraft(p.kind)?(()=>{
-    const f=p.fletching996,plan=fletchingPlan(p.scope,f?.workshop,f?.providerId,f?.hartbow);
-    return f.providerId!==p.actorId&&JSON.stringify(f)===JSON.stringify(plan)&&
+    const f=p.fletching996,plan=fletchingPlan(p.scope,f?.workshop,f?.providerId,f?.hartbow,f?.toolQuality,f?.helperIds);
+    return f.providerId!==p.actorId&&(!f.helperIds||f.helperIds.every(id=>id!==p.actorId&&data.characters.some(person=>person.id===id)))&&JSON.stringify(f)===JSON.stringify(plan)&&
      p.earliestMinute===fletchingDue(p.scope,p.startMinute,f,0.7)&&p.baseDueMinute===fletchingDue(p.scope,p.startMinute,f);
    })():CRAFT_WORK_600[p.kind]?(()=>{
     const exactCalendar=p.kind==='ceramics'&&p.craftExact994===true||p.kind==='brewing'&&p.brewing995===true;
@@ -137,6 +153,7 @@ export function validateSkillTimedWork591(data){
      p.craftItemPriceD===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.priceD&&
      p.craftItemWeightLb===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.weightLb&&
      p.craftItemName===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.name&&
+     (!Object.hasOwn(p,'printedMaterialCostD')||p.printedMaterialCostD===printedCraftMaterialCost(p.kind,p.scope))&&
      p.materialSourceConfirmed===true)),
    'Časovaný Skill Test: začátek projektu nebo pravidlová doba byly pozměněny.');
   starts.set(row.id,{row,p});
