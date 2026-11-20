@@ -4,7 +4,7 @@ import {engineeringDesignCandidate,ENGINEERING_DESIGN_DAYS} from './hmk-engineer
 /** Skill Workbench v93.274: clearer HMK pp.60–62 separation.
  * Secondary Mastery is no longer a standalone d10-only gadget.
  */
-import {availableMasteries} from './hmk-skill-test-engine.js';
+import {availableMasteries,canResolveOpposedTie} from './hmk-skill-test-engine.js';
 import {automaticSkillContext} from './hmk-skill-auto-context.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './hmk-skill-load-evidence.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineEligible} from './hmk-skill-secondary-routines.js';
@@ -173,10 +173,13 @@ export function skillWorkbenchHTML(character,roster,inventory=[],journal=[],acti
  const entries=availableMasteries(character),rivals=roster.filter(c=>c.id!==character.id),first=rivals[0],firstSkill=entries[0]?.name??'';
  const last=[...journal].filter(x=>x.characterId===character.id&&x.skillTestProof&&['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(x.skillTestProof.type)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
  const prior=last?.skillTestProof?.result;
- const previousOpposed=[...journal].reverse().find(x=>x.characterId===character.id&&x.skillTestProof?.type==='opposed-success-test');
+ const resolvedTies=new Set(journal.filter(x=>x.skillTestProof?.type==='opposed-tiebreak').map(x=>x.skillTestProof.originSkillTestId));
+ const isOpenTie=({id,skillTestProof:p})=>!!(p.comparison?.tie&&!resolvedTies.has(id)&&
+  canResolveOpposedTie(p.a,p.b,{persuasion:!!p.comparison.persuasionTie}));
+ const opposedTests=journal.filter(x=>x.characterId===character.id&&x.skillTestProof?.type==='opposed-success-test');
+ const previousOpposed=opposedTests.find(x=>x.skillTestProof.comparison?.persuasionTie&&isOpenTie(x))??opposedTests.at(-1);
  const tied=previousOpposed?.skillTestProof;
- const hasBreak=tied&&journal.some(x=>x.skillTestProof?.type==='opposed-tiebreak'&&x.skillTestProof.originSkillTestId===previousOpposed.id);
- const eligibleTie=!!(tied?.comparison?.tie&&(tied.a?.sl>=2||tied.comparison.persuasionTie)&&tied.a.sl===tied.b?.sl&&Number.isInteger(tied.a.roll)&&Number.isInteger(tied.b.roll)&&!hasBreak);
+ const eligibleTie=!!previousOpposed&&isOpenTie(previousOpposed);
  const requiresD10=eligibleTie&&tied.a.roll===tied.b.roll&&tied.a.ml===tied.b.ml;
  const breakHTML=eligibleTie?`<form id="skill-tiebreak-form" class="hsk-tiebreak"><input type="hidden" name="originId" value="${E(previousOpposed.id)}"><h4>${tied.comparison.persuasionTie?'Povinný rozstřel Persuasion · HMK str. 138':'Dobrovolný rozstřel · HMK str. 61'}</h4><p>${E(tied.skills?.[0]||'Skill Test')} · ${E(character.name)} proti ${E(roster.find(c=>c.id===tied.opponentId)?.name||'oponentovi')} · ${E(tied.a.level)} / ${E(tied.b.level)} · dosud <strong>remíza (0 ★)</strong>.</p><p class="tiny muted">${tied.comparison.persuasionTie?'U Persuasion se podle HMK str.138 rozhodují i remízy neúspěchů.':'Použij jen tam, kde konkrétní činnost vyžaduje vítěze.'} Původní d100 se neopakují. Rozstřel dává 1 ★ a zapisuje se zvlášť.</p>${requiresD10?`<p>Shodný původní d100 i ML: rozhodují dva d10. Při rovnosti d10 se oba hody opakují.</p><div class="hsk-form-grid"><label>Fyzický d10 aktivní strany<input name="tieD10A" type="number" min="1" max="10" step="1"></label><label>Fyzický d10 oponenta<input name="tieD10B" type="number" min="1" max="10" step="1"></label></div>`:`<p>Rozhodnutí proběhne podle vyššího ${tied.a.roll===tied.b.roll?'původního Primary ML':'původního d100'} bez dalších hodů.</p>`}<button type="submit">Rozhodnout remízu · 1 ★</button><output class="hsk-tiebreak-message" role="status" aria-live="polite"></output></form>`:'';
  return `<section class="panel wide hmk-skill-workbench" id="hmk-skill-workbench"><div class="topline"><div><h2>⚄ Skill Tests · HMK v1.2</h2><p class="muted">Tři pracovní panely. Primární d100 je vždy hlavní test; volitelné Secondary Modifiers upravují EML, Secondary Roll d10 a TN se aktivují jen u doložených činností HMK. Při opozici testují obě strany současně. Skutečné bojové útoky a obrany se dál řeší výhradně v Combat.</p></div><button type="button" class="secondary" data-open="${E(character.id)}">Character Sheet ↗</button></div>
