@@ -38,7 +38,7 @@ import {PRINTED_STARTER_GEAR_P120,prepareStartingKit} from './src/integration/hm
 import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,interpretCharacterDescription} from './src/integration/hmk-generator-traits.js';
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
-import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.985';
+import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.986';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=93.983';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
@@ -100,8 +100,8 @@ import {createPotableWaterFill,recordPhysicalWaterTransfer,recordPhysicalWaterLo
 import {createForagingWaterStorage,validateForagingWaterStorageJournal} from './src/integration/hmk-foraging-water-storage.js';
 import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,setWeaponGrip,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
-import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,gmSenseRows,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js?v=93.985';
-import {creationWizardHTML,characterCalculationHTML,chronicleSenseRows,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js?v=93.985';
+import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,gmSenseRows,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js?v=93.986';
+import {creationWizardHTML,characterCalculationHTML,chronicleSenseRows,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js?v=93.986';
 import {isStableAnimalProfile93813,registryCharacters93813,registryCounts93813} from './src/integration/hmk-character-registry-separation-93813.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/integration/hmk-creation-psyche.js';
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.985';
+const APP_VERSION='93.986';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5513,8 +5513,8 @@ function journalSkillColumnsHTML(c){
    const skillName=String(row.name);
    const baseName=skillName.replace(/\s*\(.*?\).*$/,'').replace(/^(2nd|3rd)\s+/,'');
    const specific=JOURNAL_SKILL_HELP[skillName]||JOURNAL_SKILL_HELP[baseName]||JOURNAL_SKILL_HELP[baseName.split(' ')[0]];
-   const meaning=(specific||'Samostatně evidovaná specializace dovednosti. Podrobné použití vyžaduje příslušný pravidlový popis.')+' Při Skill Checku se provádí d100 proti EML odvozenému z ML a okolností (HMK str. 60–62).';
-   const basisHelp='Skill Base a atributy: '+basis+'. SB vychází z hlavního a vedlejšího atributu. Základní ML = SB × SM; DP zvyšují SM (HMK str. 46).';
+   const meaning=row.help||((specific||'Samostatně evidovaná specializace dovednosti. Podrobné použití vyžaduje příslušný pravidlový popis.')+' Při Skill Checku se provádí d100 proti EML odvozenému z ML a okolností (HMK str. 60–62).');
+   const basisHelp=row.help||('Skill Base a atributy: '+basis+'. SB vychází z hlavního a vedlejšího atributu. Základní ML = SB × SM; DP zvyšují SM (HMK str. 46).');
    return `<li><span class="journal-skill-name"><span${journalHelp(skillName,meaning)}>${esc(skillName)}</span><small class="journal-skill-basis"${journalHelp('SB',basisHelp)}>${esc(basis)}</small></span><strong${journalHelp('ML',JOURNAL_NUMERIC_HELP.ML+' Pro '+skillName+' je aktuální ML '+(row.ml??'neurčeno')+'.')}>${esc(row.ml??'—')}</strong></li>`;
   }).join('')}</ul></section>`;
  }).join('')}</div></section>`;
@@ -26135,7 +26135,7 @@ let hmkJournalTooltip=null,hmkJournalTooltipTarget=null;
 function hmkHideJournalTooltip(){if(hmkJournalTooltip)hmkJournalTooltip.hidden=true;hmkJournalTooltipTarget=null;}
 function hmkShowJournalTooltip(element){
  const fateDialog=element?.closest?.('dialog.hmk-fate-dialog-93866');
- if(!element||!element.isConnected||(!element.closest('.journal-book, .hc-trek-routine, .hc-campaign-book, .hmk-gm-chronicle-person, .hc-story-receipt')&&!fateDialog))return;
+ if(!element||!element.isConnected||(!element.closest('.journal-book, .journal-edit-skills-surface, .hc-trek-routine, .hc-campaign-book, .hmk-gm-chronicle-person, .hc-story-receipt')&&!fateDialog))return;
  const explanation=element.getAttribute('data-hmk-help');if(!explanation)return;
  // The custom help bubble is authoritative; the native browser title
  // would display a second (white) bubble with the same explanation.
