@@ -1,4 +1,4 @@
-import {isMissileCraft,MISSILE_CRAFT_PROJECTS} from './hmk-fletching-work.js?v=93.997';
+import {isWorkshopCraft,WORKSHOP_CRAFT_PROJECTS} from './hmk-fletching-work.js?v=93.998';
 /** Automatic HMK follow-up discovery. No dice, no guessed physical context.
  * Every obligation is derived from an actual persistent state or a committed
  * Skill Test. Calendar date is authoritative; combat rounds are not minutes.
@@ -294,6 +294,8 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    // Skill Test with the same skill must not stop the campaign clock.
    if(x.skill==='Survival'&&!deferredAccident)continue;
    if(x.skill==='Animalcraft'&&!p.animalTrainingSV590)continue;
+   // A timed manufacturing test has its own setback and loss-of-time schedule.
+   if(x.side==='A'&&x.skill==='Lockcraft'&&e.calendarSkillProjectSV591?.kind==='lockcraft')continue;
    // An Orienteering Survival CF already has its mandatory p.148 Survival
    // Hazard resolved by the *same* confirmed travel episode. Do not create a
    // second, generic calendar CF for the identical d100. During atomic episode
@@ -428,14 +430,14 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  }
  for(const row of journal){
   const project=row.calendarSkillProjectStart591;
-  if(!isMissileCraft(project?.kind)||row.calendarCampaignId!==clock.campaignId||
+  if(!isWorkshopCraft(project?.kind)||row.calendarCampaignId!==clock.campaignId||
    journal.some(x=>x.calendarSkillFletching996?.startId===row.id))continue;
   const person=characters.find(c=>c.id===row.characterId);
   if(!person)continue;
   const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===row.id);
   const allocation=journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===row.id)?.calendarSkillFletchingAllocation996;
   const step=allocation?'potvrdit dokončení':source?'vyhodnotit výsledek':'provést Success Value';
-  push(person,'fletching-project',row.id,MISSILE_CRAFT_PROJECTS[project.kind].label+' · '+project.projectName+' · '+step,
+  push(person,'fletching-project',row.id,WORKSHOP_CRAFT_PROJECTS[project.kind].label+' · '+project.projectName+' · '+step,
    allocation?.outcome.dueMinute??project.earliestMinute,'skills',{requiresAction:false});
  }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an

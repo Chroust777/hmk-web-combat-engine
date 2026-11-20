@@ -19,7 +19,7 @@ const SELECTIONS={
  trauma:['restfulShelter','arcaneBonus','physicianStars'],
  alchemy:[],brewStart:['scope'],brewWine:['workshopTN'],jewelcraft:['jewelTime'],reading:['sourceId','condition','timeStars','exchanged','useCreativity'],copy:[],writing:['timeStars','subjectSkill']
 };
-const title={fletching:'Fletching · potvrzení hodů',brewStart:'Brewing · doba zrání',brewWine:'Brewing · cena vína',jewelcraft:'Jewelcraft · doba výroby',reading:'Reading · potvrzení hodů',copy:'Opis · potvrzení d100',writing:'Insight a Scribing · HMK 83, 132',skillFollowup:'Navazující Skill Test',fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
+const title={fletching:'Výroba · potvrzení hodů',brewStart:'Brewing · doba zrání',brewWine:'Brewing · cena vína',jewelcraft:'Jewelcraft · doba výroby',reading:'Reading · potvrzení hodů',copy:'Opis · potvrzení d100',writing:'Insight a Scribing · HMK 83, 132',skillFollowup:'Navazující Skill Test',fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
  frost:'Frost Amputation · hody v pořadí',bloodComplete:'Blood Stoppage a případný Blood Loss',blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',immersion:'Cold Water Shock',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
 const value=(form,name)=>form.elements.namedItem(name)?.value||'';
 const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n))&&Number(n)>=1&&Number(n)<=max;
@@ -56,7 +56,10 @@ function stepsFor(form,kind){
  const result=[];
  const add=(key,faces,label,fieldName=key,seq=null)=>result.push({key,faces,label,fieldName,seq});
  if(kind==='fletching'){
-  if(form.dataset.fletchingFlaw==='yes')add('flaw',2,'Vada výrobku d2','fletchingDice',0);
+  if(form.dataset.fletchingFlaw==='6'){
+   add('lost1',6,'Ztracené dny · d6 1/2','fletchingDice',0);
+   add('lost2',6,'Ztracené dny · d6 2/2','fletchingDice',1);
+  }else if(form.dataset.fletchingFlaw==='2')add('flaw',2,'Vada výrobku d2','fletchingDice',0);
   else{
    const count=Number(form.dataset.fletchingStars)-Number(value(form,'timeStars'));
    for(let i=0;i<count;i++)add('mws'+i,10,'Masterwork d10 '+(i+1)+'/'+count,'fletchingDice',i);

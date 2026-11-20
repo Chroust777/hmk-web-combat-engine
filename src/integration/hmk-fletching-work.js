@@ -1,4 +1,4 @@
-/** Fletching project evidence from HMK pp. 71–72, 109. */
+/** Timed workshop projects with individual Masterwork rolls, HMK pp. 71–72, 78, 88, 109. */
 import {PRINTED_MISSILE_WEAPONS_P109_110} from '../rules/missile-weapons-printed-p109-110.js';
 
 const stock = Object.fromEntries([
@@ -27,12 +27,13 @@ for(const item of PRINTED_MISSILE_WEAPONS_P109_110){
   wq:item.properties.quality,draw:item.properties.draw,rangeFt:item.properties.baseRangeFt,priceD:item.properties.pricePence,
   secondary:family==='kuzhanSteelbow'?['Metalcraft']:['Woodworking',family==='compositeBow'?'Hideworking':'Timbercraft']};
 }
-export const MISSILE_CRAFT_PROJECTS=Object.freeze({
+export const WORKSHOP_CRAFT_PROJECTS=Object.freeze({
+ lockcraft:{label:'Lockcraft · HMK 78',primary:'Lockcraft'},
  fletching:{label:'Fletching · HMK 71–72',primary:'Fletching'},
  slingcraft:{label:'Praky · Hideworking · HMK 72',primary:'Hideworking'},
  missileMetalcraft:{label:'Střely a napínáky · Metalcraft · HMK 72',primary:'Metalcraft'}
 });
-export const isMissileCraft=kind=>Object.hasOwn(MISSILE_CRAFT_PROJECTS,kind);
+export const isWorkshopCraft=kind=>Object.hasOwn(WORKSHOP_CRAFT_PROJECTS,kind);
 Object.assign(stock,{
  handSling:{kind:'slingcraft',name:'Prak',costD:2,hours:10,wq:9,secondary:[]},
  staffSling:{kind:'slingcraft',name:'Tyčový prak',costD:4,hours:20,wq:9,secondary:['Woodworking']},
@@ -41,7 +42,14 @@ Object.assign(stock,{
  crossbowLever:{kind:'missileMetalcraft',name:'Napínák Lever',costD:6,hours:40,pull:5,rareTransfer:true,secondary:[]},
  crossbowWindlass:{kind:'missileMetalcraft',name:'Napínák Windlass',costD:15,hours:90,pull:10,kuzhan:true,secondary:[]}
 });
-export function missileCraftItem(kind,scope){
+const lockCosts=[2,3,4,6,12,24,36,60,120];
+const lockHours=[50,75,100,150,240,400,450,600,1000];
+for(const [index,costD] of lockCosts.entries()){
+ const complexity=index+1;
+ stock['lock'+complexity]={kind:'lockcraft',name:'Zámek či mechanismus · Complexity '+complexity,
+  costD,hours:lockHours[index],complexity,secondary:['Metalcraft']};
+}
+export function workshopCraftItem(kind,scope){
  if(!Object.hasOwn(stock,scope))return null;
  const item=stock[scope];
  return (item.kind??'fletching')===kind?item:null;
@@ -67,24 +75,33 @@ export function fletchingNeeds(scope,proof,timeStars){
  if(!Number.isSafeInteger(sv)||!['CF','F','S','CS'].includes(level))throw Error('Chybí původní Success Value výroby.');
  const stars=Math.max(0,Math.min(5,sv-4));
  if(!fieldValid(timeStars,0,Math.min(3,stars)))throw Error('Na čas lze použít nejvýše tři získané hvězdy.');
- const max=stock[scope].pull?5:stock[scope].projectiles?2:stock[scope].wq-8;
- return {flaw:sv<=2,count:stars-timeStars,max,factor:(100+(level==='CF'?50:0)-10*timeStars)/100};
+ const item=stock[scope],max=item.complexity||item.pull?5:item.projectiles?2:item.wq-8;
+ const faces=sv<=2?(item.complexity?6:2):10;
+ return {flaw:sv<=2,count:stars-timeStars,max,faces,dice:sv<=2?(item.complexity?2:1):stars-timeStars,factor:(100+(level==='CF'?50:0)-10*timeStars)/100};
 }
 export function fletchingOutcome(project,proof,timeStars,rolls){
  const {scope,startMinute,fletching996:plan}=project;
  const need=fletchingNeeds(scope,proof,timeStars);
- if(!Array.isArray(rolls)||rolls.length!==(need.flaw?1:need.count)||
-  !rolls.every(n=>fieldValid(n,1,need.flaw?2:10)))throw Error('Potvrďte všechny předepsané kostky zvlášť.');
+ if(!Array.isArray(rolls)||rolls.length!==need.dice||
+  !rolls.every(n=>fieldValid(n,1,need.faces)))throw Error('Potvrďte všechny předepsané kostky zvlášť.');
  const item=stock[scope],successes=need.flaw?0:rolls.filter(n=>n<=plan.workshop).length;
+ const dueMinute=fletchingDue(scope,startMinute,plan,need.factor);
+ if(item.complexity){
+  const achieved=need.flaw?null:Math.min(item.complexity,4+successes);
+  const lostDays=need.flaw?rolls[0]+rolls[1]:0;
+  return {timeStars,rolls:[...rolls],successes,requestedComplexity:item.complexity,
+   achievedComplexity:achieved,lostDays,materialCostD:plan.costD,salePriceD:achieved===null?null:6*lockCosts[achieved-1],
+   dueMinute:dueMinute+lostDays*1440};
+ }
  const applied=Math.min(need.max,successes),mod=Math.floor(applied/2);
  const flaw=need.flaw?rolls[0]*(proof.a.sv<=0?2:1):0;
  if(item.pull)return {timeStars,rolls:[...rolls],successes,applied,
   flaw,drawBonusPct:mod*10,pull:item.pull,valueMultiplier:applied+1,
-  dueMinute:fletchingDue(scope,startMinute,plan,need.factor)};
+  dueMinute};
  return {timeStars,rolls:[...rolls],successes,applied,
   qualityDelta:Math.ceil(applied/2)-flaw,impactDelta:item.projectiles?mod-flaw:null,
   rangeDeltaFt:item.projectiles?null:(mod-flaw)*30,
-  valueMultiplier:applied+1,dueMinute:fletchingDue(scope,startMinute,plan,need.factor),
+  valueMultiplier:applied+1,dueMinute,
   halfDraw:!!(plan.hartbow&&proof.secondaryRollResult?.success)};
 }
 export function validFletchingProof(project,proof){
