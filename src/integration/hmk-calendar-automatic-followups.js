@@ -11,7 +11,7 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
-import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.991';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.992';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -390,7 +390,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   const state=writingProjectState(journal,row);
   if(state.phase==='retry')push(person,'writing-retry',row.id,
    'Writing · volitelný nový Language (Creativity SR) · '+project.projectName+' (HMK 132)',state.readyMinute,'skills',{requiresAction:false});
-  if(state.phase==='finish'&&(state.result.level==='CF'||state.attempt.calendarSkillProjectSV591.previousAttemptId))push(person,'writing-completion',state.attempt.id,
+  if(state.phase==='finish'&&(project.writingPlan||state.result.level==='CF'||state.attempt.calendarSkillProjectSV591.previousAttemptId))push(person,'writing-completion',state.attempt.id,
    'Writing · potvrdit dokončení '+project.projectName+' (HMK 132)',state.dueMinute,'skills');
  }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an

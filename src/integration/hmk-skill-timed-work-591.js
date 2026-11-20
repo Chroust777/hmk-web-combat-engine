@@ -4,6 +4,7 @@
  */
 import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
 import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600} from './hmk-skill-crafts-600.js';
+import {validWritingPlan,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=93.992';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
 export const WRITING_WORK_MINUTES_591=Object.freeze({missive:10,tract:5*1440,treatise:30*1440,disquisition:120*1440});
 export const SKILL_TIMED_WORK_FORMAT_591='hmk-skill-timed-work-591-v1';
@@ -64,7 +65,7 @@ export function writingProjectState(journal,start){
  const project=start?.calendarSkillProjectStart591;
  if(project?.kind!=='writing')return null;
  const rows=journal.filter(row=>row.calendarCampaignId===start.calendarCampaignId&&row.characterId===start.characterId);
- let state={phase:'initial',readyMinute:project.earliestMinute,startMinute:project.startMinute,baseMinutes:project.baseMinutes};
+ let state={phase:'initial',readyMinute:project.earliestMinute,startMinute:project.startMinute,baseMinutes:project.baseMinutes*writingDictationFactor(project.writingPlan)};
  for(const row of rows){
   const link=row.calendarSkillProjectSV591;
   if(link?.startId!==start.id||link.kind!=='writing')continue;
@@ -80,7 +81,7 @@ export function writingProjectState(journal,start){
   const dueMinute=writingCompletionMinute(attempt);
   if(project.scope==='missive'||result?.sv>=5){state={...attempt,phase:'finish',dueMinute};continue;}
   const startMinute=Math.max(dueMinute,row.campaignMinute,follow?.campaignMinute??0);
-  const baseMinutes=Math.ceil(project.baseMinutes*(result?.sv>=3?0.5:1));
+  const baseMinutes=Math.ceil(project.baseMinutes*writingDictationFactor(project.writingPlan)*(result?.sv>=3?0.5:1));
   state={...attempt,phase:'retry',startMinute,baseMinutes,readyMinute:startMinute+baseMinutes};
  }
  if(state.phase==='finish'&&rows.some(row=>row.calendarSkillProjectComplete591?.startId===start.id&&
@@ -96,12 +97,14 @@ export function validateSkillTimedWork591(data){
  for(const row of journal){
   const p=row.calendarSkillProjectStart591;if(!p)continue;
   const base=timedSkillBaseMinutes591(p.kind,p.scope);
+  const plannedBase=base*writingDictationFactor(p.writingPlan);
   assert(p.format===SKILL_TIMED_WORK_FORMAT_591&&base!==null&&
    typeof p.projectName==='string'&&p.projectName.trim().length>=2&&p.projectName.length<=120&&
    p.actorId===row.characterId&&data.characters?.some(c=>c.id===p.actorId)&&
    typeof row.calendarCampaignId==='string'&&row.calendarCampaignId.length>0&&
    Number.isSafeInteger(p.startMinute)&&p.startMinute>=0&&p.startMinute===row.campaignMinute&&
    p.baseMinutes===base&&
+   (!p.writingPlan||p.kind==='writing'&&validWritingPlan(p.writingPlan,p.actorId,p.scope))&&
    (CRAFT_WORK_600[p.kind]?(()=>{
     const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls});
     const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls);
@@ -113,7 +116,7 @@ export function validateSkillTimedWork591(data){
      p.materialSourceConfirmed===true;})():
     (p.calendarDayEligibility600===true?
      (p.kind==='glassworking'&&base%1440===0&&p.earliestMinute===Math.floor((p.startMinute+base)/1440)*1440&&p.baseDueMinute===p.earliestMinute):
-     (p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,base)&&p.baseDueMinute===p.startMinute+base)))&&
+     (p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,plannedBase)&&p.baseDueMinute===p.startMinute+plannedBase)))&&
    !starts.has(row.id)&&
    (!TIMED_CRAFT_ITEMS_599[p.kind]||(
      p.craftItemPriceD===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.priceD&&
@@ -135,7 +138,7 @@ export function validateSkillTimedWork591(data){
    row.characterId===s.p.actorId&&row.calendarCampaignId===s.row.calendarCampaignId&&
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
-   (s.p.kind==='writing'?/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill):
+   (s.p.kind==='writing'?(s.p.writingPlan?skill===s.p.writingPlan.language:/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)):
     skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
    (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
    (!CRAFT_WORK_600[s.p.kind]||row.campaignMinute>=s.p.earliestMinute),
@@ -165,7 +168,7 @@ export function validateSkillTimedWork591(data){
    const t=p.timeReductionStars;
    const originalLevel=source.skillTestProof?.a?.level??source.skillTestProof?.result?.level;
    const state=writingProjectState(journal,s.row);
-   const insightDice=p.physicalInsightDice,required=s.p.scope==='missive'?0:stars-t;
+   const insightDice=p.physicalInsightDice,required=writingIsText(s.p)?stars-t:0;
    const subjectIndex=p.subjectIndex,successful=Array.isArray(insightDice)?insightDice.filter(d=>d<=subjectIndex).length:0;
    const insightLimit={missive:0,tract:1,treatise:3,disquisition:5}[s.p.scope];
    const expectedInsight=Math.min(successful,insightLimit,Math.max(0,subjectIndex-4));
@@ -177,6 +180,18 @@ export function validateSkillTimedWork591(data){
     state?.phase==='complete'&&state.attempt.id===source.id&&
     done.dueMinute===writingCompletionMinute(state,t),
     'Writing: nedoložené Insight d10, hvězdy, Will následek nebo zkrácení času.');
+   const plan=s.p.writingPlan,scribe=p.scribing;
+   if(plan){
+    assert(scribe?.scribeId===plan.scribeId&&scribe.script===plan.script&&scribe.language===plan.language&&
+     typeof scribe.inputs?.forcedCF==='boolean'&&
+     (scribe.inputs.forcedCF?scribe.inputs.roll===null&&scribe.rollOrigin==='rule-forced-no-die':
+     ['manual','software'].includes(scribe.rollOrigin))&&
+     Number.isSafeInteger(scribe.inputs.languageML)&&scribe.inputs.languageML>0&&
+     Number.isSafeInteger(scribe.inputs.drawingML)&&scribe.inputs.drawingML>0,
+     'Writing: chybí doložený Scribing správného písaře, jazyka a písma.');
+    const expected=resolveAuthoredScribing({...scribe.inputs,mode:plan.mode,scope:s.p.scope,intent:plan.intent});
+    assert(JSON.stringify(scribe.outcome)===JSON.stringify(expected),'Writing: výsledek Scribing nesouhlasí s doloženým hodem.');
+   }
   }
   completed.add(done.startId);
  }
