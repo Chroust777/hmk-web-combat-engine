@@ -5,23 +5,27 @@ import {resolveSkillTest,adjustSkillResultForTrauma} from './hmk-skill-test-engi
 import {automaticCriticalFailure} from './hmk-skill-consequence-resolution.js';
 
 export const READING_CONDITION={pristine:0,degraded:-1,damaged:-2};
-const eraThresholds={ancient:[5,30],middle:[25,75],modern:[35,90]};
+export const READING_CONDITION_RULES='hmk-132';
+const eraThresholds={ancient:[5,30],middle:[25,75],modern:[35,85]};
 const scopePages={missive:1,tract:8,treatise:32,disquisition:128};
 const whole=(value,min,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(value)&&value>=min&&value<=max;
 const require=(ok,message)=>{if(!ok)throw Error('Reading: '+message);};
 const matches=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const dice=(rolls,count,faces)=>Array.isArray(rolls)&&rolls.length===count&&rolls.every(x=>whole(x,1,faces));
 
-export function readingCondition(choice,roll=null){
+export function readingCondition(choice,roll=null,rules=READING_CONDITION_RULES){
+ require(rules===READING_CONDITION_RULES||rules===null,'neznámá verze tabulky stavu předlohy.');
  if(Object.hasOwn(READING_CONDITION,choice)){
   require(roll===null,'zadaný stav předlohy nepoužívá hod.');
   return choice;
  }
  require(Object.hasOwn(eraThresholds,choice)&&whole(roll,1,100),'vyber stáří předlohy a potvrď d100.');
- const [pristine,degraded]=eraThresholds[choice];
+ const [pristine,printedDegraded]=eraThresholds[choice];
+ // Earlier receipts lack a version marker and retain their saved threshold.
+ const degraded=rules===null&&choice==='modern'?90:printedDegraded;
  return roll<=pristine?'pristine':roll<=degraded?'degraded':'damaged';
 }
-export function externalReadingSource({name,format,language,script,pages,legibility,subject,insight,conditionChoice,conditionRoll}){
+export function externalReadingSource({name,format,language,script,pages,legibility,subject,insight,conditionChoice,conditionRoll,conditionRules}){
  require(typeof name==='string'&&name.trim().length>0&&name.trim().length<=120,'zadejte název předlohy do 120 znaků.');
  require(['missive','text','cipher'].includes(format)&&writingScripts(language).includes(script)&&whole(pages,1,10000),
   'zadejte platný druh, rozsah, jazyk a odpovídající písmo.');
@@ -29,7 +33,8 @@ export function externalReadingSource({name,format,language,script,pages,legibil
   (format==='cipher'?subject==='Mathematics':format==='missive'?subject===''&&insight===0:!insight||!!subject.trim()),
   'čitelnost musí odpovídat Scribing. Insight vyžaduje předmětovou dovednost.');
  return {name:name.trim(),format,language,script,pages,legibility,subject:subject.trim(),insight,conditionChoice,conditionRoll,
-  condition:readingCondition(conditionChoice,conditionRoll)};
+  condition:readingCondition(conditionChoice,conditionRoll,conditionRules===undefined?null:conditionRules),
+  ...(conditionRules===undefined?{}:{conditionRules})};
 }
 export function readingSource(journal,id,campaignId){
  const row=journal.find(x=>x.id===id&&x.calendarCampaignId===campaignId);
@@ -133,7 +138,7 @@ export function validateReadingJournal(journal){
     require(source&&!occupied&&whole(receipt.pages,1,10000)&&whole(receipt.languageML,1,1000)&&
      readingCanStart(rows,source,receipt.languageML)&&
      (!source.external||receipt.pages===source.pages&&receipt.conditionChoice===source.condition&&receipt.conditionRoll===null)&&
-     (source.purpose==='cipher'?typeof receipt.hasCipherKey==='boolean'&&receipt.pages===source.pages:receipt.hasCipherKey===undefined)&&readingCondition(receipt.conditionChoice,receipt.conditionRoll)===receipt.condition,
+     (source.purpose==='cipher'?typeof receipt.hasCipherKey==='boolean'&&receipt.pages===source.pages:receipt.hasCipherKey===undefined)&&readingCondition(receipt.conditionChoice,receipt.conditionRoll,receipt.conditionRules===undefined?null:receipt.conditionRules)===receipt.condition,
      'nesouhlasí předloha, stav, stránky nebo podmínky pro opakování.');
    }else{
     const start=rows.find(x=>x.id===receipt.startId&&x.calendarScriptReading.stage==='start');

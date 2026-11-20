@@ -2,7 +2,7 @@ import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.000';
 import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof,weaponWorkshopTN} from './src/integration/hmk-fletching-work.js?v=94.001';
 import {JEWELLERY_D_PER_OZ,GEM_D,jewelcraftWork994} from './src/integration/hmk-jewelcraft-work.js?v=93.994';
-import {readingCondition,readingSource,externalReadingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=94.003';
+import {READING_CONDITION_RULES,readingCondition,readingSource,externalReadingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=94.004';
 import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=94.002';
 import {WRITING_LANGUAGES,writingScripts,writingDictationFactor,writingIsText,validWritingPlan,writingFixedSubject,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=94.003';
 import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
@@ -221,7 +221,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.003';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.004';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -320,7 +320,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.003';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.004';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -394,7 +394,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.003';
+const APP_VERSION='94.004';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5322,7 +5322,7 @@ document.addEventListener('submit',event=>{
     pages:Number(value('bookPages')),legibility:Number(value('bookLegibility')),
     subject:format==='text'?value('bookSubject'):format==='cipher'?'Mathematics':'',
     insight:format==='missive'?0:Number(value('bookInsight')),conditionChoice:value('condition'),
-    conditionRoll:value('readingDice')?Number(value('readingDice')):null
+    conditionRoll:value('readingDice')?Number(value('readingDice')):null,conditionRules:READING_CONDITION_RULES
    });
    if(!mutate(()=>data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:now,
     createdAt:stamp(),title:'Zapsaná předloha · '+stored.name,body:'Rozsah '+stored.pages+' str.',calendarReadingSource:stored})))
@@ -5341,7 +5341,7 @@ document.addEventListener('submit',event=>{
    if(!languageML||!scriptML)throw Error('Čtenář musí znát jazyk a písmo.');
    readingContext994(actor,source);
    const conditionChoice=source.external?source.condition:value('condition'),conditionRoll=rolls[0]??null;
-   Object.assign(proof,{sourceId:source.id,languageML,pages:Number(value('pages')),conditionChoice,conditionRoll,condition:readingCondition(conditionChoice,conditionRoll),
+   Object.assign(proof,{sourceId:source.id,languageML,pages:Number(value('pages')),conditionChoice,conditionRoll,condition:readingCondition(conditionChoice,conditionRoll),conditionRules:READING_CONDITION_RULES,
     ...(source.purpose==='cipher'?{hasCipherKey:value('cipherKey')==='yes'}:{})});
   }else if(stage==='test'){
    const input={languageML,scriptML,...readingContext994(actor,source),roll:rolls[0]??null};
