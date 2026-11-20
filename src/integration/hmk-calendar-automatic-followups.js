@@ -1,3 +1,4 @@
+import {isMissileCraft,MISSILE_CRAFT_PROJECTS} from './hmk-fletching-work.js?v=93.997';
 /** Automatic HMK follow-up discovery. No dice, no guessed physical context.
  * Every obligation is derived from an actual persistent state or a committed
  * Skill Test. Calendar date is authoritative; combat rounds are not minutes.
@@ -427,14 +428,14 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  }
  for(const row of journal){
   const project=row.calendarSkillProjectStart591;
-  if(project?.kind!=='fletching'||row.calendarCampaignId!==clock.campaignId||
+  if(!isMissileCraft(project?.kind)||row.calendarCampaignId!==clock.campaignId||
    journal.some(x=>x.calendarSkillFletching996?.startId===row.id))continue;
   const person=characters.find(c=>c.id===row.characterId);
   if(!person)continue;
   const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===row.id);
   const allocation=journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===row.id)?.calendarSkillFletchingAllocation996;
   const step=allocation?'potvrdit dokončení':source?'vyhodnotit výsledek':'provést Success Value';
-  push(person,'fletching-project',row.id,'Fletching · '+project.projectName+' · '+step,
+  push(person,'fletching-project',row.id,MISSILE_CRAFT_PROJECTS[project.kind].label+' · '+project.projectName+' · '+step,
    allocation?.outcome.dueMinute??project.earliestMinute,'skills',{requiresAction:false});
  }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an

@@ -1,4 +1,4 @@
-import {FLETCHING_ITEMS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=93.996';
+import {isMissileCraft,missileCraftItem,MISSILE_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=93.997';
 /** HârnMaster 1.2 pp.70,132: prospective scheduling of actual skill work.
  * Read-only arithmetic/validation. Never invents a roll or a project.
  * Existing unscheduled historical skill tests are unchanged.
@@ -42,7 +42,7 @@ export const TIMED_CRAFT_LABELS_599=Object.freeze({glassworking:'Glassworking ·
 
 export function timedSkillBaseMinutes591(kind,scope){
  if(CRAFT_WORK_600[kind])return CRAFT_WORK_600[kind][scope]?.hours*60??null;
- if(kind==='fletching')return Object.hasOwn(FLETCHING_ITEMS,scope)?fletchingPlan(scope,1).workMinutes:null;
+ if(isMissileCraft(kind))return missileCraftItem(kind,scope)?fletchingPlan(scope,1).workMinutes:null;
  if(kind==='jewelcraft'){const days=Number(scope);return Number.isSafeInteger(days)&&days>=1&&days<=10000?days*1440:null;}
  if(kind==='engineering')return Number.isFinite(ENGINEERING_DESIGN_DAYS[scope])?ENGINEERING_DESIGN_DAYS[scope]*1440:null;
  if(kind==='writing')return WRITING_WORK_MINUTES_591[scope]??null;
@@ -114,7 +114,7 @@ export function validateSkillTimedWork591(data){
    (p.kind!=='jewelcraft'||p.materialSourceConfirmed===true&&Number(p.scope)===p.jewelcraft994?.days&&
     JSON.stringify(jewelcraftWork994(p.jewelcraft994))===JSON.stringify(p.jewelcraft994))&&
    (!p.writingPlan||p.kind==='writing'&&validWritingPlan(p.writingPlan,p.actorId,p.scope))&&
-   (p.kind==='fletching'?(()=>{
+   (isMissileCraft(p.kind)?(()=>{
     const f=p.fletching996,plan=fletchingPlan(p.scope,f?.workshop,f?.providerId,f?.hartbow);
     return f.providerId!==p.actorId&&JSON.stringify(f)===JSON.stringify(plan)&&
      p.earliestMinute===fletchingDue(p.scope,p.startMinute,f,0.7)&&p.baseDueMinute===fletchingDue(p.scope,p.startMinute,f);
@@ -154,8 +154,8 @@ export function validateSkillTimedWork591(data){
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
    (s.p.kind==='writing'?(s.p.writingPlan?skill===s.p.writingPlan.language:/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)):
-    skill===({fletching:'Fletching',engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
-   (s.p.kind!=='fletching'||validFletchingProof(s.p,proof))&&
+    skill===({ ...Object.fromEntries(Object.entries(MISSILE_CRAFT_PROJECTS).map(([key,value])=>[key,value.primary])),engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
+   (!isMissileCraft(s.p.kind)||validFletchingProof(s.p,proof))&&
    (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
    (!CRAFT_WORK_600[s.p.kind]||row.campaignMinute>=s.p.earliestMinute),
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');
@@ -237,7 +237,7 @@ export function validateSkillTimedWork591(data){
   const draft=row.calendarSkillFletchingAllocation996,done=row.calendarSkillFletching996;
   if(!draft&&!done)continue;
   const startId=(draft||done).startId,start=starts.get(startId);
-  assert(start?.p.kind==='fletching'&&row.characterId===start.p.actorId&&row.calendarCampaignId===start.row.calendarCampaignId&&
+  assert(isMissileCraft(start?.p.kind)&&row.characterId===start.p.actorId&&row.calendarCampaignId===start.row.calendarCampaignId&&
    Number.isSafeInteger(row.campaignMinute),'Fletching: projekt nebo postava nesouhlasí.');
   if(draft){
    const source=journalById.get(draft.sourceId),out=draft.outcome;

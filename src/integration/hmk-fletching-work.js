@@ -24,14 +24,33 @@ for(const item of PRINTED_MISSILE_WEAPONS_P109_110){
  stock[item.id]={name:item.name+' · '+weightLabel,costD,hours,
   months:family==='compositeBow'?hours:0,
   bow:['compositeBow','longbow'].includes(family),kuzhan:family==='kuzhanSteelbow',
-  wq:item.properties.quality,rangeFt:item.properties.baseRangeFt,priceD:item.properties.pricePence,
+  wq:item.properties.quality,draw:item.properties.draw,rangeFt:item.properties.baseRangeFt,priceD:item.properties.pricePence,
   secondary:family==='kuzhanSteelbow'?['Metalcraft']:['Woodworking',family==='compositeBow'?'Hideworking':'Timbercraft']};
+}
+export const MISSILE_CRAFT_PROJECTS=Object.freeze({
+ fletching:{label:'Fletching · HMK 71–72',primary:'Fletching'},
+ slingcraft:{label:'Praky · Hideworking · HMK 72',primary:'Hideworking'},
+ missileMetalcraft:{label:'Střely a napínáky · Metalcraft · HMK 72',primary:'Metalcraft'}
+});
+export const isMissileCraft=kind=>Object.hasOwn(MISSILE_CRAFT_PROJECTS,kind);
+Object.assign(stock,{
+ handSling:{kind:'slingcraft',name:'Prak',costD:2,hours:10,wq:9,secondary:[]},
+ staffSling:{kind:'slingcraft',name:'Tyčový prak',costD:4,hours:20,wq:9,secondary:['Woodworking']},
+ leadBullets:{kind:'missileMetalcraft',name:'Olověné střely do praku (12)',costD:4,hours:10,projectiles:true,secondary:[]},
+ beltClaw:{kind:'missileMetalcraft',name:'Napínák Belt & Claw',costD:3,hours:10,pull:3,secondary:[]},
+ crossbowLever:{kind:'missileMetalcraft',name:'Napínák Lever',costD:6,hours:40,pull:5,rareTransfer:true,secondary:[]},
+ crossbowWindlass:{kind:'missileMetalcraft',name:'Napínák Windlass',costD:15,hours:90,pull:10,kuzhan:true,secondary:[]}
+});
+export function missileCraftItem(kind,scope){
+ if(!Object.hasOwn(stock,scope))return null;
+ const item=stock[scope];
+ return (item.kind??'fletching')===kind?item:null;
 }
 export const FLETCHING_ITEMS=Object.freeze(stock);
 const fieldValid=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
 export function fletchingPlan(scope,workshop,providerId='',hartbow=false){
  const item=Object.hasOwn(stock,scope)?stock[scope]:null;
- if(!item||!fieldValid(workshop,1,5)||typeof providerId!=='string'||providerId&&!item.projectiles||
+ if(!item||!fieldValid(workshop,1,5)||typeof providerId!=='string'||providerId&&(!item.projectiles||item.kind)||
   typeof hartbow!=='boolean'||hartbow&&!item.bow)throw Error('Vyberte výrobek, dílnu 1–5 a odpovídající způsob výroby.');
  return {workshop,providerId,hartbow,costD:item.costD*(providerId?2:1),
   workMinutes:(item.months?item.months*30*600:item.hours*60)/(providerId?2:1)};
@@ -45,10 +64,10 @@ export function fletchingDue(scope,start,plan,factor=1){
 }
 export function fletchingNeeds(scope,proof,timeStars){
  const sv=proof?.a?.sv,level=proof?.a?.level;
- if(!Number.isSafeInteger(sv)||!['CF','F','S','CS'].includes(level))throw Error('Chybí původní Fletching Success Value.');
+ if(!Number.isSafeInteger(sv)||!['CF','F','S','CS'].includes(level))throw Error('Chybí původní Success Value výroby.');
  const stars=Math.max(0,Math.min(5,sv-4));
  if(!fieldValid(timeStars,0,Math.min(3,stars)))throw Error('Na čas lze použít nejvýše tři získané hvězdy.');
- const max=stock[scope].projectiles?2:stock[scope].wq-8;
+ const max=stock[scope].pull?5:stock[scope].projectiles?2:stock[scope].wq-8;
  return {flaw:sv<=2,count:stars-timeStars,max,factor:(100+(level==='CF'?50:0)-10*timeStars)/100};
 }
 export function fletchingOutcome(project,proof,timeStars,rolls){
@@ -59,6 +78,9 @@ export function fletchingOutcome(project,proof,timeStars,rolls){
  const item=stock[scope],successes=need.flaw?0:rolls.filter(n=>n<=plan.workshop).length;
  const applied=Math.min(need.max,successes),mod=Math.floor(applied/2);
  const flaw=need.flaw?rolls[0]*(proof.a.sv<=0?2:1):0;
+ if(item.pull)return {timeStars,rolls:[...rolls],successes,applied,
+  flaw,drawBonusPct:mod*10,pull:item.pull,valueMultiplier:applied+1,
+  dueMinute:fletchingDue(scope,startMinute,plan,need.factor)};
  return {timeStars,rolls:[...rolls],successes,applied,
   qualityDelta:Math.ceil(applied/2)-flaw,impactDelta:item.projectiles?mod-flaw:null,
   rangeDeltaFt:item.projectiles?null:(mod-flaw)*30,
