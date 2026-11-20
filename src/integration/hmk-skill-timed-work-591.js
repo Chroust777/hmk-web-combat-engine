@@ -3,7 +3,7 @@
  * Existing unscheduled historical skill tests are unchanged.
  */
 import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
-import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600} from './hmk-skill-crafts-600.js?v=93.994';
+import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=93.995';
 import {validWritingPlan,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=93.992';
 import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
@@ -113,9 +113,10 @@ export function validateSkillTimedWork591(data){
     JSON.stringify(jewelcraftWork994(p.jewelcraft994))===JSON.stringify(p.jewelcraft994))&&
    (!p.writingPlan||p.kind==='writing'&&validWritingPlan(p.writingPlan,p.actorId,p.scope))&&
    (CRAFT_WORK_600[p.kind]?(()=>{
-    const exactCalendar=p.kind==='ceramics'&&p.craftExact994===true;
-    const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls,exactCalendar});
-    const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls,{exactCalendar});
+    const exactCalendar=p.kind==='ceramics'&&p.craftExact994===true||p.kind==='brewing'&&p.brewing995===true;
+    const options={exactCalendar,spiritMonths:p.brewing995===true?p.spiritMonths995:0};
+    const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls,...options});
+    const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls,options);
     return t&&p.earliestMinute===t.dueMinute&&p.baseDueMinute===t.dueMinute&&
      p.craftItemName===reference.craftItemName&&p.craftItemCostD===reference.craftItemCostD&&
      p.craftSourcePage===reference.craftSourcePage&&p.craftDayResolution===reference.craftDayResolution&&
@@ -215,6 +216,13 @@ export function validateSkillTimedWork591(data){
    row.campaignMinute>=p.craftReadyMinute&&r.readyMinute===p.craftReadyMinute&&
    r.agingDays===p.craftAgingDays&&r.confirmed===true,
    'Brewing: zralost či čas neodpovídají původním kostkám a kalendáři.');
+  if(p.brewing995===true||r.price995){
+   const source=journalById.get(r.qualitySourceId);
+   const sv=source?.skillTestProof?.a?.sv??source?.skillTestProof?.result?.sv;
+   assert(source?.calendarSkillProjectSV591?.startId===r.startId&&source.campaignMinute<=row.campaignMinute&&
+    r.price995&&JSON.stringify(r.price995)===JSON.stringify(brewingPrice995(p.scope,sv,r.price995.workshopTN,r.price995.rolls)),
+    'Brewing: ocenění neodpovídá původnímu SV, dílně nebo kostkám.');
+  }
   ready.add(r.startId);
  }
  return true;

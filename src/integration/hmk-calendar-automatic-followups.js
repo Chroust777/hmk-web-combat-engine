@@ -11,7 +11,7 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
-import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.994';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.995';
 import {copySource,findCopyStages} from './hmk-script-copy.js?v=93.993';
 import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=93.994';
 const DAY=1440;
@@ -417,6 +417,13 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   const time=allocation?Math.max(allocation.readDue,stages.read.campaignMinute)+(reflection?.reflectionMinutes??0):
    stages.test?.campaignMinute??row.campaignMinute+Math.ceil(read.pages*5/2);
   push(person,'script-reading',row.id,'Reading · '+source.name,time,'skills',{requiresAction:false});
+ }
+ for(const row of journal){
+  const batch=row.calendarSkillProjectStart591;
+  if(batch?.kind!=='brewing'||row.calendarCampaignId!==clock.campaignId||
+   !journal.some(x=>x.calendarSkillProjectSV591?.startId===row.id)||journal.some(x=>x.calendarSkillBrewReady600?.startId===row.id))continue;
+  const person=characters.find(c=>c.id===row.characterId);
+  if(person)push(person,'brew-mature',row.id,'Brewing · dokončit zrání '+batch.projectName,batch.craftReadyMinute,'skills',{requiresAction:false});
  }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an
  // unconditional extra d100. Restore this obligation from immutable journal.

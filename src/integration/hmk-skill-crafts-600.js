@@ -75,18 +75,35 @@ export function projectTiming600(kind,scope,startMinute,options={}){
  if(kind==='brewing'){
   const dice=options.agingRolls;
   if(!Array.isArray(dice)||dice.length!==item.agingDice||!dice.every(d=>Number.isInteger(d)&&d>=1&&d<=item.agingFaces))return null;
-  const days=item.agingBaseDays+dice.reduce((sum,d)=>sum+d,0);
-  aging={rolls:[...dice],days,readyMinute:calendarDayStart600(startMinute+baseMinutes+days*DAY_MINUTES_600)};
+  const extraMonths=options.spiritMonths??0;
+  if(extraMonths!==0&&(scope!=='spirits'||![3,4,5,6].includes(extraMonths)))return null;
+  const days=item.agingBaseDays+dice.reduce((sum,d)=>sum+d,0)+extraMonths*30;
+  const mature=startMinute+baseMinutes+days*DAY_MINUTES_600;
+  aging={rolls:[...dice],days,readyMinute:options.exactCalendar?mature:calendarDayStart600(mature)};
  }
  return {baseMinutes,dueMinute,mode:dayResolution?'day':'minute',aging};
 }
-export function confirmCraftStart600(kind,scope,startMinute,agingRolls,{exactCalendar=false}={}){
- const entry=CRAFT_WORK_600[kind]?.[scope],schedule=projectTiming600(kind,scope,startMinute,{agingRolls,exactCalendar});
+export function confirmCraftStart600(kind,scope,startMinute,agingRolls,{exactCalendar=false,spiritMonths=0}={}){
+ const entry=CRAFT_WORK_600[kind]?.[scope],schedule=projectTiming600(kind,scope,startMinute,{agingRolls,exactCalendar,spiritMonths});
  if(!entry||!schedule)throw Error('Nedoložený výrobek, čas nebo skutečné zrací kostky.');
  return Object.freeze({craftItemName:entry.name,craftItemCostD:entry.costD,
    craftSourcePage:({brewing:66,ceramics:66,hideworking:76,textilecraft:86,metalcraft:80,mineralogy:81})[kind],
    craftDayResolution:schedule.mode,craftAgingRolls:schedule.aging?.rolls||[],
    craftAgingDays:schedule.aging?.days??null,craftReadyMinute:schedule.aging?.readyMinute??null});
+}
+
+/** HMK 66: wine uses the original Brewing SV's stars and the printed Workshop TN. */
+export function brewingWorkshopDice995(scope,sv){
+ if(!Object.hasOwn(CRAFT_WORK_600.brewing,scope)||!Number.isSafeInteger(sv))throw Error('Brewing: chybí doložené SV nebo druh nápoje.');
+ return scope==='wine'?Math.min(5,Math.max(0,sv-4)):0;
+}
+export function brewingPrice995(scope,sv,workshopTN,rolls){
+ const count=brewingWorkshopDice995(scope,sv);
+ if(!Array.isArray(rolls)||rolls.length!==count||rolls.some(x=>!Number.isSafeInteger(x)||x<1||x>10)||
+  (count?![1,2,3,4,5].includes(workshopTN):workshopTN!==null))
+  throw Error('Brewing: potvrď právě '+count+'× d10 a při hodech zadej Workshop TN 1–5.');
+ const successes=rolls.filter(x=>x<=workshopTN).length;
+ return {workshopTN,rolls:[...rolls],successes,priceD:CRAFT_WORK_600.brewing[scope].salePriceD+5*successes};
 }
 
 /** HMK 68: the meal affects the host/cook's persuasion throughout service. */
