@@ -1,5 +1,5 @@
 /** HMK 83, 132: Reading, physical condition and timed reflection. */
-import {copySource} from './hmk-script-copy.js?v=93.993';
+import {copySource} from './hmk-script-copy.js?v=94.002';
 import {resolveSkillTest,adjustSkillResultForTrauma} from './hmk-skill-test-engine.js?v=93.986';
 import {automaticCriticalFailure} from './hmk-skill-consequence-resolution.js';
 
@@ -42,15 +42,28 @@ export function resolveReading(source,condition,input){
    gmModifier:input.modifier+source.legibility,svExtra:penalty}),{slPenalty:input.slPenalty});
 }
 export function readingStars(result){return Math.max(0,Math.min(5,result.sv-4));}
-export function readingComprehension(source,sv,pages){
+export function readingComprehension(source,sv,pages,cipher){
+ if(source.purpose==='cipher'){
+  if(!cipher)return 'Šifrovaná předloha';
+  return cipher.deciphered?'Šifra rozluštěna':cipher.hasKey?'Šifra nerozluštěna · s klíčem je nutné SV 3+':'Šifra nerozluštěna';
+ }
  if(sv<=0)return 'Písmo rozpoznáno, sdělení nepochopeno';
  if(sv<=2)return source.text?'Text nepochopen':'Obecný předmět dopisu pochopen';
  if(sv<=4)return !source.text&&pages===1?'Krátký dopis pochopen slovo od slova':'Obecný předmět pochopen';
  return 'Dílo pochopeno';
 }
-export function settleReading(source,pages,opened,result,{timeStars,subjectML,insightRolls,known}){
+export function settleReading(source,pages,opened,result,{timeStars,subjectML,insightRolls,known,hasKey}){
  const stars=readingStars(result);
  require(whole(timeStars,0,stars)&&whole(subjectML,0,1000)&&whole(known,0,source.insight??0),'neplatné rozdělení hvězd nebo znalost předlohy.');
+ if(source.purpose==='cipher'){
+  require(typeof hasKey==='boolean'&&timeStars===0&&known===0&&dice(insightRolls,hasKey?0:stars,10),
+   'Klíč nevyžaduje další kostky. Bez klíče musí být potvrzen jeden d10 za každou hvězdu Reading.');
+  const tn=Math.floor(subjectML/10);
+  const successes=insightRolls.filter(d=>d<=tn).length;
+  return {timeStars,subjectML,insightRolls,known,found:0,readDue:opened+pages*5,cipher:{
+   hasKey,tn,successes,required:source.insight,deciphered:hasKey?result.sv>=3:successes>=source.insight
+  }};
+ }
  const count=source.text?stars-timeStars:0;
  const tn=Math.floor(subjectML/10);
  require(dice(insightRolls,count&&tn&&known<source.insight?count:0,10),'chybí předepsané Insight d10.');
@@ -98,7 +111,8 @@ export function validateReadingJournal(journal){
     const occupied=rows.some(x=>x.calendarScriptReading.stage==='start'&&
      readingSource(seen,x.calendarScriptReading.sourceId,row.calendarCampaignId)?.originalId===source?.originalId&&!readingStages(rows,x).done);
     require(source&&!occupied&&whole(receipt.pages,1,10000)&&whole(receipt.languageML,1,1000)&&
-     readingCanStart(rows,source,receipt.languageML)&&readingCondition(receipt.conditionChoice,receipt.conditionRoll)===receipt.condition,
+     readingCanStart(rows,source,receipt.languageML)&&
+     (source.purpose==='cipher'?typeof receipt.hasCipherKey==='boolean'&&receipt.pages===source.pages:receipt.hasCipherKey===undefined)&&readingCondition(receipt.conditionChoice,receipt.conditionRoll)===receipt.condition,
      'nesouhlasí předloha, stav, stránky nebo podmínky pro opakování.');
    }else{
     const start=rows.find(x=>x.id===receipt.startId&&x.calendarScriptReading.stage==='start');
@@ -114,11 +128,14 @@ export function validateReadingJournal(journal){
      require(test&&row.campaignMinute>=stages.test.campaignMinute,'chybí potvrzený test.');
      if(receipt.stage==='read'){
       const known=knownReadingInsights(rows,seen,source);
-      const expected=settleReading(source,p.pages,start.campaignMinute,test.result,{...receipt.read,known});
+      const expected=settleReading(source,p.pages,start.campaignMinute,test.result,{...receipt.read,known,hasKey:p.hasCipherKey});
       require(matches(expected,receipt.read),'nesouhlasí hvězdy, Insight nebo termín čtení.');
      }else{
       require(stages.read&&row.campaignMinute>=Math.max(stages.read.campaignMinute,stages.read.calendarScriptReading.read.readDue),'nejprve dokonči samotné čtení.');
-      if(receipt.stage==='reflect'){
+      if(source.purpose==='cipher'){
+       require(receipt.stage==='done'&&!stages.reflect&&matches(receipt.reflection,settleReflection(stages.read.calendarScriptReading.read,0,[],null)),
+        'Čtení šifry se uzavírá potvrzením výsledku luštění.');
+      }else if(receipt.stage==='reflect'){
        const ref=receipt.reflection;
        require(ref&&matches(ref,settleReflection(stages.read.calendarScriptReading.read,ref.exchanged,ref.days,ref.creativity)),
         'nesouhlasí plán rozjímání.');

@@ -82,7 +82,7 @@ function stepsFor(form,kind){
   if(stage==='start'&&['ancient','middle','modern'].includes(value(form,'condition')))add('condition',100,'Stav předlohy d100','readingDice');
   if(stage==='test'&&count)add('readTest',100,'Language (Script) d100','readingDice');
   if(stage==='read'||stage==='reflect')for(let i=0;i<count;i++)add('reading'+i,stage==='read'?10:6,
-   (stage==='read'?'Insight d10 ':'Rozjímání d6 ')+(i+1)+'/'+count,'readingDice',i);
+   (stage==='read'?(form.dataset.readingCipher==='yes'?'Luštění d10 ':'Insight d10 '):'Rozjímání d6 ')+(i+1)+'/'+count,'readingDice',i);
   if(stage==='reflect'&&count&&form.elements.namedItem('useCreativity')?.checked)add('creativityD100',100,'Creativity d100');
  }else if(kind==='copy'){
   if(form.dataset.scriptCopyDie==='yes')add('copyD100',100,'Opis d100');

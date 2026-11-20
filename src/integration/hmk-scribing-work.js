@@ -20,6 +20,10 @@ export function writingScripts(language){
  const name=/^Language \((.+)\)$/.exec(language)?.[1];
  return (Object.hasOwn(scriptsByLanguage,name)?scriptsByLanguage[name]:[]).map(script=>'Script ('+script+')');
 }
+export const WRITING_SUBJECTS=Object.freeze({writ:'Law',cipher:'Mathematics'});
+export function writingFixedSubject(plan){
+ return Object.hasOwn(WRITING_SUBJECTS,plan?.purpose)?WRITING_SUBJECTS[plan.purpose]:null;
+}
 export function writingDictationFactor(plan){return plan?.mode==='dictation'?1.5:1;}
 export function writingIsText(project){return project.writingPlan?.intent!=='missive'&&project.scope!=='missive';}
 export function writingSaleValueD(scope){
@@ -27,7 +31,8 @@ export function writingSaleValueD(scope){
 }
 export function validWritingPlan(plan,actorId,scope){
  return !!plan&&['self','dictation'].includes(plan.mode)&&['missive','text'].includes(plan.intent)&&
-  (scope!=='missive'||plan.intent==='missive')&&typeof plan.scribeId==='string'&&plan.scribeId.length>0&&
+  (scope!=='missive'||plan.intent==='missive')&&
+  (plan.purpose===undefined||!!writingFixedSubject(plan)&&plan.intent==='text'&&scope!=='missive')&&typeof plan.scribeId==='string'&&plan.scribeId.length>0&&
   (plan.mode==='self'?plan.scribeId===actorId:plan.scribeId!==actorId)&&writingScripts(plan.language).includes(plan.script);
 }
 export function resolveAuthoredScribing({mode,scriptML,languageML,drawingML,modifier,slPenalty,forcedCF,roll,scope,intent}){

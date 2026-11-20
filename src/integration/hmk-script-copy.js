@@ -1,6 +1,6 @@
 /** Copying existing written works (HMK 83, 132). Three immutable receipts:
  * scheduled work, observed test, and final allocation of that test's stars. */
-import {resolveAuthoredScribing,writingIsText,writingSaleValueD} from './hmk-scribing-work.js?v=93.992';
+import {resolveAuthoredScribing,writingIsText,writingSaleValueD} from './hmk-scribing-work.js?v=94.002';
 import {resolveSkillTest,adjustSkillResultForTrauma} from './hmk-skill-test-engine.js?v=93.986';
 import {automaticCriticalFailure} from './hmk-skill-consequence-resolution.js';
 const demand=(ok,message)=>{if(!ok)throw Error('Opis: '+message);};
@@ -12,7 +12,8 @@ export function copySource(journal,sourceId,campaignId){
  const start=done&&journal.find(row=>row.id===done.calendarSkillProjectComplete591.startId&&row.calendarCampaignId===campaignId)?.calendarSkillProjectStart591;
  if(!start?.writingPlan||!done.skillTestProof?.scribing)return null;
  return {id:sourceId,name:start.projectName,scope:start.scope,text:writingIsText(start),baseMinutes:start.baseMinutes,
-  language:start.writingPlan.language,script:start.writingPlan.script,subject:done.skillTestProof.subjectSkill,insight:done.skillTestProof.insightStars};
+  language:start.writingPlan.language,script:start.writingPlan.script,subject:done.skillTestProof.subjectSkill,insight:done.skillTestProof.insightStars,
+  ...(start.writingPlan.purpose?{purpose:start.writingPlan.purpose}:{})};
 }
 export function resolveScriptCopy(source,method,input){
  demand(['script','drawing'].includes(method)&&whole(input.scriptML,0,1000)&&whole(input.languageML,0,1000)&&

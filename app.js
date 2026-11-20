@@ -2,14 +2,14 @@ import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.000';
 import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof,weaponWorkshopTN} from './src/integration/hmk-fletching-work.js?v=94.001';
 import {JEWELLERY_D_PER_OZ,GEM_D,jewelcraftWork994} from './src/integration/hmk-jewelcraft-work.js?v=93.994';
-import {readingCondition,readingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=93.994';
-import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=93.993';
-import {writingScripts,writingDictationFactor,writingIsText,validWritingPlan,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=93.992';
+import {readingCondition,readingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=94.002';
+import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=94.002';
+import {writingScripts,writingDictationFactor,writingIsText,validWritingPlan,writingFixedSubject,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=94.002';
 import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.000';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.002';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -65,7 +65,7 @@ import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltSta
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=93.995';
-import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.001';
+import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.002';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -221,7 +221,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.001';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.002';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -320,7 +320,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.001';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.002';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -394,7 +394,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.001';
+const APP_VERSION='94.002';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5180,8 +5180,9 @@ function readingHTML994(actor){
  const numOptions=n=>Array.from({length:n+1},(_,i)=>`<option value="${i}">${i} ★</option>`).join('');
  return `<section class="hsk-timed-project-591" aria-label="Reading"><h3>Reading · HMK 83, 132</h3>
  ${eligible.length?`<form class="hsk-form-grid" data-script-reading="start">
- <label>Předloha ke čtení<select name="sourceId" required>${eligible.map(x=>`<option value="${esc(x.id)}" data-pages="${x.pages}">${esc(x.name)} · ${esc(x.language)} · ${esc(x.script)} · čitelnost ${x.legibility}</option>`).join('')}</select></label>
- <label>Počet stran 10″ × 14″<input name="pages" type="number" min="1" max="10000" step="1" value="${eligible[0].pages}" required></label>
+ <label>Předloha ke čtení<select name="sourceId" required>${eligible.map(x=>`<option value="${esc(x.id)}" data-pages="${x.pages}" data-cipher="${x.purpose==='cipher'?'yes':'no'}">${esc(x.name)} · ${esc(x.language)} · ${esc(x.script)} · čitelnost ${x.legibility}</option>`).join('')}</select></label>
+ <label>Počet stran 10″ × 14″<input name="pages" type="number" min="1" max="10000" step="1" value="${eligible[0].pages}" ${eligible[0].purpose==='cipher'?'readonly':''} required></label>
+ <label data-reading-key ${eligible[0].purpose==='cipher'?'':'hidden'}>Klíč k šifře<select name="cipherKey" ${eligible[0].purpose==='cipher'?'':'disabled'}><option value="no">Pokus bez klíče</option><option value="yes">Klíč k této šifře je k dispozici</option></select></label>
  <label>Stav předlohy<select name="condition"><option value="pristine">Nepoškozená</option><option value="degraded">Opotřebená · −1 SV</option><option value="damaged">Poškozená · −2 SV</option><option value="modern">Určit hodem · novověká</option><option value="middle">Určit hodem · střední</option><option value="ancient">Určit hodem · starověká</option></select></label>
  <input type="hidden" name="readingDice"><button type="submit">Zahájit čtení</button><output role="status"></output></form>`:
  '<p>Vyžaduje dokončenou předlohu a znalost jejího jazyka a písma. Další pokus po dokončení vyžaduje +10 Language ML.</p>'}
@@ -5194,6 +5195,8 @@ function readingHTML994(actor){
   const form=(stage,content)=>`<form class="hsk-form-grid" data-script-reading="${stage}">${title}${hidden}${content}<output role="status"></output></form>`;
   if(stages.done){
    const ref=stages.done.calendarScriptReading.reflection;
+   const verdict=stages.read?.calendarScriptReading.read.cipher;
+   if(verdict)return `<article data-reading-result>${title}<p>SV ${test.result.sv} · ${esc(readingComprehension(source,test.result.sv,p.pages,verdict))}${verdict.hasKey?' · s klíčem':' · úspěchy '+verdict.successes+'/'+verdict.required}</p></article>`;
    return `<article data-reading-result>${title}<p>SV ${test.result.sv} · ${esc(readingComprehension(source,test.result.sv,p.pages))} · nově získané Insight ${ref.insights} ★</p></article>`;
   }
   if(!test){
@@ -5207,6 +5210,13 @@ function readingHTML994(actor){
    <button type="submit" ${can?'':'disabled'}>Uložit hod čtení</button><output role="status"></output></form>`;
   }
   const read=stages.read?.calendarScriptReading.read;
+  if(!read&&source.purpose==='cipher'){
+   const count=p.hasCipherKey?0:readingStars(test.result);
+   const tn=Math.floor((masteries.get('Mathematics')??0)/10);
+   return `<form class="hsk-form-grid" data-script-reading="read" data-reading-count="${count}" data-reading-cipher="yes">${title}${hidden}
+    <p>Reading SV ${test.result.sv}. ${p.hasCipherKey?'S klíčem je nutné SV 3 nebo více.':'Bez klíče · '+count+'× d10 proti Mathematics Index '+tn+' · potřebné úspěchy '+source.insight+'.'}</p>
+    <button type="submit">Uložit výsledek luštění</button><output role="status"></output></form>`;
+  }
   if(!read){
    const stars=readingStars(test.result),subjectML=masteries.get(source.subject)??0;
    const known=knownReadingInsights(rows,data.journal,source),count=source.text&&subjectML>=10&&known<source.insight?stars:0;
@@ -5217,6 +5227,8 @@ function readingHTML994(actor){
     <button type="submit">Uložit hvězdy čtení</button><output role="status"></output></form>`;
   }
   const readDue=Math.max(stages.read.campaignMinute,read.readDue),ref=stages.reflect?.calendarScriptReading.reflection;
+  if(read.cipher)return form('done',`<p>${esc(readingComprehension(source,test.result.sv,p.pages,read.cipher))} · dočtení ${esc(displayCampaignMinute(readDue))}.</p>
+   <button type="submit" ${now>=readDue?'':'disabled'}>Dokončit čtení šifry</button>`);
   if(!ref){
    const count=Math.max(0,read.found-1);
    let canCreativity=false;
@@ -5236,7 +5248,15 @@ function readingHTML994(actor){
 document.addEventListener('change',event=>{
  const field=event.target,form=field.closest?.('[data-script-reading]');
  if(!form)return;
- if(field.name==='sourceId')form.elements.namedItem('pages').value=field.selectedOptions[0]?.dataset.pages??1;
+ if(field.name==='sourceId'){
+  const option=field.selectedOptions[0],pages=form.elements.namedItem('pages'),key=form.elements.namedItem('cipherKey');
+  const cipher=option?.dataset.cipher==='yes';
+  pages.value=option?.dataset.pages??1;
+  pages.readOnly=cipher;
+  key.closest('[data-reading-key]').hidden=!cipher;
+  key.disabled=!cipher;
+  key.value='no';
+ }
  if(field.name==='timeStars'||field.name==='exchanged'){
   form.dataset.readingCount=String(Math.max(0,Number(form.dataset.readingLimit)-Number(field.value)));
   if(field.name==='timeStars'){
@@ -5265,21 +5285,26 @@ document.addEventListener('submit',event=>{
    if(!languageML||!scriptML)throw Error('Čtenář musí znát jazyk a písmo.');
    readingContext994(actor,source);
    const conditionChoice=value('condition'),conditionRoll=rolls[0]??null;
-   Object.assign(proof,{sourceId:source.id,languageML,pages:Number(value('pages')),conditionChoice,conditionRoll,condition:readingCondition(conditionChoice,conditionRoll)});
+   Object.assign(proof,{sourceId:source.id,languageML,pages:Number(value('pages')),conditionChoice,conditionRoll,condition:readingCondition(conditionChoice,conditionRoll),
+    ...(source.purpose==='cipher'?{hasCipherKey:value('cipherKey')==='yes'}:{})});
   }else if(stage==='test'){
    const input={languageML,scriptML,...readingContext994(actor,source),roll:rolls[0]??null};
    Object.assign(proof,{input,result:resolveReading(source,start.calendarScriptReading.condition,input)});
   }else if(stage==='read'){
    const result=stages.test.calendarScriptReading.result;
    proof.read=settleReading(source,start.calendarScriptReading.pages,start.campaignMinute,result,{
-    timeStars:Number(value('timeStars')),subjectML:masteries.get(source.subject)??0,insightRolls:rolls,known:knownReadingInsights(rows,data.journal,source)});
+    timeStars:Number(value('timeStars')??0),subjectML:masteries.get(source.subject)??0,insightRolls:rolls,
+    known:knownReadingInsights(rows,data.journal,source),hasKey:start.calendarScriptReading.hasCipherKey});
   }else if(stage==='reflect'){
    const field=form.elements.namedItem('useCreativity'),ml=masteries.get('Creativity');
    const creativity=field?.checked&&rolls.length?{...readingContext994(actor,source,'Creativity'),ml,roll:Number(value('creativityD100'))}:null;
    proof.reflection=settleReflection(stages.read.calendarScriptReading.read,Number(value('exchanged')??0),rolls,creativity);
-  }else proof.reflection=stages.reflect.calendarScriptReading.reflection;
+  }else proof.reflection=source.purpose==='cipher'?settleReflection(stages.read.calendarScriptReading.read,0,[],null):stages.reflect.calendarScriptReading.reflection;
   const title={start:'Zahájené čtení',test:'Hod čtení',read:'Hvězdy čtení',reflect:'Rozjímání',done:'Dočtená předloha'};
-  const body=stage==='done'?'Nově získané Insight '+proof.reflection.insights+' ★.':stage==='test'?'SV '+proof.result.sv+' · '+proof.result.level+'.':'';
+  const cipher=stages.read?.calendarScriptReading.read.cipher;
+  const body=stage==='done'&&cipher?readingComprehension(source,stages.test.calendarScriptReading.result.sv,start.calendarScriptReading.pages,cipher)+
+    (cipher.hasKey?' · s klíčem.':' · bez klíče, úspěchy '+cipher.successes+'/'+cipher.required+'.'):
+   stage==='done'?'Nově získané Insight '+proof.reflection.insights+' ★.':stage==='test'?'SV '+proof.result.sv+' · '+proof.result.level+'.':'';
   if(!mutate(()=>data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:now,
    createdAt:stamp(),title:title[stage]+' · '+source.name,body,calendarScriptReading:proof})))throw Error('Doklad nebyl uložen.');
  }catch(error){out.textContent=error.message;}
@@ -5296,7 +5321,7 @@ function pendingWritingWorkHTML591(actor){
   const sp=start.calendarSkillProjectStart591,{attempt:j,result:{sv},factor}=state;
   const stars=Math.max(0,Math.min(5,Number(sv)-4));
   const mastered=availableMasteries(actor).filter(x=>Number.isFinite(x.ml)&&x.ml>0);
-  const isText=writingIsText(sp),plan=sp.writingPlan;
+  const isText=writingIsText(sp),plan=sp.writingPlan,fixed=writingFixedSubject(plan);
   const scopeMax=isText?({tract:1,treatise:3,disquisition:5})[sp.scope]:0;
   return `<form class="hsk-form-grid hsk-writing-finish-591" data-hmk-writing-finish-591 ${plan?'data-hmk-scribing-work':''}>
    <h4>${esc(sp.projectName)} · ${esc(scopeNames[sp.scope])} · Language SV ${esc(String(sv))}</h4>
@@ -5304,7 +5329,8 @@ function pendingWritingWorkHTML591(actor){
    ${plan?`<p>${plan.mode==='dictation'?'Diktování (+50 % času, −20 k Script): ':'Vlastní zápis: '}<strong>${esc(character(plan.scribeId)?.name||'Písař')}</strong> · ${esc(plan.script)} · ${esc(plan.language)}</p>`:''}
    <p>${stars} ★. ${factor>1?'Will prodloužil dobu tohoto pokusu na '+(factor*100)+' %.':''}</p>
    <label>Hvězdy použité na zkrácení času (10 % za každou)<select name="timeStars">${Array.from({length:stars+1},(_,n)=>`<option value="${n}">${n} ★ = −${n*10} % času</option>`).join('')}</select></label>
-   ${isText?`<label>Ověřená předmětová dovednost pro Insight (Subject Index)<select name="subjectSkill"><option value="">— bez Insight / všechny hvězdy využity na čas —</option>${mastered.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} · ML ${m.ml} / Index ${Math.floor(m.ml/10)}</option>`).join('')}</select></label>
+   ${fixed?`<p>${esc(WRITING_PURPOSE_LABELS[plan.purpose])} · Subject Index ${Math.floor((mastered.find(m=>m.name===fixed)?.ml??0)/10)}.</p>`:''}
+   ${isText?`${fixed?`<input type="hidden" name="subjectSkill" value="${fixed}">`:`<label>Ověřená předmětová dovednost pro Insight (Subject Index)<select name="subjectSkill"><option value="">— bez Insight / všechny hvězdy využity na čas —</option>${mastered.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} · ML ${m.ml} / Index ${Math.floor(m.ml/10)}</option>`).join('')}</select></label>`}
     <label>Skutečné Insight d10 · zbývající hvězdy<input name="insightD10" placeholder="Počet se vypočítá automaticky" autocomplete="off"></label><button type="button" class="secondary hc-small" data-hmk-writing-roll-591>⚄ Vygenerovat Insight d10</button>`:''}
    ${plan?`<input type="hidden" name="scribingD100">${isText?'':'<input type="hidden" name="insightD10">'}`:''}
    <p class="hsk-followup-count" data-hmk-writing-guide-591></p>
@@ -5350,10 +5376,15 @@ const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','c
 const TIMED_SKILL_LABELS_600={...Object.fromEntries(Object.entries(WORKSHOP_CRAFT_PROJECTS).map(([key,value])=>[key,value.label])),engineering:'Engineering · HMK 70',writing:'Writing · HMK 132',drawing:'Drawing · HMK 69',cookery:'Cookery · HMK 68',glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91',jewelcraft:'Jewelcraft · HMK 76',...CRAFT_LABELS_600};
 const isWritingLanguage=skill=>typeof skill==='string'&&(/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill));
 const TIMED_SKILL_NAMES_600={...Object.fromEntries(Object.entries(WORKSHOP_CRAFT_PROJECTS).map(([key,value])=>[key,value.primary])),engineering:'Engineering',writing:'Writing',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',...CRAFT_SKILL_600};
+const WRITING_PURPOSE_LABELS={writ:'Právní podání · Law · HMK 77',cipher:'Tvorba šifry · Mathematics · HMK 79'};
 function writingPlanFields992(actor){
  const languages=availableMasteries(actor).filter(m=>writingScripts(m.name).length);
  return `<fieldset data-hmk-writing-plan>
  <legend>Jazyk, písmo a písař · HMK 83, 132</legend>
+ <label>Účel díla<select name="writingPurpose"><option value="">Běžné dílo</option>${Object.entries(WRITING_PURPOSE_LABELS).map(([value,label])=>{
+  const fixed=writingFixedSubject({purpose:value}),eligible=availableMasteries(actor).some(m=>m.name===fixed);
+  return `<option value="${value}" ${eligible?'':'disabled'}>${esc(label+(eligible?'':' · vyžaduje '+fixed))}</option>`;
+ }).join('')}</select></label>
  <label>Podoba díla<select name="writingIntent"><option value="missive">Dopis</option><option value="text">Text s předmětem a Insight</option></select></label>
  <label>Jazyk díla<select name="writingLanguage" required>${languages.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} · ML ${m.ml}</option>`).join('')}</select></label>
  <label>Písmo díla<select name="writingScript" required></select></label>
@@ -5365,6 +5396,9 @@ function refreshWritingPlan992(form){
  const controls=form.elements;
  const language=controls.namedItem('writingLanguage');
  if(!language)return;
+ const purpose=controls.namedItem('writingPurpose').value,intent=controls.namedItem('writingIntent');
+ if(purpose)intent.value='text';
+ intent.disabled=!!purpose;
  const script=controls.namedItem('writingScript'),scribe=controls.namedItem('writingScribe');
  const populate=(el,choices)=>{
   const last=el.value;el.replaceChildren(...choices.map(([value,label])=>new Option(label,value)));
@@ -14589,8 +14623,11 @@ document.addEventListener('submit',event=>{
   let writingPlan=null;
   if(kind==='writing'){
    const value=name=>form.elements.namedItem(name).value;
+   const purpose=value('writingPurpose');
    writingPlan={language:value('writingLanguage'),script:value('writingScript'),mode:value('writingMode'),
-    scribeId:value('writingScribe'),intent:value('writingIntent')};
+    scribeId:value('writingScribe'),intent:value('writingIntent'),...(purpose?{purpose}:{})};
+   const fixed=writingFixedSubject(writingPlan);
+   if(fixed&&!availableMasteries(actor).some(m=>m.name===fixed))throw Error('Účel díla vyžaduje osvojený '+fixed+'.');
    if(!validWritingPlan(writingPlan,actor.id,scope)||!availableMasteries(actor).some(m=>m.name===writingPlan.language)||
     !writingScribeOptions992(actor,writingPlan.language,writingPlan.script,writingPlan.mode).some(x=>x.person.id===writingPlan.scribeId))
     throw Error('Vyberte doložený jazyk, odpovídající písmo a způsobilého písaře.');
@@ -14670,7 +14707,7 @@ document.addEventListener('submit',event=>{
   const raw=f.elements.namedItem('insightD10')?.value.trim()||'';
   const dice=raw?raw.split(',').map(x=>{if(!/^\s*(?:[1-9]|10)\s*$/.test(x))throw Error('Insight d10 musí být skutečné celé hody 1–10.');return Number(x.trim());}):[];
   if(dice.length!==n)throw Error('Vyžadováno přesně '+n+'× d10 pro zbývající Insight hvězdy.');
-  const name=f.elements.namedItem('subjectSkill')?.value||'';
+  const name=writingFixedSubject(start.writingPlan)||f.elements.namedItem('subjectSkill')?.value||'';
   const mastery=availableMasteries(character(selected)).find(x=>x.name===name);
   if(n>0&&!mastery)throw Error('Pro Insight d10 musí existovat doložená předmětová dovednost.');
   const subjectIndex=mastery?Math.floor(mastery.ml/10):0;
@@ -14689,7 +14726,7 @@ document.addEventListener('submit',event=>{
     rollOrigin:inputs.forcedCF?'rule-forced-no-die':field.dataset.hmkAutoDice===field.value?'software':'manual'};
   }
   const result={type:'writing-work-complete-591',format:SKILL_TIMED_WORK_FORMAT_591,originId:source.id,actorId:selected,scope:start.scope,
-   sourceSV:sv,sourceLevel:level,timeReductionStars:used,physicalInsightDice:dice,subjectSkill:name,subjectIndex,insightStars,sourcePage:132,...(scribing?{scribing}:{})};
+   sourceSV:sv,sourceLevel:level,timeReductionStars:used,physicalInsightDice:dice,subjectSkill:name,subjectIndex,insightStars,sourcePage:132,...(start.writingPlan?.purpose?{purpose:start.writingPlan.purpose}:{}),...(scribing?{scribing}:{})};
   const body='Writing · '+start.projectName+' · Language SV '+sv+'; '+used+' hvězd na čas, '+n+' Insight d10 ['+dice.join(', ')+'] → '+insightStars+' Insight ★; termín '+displayCampaignMinute(dueMinute)+'.'+(scribing?
    ' Písař '+character(plan.scribeId).name+' · '+plan.script+' · EML '+(scribing.outcome.result.eml??'—')+
    ' · d100 '+(scribing.inputs.roll??'bez hodu')+' → '+scribing.outcome.result.level+' · SV '+scribing.outcome.result.sv+

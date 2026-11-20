@@ -12,9 +12,9 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
-import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.995';
-import {copySource,findCopyStages} from './hmk-script-copy.js?v=93.993';
-import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=93.994';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.002';
+import {copySource,findCopyStages} from './hmk-script-copy.js?v=94.002';
+import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=94.002';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');

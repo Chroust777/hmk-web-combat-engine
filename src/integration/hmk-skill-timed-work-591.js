@@ -5,7 +5,7 @@ import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,
  */
 import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
 import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=93.995';
-import {validWritingPlan,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=93.992';
+import {validWritingPlan,writingFixedSubject,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.002';
 import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
 export const WRITING_WORK_MINUTES_591=Object.freeze({missive:10,tract:5*1440,treatise:30*1440,disquisition:120*1440});
@@ -202,6 +202,7 @@ export function validateSkillTimedWork591(data){
    const originalLevel=source.skillTestProof?.a?.level??source.skillTestProof?.result?.level;
    const state=writingProjectState(journal,s.row);
    const insightDice=p.physicalInsightDice,required=writingIsText(s.p)?stars-t:0;
+   const fixedSubject=writingFixedSubject(s.p.writingPlan);
    const subjectIndex=p.subjectIndex,successful=Array.isArray(insightDice)?insightDice.filter(d=>d<=subjectIndex).length:0;
    const insightLimit={missive:0,tract:1,treatise:3,disquisition:5}[s.p.scope];
    const expectedInsight=Math.min(successful,insightLimit,Math.max(0,subjectIndex-4));
@@ -209,6 +210,7 @@ export function validateSkillTimedWork591(data){
     p.scope===s.p.scope&&p.sourceSV===sourceSV&&p.sourceLevel===originalLevel&&
     Array.isArray(insightDice)&&insightDice.length===required&&insightDice.every(d=>Number.isSafeInteger(d)&&d>=1&&d<=10)&&
     Number.isSafeInteger(subjectIndex)&&subjectIndex>=0&&p.insightStars===expectedInsight&&
+    (!fixedSubject||p.subjectSkill===fixedSubject)&&
     (required===0||typeof p.subjectSkill==='string'&&p.subjectSkill.length>0)&&
     state?.phase==='complete'&&state.attempt.id===source.id&&
     done.dueMinute===writingCompletionMinute(state,t),
