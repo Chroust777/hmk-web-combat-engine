@@ -38,7 +38,7 @@ import {PRINTED_STARTER_GEAR_P120,prepareStartingKit} from './src/integration/hm
 import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,interpretCharacterDescription} from './src/integration/hmk-generator-traits.js';
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
-import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.979';
+import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.985';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=93.983';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
@@ -100,8 +100,8 @@ import {createPotableWaterFill,recordPhysicalWaterTransfer,recordPhysicalWaterLo
 import {createForagingWaterStorage,validateForagingWaterStorageJournal} from './src/integration/hmk-foraging-water-storage.js';
 import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,setWeaponGrip,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
-import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,gmSenseRows,evaluatePerceptionDice,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js?v=93.979';
-import {creationWizardHTML,characterCalculationHTML,chronicleSenseRows,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js?v=93.983';
+import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,gmSenseRows,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js?v=93.985';
+import {creationWizardHTML,characterCalculationHTML,chronicleSenseRows,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js?v=93.985';
 import {isStableAnimalProfile93813,registryCharacters93813,registryCounts93813} from './src/integration/hmk-character-registry-separation-93813.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/integration/hmk-creation-psyche.js';
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.984';
+const APP_VERSION='93.985';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -23083,7 +23083,7 @@ document.addEventListener('submit',e=>{
  if(!revisedName||revisedName.length>120){return alert('Jméno postavy: zadejte 1–120 znaků.');}
  const attrKeys=['str','end','dex','agl','per','cml','aur','wil','rea','cre','emp','elo'];
  const valid=(raw,label,max)=>{if(!/^(?:0|[1-9][0-9]*)$/.test(String(raw??''))||!Number.isSafeInteger(Number(raw))||Number(raw)>max)throw Error(label+': zadejte celé nezáporné číslo.');return Number(raw)};
- let attrs=[],dp=[],legacy=[],senseDP=[],senseProof=[],coinChange=null,fatigueChanges=[],fatigueReason="";
+let attrs=[],dp=[],legacy=[],senseBonuses=[],coinChange=null,fatigueChanges=[],fatigueReason="";
  try{
   for(const key of attrKeys){
    const raw=v['sheet_attr_'+key];
@@ -23107,14 +23107,15 @@ document.addEventListener('submit',e=>{
    }
   }
   for(const row of gmSenseRows(c)){
-   const dpField='sheet_sense_dp_'+row.key;
-   if(dpField in v)senseDP.push([row.key,valid(v[dpField],row.skill+' DP',100)]);
-   const dice=String(v['sheet_sense_dice_'+row.key]??'').trim();
-   if(!dice)continue;
-   const {folk,ageGroup}=c.hmk;
-   const kind=c.kind||'PC';
-   const proof=evaluatePerceptionDice({name:row.key,folk,ageGroup,kind,dice:dice.split(',').map(x=>x.trim())});
-   senseProof.push([row.key,{...proof,folk,ageGroup,kind}]);
+   for(const kind of ['attribute','skill']){
+    const field='sheet_sense_bonus_'+kind+'_'+row.key;
+    if(!(field in v))continue;
+    const raw=String(v[field]);
+    const bonus=Number(raw);
+    if(!/^[+-]?\d+$/.test(raw)||!Number.isSafeInteger(bonus)||Math.abs(bonus)>100)
+     throw Error(row[kind]+': GM bonus musí být celé číslo od −100 do +100.');
+    senseBonuses.push([kind,row.key,bonus]);
+   }
   }
   // Fatigue is edited inside the existing Character Sheet Edit form, never
   // by a separate independent GM submit action. Blood Loss is immutable here.
@@ -23164,11 +23165,10 @@ document.addEventListener('submit',e=>{
    for(const [key,n] of attrs)h.attributes[key]=n;
    for(const [i,n] of legacy)h.skills[i].ml=n;
   }
-  for(const [key,n] of senseDP){
-   if(n)(h.gmSenseDP??={})[key]=n;
-   else if(h.gmSenseDP)delete h.gmSenseDP[key];
+  for(const [kind,key,n] of senseBonuses){
+   if(n)((h.gmSenseBonus??={})[kind]??={})[key]=n;
+   else if(h.gmSenseBonus?.[kind])delete h.gmSenseBonus[kind][key];
   }
-  if(senseProof.length)h.gmSenseProof={...h.gmSenseProof,...Object.fromEntries(senseProof)};
   if(fatigueChanges.length){
    const previous=persistentStateOf(live),round=Math.max(1,previous.lastRound),ids=[],adjustments=[];
    let current=previous;
