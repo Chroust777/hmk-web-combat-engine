@@ -38,9 +38,9 @@ import {PRINTED_STARTER_GEAR_P120,prepareStartingKit} from './src/integration/hm
 import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,interpretCharacterDescription} from './src/integration/hmk-generator-traits.js';
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
-import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js';
+import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.979';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
-import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=93.978';
+import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=93.979';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.964';
 import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.972';
@@ -84,7 +84,7 @@ import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,
 import {applyTalismanBestowal,projectTalismanStatus,validateTalismanEvidence,activeShamanSkillModifier,reconcileTalismanPossession} from './src/integration/hmk-shaman-talisman-state.js';
 import {HMK_OPPOSED_ACTIONS,opposedActionOptions,opposedPairIsPrinted,resolveOpposedDefenderMastery} from './src/integration/hmk-opposed-skill-pairs.js';
 import {skillNarrativeSolo,skillNarrativeOpposed,skillNarrativeTiebreak} from './src/integration/hmk-skill-narrative.js';
-import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js';
+import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js?v=93.979';
 import {resolveSkillConditions,skillConditionAvailability} from './src/integration/hmk-skill-context.js';
 import {resolveSkillTrauma,skillTraumaAvailability} from './src/integration/hmk-skill-trauma.js';
 import {automaticCriticalFailure,classifySkillConsequence,skillConsequenceProof,assertUniqueSkillConsequence,assertSkillProofAppendOnly} from './src/integration/hmk-skill-consequence-resolution.js';
@@ -100,8 +100,8 @@ import {createPotableWaterFill,recordPhysicalWaterTransfer,recordPhysicalWaterLo
 import {createForagingWaterStorage,validateForagingWaterStorageJournal} from './src/integration/hmk-foraging-water-storage.js';
 import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,setWeaponGrip,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
-import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js';
-import {creationWizardHTML,characterCalculationHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js';
+import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,gmSenseRows,evaluatePerceptionDice,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js?v=93.979';
+import {creationWizardHTML,characterCalculationHTML,gmSensePanelHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js?v=93.979';
 import {isStableAnimalProfile93813,registryCharacters93813,registryCounts93813} from './src/integration/hmk-character-registry-separation-93813.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/integration/hmk-creation-psyche.js';
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.978';
+const APP_VERSION='93.979';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6532,7 +6532,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.shock==='UNC'?'Ano':state.shock==='KIA'?'KIA':'Ne'],['Death Save',state.shock==='KIA'?'KIA':'—']];
  const conditionRows=projectChronicleConditions(state,{campaignId:data.campaignClock?campaignKey(data.campaignClock):null,auralShockLevels:h.arcane?.auralShockLevels});
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}${hmkTravelEncounterHintHTML(c)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}${editing?'<div class="journal-wound-gm-action"><button type="button" class="secondary" data-open-gm-wounds>✚ / − Správa skutečných ran · GM</button><p class="tiny muted">Výběr anatomické lokality, vytvoření a vyřešení rány přes společnou zdravotní evidenci. Nejde o volnou editaci Combat důkazů.</p></div>':''}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}${hmkTravelEncounterHintHTML(c)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${gmSensePanelHTML(c,{editing})}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}${editing?'<div class="journal-wound-gm-action"><button type="button" class="secondary" data-open-gm-wounds>✚ / − Správa skutečných ran · GM</button><p class="tiny muted">Výběr anatomické lokality, vytvoření a vyřešení rány přes společnou zdravotní evidenci. Nejde o volnou editaci Combat důkazů.</p></div>':''}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -12102,7 +12102,7 @@ document.addEventListener('click',e=>{
  e.preventDefault();pendingCombatActionHandoff=null;guidedAttackLastOutcome='Předvybraná bojová akce byla zrušena bez hodu a zápisu.';render();
 },true);
 // HMK p.60–62 Skill Workbench: read from the authoritative character, append one journal proof.
-function skillActorMastery(actor,name){const row=availableMasteries(actor).find(x=>x.name===name);if(!row)throw Error('Zvolená dovednost nemá ověřené ML: '+name);return row;}
+function skillActorMastery(actor,name){const row=availableMasteries(actor,{includeGMSenses:true}).find(x=>x.name===name);if(!row)throw Error('Zvolená dovednost nemá ověřené ML: '+name);return row;}
 function skillAssistantMLs(form,primaryName){
  const ids=[...form.querySelectorAll('select[name^="assist"]')].map(x=>x.value).filter(Boolean);
  if(new Set(ids).size!==ids.length)throw Error('Stejný pomocník je uveden vícekrát');
@@ -16292,7 +16292,7 @@ function hskApplyOpposedAction(form){
 function hskRebuildOpponent(form){
  const other=character(form.elements.namedItem('opponentId')?.value),wrap=form.querySelector('[data-opponent-skill-wrap]');
  if(!wrap||!other)return;
- const names=availableMasteries(other),opt=(name,withBlank)=>'<select name="'+name+'"><option value="">'+(withBlank?'— žádný —':'— vyberte protidovednost —')+'</option>'+names.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select>';
+ const names=availableMasteries(other,{includeGMSenses:true}),opt=(name,withBlank)=>'<select name="'+name+'"><option value="">'+(withBlank?'— žádný —':'— vyberte protidovednost —')+'</option>'+names.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select>';
  wrap.innerHTML=opt('opponentSkill',false);
  for(const name of ['defSecondary1','defSecondary2','defSecondaryRoll']){const el=form.elements.namedItem(name);if(!el)continue;el.outerHTML=opt(name,true);}
  hskApplyOpposedAction(form);
@@ -16558,6 +16558,8 @@ function hskAlchemySVHelpers(form,primary){
  * The original d100 is preserved; a Fate die is a SEPARATE optional roll.
  */
 function hmkFateSkillContext93866(actor,name){
+ const sense=gmSenseRows(actor).find(row=>row.attribute===name||row.skill===name);
+ if(sense)return sense.attribute===name?{group:'',attributeTest:true}:{group:'Physical',attributeTest:false};
  const skill=(actor?.hmk?.skills||[]).find(x=>x.name===name);
  if(skill?.group)return {group:skill.group,attributeTest:false};
  const attributes=new Set(['Strength','Endurance','Dexterity','Agility','Perception','Comeliness','Aura','Will','Reason','Creativity','Empathy','Eloquence','Voice']);
@@ -22959,7 +22961,7 @@ document.addEventListener('submit',e=>{
  if(!revisedName||revisedName.length>120){return alert('Jméno postavy: zadejte 1–120 znaků.');}
  const attrKeys=['str','end','dex','agl','per','cml','aur','wil','rea','cre','emp','elo'];
  const valid=(raw,label,max)=>{if(!/^(?:0|[1-9][0-9]*)$/.test(String(raw??''))||!Number.isSafeInteger(Number(raw))||Number(raw)>max)throw Error(label+': zadejte celé nezáporné číslo.');return Number(raw)};
- let attrs=[],dp=[],legacy=[],coinChange=null,fatigueChanges=[],fatigueReason="";
+ let attrs=[],dp=[],legacy=[],senseDP=[],senseProof=[],coinChange=null,fatigueChanges=[],fatigueReason="";
  try{
   for(const key of attrKeys){
    const raw=v['sheet_attr_'+key];
@@ -22981,6 +22983,16 @@ document.addEventListener('submit',e=>{
     if(!('sheet_legacy_ml_'+i in v))continue;
     legacy.push([i,valid(v['sheet_legacy_ml_'+i],'Skill ML',200)]);
    }
+  }
+  for(const row of gmSenseRows(c)){
+   const dpField='sheet_sense_dp_'+row.key;
+   if(dpField in v)senseDP.push([row.key,valid(v[dpField],row.skill+' DP',100)]);
+   const dice=String(v['sheet_sense_dice_'+row.key]??'').trim();
+   if(!dice)continue;
+   const {folk,ageGroup}=c.hmk;
+   const kind=c.kind||'PC';
+   const proof=evaluatePerceptionDice({name:row.key,folk,ageGroup,kind,dice:dice.split(',').map(x=>x.trim())});
+   senseProof.push([row.key,{...proof,folk,ageGroup,kind}]);
   }
   // Fatigue is edited inside the existing Character Sheet Edit form, never
   // by a separate independent GM submit action. Blood Loss is immutable here.
@@ -23030,6 +23042,11 @@ document.addEventListener('submit',e=>{
    for(const [key,n] of attrs)h.attributes[key]=n;
    for(const [i,n] of legacy)h.skills[i].ml=n;
   }
+  for(const [key,n] of senseDP){
+   if(n)(h.gmSenseDP??={})[key]=n;
+   else if(h.gmSenseDP)delete h.gmSenseDP[key];
+  }
+  if(senseProof.length)h.gmSenseProof={...h.gmSenseProof,...Object.fromEntries(senseProof)};
   if(fatigueChanges.length){
    const previous=persistentStateOf(live),round=Math.max(1,previous.lastRound),ids=[],adjustments=[];
    let current=previous;
