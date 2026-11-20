@@ -48,7 +48,7 @@ import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integra
 import {CHRONICLE_NOVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.962';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
-import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js';
+import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js?v=93.977';
 import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk-skill-balance-547.js';
 import {fishingCatchCandidate,resolveFishingCatch} from './src/integration/hmk-fishing-catch-548.js';
 import {FISH_START_V2,fishingStart93910,fishingProgress93910,fishingWork93910,fishingCancel93910,fishingSVLink93910,validateFishingTime93910} from './src/integration/hmk-fishing-time-93910.js?v=93.910';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.976';
+const APP_VERSION='93.977';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12204,7 +12204,7 @@ function hskVerdictSide(label,who,result,sr,range=null){
  if(!result)return '';
  return '<section class="hsk-verdict-section"><h4>'+esc(label+' · '+(who||'Postava'))+'</h4><div class="hsk-verdict-grid">'+
  hskVerdictMetric('Primary ML',result.ml)+hskVerdictMetric('EML',range?range.low+'–'+range.high:result.eml,range?'rozsah možného ENC; nikoli potvrzený výsledek':'')+
- hskVerdictMetric('d100',result.roll??'CF bez hodu')+hskVerdictMetric('Success Level',result.victoryLevel||result.level)+
+ hskVerdictMetric('d100',result.roll??'CF bez hodu')+hskVerdictMetric('Success Level',result.victoryLevel||result.level,result.level==='CF'?(result.splitCF||''):'')+
  (sr?hskVerdictMetric('Secondary d10',sr.roll===null?'bez hodu':sr.roll,sr.name):'')+
  (sr?hskVerdictMetric('TN / SR',sr.tn+' / '+(sr.success?'S':'F'),'HMK str. '+sr.sourcePage):'')+'</div>'+
  (sr?'<p class="hsk-verdict-footnote">'+esc(sr.effect||'')+'</p>':'')+'</section>';
@@ -12246,6 +12246,11 @@ function hskResultRichHTML(proof,body){
  }
  if(proof.gmNarrative)html+='<section class="hsk-verdict-section hsk-verdict-narrative"><h4>Vyprávění pro GM</h4><p>'+esc(proof.gmNarrative)+'</p></section>';
  return html+'</div>';
+}
+function hskFollowupContext(proof){
+ if(proof?.type==='secondary-mastery-value-test')return {climbingMode:'difficult'};
+ if(['secondary-mastery-test','assistance-success-test'].includes(proof?.type))return {climbingMode:'easy'};
+ return {};
 }
 function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=null}={}){
  if(!originalId||!proof||proof.type==='critical-followup')return '';
@@ -12294,7 +12299,7 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
    if(staged)return '<section class="hsk-followup-advisory" role="status"><strong>Survival CF při Trekking · HMK str. 145, 148</strong><p>Původní d100 '+esc(String(x.result.roll??'—'))+' je již doložen. Žádný další d100 zde nezadávejte. Vraťte se do rozpracovaného Cestování; tam zadejte skutečný Survival Hazard d10 (1–3 Equipment, 4–6 Accident, 7–10 Complication). Následky se vyhodnotí ve svých pravidlových modulech. Rozpracované testy se uloží až potvrzením celé epizody GM.</p></section>';
    return '<p class="hsk-followup-advisory"><strong>Survival CF · HMK str. 148:</strong> Survival Hazard d10 je povinný pouze při doloženém Orienteering CF v Trekking. Nelze jej vyhodnotit pouhým uložením obecného následku Skill Testu. Použijte původní cestovní rutinu a její důkaz události; nový d100 se zde nehází.</p>';
   }
-  const options=skillFollowupActivities(x.skill,x.result.level);
+  const options=skillFollowupActivities(x.skill,x.result.level,hskFollowupContext(proof));
   if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
   const choices=options.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
   const trainingAnimals=bestiaryKnownAnimals().filter(a=>a.ownerId===x.id&&!stableBurden(data,campaignKey(data.campaignClock),a).exit);
@@ -14064,7 +14069,7 @@ document.addEventListener('change',event=>{
  const proof=original?.skillTestProof,side=f.elements.namedItem('side')?.value;
  const skill=side==='B'?proof?.skills?.[1]:proof?.skills?.[0]||proof?.skill;
  const res=side==='B'?proof?.b:proof?.a||proof?.result;
- const plan=criticalFollowupPlan(skill,event.target.value,res);
+ const plan=criticalFollowupPlan(skill,event.target.value,res,hskFollowupContext(proof));
  const techniques=plan?.test==='Fumble'?['Dexterity','Legerdemain']:plan?.test==='Stumble'?['Agility','Acrobatics']:plan?.requiresRoll?[plan.test]:[];
  const actor=character(side==='B'?proof?.opponentId:proof?.actorId);
  const choices=hskCriticalSkillChoices(actor,techniques);
@@ -14150,7 +14155,7 @@ document.addEventListener('submit',event=>{
   if(data.journal.some(x=>x.skillTestProof?.type==='critical-followup'&&x.skillTestProof.originId===originId&&x.skillTestProof.side===side))throw Error('Tento následný test už byl uložen');
   const skill=side==='B'?proof.skills?.[1]:proof.skills?.[0]||proof.skill;
   const old=side==='B'?proof.b:proof.a||proof.result;
-  const plan=criticalFollowupPlan(skill,f.elements.namedItem('activity')?.value,old);
+  const plan=criticalFollowupPlan(skill,f.elements.namedItem('activity')?.value,old,hskFollowupContext(proof));
   if(!plan)throw Error('Následný postup nelze doložit pro tuto činnost a CF');
   if(plan.id==='animal-training'&&data.journal.some(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.originId===originId))throw Error('Animal Training CF už byl doložen v kompletním výcviku; neházejte druhý d3.');
   if(['animal-training','writing-routine'].includes(plan.id)&&(!Number.isSafeInteger(data.campaignClock?.minute)||original.calendarCampaignId!==campaignKey(data.campaignClock)))
@@ -16002,7 +16007,7 @@ function hskSpecialPreviewPrimary93917(form){
 function hskSpecialRefresh(form){
  const routine=hskSpecialSelectedInfo(form),kind=routine.family;
  const row=(selector,on)=>{const el=form.querySelector(selector);if(el)el.hidden=!on;};
- row('[data-special-period]',kind==='fatigue');
+ row('[data-special-period]',kind==='fatigue'&&routine.base==='variable');
  row('[data-special-divine]',kind==='divine'||routine.id==='astral-rite-member');
  row('[data-special-astral]',kind==='astral');
  row('[data-special-festival]',routine.id==='festival-style');
@@ -16113,8 +16118,12 @@ function hskValidatedSecondaries(person,info){
  return names.map(name=>({name,...skillActorMastery(person,name),modifier:secondaryMastery(skillActorMastery(person,name).ml).modifier}));
 }
 function hskSRMode(form){return form.id==='skill-value-form'?'value':'success';}
+function hskRequiredSR(form,primary){
+ // HMK 67: easy climbs use a Success Test; Climbing SV is the difficult climb.
+ return hskSRMode(form)==='value'&&primary==='Climbing'?'climbing-difficult':'';
+}
 function hskSelectedSRRoutine(form,primary,side='A'){
- const id=form.elements.namedItem('srActivity'+side)?.value||'';
+ const id=hskRequiredSR(form,primary)||form.elements.namedItem('srActivity'+side)?.value||'';
  if(!id)return null;
  const routine=skillSecondaryRoutineById(id,primary,hskSRMode(form));
  const user=side==='A'?character(selected):character(form.elements.namedItem('opponentId')?.value);
@@ -16144,8 +16153,9 @@ function hskConfigureSR(form,side='A'){
  const user=side==='A'?character(selected):character(form.elements.namedItem('opponentId')?.value);
  const available=skillSecondaryRoutines(skill,hskSRMode(form)).filter(r=>skillSecondaryRoutineEligible(r,user,availableMasteries(user)));
  const prior=field.value;
- field.innerHTML='<option value="">— běžná činnost: bez SR / TN —</option>'+available.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+' · HMK str. '+r.page+'</option>').join('');
- field.value=available.some(r=>r.id===prior)?prior:'';
+ const required=hskRequiredSR(form,skill);
+ field.innerHTML=(required?'':'<option value="">— běžná činnost: bez SR / TN —</option>')+available.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+' · HMK str. '+r.page+'</option>').join('');
+ field.value=required||(available.some(r=>r.id===prior)?prior:'');
  const outer=form.querySelector('[data-sr-side="'+side+'"]');if(outer)outer.hidden=!available.length || (form.id==='skill-secondary-form'&&side==='B'&&!form.elements.namedItem('opposed')?.checked);
  hskApplySRSelection(form,side);
 }

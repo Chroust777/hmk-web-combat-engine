@@ -124,6 +124,7 @@
 .hsk-special-container>summary{font-weight:700;cursor:pointer;padding:.2rem}
 .hsk-special-container[open]>summary{margin-bottom:.7rem}
 .hsk-special-container .hsk-form-grid{margin:.65rem 0}
+#hsk-special-sr-form [hidden]{display:none!important}
 #hsk-special-result .hsk-verdict{margin-top:.9rem}
 
 /* v93.283: a provisional zero must never resemble a certified zero. */
