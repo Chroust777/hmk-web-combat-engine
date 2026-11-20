@@ -156,7 +156,8 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   const submit=form.querySelector('button[type=submit]');if(!submit)continue;
   // Hide obsolete bulk rollers and original raw fields, retaining FormData.
   for(const field of sources.values()){
-   const label=field.closest('label');if(label)label.hidden=true;
+   const label=field.closest('label');
+   if(label){label.classList.add('hmk-chain-hidden-field-93918');label.hidden=true;}
    field.type='hidden';field.tabIndex=-1;
   }
   const legacy={
@@ -186,6 +187,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   const accepted=new Map();let generated=null;
   const mustHaveSteps=kind==='frost'||kind==='bloodComplete';
   const comaHR=kind==='shock'?form.elements.namedItem('immersionComaHR'):null;
+  comaHR?.closest('label')?.classList.add('hmk-chain-hidden-field-93918');
   function syncUnderlying(){
    const steps=stepsFor(form,kind),activeKeys=new Set(steps.map(stageKey));
    for(const name of allNames){
