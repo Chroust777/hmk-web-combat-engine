@@ -228,7 +228,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
     all.push({id:KEY('weather-shock',c.id,q.sourceId),characterId:c.id,name:c.name,
      kind:'weather-shock',sourceId:q.sourceId,
      description:q.phase==='after-all-bleeding-stopped'?'Blood Loss Shock Reroll – ihned po zastavení všech Bleederů':q.domain==='gm-health'?(q.kind==='UNC'?'GM Shock Reroll – po 10 skutečných minutách':'GM Shock Reroll – po následující skutečné akci'):
-      q.kind==='UNC'?'Cestovní Shock Reroll – po 10 minutách':'Cestovní Shock Reroll – GM potvrdí další skutečnou akci',
+      (q.domain==='skill-fall'?'Shock Reroll po pádu':'Cestovní Shock Reroll')+(q.kind==='UNC'?' – po 10 minutách':' – GM potvrdí další skutečnou akci'),
      minute:dueMinute,anchorMinute:q.originMinute,status:dueMinute<=clock.minute?'due':'future'});
    }
   }else if(pendingReroll)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',

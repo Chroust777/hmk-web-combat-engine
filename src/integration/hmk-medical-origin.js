@@ -3,8 +3,8 @@
  * actual impairment but does not own its original Weather tests or treatment.
  * HMK v1.2 pp. 167–170, 177–182, 185.
  */
-export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',TRAVEL:'travel-accident',COMBAT:'combat',GM:'gm-confirmed'});
-export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL||origin===MEDICAL_ORIGIN.GM||origin==='gm-health';
+export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',TRAVEL:'travel-accident',FALL:'skill-fall',COMBAT:'combat',GM:'gm-confirmed'});
+export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL||origin===MEDICAL_ORIGIN.FALL||origin===MEDICAL_ORIGIN.GM||origin==='gm-health';
 export function medicalOriginOfWound(wound,events=[]){
  if(!wound||typeof wound.id!=='string')return null;
  const original=Array.isArray(events)?events.find(e=>e.id===wound.originEventId):null;
@@ -17,6 +17,9 @@ export function medicalOriginOfWound(wound,events=[]){
  if(wound.originDomain===MEDICAL_ORIGIN.WEATHER&&original?.type==='travel-weather-injury'&&
   original.details?.domain===MEDICAL_ORIGIN.WEATHER&&
   original.details?.woundId===wound.id)return MEDICAL_ORIGIN.WEATHER;
+ if(wound.originDomain===MEDICAL_ORIGIN.FALL&&original?.type==='skill-fall-injury'&&
+  original.details?.domain===MEDICAL_ORIGIN.FALL&&original.details?.sourceId===original.id&&
+  original.details?.woundId===wound.id)return MEDICAL_ORIGIN.FALL;
  if(wound.originDomain===MEDICAL_ORIGIN.COMBAT&&original?.type==='confirmed-hit')return MEDICAL_ORIGIN.COMBAT;
  // A frost amputation makes a NEW Edge wound. It inherits the medical origin
  // of the original documented frost injury, NOT the name of the executor.

@@ -10,7 +10,7 @@ export function calendarEventDestination(event){
  if(event?.kind==='concurrent-treatment')return 'hazards';
  // A persisted travel/Weather medical source overrides obsolete route='combat'.
  // Origin is immutable evidence; this router never creates a second procedure.
- if((['travel-weather','travel-accident'].includes(event?.originDomain)||['travel-weather','travel-accident'].includes(event?.domain))&&
+ if((['travel-weather','travel-accident','skill-fall'].includes(event?.originDomain)||['travel-weather','travel-accident','skill-fall'].includes(event?.domain))&&
    ['treatment','healing','infection','grim','coma','extended-shock','shock-followup',
     'injury-morale','injury-mishap','bleeding','blood-loss','blood-shock'].includes(event?.kind))
   return 'hazards';

@@ -3,6 +3,7 @@
  * existing synchronized Combat State boundary. Each injury requires the exact
  * falling dice and documented armour, with no default zero protection.
  */
+import {MEDICAL_ORIGIN} from './hmk-medical-origin.js?v=93.982';
 import {humanLocation,woundFromFall} from './hmk-mounted-fall-injury-join.js';
 import {resolveLiveCombatArmour} from './live-combat-armour.js';
 import {resolveCombatantLoad} from './combatant-load.js';
@@ -76,14 +77,14 @@ export function inspectClimbingFallingStep({actor,inventory,state,fallHeightFt,s
   compoundCompatible(w,{location:loc.location,aspect:'b',area:false}));
  const needsCompound=!!base.injury&&existing.length>0;
  const needsShock=effectiveImpact>0;
- return {ready:true,needed:[],rawEML,eml,sl,rolledSL:levelNames[rolledSL],stunnedPenalty:state.shock==='STN'?1:0,repeatRequired:sl==='CF',
+ return {ready:true,needed:[],rawEML,eml,sl,rolledSL:levelNames[rolledSL],stunnedPenalty:state.shock==='STN'?1:0,repeatRequired:sl==='CF'&&row.technique!=='Swimming',
   location:loc.location,side:loc.side,locationShock:loc.locationShock,
   armourValue:armour.armourValue,strikeImpact,effectiveImpact,
   injury:base.injury?base.injury.severity+base.injury.level:null,
   needsShock,needsCompound,existingWounds:existing.length,technique:row.technique};
 }
 
-export function prepareClimbingFallingSequence({actor,inventory,state,fallHeightFt,surface,originSkill='Climbing',slope='sheer',direction='front',rows,round=1,timelineId,eventId,gmConfirmed=false}={}){
+export function prepareClimbingFallingSequence({actor,inventory,state,fallHeightFt,surface,originSkill='Climbing',slope='sheer',direction='front',rows,round=1,timelineId,eventId,gmConfirmed=false,originMinute=null}={}){
  must(gmConfirmed===true&&actor?.id&&Array.isArray(inventory)&&state&&typeof eventId==='string'&&eventId&&typeof timelineId==='string'&&timelineId&&die(round,9999),
   'Pád vyžaduje živou postavu, Combat State, totožnost události a potvrzení GM');
  validateCombatState(state);
@@ -121,13 +122,13 @@ export function prepareClimbingFallingSequence({actor,inventory,state,fallHeight
   const result=woundFromFall({state:current,character:actor,round,timelineId,eventId:eventId+':impact:'+i,
    bodyKind:'human',location:loc.location,side:loc.side,locationShock:loc.locationShock,
    strikeImpact,AV:armour.armourValue,shockRoll:r.shockD100??null,compoundD10:r.compoundD10??null,
-   physicalDice});
+   physicalDice,...(originMinute!==null?{injuryOrigin:MEDICAL_ORIGIN.FALL,originMinute,medicalSourceId:eventId+':impact:'+i}:{})});
   current=result.state;
   proofs.push({index:i,location:loc.location,side:loc.side,impact:strikeImpact,effectiveImpact:result.effectiveImpact,
    armourValue:armour.armourValue,fallingTechnique:r.technique,fallingD100:r.fallingD100,fallingEML:eml,
    level:sl,rolledLevel:step.rolledSL,stunnedPenalty:step.stunnedPenalty,injury:result.injury,shock:result.shockSL,physicalDice});
-  if(sl==='CF')must(i+1<rows.length,'CF v testu dopadu: HMK str.67 vyžaduje opakovat kroky 1–4 pro DALŠÍ zranění');
-  else must(i===rows.length-1,'Dodatečné zranění po Falling Test bez CF není přípustné');
+  if(step.repeatRequired)must(i+1<rows.length,'CF v testu dopadu: HMK str.67 vyžaduje opakovat kroky 1–4 pro DALŠÍ zranění');
+  else must(i===rows.length-1,'Tento výsledek dopadu nevyžaduje další zranění.');
  }
  const last=proofs.at(-1);const standing=limbs.has(last.location)&&fallHeightFt<=(last.fallingTechnique==='Acrobatics'?20:10);
  current=structuredClone(current);current.posture.prone=current.posture.prone||(surface!=='water'&&!standing);

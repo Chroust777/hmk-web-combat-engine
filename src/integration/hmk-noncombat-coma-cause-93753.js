@@ -2,12 +2,13 @@
  * A travel hazard can never provide fictitious Location Shock / IL inputs.
  * Read only; uses original shared healthState and its immutable injury event.
  */
+import {MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hmk-medical-origin.js?v=93.982';
 import {verifiedHumanLocationShock} from './hmk-weather-trauma-completion.js';
 import {verifiedMountedAnimalAnatomy} from './hmk-mounted-live-animal-falling.js';
 const unavailable=reason=>({ready:false,reason});
 export function verifiedNoncombatComaCause({actor,state,shockFollowup}={}){
  const q=shockFollowup;
- if(!actor?.id||!state||!q||!['travel-accident','travel-weather','gm-health'].includes(q.domain)||typeof q.sourceId!=='string'||!q.sourceId)
+ if(!actor?.id||!state||!q||!isNoncombatMedicalOrigin(q.domain)||typeof q.sourceId!=='string'||!q.sourceId)
   return unavailable('Chybí doložený nevojenský původ Shock a původní zdroj.');
  const grim=state.events?.find(e=>e.id===q.sourceId&&e.type==='grim-wound-shock'&&e.details?.woundId===q.woundId);
  if(grim){
@@ -19,10 +20,11 @@ export function verifiedNoncombatComaCause({actor,state,shockFollowup}={}){
    return {ready:true,locationShock,injuryLevel,woundId,sourceEventId:grim.id,initialHR};
   return unavailable('Grim Wound nemá doložený Location Shock nebo IL pro Coma.');
  }
- if(q.domain!=='travel-accident')
+ if(![MEDICAL_ORIGIN.TRAVEL,MEDICAL_ORIGIN.FALL].includes(q.domain))
   return unavailable('Původní klimatický Shock nemá doložené vyvolávající anatomické zranění: Location Shock a IL nelze odhadovat.');
- const matches=(state.events||[]).filter(e=>e?.type==='travel-accident-injury'&&e.details?.sourceId===q.sourceId&&e.details?.domain===q.domain&&e.details?.targetId===actor.id&&typeof e.details.woundId==='string');
- if(matches.length!==1)return unavailable('Chybí právě jedna doložená původní Accident Injury událost.');
+ const type=q.domain===MEDICAL_ORIGIN.FALL?'skill-fall-injury':'travel-accident-injury';
+ const matches=(state.events||[]).filter(e=>e?.type===type&&e.details?.sourceId===q.sourceId&&e.details?.domain===q.domain&&e.details?.targetId===actor.id&&typeof e.details.woundId==='string');
+ if(matches.length!==1)return unavailable('Chybí právě jedna doložená původní událost zranění.');
  const event=matches[0];
  const wounds=(state.wounds||[]).filter(w=>w?.id===event.details.woundId&&w.originEventId===event.id&&w.originDomain===q.domain);
  if(wounds.length!==1)return unavailable('Původní rána nesouhlasí s událostí zranění.');

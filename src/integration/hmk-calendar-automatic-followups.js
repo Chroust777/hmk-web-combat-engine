@@ -97,9 +97,9 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   // hidden even though Treatment/Healing were already displayed.
   if(s?.format==='hmk-character-health-v1'){
    for(const m of unresolvedInjuryMishaps(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=isNoncombatMedicalOrigin(medicalOriginOfWound(wound,s.events));
-    push(c,'injury-mishap',m.id,weather?'Cestovní Injury Mishap – povinná zdravotní následnost (HMK 170)':'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
+    push(c,'injury-mishap',m.id,weather?(medicalOriginOfWound(wound,s.events)==='skill-fall'?'Injury Mishap po pádu (HMK 170)':'Cestovní Injury Mishap – povinná zdravotní následnost (HMK 170)'):'Nevyřízený Injury Mishap – původní Combat průvodce (HMK 161,170)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
    for(const m of dueInjuryMorale(s)){const wound=s.wounds.find(w=>w.id===m.woundId),weather=isNoncombatMedicalOrigin(medicalOriginOfWound(wound,s.events));
-    push(c,'injury-morale',m.woundId,weather?'Cestovní Injury Morale – až po zotavení ze Shock (HMK 162)':'Povinný Morale po Serious/Grievous zranění (HMK 162)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
+    push(c,'injury-morale',m.woundId,weather?(medicalOriginOfWound(wound,s.events)==='skill-fall'?'Injury Morale po pádu – až po zotavení ze Shock (HMK 162)':'Cestovní Injury Morale – až po zotavení ze Shock (HMK 162)'):'Povinný Morale po Serious/Grievous zranění (HMK 162)',clock.minute,weather?'hazards':'combat',{woundId:m.woundId});}
   }
   // Every committed injury without a resolved initial treatment decision
   // needs routing into the existing Treatment/Untreated workflow. No roll is

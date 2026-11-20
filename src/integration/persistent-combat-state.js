@@ -1,3 +1,4 @@
+import {isNoncombatMedicalOrigin} from './hmk-medical-origin.js?v=93.982';
 import {hasBraveFearSource} from './hmk-concurrent-fear.js';
 import {validateParallelColdShocks} from './hmk-parallel-cold-shock.js';
 /** HârnMaster: Roleplaying in the World of Kèthîra, printed pp.168–169, 176–178.
@@ -333,7 +334,7 @@ export function validateCombatState(s){
   }
  if(s.shockFollowup!==undefined&&s.shockFollowup!==null){
   const q=s.shockFollowup;
-  if(q.domain!==undefined)requireCond(['travel-weather','travel-accident','gm-health'].includes(q.domain)&&
+  if(q.domain!==undefined)requireCond(isNoncombatMedicalOrigin(q.domain)&&
    typeof q.sourceId==='string'&&q.sourceId&&
    (whole(q.originMinute,0,1000000000)||(q.domain==='gm-health'&&q.originMinute===null)),
    'Weather Shock vyžaduje neměnný zdroj a kalendářovou minutu');
@@ -348,7 +349,7 @@ export function validateCombatState(s){
   requireCond(x&&['INC','UNC'].includes(x.originState)&&(s.shock===x.originState||strongerIndependentShock(s,x.originState))&&whole(x.hr,1,5)
    &&whole(x.elapsedHours,0,100000)&&x.elapsedHours%EXTENDED_HOURS===0
    &&s.shockFollowup==null,'Neplatný Extended Shock (HR / časování / stav)');
-  if(x.domain!==undefined)requireCond(['travel-weather','travel-accident','gm-health'].includes(x.domain)&&typeof x.sourceId==='string'&&x.sourceId.length>0,
+  if(x.domain!==undefined)requireCond(['travel-weather','travel-accident','skill-fall','gm-health'].includes(x.domain)&&typeof x.sourceId==='string'&&x.sourceId.length>0,
    'Extended Shock z počasí musí zachovat zdroj cestovní události');
  }
  if(s.asphyxiaComaPending!==undefined&&s.asphyxiaComaPending!==null){
@@ -377,7 +378,7 @@ export function validateCombatState(s){
   requireCond(c&&c.active===true&&whole(c.hr,1,20)&&whole(c.elapsedDays,0,100000)
    &&(c.nextCourseDays===null||whole(c.nextCourseDays,1,10))
    &&(s.extendedShock!==null&&s.extendedShock!==undefined||['NONE','UNC'].includes(s.shock)||strongerIndependentShock(s,'NONE')), 'Neplatný stav Coma');
-  if(c.domain!==undefined)requireCond(['travel-weather','travel-accident','gm-health'].includes(c.domain)&&typeof c.sourceId==='string'&&c.sourceId.length>0,
+  if(c.domain!==undefined)requireCond(['travel-weather','travel-accident','skill-fall','gm-health'].includes(c.domain)&&typeof c.sourceId==='string'&&c.sourceId.length>0,
    'Coma z počasí musí zachovat zdroj cestovní události');
  }
  for(const e of s.events){requireCond(e&&typeof e.id==='string'&&e.id&&!events.has(e.id)&&typeof e.type==='string'&&whole(e.round,1,9999),'Neplatná nebo duplicitní bojová událost');events.add(e.id);}
@@ -463,7 +464,10 @@ export function recordConfirmedSurrenderRelease({state,round,timelineId,eventId,
 export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudication={}}={}){
  const s=ready(state,round,eventId);
  const injuryOrigin=adjudication.injuryOrigin??'combat';
- requireCond(['combat','travel-weather','travel-accident'].includes(injuryOrigin),'Nepovolený původ fyzického zranění');
+ requireCond(['combat','travel-weather','travel-accident','skill-fall'].includes(injuryOrigin),'Nepovolený původ fyzického zranění');
+ if(injuryOrigin==='skill-fall')requireCond(/^climbing-fall:.+:impact:\d+$/.test(eventId)&&
+  adjudication.weatherSourceId===eventId&&whole(adjudication.originMinute,0,1000000000),
+  'Pád vyžaduje ověřený zdroj dopadu a kalendářovou minutu');
  if(injuryOrigin==='travel-weather')requireCond(eventId.startsWith('skill-weather-skin:')&&
   typeof adjudication.weatherSourceId==='string'&&adjudication.weatherSourceId&&
   whole(adjudication.originMinute,0,1000000000),'Weather zranění musí nést původní zdroj a skutečnou kalendářovou minutu');
@@ -561,12 +565,12 @@ export function applyConfirmedHit({state,characterId,draft,round,eventId,adjudic
  if(s.shock==='KIA'){s.extendedShock=null;s.coma=null;s.shockFollowup=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
  else if(s.shock!==previousShock){installShockFollowup(s,{round,timelineId:adjudication.timelineId??null});
   if(s.shockFollowup&&wound)s.shockFollowup.woundId=wound.id;}
- if(['travel-weather','travel-accident'].includes(injuryOrigin)&&s.shockFollowup&&s.shock!==previousShock){
+ if(isNoncombatMedicalOrigin(injuryOrigin)&&s.shockFollowup&&s.shock!==previousShock){
   s.shockFollowup.domain=injuryOrigin;s.shockFollowup.sourceId=adjudication.weatherSourceId;
   s.shockFollowup.originMinute=adjudication.originMinute;
  }
- record(s,eventId,injuryOrigin==='travel-weather'?'travel-weather-injury':injuryOrigin==='travel-accident'?'travel-accident-injury':'confirmed-hit',round,{domain:injuryOrigin,
-  ...(['travel-weather','travel-accident'].includes(injuryOrigin)?{sourceId:adjudication.weatherSourceId,originMinute:adjudication.originMinute}:{}),targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity,bodyKind):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:injuryOrigin==='travel-weather'?'HMK 185, 167–170; environmental injury & shared physical consequences':injuryOrigin==='travel-accident'?'HMK 148, 167–170; confirmed travel accident and shared physical consequences':'HMK 161–162, 167–170; verified special consequences'});
+ record(s,eventId,injuryOrigin==='travel-weather'?'travel-weather-injury':injuryOrigin==='travel-accident'?'travel-accident-injury':injuryOrigin==='skill-fall'?'skill-fall-injury':'confirmed-hit',round,{domain:injuryOrigin,
+  ...(isNoncombatMedicalOrigin(injuryOrigin)?{sourceId:adjudication.weatherSourceId,originMinute:adjudication.originMinute}:{}),targetId:characterId,location:draft.location,aspect:draft.aspect,kind:inj.kind,injury:inj.injury??null,woundId:wound?.id??null,shock:s.shock,bleeding:wound?.bleeding??false,compound:compound?{d10:adjudication.compoundD10,success:compound.success,affectedId:compound.compoundedInjuryId??null}:null,impact:draft.impactResult?.effectiveImpact??null,proposalId:draft.proposalId??null,amputation:amp?{affectedWoundId:ampFromOld?priorCompounded.id:wound?.id??null,severed:amp.severed,dead:amp.dead,sl:amp.slName,roll:amp.roll,forcedBleeder:amp.forceBleeder,shockTestModifier:amp.shockTestModifier}:null,injuryMishaps:wound?hmkInjuryMishaps(wound.location,wound.severity,bodyKind):[],moralePending:wound?.moralePending??false,impaled:wound?.impaled??false,source:injuryOrigin==='travel-weather'?'HMK 185, 167–170; environmental injury & shared physical consequences':injuryOrigin==='travel-accident'?'HMK 148, 167–170; confirmed travel accident and shared physical consequences':injuryOrigin==='skill-fall'?'HMK 67, 167–170; confirmed falling injury':'HMK 161–162, 167–170; verified special consequences'});
  return {state:s,wound};
 }
 /** HMK p271 direct Acid: successive successful rounds increase the SAME
@@ -680,7 +684,7 @@ export function shockFollowupReadiness({state,round,characterId=null,actorId=nul
  const q=state.shockFollowup??null;
  if(!q)return {due:false,reason:'legacy-state-needs-gm-timing-evidence'};
  if(!whole(round,1,9999))return {due:false,reason:'invalid-round'};
- if(['travel-weather','travel-accident','gm-health'].includes(q.domain)){
+ if(isNoncombatMedicalOrigin(q.domain)){
   if(!characterId||actorId!==characterId)return {due:false,reason:'wrong-weather-patient'};
   if(!Number.isSafeInteger(elapsedMinutesSinceOriginal)||elapsedMinutesSinceOriginal<0)
    return {due:false,reason:'missing-weather-calendar-time'};
@@ -754,7 +758,7 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
   if(result.extendedShock){
    // The causal Weather Shock owns subsequent medical courses. They must
    // never masquerade as Encounter/Combat follow-ups in the Calendar.
-   const medicalSource=['travel-weather','travel-accident','gm-health'].includes(q?.domain)?{domain:q.domain,sourceId:q.sourceId}:{};
+   const medicalSource=isNoncombatMedicalOrigin(q?.domain)?{domain:q.domain,sourceId:q.sourceId}:{};
    s.extendedShock={originState:before,hr:result.extendedShock.hr,elapsedHours:0,...medicalSource,
     ...(q?.woundId?{woundId:q.woundId}:{})};
    if(requireComa)s.coma={active:true,hr:immersionComaHR??result.coma.initialHR,elapsedDays:0,nextCourseDays:initialComaD10,...medicalSource,
@@ -762,7 +766,7 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
     ...(q?.woundId?{woundId:q.woundId}:{})};
   }
  }
- if(['travel-weather','travel-accident','gm-health'].includes(q?.domain)&&s.shockFollowup){
+ if(isNoncombatMedicalOrigin(q?.domain)&&s.shockFollowup){
   // A subsequent STN reroll is another *weather* obligation. No combat
   // round is manufactured, nor is the calendar advanced by the reroll.
   s.shockFollowup.domain=q.domain;s.shockFollowup.sourceId=q.sourceId;
