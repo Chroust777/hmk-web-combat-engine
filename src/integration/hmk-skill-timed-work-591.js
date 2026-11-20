@@ -59,6 +59,37 @@ export function skillTimedEarliest591(kind,baseMinutes){
  // not permission to claim the project is completed.
  return Math.ceil(baseMinutes*(kind==='engineering'?0.7:kind==='writing'?0.5:1));
 }
+/** Derive the active attempt from the original project and confirmed rolls. */
+export function writingProjectState(journal,start){
+ const project=start?.calendarSkillProjectStart591;
+ if(project?.kind!=='writing')return null;
+ const rows=journal.filter(row=>row.calendarCampaignId===start.calendarCampaignId&&row.characterId===start.characterId);
+ let state={phase:'initial',readyMinute:project.earliestMinute,startMinute:project.startMinute,baseMinutes:project.baseMinutes};
+ for(const row of rows){
+  const link=row.calendarSkillProjectSV591;
+  if(link?.startId!==start.id||link.kind!=='writing')continue;
+  if(!['initial','retry'].includes(state.phase)||row.campaignMinute<state.readyMinute||
+   (link.previousAttemptId??null)!==(state.attempt?.id??null))continue;
+  const result=row.skillTestProof?.a??row.skillTestProof?.result;
+  const follow=result?.level==='CF'?rows.find(next=>next.skillTestProof?.type==='critical-followup'&&
+   next.skillTestProof.originId===row.id&&next.skillTestProof.activity==='writing-routine'&&
+   next.skillTestProof.writingExtension?.scope===project.scope):null;
+  const factor=result?.level==='CF'?follow?.skillTestProof.writingExtension.completionTimeMultiplier:1;
+  const attempt={attempt:row,result,factor,startMinute:state.startMinute,baseMinutes:state.baseMinutes};
+  if(![1,1.5,2].includes(factor)){state={...attempt,phase:'will'};continue;}
+  const dueMinute=writingCompletionMinute(attempt);
+  if(project.scope==='missive'||result?.sv>=5){state={...attempt,phase:'finish',dueMinute};continue;}
+  const startMinute=Math.max(dueMinute,row.campaignMinute,follow?.campaignMinute??0);
+  const baseMinutes=Math.ceil(project.baseMinutes*(result?.sv>=3?0.5:1));
+  state={...attempt,phase:'retry',startMinute,baseMinutes,readyMinute:startMinute+baseMinutes};
+ }
+ if(state.phase==='finish'&&rows.some(row=>row.calendarSkillProjectComplete591?.startId===start.id&&
+  row.calendarSkillProjectComplete591.sourceId===state.attempt?.id))return {...state,phase:'complete'};
+ return state;
+}
+export function writingCompletionMinute(state,timeStars=0){
+ return state.startMinute+Math.ceil(state.baseMinutes*(1-0.1*timeStars)*state.factor);
+}
 export function validateSkillTimedWork591(data){
  const starts=new Map(),linked=new Set(),completed=new Set(),journal=data?.journal||[];
  const journalById=new Map(journal.map(j=>[j.id,j]));
@@ -92,11 +123,15 @@ export function validateSkillTimedWork591(data){
    'Časovaný Skill Test: začátek projektu nebo pravidlová doba byly pozměněny.');
   starts.set(row.id,{row,p});
  }
- for(const row of journal){
+ for(const [index,row] of journal.entries()){
   const link=row.calendarSkillProjectSV591;if(!link)continue;
   const s=starts.get(link.startId),proof=row.skillTestProof;
   const skill=proof?.skills?.[0]||proof?.skill||'';
-  assert(s&&!linked.has(link.startId)&&link.kind===s.p.kind&&
+  const writing=s?.p.kind==='writing';
+  const retry=writing&&linked.has(link.startId)?writingProjectState(journal.slice(0,index),s.row):null;
+  const validAttempt=retry?retry.phase==='retry'&&link.previousAttemptId===retry.attempt.id&&row.campaignMinute>=retry.readyMinute:
+   !linked.has(link.startId)&&link.previousAttemptId==null;
+  assert(s&&validAttempt&&link.kind===s.p.kind&&
    row.characterId===s.p.actorId&&row.calendarCampaignId===s.row.calendarCampaignId&&
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
@@ -129,10 +164,7 @@ export function validateSkillTimedWork591(data){
    const stars=Math.min(5,Math.max(0,sourceSV-4));
    const t=p.timeReductionStars;
    const originalLevel=source.skillTestProof?.a?.level??source.skillTestProof?.result?.level;
-   const willFollow=journal.find(j=>j.skillTestProof?.type==='critical-followup'&&
-    j.skillTestProof.originId===source.id&&j.skillTestProof.activity==='writing-routine');
-   const willFactor=originalLevel==='CF'?willFollow?.skillTestProof?.writingExtension?.completionTimeMultiplier:null;
-   const factor=originalLevel==='CF'?willFactor:1;
+   const state=writingProjectState(journal,s.row);
    const insightDice=p.physicalInsightDice,required=s.p.scope==='missive'?0:stars-t;
    const subjectIndex=p.subjectIndex,successful=Array.isArray(insightDice)?insightDice.filter(d=>d<=subjectIndex).length:0;
    const insightLimit={missive:0,tract:1,treatise:3,disquisition:5}[s.p.scope];
@@ -142,9 +174,8 @@ export function validateSkillTimedWork591(data){
     Array.isArray(insightDice)&&insightDice.length===required&&insightDice.every(d=>Number.isSafeInteger(d)&&d>=1&&d<=10)&&
     Number.isSafeInteger(subjectIndex)&&subjectIndex>=0&&p.insightStars===expectedInsight&&
     (required===0||typeof p.subjectSkill==='string'&&p.subjectSkill.length>0)&&
-    Number.isFinite(factor)&&
-    (originalLevel!=='CF'||willFollow?.skillTestProof?.writingExtension?.scope===s.p.scope)&&
-    done.workMinutes===Math.ceil(s.p.baseMinutes*(1-0.1*t)*factor),
+    state?.phase==='complete'&&state.attempt.id===source.id&&
+    done.dueMinute===writingCompletionMinute(state,t),
     'Writing: nedoložené Insight d10, hvězdy, Will následek nebo zkrácení času.');
   }
   completed.add(done.startId);

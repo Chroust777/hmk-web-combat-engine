@@ -34,7 +34,7 @@ function inRange(field){
  return WHOLE.test(raw)&&Number.isSafeInteger(n)&&n>=1&&n<=faces;
 }
 function due(form,field,skipPrimary){
- if(!visible(field))return false;
+ if(form.dataset.hmkWritingWaiting||!visible(field))return false;
  if(field.name.startsWith('roll10')){
   const side=field.name.endsWith('B')?'B':'A';
   if(!form.elements.namedItem('srActivity'+side)?.value)return false;
@@ -133,7 +133,8 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
    reset.hidden=![...state.values()].some(x=>x.accepted!==null);
    if(now){const index=list.indexOf(now.field)+1;
     message.textContent=(rollingStarted?'ČERVENÝ AKTIVNÍ HOD ':'Hod ')+index+'/'+list.length+' · '+now.field.name+' · d'+values[now.field.name]+' · Generovat hod nebo ručně zadat číslo → Vložit hodnotu.';
-   }else if(list.length)message.textContent='Všechny požadované hody potvrzené · lze použít původní Vyhodnotit.';
+   }else if(form.dataset.hmkWritingWaiting)message.textContent='Hody budou dostupné v termínu vybraného projektu.';
+   else if(list.length)message.textContent='Všechny požadované hody potvrzené · lze použít původní Vyhodnotit.';
    else message.textContent='Tato situace nevyžaduje další kostku · rozhodne původní pravidlové vyhodnocení.';
   }
   reset.addEventListener('click',()=>{clear();refresh();focusField(pending()?.field);});

@@ -11,6 +11,7 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.991';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -323,8 +324,10 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    if(episodeAlreadyHandled)continue;
    if(journal.some(z=>z.skillTestProof?.type==='critical-followup'&&z.skillTestProof.originId===e.id&&z.skillTestProof.side===x.side))continue;
    const c=characters.find(c=>c.id===x.id);
-   if(c)push(c,'skill-critical',e.id+'-'+x.side,`${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,actualDueMinute,'skills',
-    {originId:e.id,side:x.side,level:x.result.level,decisionRequired:true});
+   const writing=e.calendarSkillProjectSV591?.kind==='writing'&&x.side==='A';
+   if(c)push(c,'skill-critical',e.id+'-'+x.side,writing?'Writing · vyhodnotit Will po Language CF (HMK 132)':
+    `${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,actualDueMinute,'skills',
+    {originId:e.id,side:x.side,level:x.result.level,decisionRequired:!writing});
   }
  }
  // Animal Training CF adds a physically confirmed d3 number of 30-day
@@ -332,8 +335,8 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  // the SAME stable animal and SAME original Animalcraft SV determines the
  // date exactly. Do not create a permanent unknown-date obligation when
  // those immutable receipts exist: that would deadlock the Calendar before
- // the extended training can be finished. Writing delays without a known
- // work schedule (and legacy/unlinked training) must remain unresolved.
+ // the extended training can be finished. Unlinked extensions still need
+ // their original plan.
  for(const event of journal){
   if(event.calendarCampaignId!==clock.campaignId)continue;
   const t=event.skillTestProof?.trainingExtension,w=event.skillTestProof?.writingExtension;
@@ -370,24 +373,25 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    const origin=journal.find(j=>j.id===event.skillTestProof.originId&&j.calendarCampaignId===clock.campaignId&&j.characterId===person.id);
    const link=origin?.calendarSkillProjectSV591;
    const start=journal.find(j=>j.id===link?.startId&&j.calendarCampaignId===clock.campaignId)?.calendarSkillProjectStart591;
-   const result=origin?.skillTestProof?.a??origin?.skillTestProof?.result;
    if(start?.kind==='writing'&&start.actorId===person.id&&start.scope===w.scope&&
-    safe(start.startMinute)&&Number.isSafeInteger(start.baseMinutes)&&start.baseMinutes>0&&
-    result?.level==='CF'&&[1,1.5,2].includes(w.completionTimeMultiplier)){
-    if(journal.some(j=>j.calendarCampaignId===clock.campaignId&&
-     j.calendarSkillProjectComplete591?.startId===link.startId&&j.calendarSkillProjectComplete591?.sourceId===origin.id))continue;
-    if(start.scope==='missive'||result.sv>=5){
-     const due=start.startMinute+Math.ceil(start.baseMinutes*w.completionTimeMultiplier);
-     push(person,'writing-completion',origin.id,'Writing · potvrdit dokončení '+start.projectName+' (HMK 132)',due,'skills');
-     continue;
-    }
-   }
+    [1,1.5,2].includes(w.completionTimeMultiplier))continue;
   }
   const reason=t?'Původní datum a vazba Animalcraft SV na konkrétní zahájený výcvik nejsou doložené.':'Doba psaní vyžaduje doložený původní kalendářní plán a skutečný pracovní rytmus.';
   const description=t?`Animal Training CF · ${t.animalName}: d3 ${t.dieD3} → +${t.additionalMonths} měsíce (HMK 65)`:
    `Writing CF · ${w.scope}: ${w.completionTimeMultiplier*100} % původního času (HMK 132)`;
   unknown.push({characterId:person.id,name:person.name,kind:t?'animal-training-date':'writing-completion-date',
     sourceId:event.id,description,reason});
+ }
+ for(const row of journal){
+  const project=row.calendarSkillProjectStart591;
+  if(project?.kind!=='writing'||row.calendarCampaignId!==clock.campaignId)continue;
+  const person=characters.find(c=>c.id===project.actorId);
+  if(!person)continue;
+  const state=writingProjectState(journal,row);
+  if(state.phase==='retry')push(person,'writing-retry',row.id,
+   'Writing · volitelný nový Language (Creativity SR) · '+project.projectName+' (HMK 132)',state.readyMinute,'skills',{requiresAction:false});
+  if(state.phase==='finish'&&(state.result.level==='CF'||state.attempt.calendarSkillProjectSV591.previousAttemptId))push(person,'writing-completion',state.attempt.id,
+   'Writing · potvrdit dokončení '+project.projectName+' (HMK 132)',state.dueMinute,'skills');
  }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an
  // unconditional extra d100. Restore this obligation from immutable journal.
