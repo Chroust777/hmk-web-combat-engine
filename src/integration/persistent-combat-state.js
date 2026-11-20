@@ -1,4 +1,4 @@
-import {isNoncombatMedicalOrigin} from './hmk-medical-origin.js?v=93.982';
+import {isNoncombatMedicalOrigin} from './hmk-medical-origin.js?v=93.987';
 import {hasBraveFearSource} from './hmk-concurrent-fear.js';
 import {validateParallelColdShocks} from './hmk-parallel-cold-shock.js';
 /** HârnMaster: Roleplaying in the World of Kèthîra, printed pp.168–169, 176–178.

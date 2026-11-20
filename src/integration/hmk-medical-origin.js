@@ -3,8 +3,22 @@
  * actual impairment but does not own its original Weather tests or treatment.
  * HMK v1.2 pp. 167–170, 177–182, 185.
  */
-export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',TRAVEL:'travel-accident',FALL:'skill-fall',COMBAT:'combat',GM:'gm-confirmed'});
-export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL||origin===MEDICAL_ORIGIN.FALL||origin===MEDICAL_ORIGIN.GM||origin==='gm-health';
+export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',TRAVEL:'travel-accident',FALL:'skill-fall',ALCHEMY:'alchemy-dissolution',COMBAT:'combat',GM:'gm-confirmed'});
+export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL||origin===MEDICAL_ORIGIN.FALL||origin===MEDICAL_ORIGIN.ALCHEMY||origin===MEDICAL_ORIGIN.GM||origin==='gm-health';
+
+// Older alchemy saves recorded the real minute and Aural anchor already, but
+// the pending STN roll was untagged. Only recover a directly witnessed origin.
+export function projectLegacyAlchemyStun(state,clock,characterId){
+ const pending=state?.shockFollowup;
+ if(pending?.kind!=='STN'||pending.phase!=='end-next-turn'||pending.domain||pending.timelineId||!clock)return state;
+ const event=state.events?.at(-1);
+ if(event?.type!=='hmk-alchemy-dissolution-aural'||event.round!==pending.originRound||
+    event.details?.nonCombat!==true||event.details?.crucialShock?.state!=='STN')return state;
+ const minute=event.details.calendarMinute;
+ if(!Number.isSafeInteger(minute)||minute<0||minute>clock.minute||!clock.anchors?.some(
+  a=>a.kind==='aural'&&a.characterId===characterId&&a.episodeId===event.id&&a.minute===minute))return state;
+ return {...state,shockFollowup:{...pending,domain:MEDICAL_ORIGIN.ALCHEMY,sourceId:event.id,originMinute:minute}};
+}
 export function medicalOriginOfWound(wound,events=[]){
  if(!wound||typeof wound.id!=='string')return null;
  const original=Array.isArray(events)?events.find(e=>e.id===wound.originEventId):null;

@@ -5,7 +5,7 @@
  * The character's injuries[] is only a display/provenance projection.
  * Historical saves with hmk.combatState are intentionally not supported.
  */
-import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
+import {initialCombatState,validateCombatState} from './persistent-combat-state.js?v=93.987';
 export const CHARACTER_HEALTH_FIELD='healthState';
 export const CHARACTER_HEALTH_FORMAT='hmk-character-health-v1';
 const ensure=(v,m)=>{if(!v)throw Error(m)};
