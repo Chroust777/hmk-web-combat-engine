@@ -1,4 +1,4 @@
-import {FLETCHING_ITEMS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof} from './src/integration/hmk-fletching-work.js?v=93.996';
+import {FLETCHING_ITEMS,isMissileCraft,missileCraftItem,MISSILE_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingNeeds,fletchingOutcome,validFletchingProof} from './src/integration/hmk-fletching-work.js?v=93.997';
 import {JEWELLERY_D_PER_OZ,GEM_D,jewelcraftWork994} from './src/integration/hmk-jewelcraft-work.js?v=93.994';
 import {readingCondition,readingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=93.994';
 import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=93.993';
@@ -7,7 +7,7 @@ import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFrom
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.996';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.997';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -63,7 +63,7 @@ import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltSta
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=93.995';
-import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=93.996';
+import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=93.997';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -392,7 +392,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.996';
+const APP_VERSION='93.997';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4483,8 +4483,8 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   for(const j of data.journal){
    const p=j.calendarSkillProjectStart591;
    if(!p||j.calendarCampaignId!==cid||data.journal.some(x=>x.calendarSkillProjectComplete591?.startId===j.id)||
-    CRAFT_TIMED_LIST_600.includes(p.kind)&&!['brewing','fletching'].includes(p.kind)&&data.journal.some(x=>x.calendarSkillProjectSV591?.startId===j.id) ||
-    p.kind==='fletching'&&data.journal.some(x=>x.calendarSkillFletching996?.startId===j.id) ||
+    CRAFT_TIMED_LIST_600.includes(p.kind)&&p.kind!=='brewing'&&!isMissileCraft(p.kind)&&data.journal.some(x=>x.calendarSkillProjectSV591?.startId===j.id) ||
+    isMissileCraft(p.kind)&&data.journal.some(x=>x.calendarSkillFletching996?.startId===j.id) ||
     p.kind==='brewing'&&data.journal.some(x=>x.calendarSkillBrewReady600?.startId===j.id))continue;
    const actor=data.characters.find(c=>c.id===p.actorId),linked=data.journal.some(x=>x.calendarSkillProjectSV591?.startId===j.id);
    const writing=writingProjectState(data.journal,j);
@@ -4495,7 +4495,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
      due:writing.readyMinute??writing.dueMinute??writing.attempt.campaignMinute,details});
     continue;
    }
-   starts.push({name:(TIMED_SKILL_LABELS_600[p.kind]||p.kind)+' · '+p.projectName,actor:actor?.name||'Postava',start:p.startMinute,due:p.kind==='brewing'&&linked?p.craftReadyMinute:p.kind==='fletching'?(data.journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===j.id)?.calendarSkillFletchingAllocation996.outcome.dueMinute??p.earliestMinute):p.earliestMinute,
+   starts.push({name:(TIMED_SKILL_LABELS_600[p.kind]||p.kind)+' · '+p.projectName,actor:actor?.name||'Postava',start:p.startMinute,due:p.kind==='brewing'&&linked?p.craftReadyMinute:isMissileCraft(p.kind)?(data.journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===j.id)?.calendarSkillFletchingAllocation996.outcome.dueMinute??p.earliestMinute):p.earliestMinute,
     details:(p.craftDayResolution==='day'?'Splatnost od začátku herního dne. ':'')+(p.kind==='brewing'?('Práce do '+displayCampaignMinute(p.earliestMinute)+', zrání do '+displayCampaignMinute(p.craftReadyMinute)+'. '+(linked?'SV kvality uložen, čeká na potvrzení zrání.':'Čeká na původní Brewing SV.')):'Nejčasnější možný SV; základní termín '+displayCampaignMinute(p.baseDueMinute)+'. '+(linked?'Původní SV uložen, čeká na případné uzavření.':'Vyžaduje původní Skill Test navázaný na tento projekt.'))});
   }
   starts.sort((a,b)=>a.due-b.due);
@@ -4996,7 +4996,7 @@ function pendingSkillProjects591(actorId){
  if(!data.campaignClock)return [];
  const cid=campaignKey(data.campaignClock);
  const completed=new Set(data.journal.filter(j=>j.calendarSkillProjectComplete591).map(j=>j.calendarSkillProjectComplete591.startId));
- for(const j of data.journal)if(j.calendarSkillProjectSV591&&CRAFT_TIMED_LIST_600.includes(j.calendarSkillProjectSV591.kind)&&!['brewing','fletching'].includes(j.calendarSkillProjectSV591.kind))completed.add(j.calendarSkillProjectSV591.startId);
+ for(const j of data.journal)if(j.calendarSkillProjectSV591&&CRAFT_TIMED_LIST_600.includes(j.calendarSkillProjectSV591.kind)&&j.calendarSkillProjectSV591.kind!=='brewing'&&!isMissileCraft(j.calendarSkillProjectSV591.kind))completed.add(j.calendarSkillProjectSV591.startId);
  for(const j of data.journal)if(j.calendarSkillBrewReady600||j.calendarSkillFletching996)completed.add((j.calendarSkillBrewReady600||j.calendarSkillFletching996).startId);
  return data.journal.filter(j=>j.characterId===actorId&&j.calendarCampaignId===cid&&j.calendarSkillProjectStart591&&!completed.has(j.id));
 }
@@ -5344,10 +5344,10 @@ function refreshWritingWork591(root){
  }
 }
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
-const CRAFT_TIMED_LIST_600=['fletching','drawing','cookery','glassworking','woodworking','jewelcraft',...CRAFT_KIND_LIST_600];
-const TIMED_SKILL_LABELS_600={fletching:'Fletching · HMK 71–72',engineering:'Engineering · HMK 70',writing:'Writing · HMK 132',drawing:'Drawing · HMK 69',cookery:'Cookery · HMK 68',glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91',jewelcraft:'Jewelcraft · HMK 76',...CRAFT_LABELS_600};
+const CRAFT_TIMED_LIST_600=[...Object.keys(MISSILE_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...CRAFT_KIND_LIST_600];
+const TIMED_SKILL_LABELS_600={...Object.fromEntries(Object.entries(MISSILE_CRAFT_PROJECTS).map(([key,value])=>[key,value.label])),engineering:'Engineering · HMK 70',writing:'Writing · HMK 132',drawing:'Drawing · HMK 69',cookery:'Cookery · HMK 68',glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91',jewelcraft:'Jewelcraft · HMK 76',...CRAFT_LABELS_600};
 const isWritingLanguage=skill=>typeof skill==='string'&&(/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill));
-const TIMED_SKILL_NAMES_600={fletching:'Fletching',engineering:'Engineering',writing:'Writing',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',...CRAFT_SKILL_600};
+const TIMED_SKILL_NAMES_600={...Object.fromEntries(Object.entries(MISSILE_CRAFT_PROJECTS).map(([key,value])=>[key,value.primary])),engineering:'Engineering',writing:'Writing',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',...CRAFT_SKILL_600};
 function writingPlanFields992(actor){
  const languages=availableMasteries(actor).filter(m=>writingScripts(m.name).length);
  return `<fieldset data-hmk-writing-plan>
@@ -5386,15 +5386,16 @@ function fletchingMakers996(actor){
   availableMasteries(c).some(m=>m.name==='Metalcraft'&&m.ml>0));
 }
 function fletchingStartFields996(actor){
- return `<label>Dílna Fletching<select name="workshop" required><option value="">Vyberte kvalitu dílny</option>
+ return `<label>Kvalita dílny<select name="workshop" required><option value="">Vyberte kvalitu dílny</option>
  ${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★ · TN ${n}</option>`).join('')}</select></label>
  <label>Výrobce hrotů<select name="fletchingProvider"><option value="">Hroty vyrábí sám</option>
  ${fletchingMakers996(actor).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · Metalcraft ML ${skillActorMastery(c,'Metalcraft').ml}</option>`).join('')}</select></label>
- <label class="hsk-check"><input type="checkbox" name="hartbow"> Hartbow · Spirit SR</label>`;
+ <p data-hartbow-rule hidden>Hartbow · po d100 následuje povinný Spirit SR.</p>
+ <label hidden style="display:none"><input type="checkbox" name="leverTraining" disabled> Tvůrce se naučil vyrábět kúzhanskou páku</label>`;
 }
-function fletchingFinishHTML996(actor,now){
+function fletchingFinishHTML996(actor,now,kind){
  const journal=data.journal,cid=campaignKey(data.campaignClock);
- const starts=journal.filter(j=>j.characterId===actor.id&&j.calendarCampaignId===cid&&j.calendarSkillProjectStart591?.kind==='fletching');
+ const starts=journal.filter(j=>j.characterId===actor.id&&j.calendarCampaignId===cid&&j.calendarSkillProjectStart591?.kind===kind);
  return starts.map(j=>{
   const p=j.calendarSkillProjectStart591;
   const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===j.id);
@@ -5409,8 +5410,9 @@ function fletchingFinishHTML996(actor,now){
    ${need.count?`<label>Hvězdy na zkrácení času<select name="timeStars">${Array.from({length:Math.min(3,need.count)+1},(_,i)=>`<option value="${i}">${i} · −${i*10} %</option>`).join('')}</select></label>`:''}
    <input type="hidden" name="fletchingDice"><button type="submit">Uložit výsledek a termín</button><output role="status"></output></form>`;
   const signed=n=>n>0?'+'+n:String(n);
-  const description=`WQ ${signed(allocation.qualityDelta)} · ${item.projectiles?'Impact '+signed(allocation.impactDelta):'dosah '+signed(allocation.rangeDeltaFt)+' ft'} · hodnota ×${allocation.valueMultiplier}`+
-   (allocation.halfDraw?' · Hartbow, Draw na polovinu':'')+
+  const effects=item.pull?`Pull ×${allocation.pull} · Draw +${allocation.drawBonusPct} %`+(allocation.flaw?' · vada '+allocation.flaw:''):`WQ ${signed(allocation.qualityDelta)} · ${item.projectiles?'Impact '+signed(allocation.impactDelta):'dosah '+signed(allocation.rangeDeltaFt)+' ft'}`;
+  const description=effects+` · hodnota ×${allocation.valueMultiplier}`+
+   (allocation.halfDraw?` · Hartbow, Draw ${item.draw} → ${item.draw/2}`:p.fletching996.hartbow?' · Spirit SR neuspěl, Draw zůstává '+item.draw:'')+
    (allocation.rolls.length?` · potvrzené hody [${allocation.rolls.join(', ')}]`:'');
   if(done)return `<article data-fletching-done>${heading}<p>Dokončeno · ${esc(description)}</p></article>`;
   return `<form class="hsk-form-grid" data-fletching-finish="complete">${heading}${hidden}<p>${esc(description)}.</p>
@@ -5428,7 +5430,7 @@ document.addEventListener('submit',event=>{
   const project=original?.calendarSkillProjectStart591;
   const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===startId);
   const allocation=journal.find(x=>x.calendarSkillFletchingAllocation996?.startId===startId);
-  if(project?.kind!=='fletching'||!source||journal.some(x=>x.calendarSkillFletching996?.startId===startId))throw Error('Vyberte otevřený projekt s původním Success Value.');
+  if(!isMissileCraft(project?.kind)||!source||journal.some(x=>x.calendarSkillFletching996?.startId===startId))throw Error('Vyberte otevřený projekt s původním Success Value.');
   let field,details;
   if(form.dataset.fletchingFinish==='roll'){
    if(allocation)throw Error('Výsledek už je uložen.');
@@ -5440,7 +5442,7 @@ document.addEventListener('submit',event=>{
    field='calendarSkillFletching996';details={startId,allocationId:allocation.id};
   }
   mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
-   title:'HMK 71–72 Fletching · '+project.projectName,body:field==='calendarSkillFletching996'?'Výrobek dokončen.':'Výsledek a termín potvrzeny.',
+   title:TIMED_SKILL_LABELS_600[project.kind]+' · '+project.projectName,body:field==='calendarSkillFletching996'?'Výrobek dokončen.':'Výsledek a termín potvrzeny.',
    [field]:details}));
  }catch(err){form.querySelector('output').textContent=err.message;}
 },true);
@@ -5473,7 +5475,7 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
  const now=data.campaignClock.minute,pending=pendingSkillProjects591(actor.id).filter(j=>!kind||j.calendarSkillProjectStart591.kind===kind);
  return `<section class="hsk-timed-project-591 hsk-critical-next"><h3>Časované projekty · ${esc(TIMED_SKILL_LABELS_600[kind]||'HMK')}</h3><p class="hsk-project-classification">Patří do <strong>Success Value</strong>. Vlevo se zakládá projekt a sleduje herní čas; vpravo se v běžném panelu <strong>Success Value</strong> provede jeho původní d100. Následné Design d10 / Insight d10 mají navazující doklady, nikoli druhý SV hod.</p>
  <p>Nejdříve potvrď skutečný začátek projektu v kalendáři. Případné zkrácení práce se použije pouze tam, kde to pravidla výslovně stanovují; žádný čas se nekrátí odhadem. Hod před splatností není přípustný. Celodenní termín se zpřístupní od počátku cílového herního dne; hodinová práce je přesná na minutu. Splatný projekt zůstává otevřený až do potvrzeného výsledku. Běžný Skill Test mimo projekt není blokován.</p>
- <form data-hmk-project-start-591 ${kind==='jewelcraft'?'data-jewelcraft-work':kind==='brewing'?'data-brew-start':''} class="hsk-form-grid"><label>Činnost<select name="kind">${kind==='writing'?'<option value="writing">Writing Routine · HMK 132</option>':kind==='drawing'?'<option value="drawing">Drawing · HMK 69</option>':kind==='cookery'?'<option value="cookery">Cookery · HMK 68</option>':kind==='glassworking'?'<option value="glassworking">Glassworking · HMK 73</option>':kind==='fletching'?'<option value="fletching">Fletching · HMK 71–72</option>':kind==='jewelcraft'?'<option value="jewelcraft">Jewelcraft · HMK 76</option>':kind==='woodworking'?'<option value="woodworking">Woodworking · HMK 91</option>':CRAFT_WORK_600[kind]?`<option value="${esc(kind)}">${esc(CRAFT_LABELS_600[kind])}</option>`:'<option value="engineering">Engineering Design · HMK 70</option>'}</select></label>
+ <form data-hmk-project-start-591 ${kind==='jewelcraft'?'data-jewelcraft-work':kind==='brewing'?'data-brew-start':''} class="hsk-form-grid"><label>Činnost<select name="kind">${kind==='writing'?'<option value="writing">Writing Routine · HMK 132</option>':kind==='drawing'?'<option value="drawing">Drawing · HMK 69</option>':kind==='cookery'?'<option value="cookery">Cookery · HMK 68</option>':kind==='glassworking'?'<option value="glassworking">Glassworking · HMK 73</option>':isMissileCraft(kind)?`<option value="${kind}">${esc(TIMED_SKILL_LABELS_600[kind])}</option>`:kind==='jewelcraft'?'<option value="jewelcraft">Jewelcraft · HMK 76</option>':kind==='woodworking'?'<option value="woodworking">Woodworking · HMK 91</option>':CRAFT_WORK_600[kind]?`<option value="${esc(kind)}">${esc(CRAFT_LABELS_600[kind])}</option>`:'<option value="engineering">Engineering Design · HMK 70</option>'}</select></label>
  <label>Konkrétní dílo / předmět práce<input name="projectName" required minlength="2" maxlength="120" placeholder="Např. návrh malé pevnosti"></label>
  ${kind==='drawing'?'<label>Plocha v ft²<input name="scope" type="number" step="any" value="1" required></label>':
    kind==='jewelcraft'?`<fieldset><legend>Výroba šperku</legend>
@@ -5488,8 +5490,8 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
     <label class="hsk-check"><input type="checkbox" name="materialSourceConfirmed" required> Materiál, případné kameny a dílna jsou k dispozici</label>
     </fieldset>`:
    kind==='cookery'?'<label>Počet strávníků<input name="scope" type="number" min="1" step="1" value="5" required></label>':
-   `<label>${kind==='fletching'?'Výrobek':'Rozsah nebo stavba'}<select name="scope" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${esc(name)}">${esc(name)} · ${days} dnů</option>`).join('')}</select></label>`}
- ${kind==='fletching'?fletchingStartFields996(actor):''}
+   `<label>${isMissileCraft(kind)?'Výrobek':'Rozsah nebo stavba'}<select name="scope" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${esc(name)}">${esc(name)} · ${days} dnů</option>`).join('')}</select></label>`}
+ ${isMissileCraft(kind)?fletchingStartFields996(actor):''}
  ${kind==='writing'?writingPlanFields992(actor):''}
  ${kind==='brewing'?`<input type="hidden" name="brewAgingDice"><label data-brew-spirit-months hidden>Dodatečné zrání destilátu
  <select name="spiritMonths"><option value="0">Bez prodloužení</option>${[3,4,5,6].map(n=>`<option value="${n}">${n} měsíce navíc</option>`).join('')}</select></label>`:''}
@@ -5503,9 +5505,9 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
     `SV ${writing.result.sv}. Termín bez zkrácení ${displayCampaignMinute(writing.dueMinute)}.`;
    return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong> · ${esc(p.scope)}<p>${esc(message)}</p></div>`;
   }
-  return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong> · ${esc(TIMED_SKILL_NAMES_600[p.kind]||p.kind)} · ${esc(p.kind==='fletching'?FLETCHING_ITEMS[p.scope].name:p.scope)}<p>Začátek ${esc(displayCampaignMinute(p.startMinute))}. Nejčasnější možný test ${esc(displayCampaignMinute(p.earliestMinute))}${now<p.earliestMinute?' · zbývá '+esc(chronicleRemainingTime(p.earliestMinute-now)):''}. Základní dokončení ${esc(displayCampaignMinute(nowDue))}. ${linked?(p.kind==='brewing'?'SV kvality uložen; zrání čeká na potvrzení.':p.kind==='fletching'?'SV uložen. Pokračujte výsledkem zakázky níže.':'SV již uložen.'):'Po skutečně uplynulé době proveď původní Success Value. Založení projektu není hod a nevytvoří inventář.'}</p></div>`;
+  return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong> · ${esc(TIMED_SKILL_NAMES_600[p.kind]||p.kind)} · ${esc(isMissileCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.scope)}<p>Začátek ${esc(displayCampaignMinute(p.startMinute))}. Nejčasnější možný test ${esc(displayCampaignMinute(p.earliestMinute))}${now<p.earliestMinute?' · zbývá '+esc(chronicleRemainingTime(p.earliestMinute-now)):''}. Základní dokončení ${esc(displayCampaignMinute(nowDue))}. ${linked?(p.kind==='brewing'?'SV kvality uložen; zrání čeká na potvrzení.':isMissileCraft(p.kind)?'SV uložen. Pokračujte výsledkem zakázky níže.':'SV již uložen.'):'Po skutečně uplynulé době proveď původní Success Value. Založení projektu není hod a nevytvoří inventář.'}</p></div>`;
  }).join('')||'<p class="tiny">Žádný otevřený projekt vybraného druhu.</p>'}</div>
- ${kind==='brewing'?brewingFinishHTML995(actor,now):kind==='fletching'?fletchingFinishHTML996(actor,now):''}</section>`;
+ ${kind==='brewing'?brewingFinishHTML995(actor,now):isMissileCraft(kind)?fletchingFinishHTML996(actor,now,kind):''}</section>`;
 }
 function decorateTimedSkillProject591(root){
  const create=root.querySelector('[data-hmk-project-start-591]');
@@ -5514,10 +5516,10 @@ function decorateTimedSkillProject591(root){
   const update=()=>{
    refreshWritingPlan992(create);
    const isText=create.elements.namedItem('writingIntent')?.value==='text';
-   const labels=kind.value==='fletching'?Object.entries(FLETCHING_ITEMS).filter(([,item])=>!item.kuzhan||isKuzhan996(character(selected))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD}d · ${item.hours} pracovních hodin${item.agingDice?' + '+item.agingDice+'d'+item.agingFaces+' zrání':''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name} · ${item.priceD}d · ${timedSkillBaseMinutes591(kind.value,key)/60} hodin`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
+   const labels=isMissileCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>missileCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD}d · ${item.hours} pracovních hodin${item.agingDice?' + '+item.agingDice+'d'+item.agingFaces+' zrání':''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name} · ${item.priceD}d · ${timedSkillBaseMinutes591(kind.value,key)/60} hodin`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
    const last=scope.value;
    if(scope.tagName==='SELECT'){
-    scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${kind.value==='fletching'?'':esc(key)+' · '}${esc(description)}</option>`).join('');
+    scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${isMissileCraft(kind.value)?'':esc(key)+' · '}${esc(description)}</option>`).join('');
     if(labels.some(x=>x[0]===last))scope.value=last;
    }
    if(kind.value==='brewing'){
@@ -5527,14 +5529,21 @@ function decorateTimedSkillProject591(root){
     create.dataset.brewAgingCount=String(recipe?.agingDice??0);
     create.dataset.brewAgingFaces=String(recipe?.agingFaces??0);
    }
-   if(kind.value==='fletching'){
-    const item=FLETCHING_ITEMS[scope.value],provider=create.elements.namedItem('fletchingProvider'),hartbow=create.elements.namedItem('hartbow');
+   if(isMissileCraft(kind.value)){
+    const item=FLETCHING_ITEMS[scope.value],provider=create.elements.namedItem('fletchingProvider');
     if(!item)return;
-    provider.disabled=!item.projectiles;provider.closest('label').hidden=provider.disabled;
+    provider.disabled=kind.value!=='fletching'||!item.projectiles;provider.closest('label').hidden=provider.disabled;
     if(provider.disabled)provider.value='';
-    hartbow.disabled=!item.bow||!canCraftHartbow996(character(selected));hartbow.closest('label').hidden=hartbow.disabled;
-    if(hartbow.disabled)hartbow.checked=false;
-    const plan=fletchingPlan(scope.value,1,provider.value,hartbow.checked),now=data.campaignClock.minute;
+    const hartbow=!!item.bow&&canCraftHartbow996(character(selected));
+    create.querySelector('[data-hartbow-rule]').hidden=!hartbow;
+    const lever=create.elements.namedItem('leverTraining');
+    lever.disabled=!item.rareTransfer||isKuzhan996(character(selected));
+    lever.required=!lever.disabled;
+    const leverLabel=lever.closest('label');
+    leverLabel.hidden=lever.disabled;
+    leverLabel.style.display=lever.disabled?'none':'';
+    if(lever.disabled)lever.checked=false;
+    const plan=fletchingPlan(scope.value,1,provider.value,hartbow),now=data.campaignClock.minute;
     preview.textContent='Materiál '+plan.costD+' d · '+(item.months?item.months+' měsíců':plan.workMinutes/60+' pracovních hodin')+
      ' · nejčasnější SV '+displayCampaignMinute(fletchingDue(scope.value,now,plan,0.7))+' · základní termín '+displayCampaignMinute(fletchingDue(scope.value,now,plan))+'.';
     return;
@@ -5568,7 +5577,7 @@ function decorateTimedSkillProject591(root){
  (j.calendarSkillProjectStart591.kind==='writing'?isWritingLanguage(skill):skill===TIMED_SKILL_NAMES_600[j.calendarSkillProjectStart591.kind]));
  const signature=JSON.stringify(matches.map(j=>[j.id,timedProjectTestMinute591(j)]));
  if(picker.dataset.optionsSignature!==signature){
-  picker.innerHTML='<option value="">— vyberte doložený projekt —</option>'+matches.map(j=>{const p=j.calendarSkillProjectStart591;return `<option value="${esc(j.id)}">${esc(p.projectName)} · ${esc(p.kind==='fletching'?FLETCHING_ITEMS[p.scope].name:p.scope)} · test nejdříve ${esc(displayCampaignMinute(timedProjectTestMinute591(j)))}</option>`;}).join('');
+  picker.innerHTML='<option value="">— vyberte doložený projekt —</option>'+matches.map(j=>{const p=j.calendarSkillProjectStart591;return `<option value="${esc(j.id)}">${esc(p.projectName)} · ${esc(isMissileCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.scope)} · test nejdříve ${esc(displayCampaignMinute(timedProjectTestMinute591(j)))}</option>`;}).join('');
   picker.dataset.optionsSignature=signature;
  }
  const selectedProject=matches.some(j=>j.id===current)?current:matches[0]?.id||'';
@@ -5577,7 +5586,7 @@ function decorateTimedSkillProject591(root){
  const project=matches.find(j=>j.id===picker.value);
  const due=project?timedProjectTestMinute591(project):null;
  let note=label.querySelector('small');if(!note){note=document.createElement('small');label.appendChild(note);}
- if(project?.calendarSkillProjectStart591.kind==='fletching'&&primary.dataset.fletchingProject!==project.id){
+ if(isMissileCraft(project?.calendarSkillProjectStart591.kind)&&primary.dataset.fletchingProject!==project.id){
   primary.dataset.fletchingProject=project.id;
   primary.dataset.srConfigured='yes';
   hskConfigureSR(primary,'A');
@@ -5587,7 +5596,7 @@ function decorateTimedSkillProject591(root){
  }
  note.textContent=due!==null?(data.campaignClock.minute<due?'Do dalšího hodu zbývá '+chronicleRemainingTime(due-data.campaignClock.minute)+'.':'Časové podmínky pro tento Success Value jsou splněny.'):'Projekt se neváže na běžný Skill Test. Pro časovanou práci vyber skutečný projekt.';
  const blocked=due===null||data.campaignClock.minute<due;
- if(['writing','fletching'].includes(skillSVChoice595.value)&&blocked)primary.dataset.hmkWritingWaiting='yes';
+ if((skillSVChoice595.value==='writing'||isMissileCraft(skillSVChoice595.value))&&blocked)primary.dataset.hmkWritingWaiting='yes';
  else delete primary.dataset.hmkWritingWaiting;
  const submit=primary.querySelector('button[type="submit"]');
  if(submit){submit.disabled=blocked;submit.title=blocked?'Vybraný projekt ještě nesplnil termín Success Value.':'';}
@@ -5595,7 +5604,7 @@ function decorateTimedSkillProject591(root){
 function skillSVPicker595(actor){
  const c=skillSVChoice595?.actorId===actor?.id?skillSVChoice595:null;
  const skills=actor?availableMasteries(actor):[];
- const choices=[['trapping','Trapping · Survival po 8 hodinách · HMK 85'],['engineering','Engineering Design · HMK 70'],['writing','Writing, opis a Reading · HMK 83, 132'],['drawing','Drawing · 4 hodiny na 1 ft² · HMK 69'],['cookery','Cookery · 1 hodina / 5 osob · HMK 68'],['fishing','Fishing · čtyřhodinový postup HMK 71'],['animal','Animal Training · výcvik HMK 65'],['jewelcraft','Jewelcraft · HMK 76'],['glassworking','Glassworking · tištěné skleněné výrobky · HMK 73'],['woodworking','Woodworking · tištěné dřevěné výrobky · HMK 91'],['fletching',TIMED_SKILL_LABELS_600.fletching],...Object.entries(CRAFT_LABELS_600)];
+ const choices=[['trapping','Trapping · Survival po 8 hodinách · HMK 85'],['engineering','Engineering Design · HMK 70'],['writing','Writing, opis a Reading · HMK 83, 132'],['drawing','Drawing · 4 hodiny na 1 ft² · HMK 69'],['cookery','Cookery · 1 hodina / 5 osob · HMK 68'],['fishing','Fishing · čtyřhodinový postup HMK 71'],['animal','Animal Training · výcvik HMK 65'],['jewelcraft','Jewelcraft · HMK 76'],['glassworking','Glassworking · tištěné skleněné výrobky · HMK 73'],['woodworking','Woodworking · tištěné dřevěné výrobky · HMK 91'],...Object.keys(MISSILE_CRAFT_PROJECTS).map(key=>[key,TIMED_SKILL_LABELS_600[key]]),...Object.entries(CRAFT_LABELS_600)];
  return `<section class="hsk-sv-picker-595" aria-label="Výběr konkrétního Success Value">
   <h3>Success Value · vyberte postup</h3>
   <p class="tiny">Výběr zde neprovádí žádný hod ani zápis do kalendáře. Každý postup má vlastní správné vstupy; formulář se zobrazí až po stisknutí tlačítka.</p>
@@ -6841,7 +6850,7 @@ function folioChapterParts(body,kind=''){
       if(!known||!pending.length)right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
       right=timedSkillProjectsPanel591(actor,{kind:choice.value})+
         (!known?`<p class="notice error">Postava nemá doloženou dovednost ${requiredSkill}. Neprovádějte jiný SV místo ní.</p>`:
-         choice.value==='fletching'?'<p class="hsk-sv-project-note-595">Kalendář otevře původní d100 v nejčasnějším termínu. Výsledek určí vadu, Masterwork hody a konečnou dobu práce.</p>':
+         isMissileCraft(choice.value)?'<p class="hsk-sv-project-note-595">Kalendář otevře původní d100 v nejčasnějším termínu. Výsledek určí vadu, Masterwork hody a konečnou dobu práce.</p>':
          `<p class="hsk-sv-project-note-595">${requiredSkill} · původní d100 Success Value je svázaný s kalendářním začátkem; nejdříve po celé době práce. Žádné další kostky se neházejí bez zvláštního pravidlového důvodu.</p>`)+right;
      }else if(choice.value==='trapping'){
       right='<section class="hsk-timed-project-591 hsk-critical-next"><h3>Trapping · HMK 85</h3><p>Zahajte osm hodin kladení a kontroly pastí. Až po potvrzeném uplynutí času proveďte stávající Survival Success Value d100. Dokončení úlovku a fyzické převzetí potravy jsou dvě samostatná potvrzení; čas posouvá pouze GM.</p></section>'+right;
@@ -14305,14 +14314,15 @@ document.addEventListener('submit',event=>{
     throw Error('Vyberte doložený jazyk, odpovídající písmo a způsobilého písaře.');
   }
   let fletching=null;
-  if(kind==='fletching'){
-   const item=FLETCHING_ITEMS[scope];
+  if(isMissileCraft(kind)){
+   const item=missileCraftItem(kind,scope);
+   if(!item)throw Error('Vyberte výrobek odpovídající vybranému projektu.');
    fletching=fletchingPlan(scope,Number(form.elements.namedItem('workshop').value),
-    form.elements.namedItem('fletchingProvider').value,form.elements.namedItem('hartbow').checked);
-   if(!availableMasteries(actor).some(m=>m.name==='Fletching')||item.kuzhan&&!isKuzhan996(actor)||
-    fletching.hartbow&&!canCraftHartbow996(actor)||fletching.providerId&&!fletchingMakers996(actor).some(c=>c.id===fletching.providerId))
+    form.elements.namedItem('fletchingProvider').value,!!item.bow&&canCraftHartbow996(actor));
+   if(!availableMasteries(actor).some(m=>m.name===TIMED_SKILL_NAMES_600[kind])||item.kuzhan&&!isKuzhan996(actor)||
+    item.rareTransfer&&!isKuzhan996(actor)&&!form.elements.namedItem('leverTraining').checked||fletching.providerId&&!fletchingMakers996(actor).some(c=>c.id===fletching.providerId))
     throw Error('Projekt vyžaduje způsobilého výrobce, původ a dílnu.');
-   hskValidatedSecondaries(actor,{primary:'Fletching',secondary1:item.secondary[0],secondary2:item.secondary[1],
+   hskValidatedSecondaries(actor,{primary:TIMED_SKILL_NAMES_600[kind],secondary1:item.secondary[0],secondary2:item.secondary[1],
     proxyMetalcraftId:fletching.providerId});
   }
   const plannedBase=(fletching?.workMinutes??base)*writingDictationFactor(writingPlan);
@@ -14333,7 +14343,7 @@ document.addEventListener('submit',event=>{
    }:{})};
   mutate(()=>{if(data.campaignClock.minute!==minute||campaignKey(data.campaignClock)!==cid)throw Error('Kalendář se změnil.');
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:start,createdAt:stamp(),
-    title:'HMK '+({writing:'132 Writing',engineering:'70 Engineering',drawing:'69 Drawing',cookery:'68 Cookery',jewelcraft:'76 Jewelcraft',glassworking:'73 Glassworking',woodworking:'91 Woodworking',fletching:'71–72 Fletching',...Object.fromEntries(Object.entries(CRAFT_LABELS_600).map(([k,v])=>[k,v]))}[kind])+' · zahájení · '+projectName,
+    title:'HMK '+({writing:'132 Writing',engineering:'70 Engineering',drawing:'69 Drawing',cookery:'68 Cookery',jewelcraft:'76 Jewelcraft',glassworking:'73 Glassworking',woodworking:'91 Woodworking',...Object.fromEntries(Object.keys(MISSILE_CRAFT_PROJECTS).map(key=>[key,MISSILE_CRAFT_PROJECTS[key].label])),...Object.fromEntries(Object.entries(CRAFT_LABELS_600).map(([k,v])=>[k,v]))}[kind])+' · zahájení · '+projectName,
     body:'Doložený začátek '+displayCampaignMinute(start)+'; základní doba '+plannedBase+' minut, nejčasnější možný SV '+displayCampaignMinute(p.earliestMinute)+(p.craftDayResolution==='day'?' (od začátku herního dne)':'')+(recipe?.agingDice?'; zrání '+p.craftAgingDays+' dní, skutečné kostky ['+p.craftAgingRolls.join(', ')+'], připraveno '+displayCampaignMinute(p.craftReadyMinute):'')+'. Čas se neposunul, výrobek ani výdaje se nevytvořily.',
     calendarSkillProjectStart591:p});});
  }catch(err){alert('Časovaný projekt: '+err.message);}
@@ -14425,7 +14435,7 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
    (p.kind==='writing'?writing.readyMinute==null||data.campaignClock.minute<writing.readyMinute:
     data.campaignClock.minute<p.earliestMinute||data.journal.some(j=>j.calendarSkillProjectSV591?.startId===timedId))||
    (p.kind==='writing'?(p.writingPlan?skill!==p.writingPlan.language:!isWritingLanguage(skill)):skill!==TIMED_SKILL_NAMES_600[p.kind])||
-   (p.kind==='fletching'&&!validFletchingProof(p,proof))||
+   (isMissileCraft(p.kind)&&!validFletchingProof(p,proof))||
    (p.kind==='writing'&&(proof.secondaryRollResult?.routineId!=='language-written'||
     proof.secondaryRollResult.name!=='Creativity'||!Number.isInteger(proof.secondaryRollResult.roll))))
    throw Error('Časovaný projekt: vyber skutečný původní projekt, Language + Creativity SR (Writing), a nejdříve dosáhni doloženého termínu.');
@@ -16792,13 +16802,13 @@ function hskRefreshFletchingSecondary(form){
 function selectedFletchingProject996(form){
  const id=form.id==='skill-value-form'&&form.elements.namedItem('timedProjectId')?.value;
  const project=id&&data.journal.find(row=>row.id===id)?.calendarSkillProjectStart591;
- return project?.kind==='fletching'?project:null;
+ return isMissileCraft(project?.kind)?project:null;
 }
 function hskFields(form,side){
  const project=side==='A'&&selectedFletchingProject996(form);
  if(project){
   const [secondary1,secondary2]=FLETCHING_ITEMS[project.scope].secondary;
-  return {primary:'Fletching',secondary1,secondary2,proxyMetalcraftId:project.fletching996.providerId};
+  return {primary:TIMED_SKILL_NAMES_600[project.kind],secondary1,secondary2,proxyMetalcraftId:project.fletching996.providerId};
  }
  if(hskFletchingProjectiles(form,side))return {
   primary:'Fletching',secondary1:'Woodworking',secondary2:'Metalcraft',
@@ -20212,7 +20222,8 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   if(form?.elements.namedItem('timedProjectId')?.value!==sourceId){form=null;break;}
   break;
  case 'fletching-project':
-  selected=actor.id;view='skills';activeSkillTab='value';skillSVChoice595={actorId:actor.id,kind:'timed',value:'fletching'};
+  selected=actor.id;view='skills';activeSkillTab='value';skillSVChoice595={actorId:actor.id,kind:'timed',
+   value:data.journal.find(j=>j.id===sourceId)?.calendarSkillProjectStart591?.kind??'fletching'};
   render();
   form=q('form[data-fletching-finish]').find(f=>f.elements.namedItem('startId')?.value===sourceId)||
    document.querySelector('#skill-value-form');
