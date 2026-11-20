@@ -12,6 +12,7 @@ import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
 import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.992';
+import {copySource,findCopyStages} from './hmk-script-copy.js?v=93.993';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -392,6 +393,16 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    'Writing · volitelný nový Language (Creativity SR) · '+project.projectName+' (HMK 132)',state.readyMinute,'skills',{requiresAction:false});
   if(state.phase==='finish'&&(project.writingPlan||state.result.level==='CF'||state.attempt.calendarSkillProjectSV591.previousAttemptId))push(person,'writing-completion',state.attempt.id,
    'Writing · potvrdit dokončení '+project.projectName+' (HMK 132)',state.dueMinute,'skills');
+ }
+ for(const row of journal){
+  const copy=row.calendarScriptCopy;
+  if(copy?.stage!=='start'||row.calendarCampaignId!==clock.campaignId)continue;
+  const person=characters.find(c=>c.id===row.characterId),source=copySource(journal,copy.sourceId,row.calendarCampaignId);
+  if(!person||!source)continue;
+  const {test,done}=findCopyStages(journal,row);
+  if(done)continue;
+  push(person,'script-copy',row.id,test?'Opis · rozdělit hvězdy a dokončit '+source.name:'Opis · nejčasnější hod pro '+source.name,
+   test?test.campaignMinute:row.campaignMinute+Math.ceil(source.baseMinutes/2),'skills',{requiresAction:false});
  }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an
  // unconditional extra d100. Restore this obligation from immutable journal.
