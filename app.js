@@ -396,7 +396,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.015';
+const APP_VERSION='94.016';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3907,7 +3907,7 @@ function projectResourcesHTML(requirements,{label='Použít zdarma (GM)',confirm
  </fieldset>`;
 }
 const projectResourceReceipt=form=>{
- const source=form.elements.namedItem('projectResources')?.value;
+ const source=form?.elements.namedItem('projectResources')?.value;
  return ['free','own'].includes(source)?{calendarProjectResources:{source}}:{};
 };
 document.addEventListener('click',event=>{
@@ -3949,6 +3949,9 @@ document.addEventListener('change',event=>{
  const output=form.querySelector('[data-project-resources-status]');
  if(output)output.textContent='';
 });
+function projectStartWithResources(requirements,startButton,label='Použít pomůcky zdarma (GM)'){
+ return `<form>${projectResourcesHTML(requirements,{label})}${startButton}</form>`;
+}
 function alchemyWorkshopAccess(actor,ml){
  const wealth=actor.hmk?.wealth;
  const own=Number.isInteger(wealth)?occupationalWorkshop({skill:'Alchemy',masteryLevel:ml,wealth}).workshop:null;
@@ -5167,6 +5170,7 @@ function scriptCopyHTML993(actor){
  `<form class="hsk-form-grid" data-script-copy="start">
  <label>Předloha<select name="sourceId" required>${eligible.map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.language)} · ${esc(x.script)}</option>`).join('')}</select></label>
  <label>Postup opisu<select name="method"><option value="script">Script (Language · Drawing)</option><option value="drawing">Drawing · −2 SV</option></select></label>
+ ${projectResourcesHTML('Je potřeba doložená předloha, psací či kreslicí pomůcky a materiál pro opis.',{label:'Použít pomůcky zdarma (GM)'})}
  <button type="submit">Zahájit opis</button><output role="status"></output></form>`}
  ${rows.map(row=>{
   const source=sources.find(x=>x.id===row.calendarScriptCopy.sourceId);if(!source)return '';
@@ -5256,7 +5260,7 @@ document.addEventListener('submit',event=>{
    title='Dokončený opis';body='Postih při čtení '+settlement.readingModifier+'.';
   }
   if(!mutate(()=>data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:now,
-   createdAt:stamp(),title:title+' · '+source.name,body,calendarScriptCopy:receipt})))throw Error('Doklad nebyl uložen.');
+   createdAt:stamp(),title:title+' · '+source.name,body,...(stage==='start'?projectResourceReceipt(form):{}),calendarScriptCopy:receipt})))throw Error('Doklad nebyl uložen.');
  }catch(error){out.textContent=error.message;}
 },true);
 function readingContext994(actor,source,name=source.language){
@@ -6247,7 +6251,8 @@ function faeriecraftPanel(actor){
     '<label>Doložená doba výroby od zahájení (herní hodiny včetně přestávek)<input name="hours" type="number" min="1" max="166666" required></label>'+
     '<fieldset data-faerie-product="hartbow" hidden disabled><legend>Hartbow</legend><label>Druh luku<select name="bow"><option value="composite">Kompozitní luk</option><option value="longbow">Longbow</option></select></label><label>Základní Draw<input name="baseDraw" type="number" min="1" max="500" required></label></fieldset>'+
     '<fieldset data-faerie-product="longknife" hidden disabled><legend>Výrobek Weaponcraft</legend><label>Druh výrobku<select name="armourArticleId"><option value="">Vagorsereq (Longknife)</option>'+FAERIE_ARMOUR_ARTICLES.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+' · '+item.properties.weightLb+' lb</option>').join('')+'</select></label></fieldset>'+
-    '<p>Weaponcraft nabízí Vagorsereq (Longknife) a tři druhy kovových zbrojí. Masonry je určené pro samostatnou plastiku. Čas posouvá Kalendář.</p>'+entryFields,
+    '<p>Weaponcraft nabízí Vagorsereq (Longknife) a tři druhy kovových zbrojí. Masonry je určené pro samostatnou plastiku. Čas posouvá Kalendář.</p>'+
+    projectResourcesHTML('Připravte klidné místo pro reverie a vše potřebné pro zvolené řemeslo.',{label:'Použít pomůcky zdarma (GM)'})+entryFields,
     'Potvrdit vstup do reverie a zahájit práci',true));
  }else{
   const {project,entry,minutes,deadline,readyMinute}=active,plan=project.calendarFaeriecraft.input,next=faerieNext(active,now);
@@ -6327,7 +6332,7 @@ document.addEventListener('submit',event=>{
   }
   const step={stage,projectId,input};
   const row={id,characterId:actor.id,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
-   title:source?.title??'Faeriecraft · '+input.item,calendarFaeriecraft:step};
+   title:source?.title??'Faeriecraft · '+input.item,...(stage==='start'?projectResourceReceipt(form):{}),calendarFaeriecraft:step};
   const result=step.result=resolveFaerieStep(data.journal,row);
   const armour=stage==='finish'&&plan.armourArticleId?faerieArmourItem(plan,result,projectId,actor.id):null;
   if(stage==='finish'){
@@ -9491,7 +9496,7 @@ function stableHubAnimalHTML(a,campaignId){
  <p class="hc-hint">Použití ze skladu vyžaduje dostupný fyzický lot původního majitele. Externí krmení/pití (pastva, potok) zůstává samostatným GM potvrzením bez odpisu skladu.</p>
 <details><summary>Záznamy péče (${p.care.length})</summary>${p.care.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Čas (min)</th><th>Úkon</th><th>Množství</th><th>Doklad</th></tr></thead><tbody>${p.care.map(j=>`<tr><td>${j.minute}</td><td>${esc(j.kind)}</td><td>${j.amount===null?'—':j.amount+' '+j.unit}</td><td>${esc(j.reason)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Dosud není doložena žádná péče.</p>'}</details></section>
  <section class="hmk-stable-block"><h4>Výcvik, cesta, zdravotní historie a kalendář</h4>
- ${!dead?`<div class="hsk-training-calendar-panel"><p class="tiny">Pravidlový postup: nejprve zahájit šestiměsíční výcvik; po skutečném uplynutí doby v kalendáři provést Animalcraft SV a pokračující Training d10. Kalendář se sám neposouvá.</p><button type="button" class="secondary hc-small" data-hmk-training-start-animal="${esc(a.id)}">Zahájit šestiměsíční výcvik · HMK 65</button>${data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).slice(-2).map(j=>`<p class="tiny hsk-training-date">Výcvik začal ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.startMinute))}, základní termín ${esc(displayCampaignMinute(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)))}${j.calendarAnimalTrainingStart590.calendarDayEligibility600?' · od začátku tohoto dne':''}${data.campaignClock.minute<trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)?' · zbývá '+esc(chronicleRemainingTime(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)-data.campaignClock.minute)):' · základní doba uplynula'}</p>`).join('')}</div>${trainingInterruptionStableHTML93902(a,campaignId)}${(()=>{const open=data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).findLast(j=>!data.journal.some(r=>r.calendarAnimalTraining590?.startId===j.id));return open?trainingWorkStableHTML93914(open,a,data.campaignClock):'';})()}`:''}
+ ${!dead?`<div class="hsk-training-calendar-panel"><p class="tiny">Pravidlový postup: nejprve zahájit šestiměsíční výcvik; po skutečném uplynutí doby v kalendáři provést Animalcraft SV a pokračující Training d10. Kalendář se sám neposouvá.</p>${projectStartWithResources('Připravte zvíře, místo pro výcvik a případné pomůcky podle způsobu výcviku.',`<button type="button" class="secondary hc-small" data-hmk-training-start-animal="${esc(a.id)}">Zahájit šestiměsíční výcvik · HMK 65</button>`)}${data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).slice(-2).map(j=>`<p class="tiny hsk-training-date">Výcvik začal ${esc(displayCampaignMinute(j.calendarAnimalTrainingStart590.startMinute))}, základní termín ${esc(displayCampaignMinute(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)))}${j.calendarAnimalTrainingStart590.calendarDayEligibility600?' · od začátku tohoto dne':''}${data.campaignClock.minute<trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)?' · zbývá '+esc(chronicleRemainingTime(trainingOpenMinute600(j.calendarAnimalTrainingStart590,j.calendarAnimalTrainingStart590.dueMinute)-data.campaignClock.minute)):' · základní doba uplynula'}</p>`).join('')}</div>${trainingInterruptionStableHTML93902(a,campaignId)}${(()=>{const open=data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.calendarAnimalTrainingStart590?.animalId===a.id).findLast(j=>!data.journal.some(r=>r.calendarAnimalTraining590?.startId===j.id));return open?trainingWorkStableHTML93914(open,a,data.campaignClock):'';})()}`:''}
  <p>Animalcraft (HMK 65): základní ML zvířete neznamená automaticky získaný MB. Výcvik vyžaduje původní SV, skutečné hody a pravidlový čas. ${training.length?`Potvrzené doklady: ${training.map(t=>esc(t.title)).join(' · ')}`:'Výcvik zatím není pro tuto identitu doložen.'}</p>
  <p><strong>Skutečně aktivovaný výcvik:</strong> ${trainingState.boosts} MB · ${trainingState.sourceId?'ověřený kalendářní doklad':'žádný úplný kalendářní doklad'}. Zvlášť se ověřuje uplynutí alespoň ${training.length?'příslušného počtu':'šesti'} měsíců; až pak se MB používají v bojových náhledech.</p>
  ${!dead&&training.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="training-activate"><label>Dokončený výcvik<select name="trainingProofId">${training.map((t,i)=>`<option value="${esc(t.id)}">Výcvik ${i+1} · ${t.skillTestProof?.finalBoosts??0} MB · ${t.skillTestProof?.months??6} měs.</option>`).join('')}</select></label><p class="hc-hint">Čas se převezme ze skutečného začátku a dokončení výcviku v kalendáři; nelze jej ručně změnit.</p><label>Doložený kalendářní podklad<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Aktivovat již dokončený výcvik v boji</button></form>`:''}
@@ -12966,7 +12971,7 @@ function decorateTrappingCalendar93908(root){
     '<p>480 minut je doloženo; nyní lze provést jediný původní Survival Success Value.</p>')+
    `<p><button type="button" class="secondary" data-hmk-trapping-cancel-93909="${esc(pending.id)}">Ukončit projekt pastí bez výnosu · GM</button></p>`:
    pending?`<p>Historický Trapping v93.908: zahájen ${esc(displayCampaignMinute(pending.campaignMinute))}, termín ${esc(displayCampaignMinute(pending.calendarTrappingStart93908.dueMinute))}. ${now<pending.calendarTrappingStart93908.dueMinute?'Survival SV ještě není splatný.':'Lze provést původní Survival SV.'}</p>`:
-   '<button type="button" class="secondary" data-hmk-trapping-start-93908>Zahájit Trapping · 480 odpracovaných minut · GM</button>');
+   projectStartWithResources('Připravte oka či pasti a území pro práci. Dobrovolný Secondary Modifier je Woodworking nebo Metalcraft (HMK str. 85).','<button type="button" class="secondary" data-hmk-trapping-start-93908>Zahájit Trapping · 480 odpracovaných minut · GM</button>'));
  form.before(panel);
  const submit=form.querySelector('button[type="submit"]');if(submit){const blocked=!pending||(v2?progress.remainingMinutes>0:now<pending.calendarTrappingStart93908.dueMinute);
   submit.disabled=blocked;submit.dataset.hmkTrappingGate93908=blocked?'yes':'no';}
@@ -12984,7 +12989,7 @@ document.addEventListener('click',e=>{
   const p=trappingStart93909({campaignId:cid,actorId:selected,minute:now,gmConfirmed:true});
   mutate(()=>data.journal.push({id:uuid(),characterId:selected,calendarCampaignId:cid,campaignMinute:now,
    createdAt:stamp(),title:'HMK 85 · Zahájení Trapping',body:'480 minut skutečné práce v potvrzených úsecích, až potom původní Survival SV; čas se neposunul.',
-   calendarTrappingStart93908:p}));
+   ...projectResourceReceipt(b.form),calendarTrappingStart93908:p}));
  }catch(err){alert(err.message);}
 },true);
 document.addEventListener('click',e=>{
@@ -13066,7 +13071,7 @@ function decorateFishingCalendarStart590(root){
    '<p>240 minut je doloženo. Nyní lze provést jediný Fishing Success Value.</p>')+
    `<button type="button" class="secondary" data-hmk-fishing-cancel-93910="${esc(pending.id)}">Ukončit projekt bez úlovku · GM</button>`:
   pending?`<p>Historický Fishing: ${esc(displayCampaignMinute(pending.calendarFishingStart590.startMinute))} → ${esc(displayCampaignMinute(pending.calendarFishingStart590.dueMinute))}. Dřívější doklady zůstávají ve své původní verzi.</p>`:
-  '<button type="button" class="secondary" data-hmk-fishing-start-590>Zahájit nový Fishing · 240 minut práce</button>');
+  projectStartWithResources('Podle techniky použijte háček a šňůru, oštěp, síť nebo holé ruce. Technika se zaznamená v původním Fishing testu (HMK str. 70–71).','<button type="button" class="secondary" data-hmk-fishing-start-590>Zahájit nový Fishing · 240 minut práce</button>'));
  target.before(panel);refreshFishingCalendarGate590(root);
 }
 function refreshFishingCalendarGate590(root){
@@ -13102,7 +13107,7 @@ document.addEventListener('click',e=>{
   const proof=fishingStart93910({journal:data.journal,campaignId:cid,actorId:actor.id,minute:now,gmConfirmed:true});
   mutate(()=>data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:now,createdAt:stamp(),
    title:'HMK 71 · Fishing · zahájení',body:'240 minut skutečné práce před původním Fishing SV; kalendář se neposunul.',
-   calendarFishingStart590:proof}));
+   ...projectResourceReceipt(b.form),calendarFishingStart590:proof}));
  }catch(err){alert('Fishing: '+err.message);}
 },true);
 document.addEventListener('submit',e=>{
@@ -22634,7 +22639,7 @@ document.addEventListener('click',e=>{
    const dueMinute=minute+6*30*1440;
    data.journal.push({id:uuid(),characterId:animal.ownerId,calendarCampaignId:cid,campaignMinute:minute,createdAt:stamp(),
     title:'HMK 65 · Zahájení výcviku · '+animal.name,body:'Doložený počátek: '+displayCampaignMinute(minute)+'; základní konec: '+displayCampaignMinute(dueMinute)+'. Pravidlový Animalcraft SV následuje po uplynutí času. Žádný hod nebyl proveden.',
-    calendarAnimalTrainingStart590:{format:'animal-training-start-590',animalId:animal.id,ownerId:animal.ownerId,startMinute:minute,dueMinute,requiredDays:180,calendarDayEligibility600:true,trainingWorkPolicy:ANIMAL_WORK_POLICY93914}});
+    ...projectResourceReceipt(b.form),calendarAnimalTrainingStart590:{format:'animal-training-start-590',animalId:animal.id,ownerId:animal.ownerId,startMinute:minute,dueMinute,requiredDays:180,calendarDayEligibility600:true,trainingWorkPolicy:ANIMAL_WORK_POLICY93914}});
   });
  }catch(err){alert('Zahájení výcviku: '+err.message);}
 },true);
