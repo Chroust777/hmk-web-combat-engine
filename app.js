@@ -9,7 +9,7 @@ import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFrom
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.007';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.008';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -45,6 +45,7 @@ import {PRINTED_STARTER_GEAR_P120,prepareStartingKit} from './src/integration/hm
 import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,interpretCharacterDescription} from './src/integration/hmk-generator-traits.js';
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
+import {FAERIE_CRAFTS,FAERIE_TOTAL,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.008';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.986';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.007';
@@ -221,7 +222,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.007';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.008';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -320,7 +321,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.007';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.008';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -394,7 +395,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.007';
+const APP_VERSION='94.008';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -702,7 +703,7 @@ function validate(d){
  validateGMHealthOverrideEvidence(d?.characters||[],d?.journal||[],d?.trash||[]);
  validateGlobalActionLedger(d);
  validateExtendedShockAidJournal(d?.journal||[]);
- validateSkillTimedWork591(d);validateConstruction(d.journal,d.characters);validateShipwright(d.journal,d.characters);validateScriptCopies(d.journal);validateReadingJournal(d.journal);
+ validateFaeriecraft(d.journal);validateSkillTimedWork591(d);validateConstruction(d.journal,d.characters);validateShipwright(d.journal,d.characters);validateScriptCopies(d.journal);validateReadingJournal(d.journal);
  validateTrainingInterruption93902(d?.journal||[]);validateAnimalTrainingCalendar590(d);
  validateLogbookVisibility(d);validateChroniclePresentation93889(d);
  validateLivestockEvidence(d);
@@ -1079,7 +1080,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
   for(const old of previous.journal.filter(j=>j.calendarFishingWork93910||j.calendarFishingCancel93910||j.calendarTrappingStart93908||j.calendarTrappingWork93909||j.calendarTrappingCancel93909||j.calendarTrappingSV93908||j.skillTestProof?.type==='trapping-result'||['hmk-wild-catch-carry-93908-v1',WILD_FRESH_CARRY_93912].includes(j.calendarForagingCarry?.format)||j.calendarCatchSpoilage93912||j.calendarCatchSaltStart93912||j.calendarCatchSaltFinish93912||j.calendarForagingCarryDiscard?.format==='hmk-wild-catch-discard-93908-v1')){
    const updated=data.journal.find(j=>j.id===old.id);if(!updated||JSON.stringify(updated)!==JSON.stringify(old))
     throw Error('Trapping / úlovek: potvrzený historický doklad nelze změnit.');
-  }assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTimeEpisodeAppendOnly(previous.journal,data.journal);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertEpisodeEncounterGMAppendOnly93902(previous.journal,data.journal);assertDirectionGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertTrainingInterruptionAppendOnly93902(previous.journal,data.journal);assertAnimalTrainingWorkAppendOnly93914(previous.journal,data.journal);assertSkillTimedAppendOnly591(previous,data);assertConstructionAppendOnly(previous.journal,data.journal);assertShipwrightAppendOnly(previous.journal,data.journal);assertScriptCopiesAppendOnly(previous.journal,data.journal);assertReadingAppendOnly(previous.journal,data.journal);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);// Temporary Bestiary participants never impose calendar healing obligations;
+  }assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTimeEpisodeAppendOnly(previous.journal,data.journal);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertEpisodeEncounterGMAppendOnly93902(previous.journal,data.journal);assertDirectionGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertTrainingInterruptionAppendOnly93902(previous.journal,data.journal);assertAnimalTrainingWorkAppendOnly93914(previous.journal,data.journal);assertSkillTimedAppendOnly591(previous,data);assertFaerieAppendOnly(previous.journal,data.journal);assertConstructionAppendOnly(previous.journal,data.journal);assertShipwrightAppendOnly(previous.journal,data.journal);assertScriptCopiesAppendOnly(previous.journal,data.journal);assertReadingAppendOnly(previous.journal,data.journal);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);// Temporary Bestiary participants never impose calendar healing obligations;
   // permanent PC/NPC health deadlines remain enforced by the original agenda.assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});
   assertGlobalActionLedgerAppendOnly(previous,data);assertChroniclePresentationAppendOnly93889(previous,data);
   assertPCShelteredStayAppendOnly(previous.journal,data.journal);
@@ -6025,10 +6026,129 @@ document.addEventListener('submit',event=>{
   if(!mutate(()=>data.journal.push(row)))throw Error('Zápis loďařské zakázky se nepodařilo uložit.');
  }catch(error){out.textContent=error.message;}
 },true);
+function faerieSecondarySkills(plan){
+ if(plan.skill==='Fletching')return ['Woodworking',plan.bow==='composite'?'Hideworking':'Timbercraft'];
+ if(plan.skill!=='Weaponcraft')return [];
+ if(plan.armour)return plan.armour==='scale'?['Hideworking','Metalcraft']:['Metalcraft','Mineralogy'];
+ return Object.values(FLETCHING_ITEMS).find(item=>item.name==='Longknife').secondary;
+}
+function faeriecraftPanel(actor){
+ const signed=n=>n>0?'+'+n:String(n);
+ const clock=data.campaignClock,cid=campaignKey(clock),now=clock?.minute;
+ const title='<h3>Faeriecraft · HMK 93, 308</h3>';
+ if(!actor||!clock)return '<section>'+title+'<p>Otevřete kalendář kampaně.</p></section>';
+ if(!isFaerieCrafter(actor))return '<section>'+title+'<p>Faeriecraft je dostupný pouze postavám původu Ælrhin.</p></section>';
+ if(!calendarMemberIds(clock,[actor]).length)return '<section>'+title+'<p>Vybraná postava musí být účastníkem kampaně.</p></section>';
+ const records=data.journal.filter(x=>x.characterId===actor.id&&x.calendarCampaignId===cid&&x.calendarFaeriecraft?.stage==='start');
+ const states=records.map(x=>faerieState(data.journal,x.id));
+ const active=states.find(state=>faerieNext(state,now)),masteries=availableMasteries(actor);
+ const crafts=masteries.filter(x=>x.ml>0&&Object.hasOwn(FAERIE_CRAFTS,x.name));
+ const spirit=masteries.find(x=>x.name==='Spirit'&&x.ml>0);
+ const outer=(stage,id,contents,label,queue=false)=>'<form class="hsk-critical-next" '+(queue?'data-faerie-roll ':'')+'data-faerie-step="'+stage+'"><input type="hidden" name="projectId" value="'+esc(id)+'">'+contents+
+  '<button type="submit">'+label+'</button><output role="status" aria-live="polite"></output></form>';
+ const die=name=>'<input type="hidden" name="'+name+'">';
+ const entryFields='<label>Klidné místo<input name="location" required minlength="2" maxlength="120"></label>'+
+  '<label>Siemist Sacred Ground<select name="consecration"><option value="0">Bez posvěcené půdy</option>'+[1,2,3,4,5].map(x=>'<option value="'+x+'">'+x+' ★ posvěcení</option>').join('')+'</select></label>'+
+  die('spiritRoll')+die('sacredRoll');
+ const history=states.filter(x=>x.done||x.expired).reverse().map(({done,expired,project})=>'<p><strong>'+esc(project.title)+'</strong> · '+esc((done||expired).body)+'</p>').join('');
+ let html='';
+ if(!active){
+  html=!spirit||!crafts.length?'<p>Postava potřebuje osvojený Spirit a odpovídající řemeslo.</p>':
+   outer('start','', '<label>Řemeslo<select name="craftSkill" required><option value="">Vyberte řemeslo</option>'+crafts.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select></label>'+
+    '<label>Konkrétní výrobek<input name="item" required minlength="2" maxlength="120"></label>'+
+    '<label>Doložená doba výroby od zahájení (herní hodiny včetně přestávek)<input name="hours" type="number" min="1" max="166666" required></label>'+
+    '<fieldset data-faerie-product="hartbow" hidden disabled><legend>Hartbow</legend><label>Druh luku<select name="bow"><option value="composite">Kompozitní luk</option><option value="longbow">Longbow</option></select></label><label>Základní Draw<input name="baseDraw" type="number" min="1" max="500" required></label></fieldset>'+
+    '<fieldset data-faerie-product="longknife" hidden disabled><legend>Výrobek Weaponcraft</legend><label>Druh výrobku<select name="armour"><option value="">Vagorsereq (Longknife)</option><option value="mail">Kroužková zbroj</option><option value="scale">Šupinová zbroj</option><option value="plate">Plátová zbroj</option></select></label><label hidden>Základní hmotnost (lb)<input name="baseWeight" type="number" min="0.01" step="any" required disabled></label></fieldset>'+
+    '<p>Weaponcraft nabízí Vagorsereq (Longknife) a tři druhy kovových zbrojí. Masonry je určené pro samostatnou plastiku. Čas posouvá Kalendář.</p>'+entryFields,
+    'Potvrdit vstup do reverie a zahájit práci',true);
+ }else{
+  const {project,entry,minutes,deadline,readyMinute}=active,plan=project.calendarFaeriecraft.input,next=faerieNext(active,now);
+  const completed=readyMinute!==null&&now>=readyMinute||minutes>=FAERIE_TOTAL;
+  html='<section class="hsk-project-pending"><h4>'+esc(project.title)+'</h4><p>'+esc(plan.skill)+' · Pětidenní lhůta do '+displayCampaignMinute(deadline)+'.</p>'+
+   (completed?'<p>Požadovaných 20 hodin reverie dosaženo.</p>':
+    '<p>Uzavřené úseky '+Math.min(minutes/60,20)+' / 20 h. '+(entry?'Probíhající vstup od '+displayCampaignMinute(entry.campaignMinute)+'.':'')+'</p>')+
+   (entry&&!completed?'<p>Spirit SV při posledním vstupu '+entry.calendarFaeriecraft.result.spirit.sv+
+    ' · Awareness a Lifting the Veil '+signed(entry.calendarFaeriecraft.result.awarenessAndVeil)+
+    ' · Spirit World Actions '+signed(entry.calendarFaeriecraft.result.spiritWorldActions)+
+    ' · astrální cesta '+signed(entry.calendarFaeriecraft.result.astralRounds)+' kol.</p>':'');
+  if(next.stage==='finish'){
+   html+='<p>Craft Success Value od '+displayCampaignMinute(next.minute)+'.</p>';
+   if(now>=next.minute)html+=outer('finish',project.id,die('craftRoll')+(spirit?die('spiritDie'):'<p>Spirit už není osvojený. Secondary Roll automaticky selže.</p>'),'Uložit výsledek výroby',true);
+  }else if(next.stage==='expire'){
+   if(now>=deadline)html+=outer('expire',project.id,'<p>Lhůta skončila. Uzavřete pokus bez Faeriecraft účinku.</p>','Uzavřít nedokončenou reverie');
+   else html+='<p>Do konce lhůty se další čtyřhodinový úsek už nevejde.</p>';
+  }else if(next.stage==='enter')html+=outer('enter',project.id,entryFields,'Potvrdit nový vstup do reverie',true);
+  else{
+   html+='<p>Z reverie lze vystoupit nebo zaznamenat její skutečné přerušení. Úsek kratší než čtyři hodiny se nezapočte.</p>'+
+    outer('leave',project.id,'','Vystoupit z reverie')+
+    outer('interrupt',project.id,'','Zapsat ztrátu soustředění')+
+    '<details><summary>Vyrušení bez traumatu</summary>'+outer('disturbance',project.id,die('willRoll'),'Vyhodnotit Will',true)+'</details>';
+  }
+  html+='</section>';
+ }
+ return '<section class="hsk-timed-project-591">'+title+'<p>Potvrďte Spirit SV při každém vstupu. Nasbírejte 20 hodin během pěti dnů v úsecích nejméně po čtyřech hodinách. Po dokončení práce následuje Craft SV a Spirit SR.</p>'+html+
+  (history?'<details><summary>Uzavřené projekty Faeriecraft</summary>'+history+'</details>':'')+
+  (active?'<details><summary>Doklady rozpracovaného projektu</summary>'+data.journal.filter(x=>x.calendarFaeriecraft?.projectId===active.project.id).map(x=>'<p>'+displayCampaignMinute(x.campaignMinute)+' · '+esc(x.body)+'</p>').join('')+'</details>':'')+'</section>';
+}
+document.addEventListener('change',event=>{
+ if(!event.target.matches?.('[data-faerie-step="start"] :is([name="craftSkill"],[name="armour"])'))return;
+ const form=event.target.form,kind=FAERIE_CRAFTS[form.elements.craftSkill.value];
+ for(const group of form.querySelectorAll('[data-faerie-product]'))group.disabled=group.hidden=group.dataset.faerieProduct!==kind;
+ const weight=form.elements.baseWeight;weight.disabled=weight.closest('label').hidden=kind!=='longknife'||!form.elements.armour.value;
+});
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(!form?.matches?.('[data-faerie-step]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const out=form.querySelector('output');
+ try{
+  const clock=data.campaignClock,cid=campaignKey(clock),actor=character(selected),stage=form.dataset.faerieStep;
+  if(!clock||!isFaerieCrafter(actor)||!calendarMemberIds(clock,[actor]).length)throw Error('Faeriecraft vyžaduje Ælrhin v otevřené kampani.');
+  const fields=form.elements,read=name=>fields.namedItem(name)?.value??'',num=name=>Number(read(name));
+  const id=uuid(),projectId=stage==='start'?id:read('projectId');
+  const source=data.journal.find(x=>x.id===projectId),plan=source?.calendarFaeriecraft?.input;
+  const input={};
+  if(stage==='start'){
+   Object.assign(input,{skill:read('craftSkill'),item:read('item').trim(),durationMinutes:num('hours')*60});
+   skillActorMastery(actor,input.skill);
+   if(FAERIE_CRAFTS[input.skill]==='hartbow')Object.assign(input,{bow:read('bow'),baseDraw:num('baseDraw')});
+   if(input.skill==='Weaponcraft'&&read('armour'))Object.assign(input,{armour:read('armour'),baseWeight:num('baseWeight')});
+   for(const secondary of faerieSecondarySkills(input))skillActorMastery(actor,secondary);
+  }
+  if(stage==='start'||stage==='enter'){
+   const health=persistentStateOf(actor);
+   if(['UNC','KIA'].includes(health.shock)||health.coma?.active||health.dead)throw Error('Před vstupem do reverie musí být postava při vědomí.');
+   Object.assign(input,{spiritML:skillActorMastery(actor,'Spirit').ml,modifier:skillAutoFor(actor,'Spirit').modifier,
+    spiritRoll:num('spiritRoll'),consecration:num('consecration'),sacredRoll:read('sacredRoll')?num('sacredRoll'):null,location:read('location').trim()});
+  }
+  if(stage==='disturbance')Object.assign(input,{willML:skillActorMastery(actor,'Will').ml,modifier:skillAutoFor(actor,'Will').modifier,willRoll:num('willRoll')});
+  if(stage==='finish'){
+   const skills=availableMasteries(actor),spiritML=skills.find(x=>x.name==='Spirit')?.ml??0;
+   const secondary=faerieSecondarySkills(plan);
+   Object.assign(input,{craftML:skillActorMastery(actor,plan.skill).ml,spiritML,modifier:skillAutoFor(actor,plan.skill).modifier,
+    craftRoll:num('craftRoll'),spiritDie:spiritML?num('spiritDie'):null,secondaryMLs:secondary.map(name=>skillActorMastery(actor,name).ml)});
+  }
+  const step={stage,projectId,input};
+  const row={id,characterId:actor.id,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
+   title:source?.title??'Faeriecraft · '+input.item,calendarFaeriecraft:step};
+  const result=step.result=resolveFaerieStep(data.journal,row);
+  if(stage==='finish'){
+   const tr=result.trait,trait=tr?.kind==='hartbow'?' · Draw '+tr.draw:tr?.kind==='longknife'?' · +5 Melee':tr?.kind==='metal-armour'?' · ENC −5 · '+tr.weightLb+' lb':'';
+   row.body=plan.skill+' · d100 ('+result.craft.roll+') · EML '+result.craft.eml+' · '+result.craft.level+' · Spirit SR '+(result.spirit.roll??'—')+
+    ' '+(result.spirit.success?'S':'F')+' · SV '+result.sv+' · '+result.stars+' ★'+trait;
+  }else if(stage==='start'||stage==='enter')row.body='Spirit SV '+result.spirit.sv+' · d100 ('+input.spiritRoll+') · '+result.spirit.level+' · '+input.location+
+   (input.sacredRoll?' · Siemist d10 ('+input.sacredRoll+') '+(result.sacredSuccess?'S':'F'):'')+'.';
+  else if(stage==='expire')row.body='Pětidenní reverie nedokončena. Započteno '+result.credited+' minut.';
+  else row.body=(stage==='disturbance'?'Will d100 ('+input.willRoll+') · ':'')+
+   (result.maintained?'Reverie udržena.':'Reverie opuštěna. Započteno '+result.credited+' minut.');
+  if(!mutate(()=>data.journal.push(row)))throw Error('Krok Faeriecraft nebyl uložen.');
+ }catch(error){out.textContent=error.message;}
+},true);
+
 function skillSVPicker595(actor){
  const c=skillSVChoice595?.actorId===actor?.id?skillSVChoice595:null;
  const skills=actor?availableMasteries(actor):[];
- const choices=[['shipwright','Shipwright · stavba plavidel · HMK 84'],['construction','Construction · stavba · HMK 78, 91'],['trapping','Trapping · Survival po 8 hodinách · HMK 85'],['engineering','Engineering Design · HMK 70'],['writing','Writing, opis a Reading · HMK 83, 132'],['drawing','Drawing · 4 hodiny na 1 ft² · HMK 69'],['cookery','Cookery · 1 hodina / 5 osob · HMK 68'],['fishing','Fishing · čtyřhodinový postup HMK 71'],['animal','Animal Training · výcvik HMK 65'],['jewelcraft','Jewelcraft · HMK 76'],['glassworking','Glassworking · tištěné skleněné výrobky · HMK 73'],['woodworking','Woodworking · tištěné dřevěné výrobky · HMK 91'],...Object.keys(WORKSHOP_CRAFT_PROJECTS).map(key=>[key,TIMED_SKILL_LABELS_600[key]]),...Object.entries(CRAFT_LABELS_600)];
+ const choices=[['faeriecraft','Faeriecraft · HMK 93, 308'],['shipwright','Shipwright · stavba plavidel · HMK 84'],['construction','Construction · stavba · HMK 78, 91'],['trapping','Trapping · Survival po 8 hodinách · HMK 85'],['engineering','Engineering Design · HMK 70'],['writing','Writing, opis a Reading · HMK 83, 132'],['drawing','Drawing · 4 hodiny na 1 ft² · HMK 69'],['cookery','Cookery · 1 hodina / 5 osob · HMK 68'],['fishing','Fishing · čtyřhodinový postup HMK 71'],['animal','Animal Training · výcvik HMK 65'],['jewelcraft','Jewelcraft · HMK 76'],['glassworking','Glassworking · tištěné skleněné výrobky · HMK 73'],['woodworking','Woodworking · tištěné dřevěné výrobky · HMK 91'],...Object.keys(WORKSHOP_CRAFT_PROJECTS).map(key=>[key,TIMED_SKILL_LABELS_600[key]]),...Object.entries(CRAFT_LABELS_600)];
  return `<section class="hsk-sv-picker-595" aria-label="Výběr konkrétního Success Value">
   <h3>Success Value · vyberte postup</h3>
   <p class="tiny">Výběr zde neprovádí žádný hod ani zápis do kalendáře. Každý postup má vlastní správné vstupy; formulář se zobrazí až po stisknutí tlačítka.</p>
@@ -7268,6 +7388,8 @@ function folioChapterParts(body,kind=''){
       if(!pending.length)right=right.replace(/(<section class="hsk-test-card" data-skill-section="value")/, '$1 hidden');
       right=timedSkillProjectsPanel591(actor,{kind:choice.value})+(choice.value==='writing'?pendingWritingWorkHTML591(actor)+completedWritingHTML992(actor)+scriptCopyHTML993(actor)+readingHTML994(actor):'')+
        (pending.length?'<p class="hsk-sv-project-note-595">Po uplynutí nejčasnějšího termínu použijte Success Value vpravo. Výsledný hod bude svázán s vybraným projektem; bez uzavření času nebude přijat.</p>':'<p class="hsk-sv-project-note-595">Nejprve zahajte projekt níže. Základní Success Value se zpřístupní až při otevřené, doložené práci.</p>')+right;
+     }else if(choice.value==='faeriecraft'){
+      right=faeriecraftPanel(actor)+right.replace(/(<section class="hsk-test-card" data-skill-section="value")/,'$1 hidden');
      }else if(choice.value==='shipwright'){
       right=shipwrightPanel(actor)+right.replace(/(<section class="hsk-test-card" data-skill-section="value")/,'$1 hidden');
      }else if(choice.value==='construction'){
@@ -20720,6 +20842,13 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   selected=actor.id;view='skills';activeSkillTab='value';skillSVChoice595={actorId:actor.id,kind:'timed',value:'shipwright'};render();
   form=q('form[data-shipwright-project]:not([data-shipwright-project="start"])').find(f=>f.elements.namedItem('startId')?.value===sourceId);
   break;
+ case 'faeriecraft-project':{
+  const state=faerieState(data.journal,sourceId),step=state&&faerieNext(state,data.campaignClock.minute);
+  if(!step)break;
+  selected=actor.id;view='skills';activeSkillTab='value';skillSVChoice595={actorId:actor.id,kind:'timed',value:'faeriecraft'};render();
+  form=q('form[data-faerie-step]').find(f=>f.dataset.faerieStep===step.stage&&f.elements.namedItem('projectId')?.value===sourceId);
+  break;
+ }
  case 'engineering-project':{
   const source=data.journal.find(row=>row.calendarSkillProjectSV591?.startId===sourceId);
   const schedule=data.journal.some(row=>row.calendarEngineeringDesignTiming?.startId===sourceId);
@@ -20817,7 +20946,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
    kind==='aural-recovery'?form.elements.namedItem('die'):
    kind==='writing-retry'?form.elements.namedItem('rollA'):
    kind==='shipwright-project'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name="timePct"]')||form.querySelector('button[type="submit"]')):
-   kind==='engineering-project'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name=rollA]:not([disabled])')||form.querySelector('button[type=submit]')):
+   ['faeriecraft-project','engineering-project'].includes(kind)?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name=rollA]:not([disabled])')||form.querySelector('button[type=submit]')):
    kind==='construction-project'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled])')||form.querySelector('button[type="submit"]')):
    ['fletching-project','printed-craft-project'].includes(kind)?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled])')||form.elements.namedItem('timeStars')||form.querySelector('input[name=roll10A]:not(:disabled):not([readonly]), input[name=rollA]:not(:disabled):not([readonly])')||form.querySelector('button[type=submit]')):
    kind==='brew-mature'?(form.elements.namedItem('workshopTN')||form.querySelector('button[type="submit"]')):

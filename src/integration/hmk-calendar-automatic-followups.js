@@ -15,6 +15,7 @@ import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.j
 import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.007';
 import {copySource,findCopyStages} from './hmk-script-copy.js?v=94.006';
 import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=94.006';
+import {faerieState,faerieNext} from './hmk-faeriecraft.js?v=94.008';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -461,6 +462,13 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   const step=schedule?'dokončit návrh':source?'vyhodnotit Design Roll':'provést Success Value';
   push(person,'engineering-project',row.id,'Engineering · '+plan.projectName+' · '+step,
    schedule?.dueMinute??source?.campaignMinute??plan.earliestMinute,'skills',{requiresAction:false});
+ }
+ for(const row of journal){
+  if(row.calendarFaeriecraft?.stage!=='start'||row.calendarCampaignId!==clock.campaignId)continue;
+  const person=characters.find(c=>c.id===row.characterId),step=faerieNext(faerieState(journal,row.id),clock.minute);
+  if(!person||!step)continue;
+  const label={leave:'věnovat se reverie',enter:'znovu vstoupit do reverie',finish:'provést Craft SV a Spirit SR',expire:'uzavřít nedokončenou reverie'}[step.stage];
+  push(person,'faeriecraft-project',row.id,row.title+' · '+label,step.minute,'skills',{requiresAction:false});
  }
  for(const row of journal){
   const plan=row.calendarConstructionStart;
