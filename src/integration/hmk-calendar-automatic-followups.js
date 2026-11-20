@@ -352,7 +352,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
       Math.floor(scheduled.dueMinute/DAY)*DAY:scheduled.dueMinute):null;
    if(cf.type==='critical-followup'&&cf.activity==='animal-training'&&
       origin?.skillTestProof?.type==='secondary-mastery-value-test'&&
-      origin.skillTestProof?.result?.level==='CF'&&
+      (origin.skillTestProof?.a?.level??origin.skillTestProof?.result?.level)==='CF'&&
       link?.format==='hmk-animal-training-sv-93893-v1'&&
       link.animalId===t.animalId&&link.ownerId===person.id&&
       scheduled?.animalId===t.animalId&&scheduled?.ownerId===person.id&&
@@ -364,6 +364,23 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
     // No new roll, fabricated end date, or automatic completion. The
     // existing Animal Training form checks this same due when GM finishes.
     continue;
+   }
+  }
+  if(w){
+   const origin=journal.find(j=>j.id===event.skillTestProof.originId&&j.calendarCampaignId===clock.campaignId&&j.characterId===person.id);
+   const link=origin?.calendarSkillProjectSV591;
+   const start=journal.find(j=>j.id===link?.startId&&j.calendarCampaignId===clock.campaignId)?.calendarSkillProjectStart591;
+   const result=origin?.skillTestProof?.a??origin?.skillTestProof?.result;
+   if(start?.kind==='writing'&&start.actorId===person.id&&start.scope===w.scope&&
+    safe(start.startMinute)&&Number.isSafeInteger(start.baseMinutes)&&start.baseMinutes>0&&
+    result?.level==='CF'&&[1,1.5,2].includes(w.completionTimeMultiplier)){
+    if(journal.some(j=>j.calendarCampaignId===clock.campaignId&&
+     j.calendarSkillProjectComplete591?.startId===link.startId&&j.calendarSkillProjectComplete591?.sourceId===origin.id))continue;
+    if(start.scope==='missive'||result.sv>=5){
+     const due=start.startMinute+Math.ceil(start.baseMinutes*w.completionTimeMultiplier);
+     push(person,'writing-completion',origin.id,'Writing · potvrdit dokončení '+start.projectName+' (HMK 132)',due,'skills');
+     continue;
+    }
    }
   }
   const reason=t?'Původní datum a vazba Animalcraft SV na konkrétní zahájený výcvik nejsou doložené.':'Doba psaní vyžaduje doložený původní kalendářní plán a skutečný pracovní rytmus.';
