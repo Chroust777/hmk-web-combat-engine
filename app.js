@@ -40,7 +40,7 @@ import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} f
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.979';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
-import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=93.982';
+import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=93.983';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.964';
 import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.972';
@@ -59,7 +59,7 @@ import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/h
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js';
 import {WRITING_WORK_MINUTES_591,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js';
-import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep} from './src/integration/hmk-climbing-fall-sequence.js';
+import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
 import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgilityStage93864,ACCIDENT_AGILITY_STAGE_FORMAT_93864} from './src/integration/hmk-accident-agility-gate-93864.js';
@@ -101,7 +101,7 @@ import {createForagingWaterStorage,validateForagingWaterStorageJournal} from './
 import {isHandheldItem,requiresTwoHands,gripOf,supportsSelectableTwoHandGrip,setWeaponGrip,validateHandInventory,equipInventoryHand} from './src/integration/hmk-hand-equipment.js';
 import {creationChoicesFromPhysicalDice,mergeCreationChoices} from './src/integration/hmk-creation-roll-choices.js';
 import {CHARACTER_STEPS,SKILL_STAGES,ATTRIBUTES,creationOf,defaultCreation,applyCreationPatch,physicalDiceRequirement,voiceDiceRequirement,SKILL_DEFINITIONS,calculateSheetSkills,syncCreationSkills,gmSenseRows,evaluatePerceptionDice,setPerceptionMode,creationRevisionIssues,characterJournalReadiness,assertCreationInvariants,assertCreationHistoryAppendOnly} from './src/integration/hmk-character-creation.js?v=93.979';
-import {creationWizardHTML,characterCalculationHTML,gmSensePanelHTML,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js?v=93.979';
+import {creationWizardHTML,characterCalculationHTML,chronicleSenseRows,refreshCreationChoiceUI} from './src/integration/hmk-character-creation-ui.js?v=93.983';
 import {isStableAnimalProfile93813,registryCharacters93813,registryCounts93813} from './src/integration/hmk-character-registry-separation-93813.js';
 import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/integration/hmk-creation-psyche.js';
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.982';
+const APP_VERSION='93.983';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5496,6 +5496,9 @@ function journalGracePietyBoxes(rows,roll,fp){
 }
 function journalSkillColumnsHTML(c){
  const groups=groupedSheetSkills(c);
+ const senses=chronicleSenseRows(c);
+ for(const [group,rows] of groups)groups.set(group,rows.filter(row=>!senses.some(sense=>sense.name===row.name)));
+ if(senses.length)groups.set('Physical',[...(groups.get('Physical')||[]),...senses]);
  const order=['Social','Lore','Physical','Nature','Craft','Combat','Esoterica','Communication','Ritual','Magic','Psionics','Other'];
  const present=[...order.filter(k=>groups.has(k)), ...[...groups.keys()].filter(k=>!order.includes(k))];
  const titles={Communication:'Social',Lore:'Lore',Social:'Social',Nature:'Nature',Physical:'Physical',Craft:'Craft',Combat:'Combat',Ritual:'Ritual & Faith',Magic:'Arcane',Esoterica:'Esoterica',Psionics:'Psionics',Other:'Other'};
@@ -5506,7 +5509,7 @@ function journalSkillColumnsHTML(c){
   const modInfo='Sunsign Modifier skupiny '+(titles[key]||key)+': '+signedNumber(modifier)+'. Tato hodnota se používá ve vybraných esoterických testech, například Fate Rolls; NENÍ to přímý bonus k běžnému Skill Checku ani počet dovedností (HMK str. 22).';
   const groupMark=Number.isFinite(modifier)?` <small class="journal-group-mod"${journalHelp('Sunsign Modifier',modInfo)}>[${signedNumber(modifier)}]</small>`:'';
   return `<section class="journal-skill-family"><h4>${journalTerm(titles[key]||key,JOURNAL_GROUP_HELP[key]||JOURNAL_GROUP_HELP[titles[key]])}${groupMark}</h4><ul>${rows.filter(row=>row.ml!==null||row.totalDP>0||row.subskillOf).map(row=>{
-   const basis=row.primary&&row.secondary?`${row.primary.toUpperCase()} ${row.primaryValue??'?'} + ${row.secondary.toUpperCase()} ${row.secondaryValue??'?'}`:row.perceptionParent?'Sdílené SM':'SB neověřen';
+   const basis=row.basis??(row.primary&&row.secondary?`${row.primary.toUpperCase()} ${row.primaryValue??'?'} + ${row.secondary.toUpperCase()} ${row.secondaryValue??'?'}`:row.perceptionParent?'Sdílené SM':'SB neověřen');
    const skillName=String(row.name);
    const baseName=skillName.replace(/\s*\(.*?\).*$/,'').replace(/^(2nd|3rd)\s+/,'');
    const specific=JOURNAL_SKILL_HELP[skillName]||JOURNAL_SKILL_HELP[baseName]||JOURNAL_SKILL_HELP[baseName.split(' ')[0]];
@@ -6532,7 +6535,7 @@ function characterJournalHero(c,inv,editing=false){
  const injuryStateRows=[['Current Shock',firstPresent(state.shock,0)],['Shock Save',skillValueForJournal(c,['Shock'])],['Unconscious',state.shock==='UNC'?'Ano':state.shock==='KIA'?'KIA':'Ne'],['Death Save',state.shock==='KIA'?'KIA':'—']];
  const conditionRows=projectChronicleConditions(state,{campaignId:data.campaignClock?campaignKey(data.campaignClock):null,auralShockLevels:h.arcane?.auralShockLevels});
  const notes=[c.description,traitValues[0],traitValues[1]].filter(Boolean).join(' · ')||'No personal notes entered.';
- return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}${hmkTravelEncounterHintHTML(c)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${gmSensePanelHTML(c,{editing})}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}${editing?'<div class="journal-wound-gm-action"><button type="button" class="secondary" data-open-gm-wounds>✚ / − Správa skutečných ran · GM</button><p class="tiny muted">Výběr anatomické lokality, vytvoření a vyřešení rány přes společnou zdravotní evidenci. Nejde o volnou editaci Combat důkazů.</p></div>':''}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
+ return journalShell(`${editing?'<form id="sheet-inline-form" class="sheet-inline-form journal-edit-spread">':''}<div class="journal-book-spread"><section class="journal-book-page journal-book-page--left"><header class="journal-nameplate"><div class="journal-crest">⚜</div><div class="journal-nameplate-copy"><h3>${editing?`<label class="journal-name-edit-label">Jméno postavy<input class="journal-name-edit-input" name="sheet_character_name" type="text" maxlength="120" required value="${esc(c.name)}" aria-label="Jméno postavy"></label>`:esc(c.name)}</h3><p>${esc((c.occupation||bio('standing')||'Wayfarer')).toUpperCase()}</p><div class="journal-nameplate-minor">${esc(bio('folk'))} &nbsp; ✦ &nbsp; ${esc(bio('society'))} &nbsp; ✦ &nbsp; ${esc(bio('background'))}</div></div></header><div class="journal-left-top">${journalSectionTable('Birth & Origins',lineageRows)}<div class="journal-portrait-panel"><div class="sheet-portrait sheet-portrait--book">${sheetPortraitHTML(c)}</div></div>${journalSectionTable('Appearance',appearanceRows,'journal-appearance')}</div><div class="journal-left-mid">${journalSectionTable('Family & Links',familyRows,'',editing)}<div class="journal-traits-status-column"><section class="journal-book-section">${journalRuleTitle('Traits & Character')}${traitValues.length?`<ul class="journal-trait-list">${traitEntries.map(t=>`<li data-hmk-help="${esc(t.help+' Aktuální záznam: '+t.value)}" tabindex="0" aria-label="${esc(t.help+' Aktuální záznam: '+t.value)}">${esc(t.value)}</li>`).join('')}</ul>`:'<p class="muted">Bez zaznamenaných rysů.</p>'}</section>${journalChronicleStatusHTML(c,state)}${hmkTravelEncounterHintHTML(c)}</div></div><div class="journal-attributes-row">${journalStatBoxes('Physical Attributes',physical,editing)}${journalStatBoxes('Mental Attributes',mental,editing)}${journalGracePietyBoxes(gracePiety,fateRoll,fateFP)}</div>${editing?`<section class="journal-book-section journal-book-section--skills journal-inline-skills"><div class="journal-book-title">Skills · Edit <span class="journal-book-hint">DP, SB, SM a ML</span></div>${characterCalculationHTML(c,{editing:true,embedded:true})}</section>`:journalSkillColumnsHTML(c)}${journalConvocationsHTML(c)}</section><section class="journal-book-page journal-book-page--right"><div class="journal-right-top-grid">${journalSectionTable('Combat Skills',combatSkills,'journal-book-section--tight')}${journalSectionTable('Encumbrance',encumbrance,'journal-book-section--tight')}${journalSectionTable('Movement',movement,'journal-book-section--tight').replace(/<\/section>$/,movementCaption+'</section>')}${journalSectionTable('Trauma & Conditions',trauma,'journal-book-section--tight')}</div>${journalInventoryTable('Melee Weapons',['Weapon','WQ','HFT','RCH','ATK','DEF','ZD','IMP','TA'],meleeRows,'journal-weapon-table')}${journalInventoryTable('Missile Weapons',['Weapon','WQ','DRW','BR','ATK','PRJ','ZD','IMP','TA'],missileRows,'journal-weapon-table')}<div class="journal-right-mid-grid">${journalInventoryTable('Armour & Clothing',['Item','ENC','WQ','Notes'],armourRows,'journal-right-card')}${journalBodyLocationsHTML(c)}${editing?'<div class="journal-wound-gm-action"><button type="button" class="secondary" data-open-gm-wounds>✚ / − Správa skutečných ran · GM</button><p class="tiny muted">Výběr anatomické lokality, vytvoření a vyřešení rány přes společnou zdravotní evidenci. Nejde o volnou editaci Combat důkazů.</p></div>':''}</div><div class="journal-right-low-grid">${journalInventoryTable('Possessions',['Item','Qty','lb','Notes'],possessionRows,'journal-right-card')}${journalInventoryTable('Spells & Abilities',['Name','Notes'],abilityRows,'journal-right-card')}</div><div class="journal-right-bottom-grid">${journalSectionTable('Shock & Injury',injuryStateRows,'journal-right-card')}${journalSimpleChecklist('Conditions',conditionRows)}<section class="journal-book-section journal-notes-card">${journalRuleTitle('Notes')}<p>${esc(notes)}</p></section></div>${journalConditionDetailsHTML(c,state,load,editing)}</section></div>${editing?'</form>':''}`,`journal-book--overview`)
 }
 function equippedHandsPanel(inv,character){
  const handedness=character?.hmk?.handedness;
@@ -12518,6 +12521,7 @@ const fallDice982=Object.freeze({
  fallingD100:[100,'Test dopadu'],compoundD10:[10,'Compound'],shockD100:[100,'Shock']
 });
 const fallConfirmed982=new WeakMap();
+const confirmedPassiveImpact=new WeakSet();
 function hskClimbingFallDie(name){
  const [faces,label]=fallDice982[name];
  return `<label class="hmk-confirmed-dice-label">${label} d${faces}<span class="hmk-confirmed-dice-row">
@@ -12529,7 +12533,9 @@ function hskClimbingFallRow(i){
  return `<fieldset data-climb-fall-row class="hsk-fall-row"><legend>${i===0?'První dopad':'Opakovaný dopad po CF'} · HMK str. 67</legend><div class="hsk-form-grid">
  ${hskClimbingFallDie('zoneD10')}${hskClimbingFallDie('locationD10')}${hskClimbingFallDie('impactD10')}
  <label>Test dopadu<select name="technique" disabled><option value="Jumping">Jumping</option><option value="Acrobatics">Acrobatics</option><option value="Swimming">Swimming (jen hluboká voda)</option></select></label>
- ${hskClimbingFallDie('fallingD100')}${hskClimbingFallDie('compoundD10')}${hskClimbingFallDie('shockD100')}
+ ${hskClimbingFallDie('fallingD100')}
+ ${i?'<button type="button" class="secondary hmk-simple-current-93915" data-fall-passive hidden disabled>Potvrdit pasivní dopad · GM (Impact +0)</button>':''}
+ ${hskClimbingFallDie('compoundD10')}${hskClimbingFallDie('shockD100')}
  </div></fieldset>`;
 }
 function hskClimbingFallForm(entry){
@@ -12555,7 +12561,7 @@ function hskClimbingFallForm(entry){
  <li><strong>Shock d100:</strong> vyplňte POUZE pokud je skutečný Impact po odečtení zbroje větší než 0; jinak nechte pole prázdné.</li>
  <li><strong>Compound d10:</strong> vyplňte POUZE pokud nové zranění zasáhlo stejnou kompatibilní lokalitu jako <em>už existující</em> nezhojené zranění. Pro první zásah do zdravé lokality se nehází. Nesouvisí s tím, že test dopadu skončil CF.</li>
  <li><strong>Další celý dopad:</strong> jen když test Jumping / Acrobatics skončí <b>CF</b> (hvězdička u Falling tabulky); tlačítkem přidejte <em>novou řadu</em> s novými d10 Impact, ZD, LD a d100. Opakujte, dokud poslední test není F, S nebo CS. Bez všech povinných dopadů se nic nezapíše.</li></ol>
- <p>Níže se po potvrzení potřebných kostek přepočítá <b>EML, Success Level, Impact po zbroji a povinnost jednotlivých hodů</b>. Náhled není uložené zranění.</p></details>
+ <p>Pokud předchozí dopad způsobil INC nebo UNC, může GM potvrdit další dopad bez zmírnění. Tato volba je rozhodnutí GM o průběhu téhož pádu. Zachová hody na místo a sílu dopadu i zdravotní následky.</p><p>Níže se po potvrzení potřebných kostek přepočítá <b>EML, Success Level, Impact po zbroji a povinnost jednotlivých hodů</b>. Náhled není uložené zranění.</p></details>
  <div class="field-grid"><label>Výška pádu (stop, nejméně 6)<input name="heightFt" type="number" min="6" max="1000" required></label>
  <label>Povrch<select name="surface"><option value="rock">Skála / tvrdý kámen (0)</option><option value="paving">Dlažba (−2)</option><option value="earth">Tráva / hlína (−4)</option><option value="snow">Sníh / seno (−8)</option><option value="mud">Bláto / bažina (−12)</option><option value="water">Hluboká voda (−16)</option></select></label>
  <label>Sklon svahu<select name="slope"><option value="sheer">Svislý pád / bez Climbing úprav</option>${proof.skill==='Climbing'?'<option value="very-steep">Very steep · 40–59° (poloviční Impact)</option><option value="steep">Steep · 20–39° (S/CS bez nárazu)</option>':''}</select></label>
@@ -14283,7 +14289,7 @@ function hskClimbingFallGuide(form){
  const [height,surface,slope,direction]=settings.map(field=>field.value);
  const fallHeightFt=Number(height);
  const updates=[];
- let active=null,chosenTechnique=null,canAdd=false,complete=false;
+ let active=null,chosenTechnique=null,passiveButton=null,canAdd=false,complete=false;
  const request=(node,name,i)=>{
   active=node.querySelector('[name="'+name+'"]');
   const [faces,label]=fallDice982[name];
@@ -14297,24 +14303,31 @@ function hskClimbingFallGuide(form){
   const round=Math.max(1,combatClock.round||1,state.lastRound||0),timelineId='skill-falling:'+source.id;
   for(const [i,node] of nodes.entries()){
    const technique=node.querySelector('[name="technique"]');
+   const passive=passiveRepeatFallAvailable(state,i>0);
    const allowedTechnique=new Set((actor.hmk?.skills||[]).filter(skill=>skill.ml>0).map(skill=>skill.name.toLowerCase()));
    for(const option of technique.options)option.disabled=!allowedTechnique.has(option.value.toLowerCase())||
     (option.value==='Swimming'&&surface!=='water');
-   if(!technique.selectedOptions.length||technique.selectedOptions[0].disabled){
+   if(!passive&&(!technique.selectedOptions.length||technique.selectedOptions[0].disabled)){
     const allowed=[...technique.options].find(option=>!option.disabled);
     if(!allowed)throw Error('Pro tento povrch postava nemá ověřený Jumping, Acrobatics ani přípustný Swimming.');
     technique.value=allowed.value;
    }
    const fields=Object.fromEntries(Object.keys(fallDice982).map(name=>[name,node.querySelector('[name="'+name+'"]')]));
-   const row={technique:technique.value,...Object.fromEntries(Object.entries(fields).map(([name,field])=>[name,fallConfirmed982.get(field)?.value??null]))};
-   const basic=Object.keys(fields).slice(0,4).find(name=>row[name]===null);
+   const row={technique:technique.value,passive:confirmedPassiveImpact.has(node),...Object.fromEntries(Object.entries(fields).map(([name,field])=>[name,fallConfirmed982.get(field)?.value??null]))};
+   const basic=Object.keys(fields).slice(0,passive?3:4).find(name=>row[name]===null);
    if(basic){
     if(basic==='fallingD100')chosenTechnique=technique;
     request(node,basic,i);break;
    }
-   const step=inspectClimbingFallingStep({actor,inventory:data.inventory,state,fallHeightFt,surface,slope,direction,row,round,timelineId});
-   updates.push('Dopad '+(i+1)+' · '+row.technique+' EML '+step.eml+' · d100 ('+row.fallingD100+') → '+step.sl+
-    ' · lokalita '+step.location+' · účinný Impact '+step.effectiveImpact+'.');
+   if(passive&&!row.passive){
+    passiveButton=node.querySelector('[data-fall-passive]');
+    updates.push('Dopad '+(i+1)+': postava je '+state.shock+'. GM může potvrdit pasivní dopad bez zmírnění (+0 Impact), bez dalšího testu d100.');
+    break;
+   }
+   const step=inspectClimbingFallingStep({actor,inventory:data.inventory,state,fallHeightFt,surface,slope,direction,row,round,timelineId,afterPriorImpact:i>0});
+   const landing=step.passive?'pasivní dopad · rozhodnutí GM':
+    row.technique+' EML '+step.eml+' · d100 ('+row.fallingD100+') → '+step.sl;
+   updates.push('Dopad '+(i+1)+' · '+landing+' · lokalita '+step.location+' · účinný Impact '+step.effectiveImpact+'.');
    if(step.needsCompound&&row.compoundD10===null){request(node,'compoundD10',i);break;}
    if(step.needsShock&&row.shockD100===null){request(node,'shockD100',i);break;}
    const outcome=woundFromFall({state,character:actor,round,timelineId,eventId:'fall-guide:'+source.id+':impact:'+i,
@@ -14322,7 +14335,7 @@ function hskClimbingFallGuide(form){
     strikeImpact:step.strikeImpact,AV:step.armourValue,shockRoll:row.shockD100,compoundD10:row.compoundD10,physicalDice:[]});
    state=outcome.state;
    if(i===nodes.length-1){
-    canAdd=step.repeatRequired;
+    canAdd=step.repeatRequired&&state.shock!=='KIA';
     complete=!canAdd;
     updates.push(canAdd?'CF vyžaduje další dopad. Otevřete ho tlačítkem pod formulářem.':
      'Všechny povinné hody jsou potvrzené. Tlačítkem uložte výsledky pádu.');
@@ -14332,6 +14345,8 @@ function hskClimbingFallGuide(form){
  for(const node of nodes){
   const technique=node.querySelector('[name="technique"]');
   technique.disabled=technique!==chosenTechnique;
+  const passive=node.querySelector('[data-fall-passive]');
+  if(passive){passive.hidden=passive!==passiveButton;passive.disabled=passive!==passiveButton;}
   for(const field of node.querySelectorAll('input')){
    const current=field===active,confirmed=fallConfirmed982.has(field);
    field.disabled=!current&&!confirmed;
@@ -14345,7 +14360,7 @@ function hskClimbingFallGuide(form){
  guide.textContent=updates.join(' ');
  add.disabled=!canAdd||nodes.length>=20;
  submit.disabled=!complete;
- return {active,complete};
+ return {active:active||passiveButton,complete};
 }
 document.addEventListener('input',event=>{
  const field=event.target,form=field.closest?.('[data-climbing-fall-form]');if(!form)return;
@@ -14356,7 +14371,7 @@ document.addEventListener('change',event=>{
  const form=event.target.closest?.('[data-climbing-fall-form]');if(form)hskClimbingFallGuide(form);
 },true);
 document.addEventListener('click',event=>{
- const button=event.target.closest?.('[data-fall-generate],[data-fall-accept],[data-climb-fall-add],[data-climb-fall-reset]');
+ const button=event.target.closest?.('[data-fall-generate],[data-fall-accept],[data-fall-passive],[data-climb-fall-add],[data-climb-fall-reset]');
  const form=button?.closest('[data-climbing-fall-form]');if(!form||button.disabled)return;
  const rows=form.querySelector('[data-climb-fall-rows]');
  if(button.matches('[data-climb-fall-reset]')){
@@ -14367,6 +14382,12 @@ document.addEventListener('click',event=>{
  if(button.matches('[data-climb-fall-add]')){
   rows.insertAdjacentHTML('beforeend',hskClimbingFallRow(rows.children.length));
   hskClimbingFallGuide(form)?.active?.focus();return;
+ }
+ if(button.matches('[data-fall-passive]')){
+  if(hskClimbingFallGuide(form)?.active!==button)return;
+  confirmedPassiveImpact.add(button.closest('[data-climb-fall-row]'));
+  const next=hskClimbingFallGuide(form);
+  (next.active||form.querySelector('button[type="submit"]:not([disabled])'))?.focus();return;
  }
  const field=button.closest('label').querySelector('input');
  if(hskClimbingFallGuide(form)?.active!==field)return;
@@ -14420,7 +14441,7 @@ document.addEventListener('submit',event=>{
   if(!hskClimbingFallGuide(form)?.complete)throw Error('Nejprve potvrďte každou požadovanou kostku zvlášť.');
   const rows=[...form.querySelectorAll('[data-climb-fall-row]')].map(row=>{
    const rolls=Object.fromEntries(Object.keys(fallDice982).map(key=>[key,fallConfirmed982.get(row.querySelector('[name="'+key+'"]'))]));
-   return {technique:row.querySelector('[name="technique"]').value,
+   return {technique:row.querySelector('[name="technique"]').value,passive:confirmedPassiveImpact.has(row),
     ...Object.fromEntries(Object.entries(rolls).map(([key,die])=>[key,die?.value??null])),
     rollOrigins:Object.fromEntries(Object.entries(rolls).map(([key,die])=>[key,die?.origin]))};
   });
@@ -14433,7 +14454,7 @@ document.addEventListener('submit',event=>{
    originMinute:data.campaignClock&&calendarMemberIds(data.campaignClock,data.characters).some(c=>c.id===actor.id)?data.campaignClock.minute:null});
   const body='Falling Routine HMK str. 67 · pád '+report.fallHeightFt+' ft · '+report.surface+' · '+report.slope+'\n'+
    report.proofs.map((p,i)=>'Dopad '+(i+1)+': '+p.location+', Impact '+p.impact+', AV '+p.armourValue+', efekt '+p.effectiveImpact+
-    ', '+p.fallingTechnique+' d100 '+p.fallingD100+' / EML '+p.fallingEML+' → '+p.level+', Shock '+(p.shock||'—')).join('\n')+
+    ', '+(p.gmRuling?'pasivní dopad, rozhodnutí GM (+0 Impact)':p.fallingTechnique+' d100 '+p.fallingD100+' / EML '+p.fallingEML+' → '+p.level)+', Shock '+(p.shock||'—')).join('\n')+
    '\nProne: '+(report.prone?'ano':'ne');
   const evidence={type:'climbing-falling',sourceId,actorId:actor.id,originSkill:follow.skill,page:67,fallHeightFt:report.fallHeightFt,
    surface:report.surface,slope:report.slope,direction:report.direction,proofs:report.proofs,prone:report.prone,physicalDice:report.physicalDice,status:'committed'};
@@ -16919,7 +16940,6 @@ document.addEventListener('submit',async event=>{
   const actor=character(selected);if(!actor)throw Error('Postava není otevřená');
   if(form.id==='skill-assistance-form'){
    const v=Object.fromEntries(new FormData(form)),primary=skillActorMastery(actor,v.primary),helpers=skillAssistantMLs(form,v.primary);
-   if(form.elements.namedItem('helpersFeasible')?.checked!==true)throw Error('GM musí potvrdit fyzickou a pravidlovou přípustnost pomoci.');
    const checks=helpers.map(x=>({name:x.actor.name,ml:x.mastery.ml,index:x.mastery.index,eligible:x.mastery.ml*2>=primary.ml}));
    const bonus=Math.min(10,checks.filter(x=>x.eligible).reduce((s,x)=>s+x.index,0));
    const ctx=skillAutoFor(actor,v.primary,form,'A');
