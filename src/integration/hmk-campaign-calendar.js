@@ -11,6 +11,7 @@ import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js?v=94.
 import {calendarMoraleProjection} from './hmk-calendar-morale-93891.js';
 import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
 import {automaticAilmentOnset} from './hmk-calendar-automatic-onsets.js';
+import {operationalProjectJournal} from './hmk-project-cancellation-94017.js';
 import {gmCalendarCancellationMatches} from './hmk-calendar-gm-cancellation.js';
 export const DAY_MINUTES=1440;
 const validInt=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
@@ -192,7 +193,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  if(!clock)return {due:[],future:[],unknown:[],all:[],suspended:[]};
  validateCampaignCalendar(clock);
  characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
- journal=projectedCalendarJournal(clock,journal);
+ journal=projectedCalendarJournal(clock,operationalProjectJournal(journal));
  characters=characters.map(c=>{
   const state=c.hmk?.healthState,projected=projectLegacyAlchemyShock(projectLegacyGrimShock(state,clock,c.id),clock,c.id);
   return projected===state?c:{...c,hmk:{...c.hmk,healthState:projected}};

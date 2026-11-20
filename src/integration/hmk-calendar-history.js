@@ -4,12 +4,13 @@
  * an unfinished wound, poison episode, etc. retains its own pending event.
  */
 import {projectedCalendarJournal,calendarMemberIds} from './hmk-calendar-campaign-lifecycle.js';
+import {operationalProjectJournal} from './hmk-project-cancellation-94017.js';
 const safeMinute=v=>Number.isSafeInteger(v)&&v>=0&&v<=1000000000;
 export function historicalHMKCalendarEntries(clock,characters=[],journal=[]){
  if(!clock)return [];
  const allowed=new Map(calendarMemberIds(clock,characters).map(c=>[c.id,c.name]));
  const seen=new Set(),out=[];
- for(const entry of projectedCalendarJournal(clock,journal)){
+ for(const entry of projectedCalendarJournal(clock,operationalProjectJournal(journal))){
   if(!entry||typeof entry.id!=='string'||!entry.id||seen.has(entry.id)||
     (entry.calendarCampaignId&&clock.campaignId&&entry.calendarCampaignId!==clock.campaignId&&!clock.journalMinuteEvidence?.some(e=>e.id===entry.id))||
     !allowed.has(entry.characterId)||!safeMinute(entry.campaignMinute)||
