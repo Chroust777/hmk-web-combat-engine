@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.980';
+const APP_VERSION='93.981';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -29890,6 +29890,43 @@ function updateEpisodePreview(form){
    `Noční bonusy jsou vypnuté (${sky?.period==='twilight'?'soumrak':'denní světlo'} na začátku).`)+
    (spansNight?' Cesta přechází mezi dnem a nocí: pro nový Orienteering s odlišnými světelnými podmínkami rozdělte epizodu v okamžiku změny světla.':'');
  }
+ const weatherGlobal=choice?.value!=='local';
+ const source=data.journal.find(j=>j.id===choice?.value)?.calendarTrekDayWeather;
+ const changedWeather=source&&weatherGlobal?
+  effectiveTrekShift(campaignKey(data.campaignClock),data.campaignClock.minute,source.area)?.calendarTrekWeatherShift?.weatherDay:null;
+ const displayedWeather=changedWeather||source?.weatherDay;
+ // Apply the confirmed relief before validating terrain and deriving travel values.
+ for(const name of ['temperatureD10','precipitationD10','season','climate','latitudeBand','topography']){
+  const input=form.elements.namedItem(name);if(!input)continue;
+  if(source&&weatherGlobal){
+   const value={temperatureD10:displayedWeather?.temperatureD10,
+    precipitationD10:displayedWeather?.precipitationD10,season:displayedWeather?.season??source.season,
+    climate:displayedWeather?.climate??source.climate,latitudeBand:source.latitudeBand,
+    topography:displayedWeather?.landscape??source.landscape}[name];
+   if(value!==undefined&&value!==null)input.value=String(value);
+  }
+  input.disabled=weatherGlobal;
+  input.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
+  input.title=weatherGlobal?'Potvrzeno v denním globálním počasí oblasti. Pro změnu přejděte do Kalendáře nebo zvolte jinou oblast.':'';
+ }
+ for(const name of ['alpine','aridDesert']){
+  const input=form.elements.namedItem(name);if(!input)continue;
+  if(source&&weatherGlobal)input.checked=!!(displayedWeather?.[name]??source[name]);
+  input.disabled=weatherGlobal;
+  input.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
+ }
+ for(const button of form.querySelectorAll('[data-episode-die="temperatureD10"],[data-episode-die="precipitationD10"]'))button.disabled=weatherGlobal;
+ const local=form.querySelector('[data-episode-local-weather]');if(local)local.hidden=weatherGlobal;
+ const areaInput=form.elements.namedItem('area');
+ if(areaInput){
+  if(source&&weatherGlobal)areaInput.value=source.area;
+  areaInput.readOnly=weatherGlobal;
+  areaInput.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
+  areaInput.title=weatherGlobal?'Název převzatý z potvrzeného počasí. Vyberte jinou oblast, chcete-li změnit zdroj.':'';
+ }
+ const selectedWeatherInfo=form.querySelector('[data-episode-global-weather-lock-note]');
+ if(selectedWeatherInfo){selectedWeatherInfo.hidden=!weatherGlobal;
+  selectedWeatherInfo.textContent=weatherGlobal?'Globálně potvrzené počasí: oblast, roční období, klima, šířkové pásmo, reliéf, nadmořské a pouštní podmínky i denní d10 jsou převzaté a uzamčené. Typ cesty, skutečný terén a úkryt zůstávají volitelné. Změna počasí vyžaduje potvrzení v Kalendáři.':'';}
  const reuseInput=form.elements.namedItem('orientationReuse'),originInput=form.elements.namedItem('orientationUse');
  if(originInput&&reuseInput)originInput.value=reuseInput.checked?'reuse':'new';
  let v=episodeFormSnapshot(form);
@@ -29899,6 +29936,7 @@ function updateEpisodePreview(form){
  delete form.dataset.episodeOrientationStars;delete form.dataset.episodeOrientationSv;
  if(travel){
   const select=form.elements.namedItem('terrain');
+  select.title='Šedé terény nelze při tomto reliéfu a způsobu dopravy použít (HMK 146).';
   try{const valid=trekAvailableTerrain(v.topography,v.conveyance);
    for(const opt of select.options)opt.disabled=!valid.includes(opt.value);
    if(!valid.includes(select.value)){select.value=valid[0];v.terrain=select.value;}
@@ -30157,50 +30195,6 @@ function updateEpisodePreview(form){
   const guidance=state==='lost'?' Nový Orienteering při automatickém přidělení využije volnou hvězdu na zvláštní Bearing. V ručním režimu ji přidělte k Bearing sami.':'';
   navigationText.innerHTML='Přetrvávající stav družiny: <span class="hc-help-term" tabindex="0" data-hmk-help="Možnosti: clear = správný směr, misdirection = odchýlení od trasy, lost = ztracení. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení.">'+esc(state)+'</span>. Možnosti: clear = správná trasa; misdirection = odchýlení; lost = ztracení. Změna stavu vyžaduje skutečný pravidlový následek nebo rozhodnutí GM.'+esc(guidance);
  }
- if(v.weatherSource==='local'&&String(v.area||'').trim()){
-  const existing=activeAreaWeather(data.journal,campaignKey(data.campaignClock),Math.floor(data.campaignClock.minute/1440),v.area);
-  if(existing){const select=form.elements.namedItem('weatherSource');if(select&&select.value!==existing.id){select.value=existing.id;v.weatherSource=existing.id;}}
- }
- const weatherGlobal=v.weatherSource!=='local';
- const source=data.journal.find(j=>j.id===v.weatherSource)?.calendarTrekDayWeather;
- const changedWeather=source&&weatherGlobal?
-  effectiveTrekShift(campaignKey(data.campaignClock),data.campaignClock.minute,source.area)?.calendarTrekWeatherShift?.weatherDay:null;
- const displayedWeather=changedWeather||source?.weatherDay;
- // v93.837: globally CONFIRMED weather facts are read-only in an episode.
- // This is a draft-only display sync, never an extra weather roll or a commit.
- // Users may select a different weather area (or 'local') explicitly.
- // Route-specific terrain, shelter, and travel decisions remain editable.
- for(const name of ['temperatureD10','precipitationD10','season','climate','latitudeBand','topography']){
-  const input=form.elements.namedItem(name);if(!input)continue;
-  if(source&&weatherGlobal){
-   const value={temperatureD10:displayedWeather?.temperatureD10,
-    precipitationD10:displayedWeather?.precipitationD10,season:displayedWeather?.season??source.season,
-    climate:displayedWeather?.climate??source.climate,latitudeBand:source.latitudeBand,
-    topography:displayedWeather?.landscape??source.landscape}[name];
-   if(value!==undefined&&value!==null)input.value=String(value);
-  }
-  input.disabled=weatherGlobal;
-  input.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
-  input.title=weatherGlobal?'Potvrzeno v denním globálním počasí oblasti. Pro změnu přejděte do Kalendáře nebo zvolte jinou oblast.':'';
- }
- for(const name of ['alpine','aridDesert']){
-  const input=form.elements.namedItem(name);if(!input)continue;
-  if(source&&weatherGlobal)input.checked=!!(displayedWeather?.[name]??source[name]);
-  input.disabled=weatherGlobal;
-  input.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
- }
- for(const button of form.querySelectorAll('[data-episode-die="temperatureD10"],[data-episode-die="precipitationD10"]'))button.disabled=weatherGlobal;
- const local=form.querySelector('[data-episode-local-weather]');if(local)local.hidden=weatherGlobal;
- const areaInput=form.elements.namedItem('area');
- if(areaInput){
-  if(source&&weatherGlobal)areaInput.value=source.area;
-  areaInput.readOnly=weatherGlobal;
-  areaInput.closest('label')?.classList.toggle('hc-episode-inactive',weatherGlobal);
-  areaInput.title=weatherGlobal?'Název převzatý z potvrzeného počasí. Vyberte jinou oblast, chcete-li změnit zdroj.':'';
- }
- const selectedWeatherInfo=form.querySelector('[data-episode-global-weather-lock-note]');
- if(selectedWeatherInfo){selectedWeatherInfo.hidden=!weatherGlobal;
-  selectedWeatherInfo.textContent=weatherGlobal?'Globálně potvrzené počasí: oblast, roční období, klima, šířkové pásmo, reliéf, nadmořské a pouštní podmínky i denní d10 jsou převzaté a uzamčené. Typ cesty, skutečný terén a úkryt zůstávají volitelné. Změna počasí vyžaduje potvrzení v Kalendáři.':'';}
  // Deterministic Tracking Conditions (HMK 147) from the actual route,
  // atmospheric roll and calendar. GM supplies only facts we cannot infer:
  // identity/size of the pursued group, and any unusual surface override.
