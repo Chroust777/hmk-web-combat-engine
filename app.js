@@ -194,7 +194,7 @@ import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-lay
 import { auditArmourLoadout } from './src/integration/armour-loadout-audit.js';
 import {layerDisplayRows,readableLayerIssues} from './src/integration/hmk-armour-display.js';
 import {previewExistingArmourArrangement} from './src/integration/hmk-starting-armour-layout.js';
-import {projectInventoryRows,inventoryTotals} from './src/integration/hmk-inventory-overview.js';
+import {projectInventoryRows,inventoryTotals} from './src/integration/hmk-inventory-overview.js?v=93.974';
 import { projectCombatState } from './src/integration/combat-state-projection.js';
 import {resolveLiveCombatArmour} from './src/integration/live-combat-armour.js';
 import {compoundCompatible,injuryFromEffectiveImpact} from './src/rules/injury.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.973';
+const APP_VERSION='93.974';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6138,10 +6138,16 @@ function foragingEvidenceInCharacterInventory(actorId){
  const clock=data.campaignClock;if(!clock||!calendarMemberIds(clock,data.characters).some(c=>c.id===actorId))return '';
  const campaignId=campaignKey(clock),balance=supplyBalances(data.journal,campaignId);
  const claims=data.journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===actorId&&j.calendarForagingSupplyUse);
+ const dispositionLabels={
+  consumed:'Spotřebováno',
+  'stored-in-container':'Převedeno do nádoby (nevypito)',
+  'packed-in-inventory':'Přiděleno jako nesená potrava',
+  'ingredient-reserved':'Ingredience rezervována pro Concoction'
+ };
  return `<section class="panel wide"><h3>Foraging · doložené zásoby (HMK 147)</h3>
  <p>Společná zásoba kampaně: ${balance.available.foodDays} food-days · ${balance.available.waterDays} water-days · ${balance.available.herbDoses} dávek bylin.</p>
  <p class="muted">Tento oddíl je auditní propojení zásob s evidencí výbavy postavy. Jde o jednotky potravy, vody a dávky bylin, nikoliv o vymyšlený fyzický předmět s neznámou hmotností. Výdeje se provádějí v Kalendáři.</p>
- ${claims.length?claims.slice(-10).reverse().map(j=>`<p class="hc-hint">${esc(displayCampaignMinute(j.campaignMinute))} · ${j.calendarForagingSupplyUse.quantity} ${esc(j.calendarForagingSupplyUse.unit)}${j.calendarForagingSupplyUse.herbName?' · '+esc(j.calendarForagingSupplyUse.herbName):''} · ${j.calendarForagingSupplyUse.disposition==='consumed'?'Spotřebováno':j.calendarForagingSupplyUse.disposition==='stored-in-container'?'Převedeno do Waterskin (nikoli vypito)':'Ingredience rezervována pro Concoction'}</p>`).join(''):'<p class="hc-hint">Postava zatím nemá žádný doložený výdej zásob.</p>'}
+ ${claims.length?claims.slice(-10).reverse().map(j=>`<p class="hc-hint">${esc(displayCampaignMinute(j.campaignMinute))} · ${j.calendarForagingSupplyUse.quantity} ${esc(j.calendarForagingSupplyUse.unit)}${j.calendarForagingSupplyUse.herbName?' · '+esc(j.calendarForagingSupplyUse.herbName):''} · ${esc(dispositionLabels[j.calendarForagingSupplyUse.disposition]||'Výdej zásob')}</p>`).join(''):'<p class="hc-hint">Postava zatím nemá žádný doložený výdej zásob.</p>'}
  </section>`;
 }
 function journalSectionNav(){
@@ -6636,7 +6642,9 @@ function characterInventoryOverview(c,inv){
   const alchemyStrength=alchemyInside?alchemyElixirStates(data.journal,campaignKey(data.campaignClock)).find(a=>a.finishId===alchemyInside.calendarAlchemyVialBinding.finishId):null;
   const extras=r.keyFields.filter(t=>!/^Tištěná položka vybavení HMK, str\. \d+; výběr do počáteční výbavy je orientační, nikoli povinný\.$/i.test(t.trim()));
   const details=extras.length||r.protection.length?`<details class="inv-spec-details"><summary>Parametry (${extras.length+r.protection.length})</summary>${extras.map(t=>`<div>${esc(t)}</div>`).join('')}${r.protection.length?`<div class="inv-av-scroll"><table class="catalog-spec"><thead><tr><th>Lokace</th><th>B</th><th>E</th><th>P</th><th>F</th></tr></thead><tbody>${r.protection.map(y=>`<tr><td>${esc(y.loc)}</td><td>${esc(y.b)}</td><td>${esc(y.e)}</td><td>${esc(y.p)}</td><td>${esc(y.f)}</td></tr>`).join('')}</tbody></table></div>`:''}</details>`:'<span class="muted">Bez dalších katalogových atributů</span>';
-  const lotNote=r.qty!==null&&r.qty!==1?`<span class="inv-item-kind">${r.qty} kusů v původním záznamu</span>`:'';
+  const lotNote=x._foragingCarryReceipt&&r.qty!==null?
+   `<span class="inv-item-kind">${esc(r.qty.toLocaleString('cs-CZ'))} potravního dne</span>`:
+   r.qty!==null&&r.qty!==1?`<span class="inv-item-kind">${r.qty} kusů v původním záznamu</span>`:'';
   const unitLabel=r.qty!==null&&r.qty!==1?'Celková hmotnost':'Hmotnost';
   const rowCheckboxTitle=x.slot==='stable'?' title="Přesun naloženého předmětu se řeší ve stáji."':x._foragingCarryReceipt?' title="Skutečně nesená potrava z Foraging: spotřeba v Kalendáři / Zásobování, nelze upravit jako katalogový předmět."':x._campaignRationReceipt?' title="Doklad zásob lze hromadně odepsat / vyřadit, nikoli běžně přesouvat jako samostatný fyzický předmět"':'';
   const rowCheckboxDisabled=x.slot==='stable'||!!x._foragingCarryReceipt?' disabled':'';
