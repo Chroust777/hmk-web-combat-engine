@@ -396,7 +396,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.014';
+const APP_VERSION='94.015';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3897,6 +3897,74 @@ document.addEventListener('submit',event=>{
   }
  }catch(error){out.textContent=error.message;}
 },true);
+function projectResourcesHTML(requirements,{label='Použít zdarma (GM)',confirm='',workshop='',own=null}={}){
+ return `<fieldset class="hmk-project-resources"><legend>Dílna, pomůcky a materiál</legend>
+  <p>${esc(requirements)}</p>
+  <input type="hidden" name="projectResources">
+  <button type="button" class="secondary" data-project-access="free" data-project-confirm="${esc(confirm)}" data-project-workshop="${esc(workshop)}">${esc(label)}</button>
+  ${own?`<button type="button" class="secondary" data-project-access="own" data-project-confirm="${esc(confirm)}" data-project-workshop="${esc(workshop)}" data-project-quality="${own.quality}">Použít vlastní dílnu · ${own.quality} ★</button>`:''}
+  <output data-project-resources-status aria-live="polite"></output>
+ </fieldset>`;
+}
+const projectResourceReceipt=form=>{
+ const source=form.elements.namedItem('projectResources')?.value;
+ return ['free','own'].includes(source)?{calendarProjectResources:{source}}:{};
+};
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-project-access]');
+ const form=button?.closest('form');
+ if(!form)return;
+ const confirm=form.elements.namedItem(button.dataset.projectConfirm||'');
+ const workshop=form.elements.namedItem(button.dataset.projectWorkshop||'');
+ const source=form.elements.namedItem('projectResources');
+ const output=form.querySelector('[data-project-resources-status]');
+ if(!source||!output)return;
+ const own=button.dataset.projectAccess==='own';
+ source.value=own?'own':'free';
+ if(confirm)confirm.checked=true;
+ if(workshop?.name==='workshopSource'){
+  workshop.value=own?'private':'chantry';
+  const stars=form.elements.namedItem('workshopStars');
+  stars.required=!own;
+  if(!own){stars.value='';stars.focus();}
+ }else if(workshop){
+  workshop.value=own?button.dataset.projectQuality:'';
+  if(!own)workshop.focus();
+ }
+ output.textContent=own?'Použije se vlastní dílna.':workshop?'GM poskytl vybavení zdarma. Vyberte kvalitu dílny.':'GM poskytl vybavení zdarma.';
+});
+document.addEventListener('change',event=>{
+ const field=event.target,form=field?.form;
+ if(!form||!['workshopSource','workshop','materialSourceConfirmed','workshopConfirmed'].includes(field.name))return;
+ if(field.name==='workshopSource'){
+  const stars=form.elements.namedItem('workshopStars');
+  if(stars)stars.required=field.value==='chantry';
+ }
+ const source=form.elements.namedItem('projectResources');
+ if(!source?.value)return;
+ // Choosing the quality for a loan is part of the same access decision.
+ if(field.name==='workshop'&&source.value==='free')return;
+ if(field.type==='checkbox'&&field.checked)return;
+ source.value='';
+ const output=form.querySelector('[data-project-resources-status]');
+ if(output)output.textContent='';
+});
+function alchemyWorkshopAccess(actor,ml){
+ const wealth=actor.hmk?.wealth;
+ const own=Number.isInteger(wealth)?occupationalWorkshop({skill:'Alchemy',masteryLevel:ml,wealth}).workshop:null;
+ return projectResourcesHTML('Je potřeba alchymistická dílna a nepřerušená příprava. Vlastní alchymistická dílna vyžaduje Wealth 10+. Pro uložení tekutého či plynného elixíru připravte vhodnou lahvičku.',{
+  label:'Použít dílnu a pomůcky zdarma (GM)',confirm:'workshopConfirmed',workshop:'workshopSource',own});
+}
+function alchemyProjectRequirements(actor){
+ const masteries=availableMasteries(actor);
+ const ml=masteries.find(skill=>skill.name==='Alchemy')?.ml??0;
+ const known=threshold=>ml>=threshold?'splněno':'chybí '+(threshold-ml)+' ML';
+ return `<aside class="notice"><strong>Požadavky Alchemy · aktuální ML ${ml}</strong>
+  <ul><li>Běžný elixír · ML 60 (${known(60)})</li><li>Vynález vlastního elixíru · ML 100 (${known(100)})</li>
+  <li>Asistence u cizí práce · ML 40 (${known(40)})</li></ul>
+  <p>Příprava používá Herblore a Mineralogy jako Secondary Modifiers a Mathematics jako Secondary Roll.</p>
+  <ul>${['Herblore','Mineralogy','Mathematics'].map(name=>`<li>${name} · ${masteries.find(skill=>skill.name===name)?.ml>0?'ML '+masteries.find(skill=>skill.name===name).ml:'neosvojeno'}</li>`).join('')}</ul></aside>`;
+}
 function characterCraftPanel(clock,maker,discipline){
  const participants=calendarMemberIds(clock,registryCharacters93813(data.characters));
  const actorId=maker.id,onlyMaker=participants.filter(person=>person.id===actorId);
@@ -3967,9 +4035,10 @@ function characterCraftPanel(clock,maker,discipline){
   return `<form data-alchemy-start><strong>${esc(c.name)} · Alchemy ML ${ml} · Sunsign ${esc(sunsign||'NEVYPLNĚN')}</strong><input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}">
   <div class="hc-fields"><label>Kanonický elixír<select name="elixirName" required>${CANONICAL_ALCHEMY_ELIXIRS.map(x=>`<option value="${esc(x.name)}">${esc(x.name)} · ${esc(x.principle)} (${esc(x.convocation)})</option>`).join('')}</select></label>
   <label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Cech / chantry · potvrdit kvalitu</option></select></label>
-  <label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label>
+  <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label>
   <input type="hidden" name="wealth" value="${esc(c.hmk?.wealth??'')}"></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  ${alchemyWorkshopAccess(c,ml)}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje skutečný přístup k dílně a zajištěnou možnost nepřerušené přípravy</label>
@@ -3987,8 +4056,9 @@ function characterCraftPanel(clock,maker,discipline){
   <label>Trvání<select name="duration"><option value="instantaneous">Instantaneous</option><option value="temporary">Temporary</option></select></label></div>
   <label>Definovaný efekt (GM; zatím bez automatické mechaniky)<textarea name="effect" required minlength="3" maxlength="1000" rows="2"></textarea></label>
   <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry (GM doloží hvězdy)</option></select></label>
-  <label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
+  <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  ${alchemyWorkshopAccess(c,ml)}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje parametry unikátního elixíru a jejich znalost výrobcem</label>
@@ -4000,8 +4070,9 @@ function characterCraftPanel(clock,maker,discipline){
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start data-alchemy-known><strong>${esc(c.name)} · znalost unikátní receptury „${esc(recipe.title)}“ · ML ${ml}</strong>
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="known"><input type="hidden" name="elixirName" value="${esc(recipe.title)}"><input type="hidden" name="knowledgeFinishId" value="${esc(source.id)}">
-  <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry</option></select></label><label>Chantry stars<select name="workshopStars">${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
+  <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry</option></select></label><label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
+  ${alchemyWorkshopAccess(c,ml)}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje přístup této postavy k doložené receptuře a veškerým parametrům</label>
@@ -4111,7 +4182,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <button type="submit">Doložit potenci bez posunu času</button></form>`).join('')||'<p class="hc-hint">Všechny nálezy již mají doloženou potenci.</p>'}
  ${herbalProofs.flatMap(a=>a.calendarHerbPotency.doses.map((dose,i)=>{let q;try{q=herbDoseStatus(data.journal,campaignKey(clock),a.calendarHerbPotency.sourceId,a.calendarHerbPotency.resultIndex,i,clock.minute)}catch{return ''}
  return `<div class="hc-event"><strong>${esc(a.calendarHerbPotency.herbName)} · dávka ${i+1} · ${esc(q.potency)}</strong> ${q.preserved?'· konzervováno':''}
- ${q.quality>0&&!q.preserved&&usableHerblore(actorId).length?`<form data-herb-preserve><input type="hidden" name="assessmentId" value="${esc(a.id)}"><input type="hidden" name="doseIndex" value="${i}"><label>Herblore SV z původního Skill Workbench<select name="skillId">${usableHerblore(actorId).map(j=>`<option value="${esc(j.id)}">${esc(character(j.characterId)?.name||j.characterId)} · SV ${(j.skillTestProof.a||j.skillTestProof.result).sv}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrdil suchou, tmavou dílnu</label><button type="submit">Konzervovat bez posunu času</button></form>`:''}</div>`})).join('')}
+ ${q.quality>0&&!q.preserved&&usableHerblore(actorId).length?`<form data-herb-preserve><input type="hidden" name="assessmentId" value="${esc(a.id)}"><input type="hidden" name="doseIndex" value="${i}"><label>Herblore SV z původního Skill Workbench<select name="skillId">${usableHerblore(actorId).map(j=>`<option value="${esc(j.id)}">${esc(character(j.characterId)?.name||j.characterId)} · SV ${(j.skillTestProof.a||j.skillTestProof.result).sv}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrdil suchou, tmavou dílnu</label>${projectResourcesHTML('Ke konzervaci je potřeba suchá a tmavá dílna a doložený Herblore Success Value.',{label:'Použít dílnu zdarma (GM)',confirm:'workshopConfirmed'})}<button type="submit">Konzervovat bez posunu času</button></form>`:''}</div>`})).join('')}
  <details><summary>Mundánní Concoctions · HMK str. 74 · Brewing / Cookery / Embalming / Perfumery</summary>
  <p class="hc-hint">Použijte jednu skutečně rezervovanou dávku odpovídající byliny a doložené SV obou dovedností. Výrobní test musí mít <strong>Herblore jako Secondary Modifier</strong> (p.62). Potence Strong přidá +1 SV, Great +2 SV. HMK neuvádí jednotnou recepturu ani jednotný výrobní čas, a proto musí GM potvrdit konkrétní recept a již vykonanou práci. Záznam automaticky nevytváří fyzické zboží, inventář ani jeho hmotnost.</p>
  ${mundaneReservations.map(({row,skill,status})=>{const actorId=row.characterId;
@@ -4136,7 +4207,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   <label>${esc(lot.herbName)} · dostupné dávky ${lot.remaining} <input name="purpose" maxlength="120" required placeholder="Účel rezervace"></label>
   <button type="submit">Vyhradit jednu dávku</button></form>`).join('')||'<p>Žádná dostupná bylinná dávka.</p>'}</details>
  <button type="button" class="secondary" data-character-craft-sv="Herblore">Otevřít Herblore Success Value</button><p class="hc-hint">Nejdřív vyhraďte přesně jednu dávku ve stávajícím formuláři zásob. Lektvar lze dokončit až po deseti minutách GM času a novém skutečném Herblore SV. Výroba nic nepodává ani neléčí.</p>
- ${herbalReservations.filter(x=>EXOTIC_POTIONS.includes(x.row.calendarForagingSupplyUse.herbName?.toLowerCase().trim())).map(({row,status})=>`<form data-herb-start><input type="hidden" name="reserveId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(row.characterId)}"><input type="hidden" name="herbType" value="${esc(row.calendarForagingSupplyUse.herbName.toLowerCase().trim())}"><strong>${esc(character(row.characterId)?.name||row.characterId)} · ${esc(row.calendarForagingSupplyUse.herbName)} · ${esc(status.potency)}</strong><button type="submit">Zahájit výrobu na 10 minut</button></form>`).join('')||'<p class="hc-hint">Žádná dostupná, účinná a rezervovaná bylina odpovídající tištěným kategoriím.</p>'}
+ ${herbalReservations.filter(x=>EXOTIC_POTIONS.includes(x.row.calendarForagingSupplyUse.herbName?.toLowerCase().trim())).map(({row,status})=>`<form data-herb-start><input type="hidden" name="reserveId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(row.characterId)}"><input type="hidden" name="herbType" value="${esc(row.calendarForagingSupplyUse.herbName.toLowerCase().trim())}"><strong>${esc(character(row.characterId)?.name||row.characterId)} · ${esc(row.calendarForagingSupplyUse.herbName)} · ${esc(status.potency)}</strong>${projectResourcesHTML('Jedna rezervovaná účinná dávka. Podle lektvaru použijte pomůcky k vaření nebo drcení; příprava trvá 10 minut.',{label:'Použít pomůcky zdarma (GM)'})}<button type="submit">Zahájit výrobu na 10 minut</button></form>`).join('')||'<p class="hc-hint">Žádná dostupná, účinná a rezervovaná bylina odpovídající tištěným kategoriím.</p>'}
  </div>
  ${pendingHerbalPotions.map(j=>{const p=j.calendarHerbPotionStart,skills=usableHerblore(p.actorId,j.id);return `<div class="hc-event" data-project-calendar-record="${esc(j.id)}"><strong>${esc(character(p.actorId)?.name||p.actorId)} · ${esc(p.herbType)} · ${esc(potencyLabel(p.quality))}</strong> · Herblore splatný ${esc(displayCampaignMinute(p.dueMinute))}
  ${clock.minute>=p.dueMinute&&skills.length?`<form data-herb-complete><input type="hidden" name="startId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(p.actorId)}"><label>Skutečný Herblore SV<select name="skillId">${skills.map(x=>`<option value="${esc(x.id)}">SV ${(x.skillTestProof.a||x.skillTestProof.result).sv} · ${esc(x.id)}</option>`).join('')}</select></label><label>Trvanlivost · d6<input name="shelfD6" type="number" min="1" max="6" required></label><button type="button" class="hc-small" data-herb-shelf-roll>⚄ Generovat d6</button><button type="submit">Dokončit výrobu bez podání</button></form>`:clock.minute<p.dueMinute?'<p>Čeká na skutečný posun GM.</p>':`<button type="button" class="secondary" data-character-craft-sv="Herblore" data-craft-source="${esc(j.id)}">Provést Herblore Success Value</button>`}</div>`}).join('')}
@@ -5542,12 +5613,16 @@ function weaponWorkOptions(actor,skill){
 function fletchingStartFields996(actor,kind){
  const isWeapon=Object.values(FLETCHING_ITEMS).some(item=>item.kind===kind&&item.meleeWeapon);
  const usesTools=isWeapon||kind.startsWith('armour');
+ const skill=TIMED_SKILL_NAMES_600[kind],wealth=actor.hmk?.wealth;
+ const ml=availableMasteries(actor).find(x=>x.name===skill)?.ml??0;
+ const own=Number.isInteger(wealth)?occupationalWorkshop({skill,masteryLevel:ml,wealth}).workshop:null;
  const helpers=isWeapon?weaponWorkOptions(actor,TIMED_SKILL_NAMES_600[kind]):[];
  const weaponFields=usesTools?`<label>Kvalita nástrojů <select name="weaponToolQuality">${[0,1,2,3].map(n=>`<option value="${n}">TQ +${n}</option>`).join('')}</select></label>
   ${(isWeapon?[1,2]:[]).map(n=>`<label>Pomocník ${n} · po celou dobu práce <select name="weaponHelper${n}"><option value="">Bez pomocníka</option>
   ${helpers.map(({person,mastery})=>`<option value="${esc(person.id)}">${esc(person.name)} · ML ${mastery.ml}</option>`).join('')}</select></label>`).join('')}`:'';
 
- return `<label>Kvalita dílny<select name="workshop" required><option value="">Vyberte kvalitu dílny</option>
+ return `${projectResourcesHTML('Připravte dílnu, odpovídající nástroje a materiál pro zvolený výrobek. Potřebné dovednosti a základní cena materiálu se zobrazí po výběru.',{workshop:'workshop',own})}
+ <label>Kvalita dílny<select name="workshop" required><option value="">Vyberte kvalitu dílny</option>
  ${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★ · TN ${n}</option>`).join('')}</select></label>
  ${weaponFields}
  <label>Výrobce hrotů<select name="fletchingProvider"><option value="">Hroty vyrábí sám</option>
@@ -5695,6 +5770,19 @@ function engineeringFinishHTML(actor,now){
    <button type="submit" ${now<timing.dueMinute?'disabled':''}>Potvrdit dokončení návrhu</button><output role="status"></output></form>`;
  }).join('');
 }
+function timedProjectResourcesHTML(kind){
+ if(isWorkshopCraft(kind))return '';
+ const descriptions={
+  engineering:'Podklady, pomůcky pro měření a kreslení. Při navazujícím Design Roll se používá Mathematics.',
+  writing:'Písařské potřeby a psací materiál. Zkontrolujte požadovaný jazyk a písmo.',
+  drawing:'Vhodná plocha a kreslicí pomůcky.',
+  cookery:'Suroviny podle počtu strávníků a pomůcky odpovídající způsobu vaření.',
+  jewelcraft:'Dílna, šperkařské nástroje, základní materiál a případné kameny.'
+ };
+ const requirement=descriptions[kind]||(TIMED_CRAFT_ITEMS_599[kind]||CRAFT_WORK_600[kind]?'Materiál a vybavení pro vybraný výrobek. Případná výrobní cena a doba se zobrazí po výběru.':'');
+ if(!requirement)return '';
+ return projectResourcesHTML(requirement,{confirm:kind==='jewelcraft'||TIMED_CRAFT_ITEMS_599[kind]||CRAFT_WORK_600[kind]?'materialSourceConfirmed':''});
+}
 function timedSkillProjectsPanel591(actor,{kind=null}={}){
  if(!data.campaignClock)return '<section class="hsk-timed-project-591"><p>Časované projekty vyžadují aktivní kampaň s kalendářem.</p></section>';
  const now=data.campaignClock.minute,pending=pendingSkillProjects591(actor.id).filter(j=>!kind||j.calendarSkillProjectStart591.kind===kind);
@@ -5716,7 +5804,7 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
     </fieldset>`:
    kind==='cookery'?'<label>Počet strávníků<input name="scope" type="number" min="1" step="1" value="5" required></label>':
    `<label>${isWorkshopCraft(kind)?'Výrobek':'Rozsah nebo stavba'}<select name="scope" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${esc(name)}">${esc(name)} · ${days} dnů</option>`).join('')}</select></label>`}
- ${isWorkshopCraft(kind)?fletchingStartFields996(actor,kind):''}
+ ${isWorkshopCraft(kind)?fletchingStartFields996(actor,kind):timedProjectResourcesHTML(kind)}
  ${kind==='engineering'?'<label><input type="checkbox" name="engineeringRandomTime"> Volitelný rozptyl konečné doby návrhu (±20 %, 2× d3 při Design Rollu)</label>':''}
  ${kind==='writing'?writingPlanFields992(actor):''}
  ${kind==='brewing'?`<input type="hidden" name="brewAgingDice"><label data-brew-spirit-months hidden>Dodatečné zrání destilátu
@@ -5778,7 +5866,13 @@ function decorateTimedSkillProject591(root){
     leverLabel.style.display=lever.disabled?'none':'';
     if(lever.disabled)lever.checked=false;
     const plan=fletchingPlan(scope.value,1,provider.value),now=data.campaignClock.minute;
-    preview.textContent='Materiál '+plan.costD+' d · '+(item.meleeWeapon||item.armour?'Test: '+TIMED_SKILL_NAMES_600[kind.value]+(item.secondary.length?' ('+item.secondary.join(' · ')+')':'')+' · ':item.complexity?'prodejní cena při dosažení cíle '+6*plan.costD+' d · ':'')+(item.months?item.months+' měsíců':plan.workMinutes/60+' pracovních hodin')+
+    const actor=character(selected),masteries=availableMasteries(actor);
+    const requirements=item.secondary.map(name=>{
+     const list=name==='Metalcraft'&&provider.value?availableMasteries(character(provider.value)):masteries;
+     const ml=list.find(skill=>skill.name===name)?.ml;
+     return name+' '+(ml>0?'ML '+ml:'chybí');
+    });
+    preview.textContent='Materiál '+plan.costD+' d · '+(requirements.length?'Vedlejší dovednosti: '+requirements.join(', ')+' · ':'')+(item.meleeWeapon||item.armour?'Test: '+TIMED_SKILL_NAMES_600[kind.value]+(item.secondary.length?' ('+item.secondary.join(' · ')+')':'')+' · ':item.complexity?'prodejní cena při dosažení cíle '+6*plan.costD+' d · ':'')+(item.months?item.months+' měsíců':plan.workMinutes/60+' pracovních hodin')+
      ' · nejčasnější SV '+displayCampaignMinute(fletchingDue(scope.value,now,plan,0.7))+' · základní termín '+displayCampaignMinute(fletchingDue(scope.value,now,plan))+'.';
     return;
    }
@@ -5898,7 +5992,7 @@ function constructionPanel(actor){
    <label data-construction-master-label>Zapojený mistr<select name="masterId"><option value="">Vyberte mistra</option>${masterOptions}</select></label>
    <label>Skupiny dělníků (počet, ML)<textarea name="groups" rows="3" placeholder="20, 68" required></textarea></label>
    <p>Jeden řádek na skupinu se stejným ML v hlavní dovednosti stavby. Například 20, 68 znamená 20 dělníků s ML 68.</p>
-   <p data-construction-base></p>
+   <p data-construction-base></p>${projectResourcesHTML('Podle stavby zajistěte pracoviště, nástroje, stavební materiál a uvedené skupiny dělníků. Některé stavby vyžadují dokončený návrh a mistra.')}
    <p>Kalendář počítá od zahájení po 216 pracovních dnech 144 dní přestávky. Nákladový výsledek se zaznamená při hodu.</p>
    <button type="submit">Zapsat zahájení stavby</button><output role="status"></output>
   </form>${projects}</section>`;
@@ -5949,6 +6043,7 @@ document.addEventListener('submit',event=>{
    const groups=parseConstructionGroups(fields.groups.value);
    const master=item.secondary?calendarMemberIds(clock,registryCharacters93813(data.characters)).find(p=>p.id===fields.masterId.value):null;
    row.title=title;
+   Object.assign(row,projectResourceReceipt(form));
    row.calendarConstructionStart=constructionPlan({structure,groups,
     master:master?{id:master.id,ml:availableMasteries(master).find(s=>s.name===item.secondary)?.ml}:null,
     designId:item.design?fields.designId.value:null,startMinute:minute});
@@ -6003,6 +6098,7 @@ function shipwrightPanel(actor){
   <label>GM potvrzuje znalost návrhu Karúnè<input name="knowsKarune" type="checkbox"></label>
   <label>Skupiny dělníků (počet, Woodworking ML)<textarea name="groups" rows="3" placeholder="5, 62" required></textarea></label>
   <p>Každá skupina patří na vlastní řádek. Mistr má Shipwright ML ${masterML}. Základní pracovní měsíc má 24 dní.</p>
+  ${projectResourcesHTML('Zajistěte loděnici, stavební materiál, nástroje a dělníky. Kvalifikaci, styl a případnou znalost návrhu Karúnè doložte výše.')}
   <button type="submit">Zapsat zahájení stavby plavidla</button><output role="status"></output>
  </form>`:'<p>Vyberte jako aktivní postavu mistra s dovedností Shipwright.</p>'}
  ${entries.map(row=>shipwrightStatus(row,clock.minute,data.journal)).join('')}</section>`;
@@ -6067,6 +6163,7 @@ document.addEventListener('submit',event=>{
   if(stage==='start'){
    const title=f.projectName.value.trim(),vessel=f.vessel.value,region=f.shipRegion.value,training=shipwrightHomeStyle(region);
    if(title.length<2||title.length>120)throw Error('Zadejte název plavidla.');
+   Object.assign(row,projectResourceReceipt(form));
    row.calendarShipwrightStart=shipwrightPlan({vessel,region,style:vessel==='karune'?null:f.shipStyle.value,
     homeStyle:training==='shipyard'?null:['carvel','clinker'].includes(training)?training:f.homeStyle.value,
     knowsKarune:f.knowsKarune.checked,masterML:availableMasteries(actor).find(s=>s.name==='Shipwright')?.ml,
@@ -8099,9 +8196,10 @@ function characterProjectRows(actor,kind){
   const item=inventoryId?data.inventory.find(x=>x.id===inventoryId&&x.characterId===actor.id):null;
   const state=!open?'Uzavřeno':due===null?'Čeká na další krok':now>=due?'Hod je připravený':'Probíhá';
   const date=!open?result?.campaignMinute:due;
+  const resources=row.calendarProjectResources?.source;
   return `<article class="hmk-project-record" data-character-project-record="${esc(row.id)}"><h4>${esc(project.projectName)}</h4><p><strong>${state}</strong> · zahájeno ${esc(medicalFullMoment(project.startMinute))}</p>
    ${Number.isSafeInteger(date)?`<p>${open?'Nejčasnější hod':'Uzavřeno'} ${esc(medicalFullMoment(date))}${open&&date>now?' · zbývá '+esc(chronicleRemainingTime(date-now)):''}</p>`:''}
-   ${summary?`<p>${esc(summary)}</p>`:''}
+   ${resources?`<p>${resources==='own'?'Vlastní dílna':'Vybavení přidělil GM zdarma'}</p>`:''}${summary?`<p>${esc(summary)}</p>`:''}
    ${open&&due!==null&&now>=due?jump(kind,'Provést Success Value',row.id):''}
    ${item?`<button type="button" class="secondary" data-character-project-item="${esc(item.id)}">Zobrazit výrobek · ${esc(slotLabel(item.slot))}</button>`:''}</article>`;
  }).join('');
@@ -8123,6 +8221,7 @@ function characterProjectRows(actor,kind){
   const label=end?(end[keys[2]]?'Ukončeno':'Hod nebo výsledek uložen'):'Rozpracováno';
   return `<article class="hmk-project-record" data-character-project-record="${esc(row.id)}"><h4>${esc(start.elixirName||start.herbType||row.title)}</h4>
    <p><strong>${label}</strong> · ${esc(medicalFullMoment(row.campaignMinute))}</p>
+   ${row.calendarProjectResources?`<p>${row.calendarProjectResources.source==='own'?'Vlastní dílna':'Vybavení přidělil GM zdarma'}</p>`:''}
    ${progress?`<p>Odpracováno ${progress.workedMinutes} / ${kind==='fishing'?240:480} minut.</p>`:''}
    ${!end&&Number.isSafeInteger(due)?`<p>Termín ${esc(medicalFullMoment(due))}</p>`:''}
    ${end?.body?`<p>${esc(end.body)}</p>`:''}
@@ -8143,6 +8242,8 @@ function characterProjectsChapter(actor){
   available.push(`<h4>${esc(sp.title)}</h4><p>${esc(sp.page)} · ${esc(sp.reason)}</p>
    ${sp.details.map(fact=>`<div class="list-row"><strong>${esc(fact.name)}</strong><span>${esc(fact.value)}</span></div>`).join('')}
    <p>${esc(sp.note)}</p>`);
+  if(sp.id==='special-alchemy')available.push(alchemyProjectRequirements(actor));
+  if(sp.id==='special-herblore')available.push('<p>Bylinný lektvar lze připravit v terénu. Konzervace vyžaduje suchou, tmavou dílnu a Herblore Success Value. Pro výrobu lektvaru se vyhrazuje účinná dávka.</p>');
   if(active&&['special-alchemy','special-herblore'].includes(sp.id)){
    const [panel]=folioHTMLNodes(characterCraftPanel(clock,actor,sp.id));
    const start=panel.querySelector('[data-character-craft-start]');
@@ -15334,7 +15435,7 @@ document.addEventListener('submit',event=>{
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:start,createdAt:stamp(),
     title:'HMK '+({writing:'132 Writing',engineering:'70 Engineering',drawing:'69 Drawing',cookery:'68 Cookery',jewelcraft:'76 Jewelcraft',glassworking:'73 Glassworking',woodworking:'91 Woodworking',...Object.fromEntries(Object.keys(WORKSHOP_CRAFT_PROJECTS).map(key=>[key,WORKSHOP_CRAFT_PROJECTS[key].label])),...Object.fromEntries(Object.entries(CRAFT_LABELS_600).map(([k,v])=>[k,v]))}[kind])+' · zahájení · '+projectName,
     body:'Doložený začátek '+displayCampaignMinute(start)+'; základní doba '+plannedBase+' minut, nejčasnější možný SV '+displayCampaignMinute(p.earliestMinute)+(p.craftDayResolution==='day'?' (od začátku herního dne)':'')+(recipe?.agingDice?'; zrání '+p.craftAgingDays+' dní, skutečné kostky ['+p.craftAgingRolls.join(', ')+'], připraveno '+displayCampaignMinute(p.craftReadyMinute):'')+'. Čas se neposunul, výrobek ani výdaje se nevytvořily.',
-    calendarSkillProjectStart591:p});});
+    ...projectResourceReceipt(form),calendarSkillProjectStart591:p});});
  }catch(err){alert('Časovaný projekt: '+err.message);}
 },true);
 document.addEventListener('change',e=>{
@@ -20349,7 +20450,7 @@ document.addEventListener('submit',e=>{
     sunsign:actualSunsign,workshopSource:v.workshopSource,wealth:who.hmk?.wealth??null,workshopStars:Number(v.workshopStars),
     workshopConfirmed:!!v.workshopConfirmed,timeD6:time.map(x=>x.value),timeOrigins:time.map(x=>x.origin),uniqueElixir,assistantPlan});
    if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),
-    title:'Alchemy · '+(proof.uniqueElixir?'Invent':'Create')+' · zahájení · '+proof.elixirName,body:'HMK 267–268 · 10+3d6='+proof.durationDays+' dní; splatnost '+proof.dueMinute+'; GM čas neposunut',calendarAlchemyStart:proof})))
+    title:'Alchemy · '+(proof.uniqueElixir?'Invent':'Create')+' · zahájení · '+proof.elixirName,body:'HMK 267–268 · 10+3d6='+proof.durationDays+' dní; splatnost '+proof.dueMinute+'; GM čas neposunut',...projectResourceReceipt(f),calendarAlchemyStart:proof})))
     notice='Alchemy zahájena · čas GM beze změny';
   }else if(f.matches('[data-alchemy-abort]')){
    const proof=createAlchemyAbort({journal:data.journal,campaignId,minute,actorId,startId:v.startId,reason:v.reason,gmConfirmed:!!v.gmConfirmed});
@@ -20446,7 +20547,7 @@ document.addEventListener('submit',e=>{
   }
   if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actorId))throw Error('Postava není členem kampaně');
   if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,
-   createdAt:stamp(),title,body:'HMK 74–75 · doloženo bez posunu GM času',[kind]:p})))notice=title+' · auditováno bez posunu času';
+   createdAt:stamp(),title,body:'HMK 74–75 · doloženo bez posunu GM času',...projectResourceReceipt(f),[kind]:p})))notice=title+' · auditováno bez posunu času';
  }catch(err){alert('Bylinná procedura nebyla uložena: '+err.message)}
 },true);
 // v93.734: a completed travel episode offers its OWN Foraging lots for allocation.
