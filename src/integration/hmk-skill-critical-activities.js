@@ -28,10 +28,10 @@ export const FAILURE_ACTIVITIES=Object.freeze({
   {id:'climb-easy-turn-failure',label:'Easy Climbing · F: neúspěch po 1 turn (bez hodu)',page:67,mode:'decision'},
   {id:'climb-difficult-failure',label:'Difficult Climbing · F: výsledek SV bez nového testu',page:67,mode:'decision'}])
 });
-export function skillFollowupActivities(skill,level){
- if(level==='CF')return criticalActivities(skill);
- if(level==='F')return FAILURE_ACTIVITIES[String(skill)]||[];
- return [];
+export function skillFollowupActivities(skill,level,{climbingMode}={}){
+ const options=level==='CF'?criticalActivities(skill):level==='F'?(FAILURE_ACTIVITIES[String(skill)]||[]):[];
+ if(skill!=='Climbing'||!climbingMode)return options;
+ return options.filter(option=>option.id.startsWith('climb-'+climbingMode));
 }
 export function criticalActivities(skill){const name=String(skill);return CF_ACTIVITIES[name]||(/^Language(?:\s|\(|:|$)/.test(name)||/\(Language\)$/.test(name)?CF_ACTIVITIES.Language:[]);}
 /** HMK p.60–61 gives no universal reroll on F/CF. Only source-backed
@@ -52,9 +52,9 @@ export function skillFailureGuidance(skill,level){
  if(criticalActivities(base).length&&level==='CF')return {page:criticalActivities(base)[0].page,kind:'activity-dependent',text:'CF může spustit konkrétní pravidlový následek. Vyberte skutečně prováděnou činnost v navazujícím formuláři.'};
  return {page:60,kind:'gm-context',text:'HMK nepředepisuje univerzální další d100 za F/CF u této dovednosti. GM musí ověřit konkrétní činnost či její samostatnou rutinu; bez takového předpisu nový hod nevzniká.'};
 }
-export function criticalFollowupPlan(skill,activity,original){
+export function criticalFollowupPlan(skill,activity,original,context){
  if(!original||!['CF','F'].includes(original.level)||original.forcedCF===true)return null;
- const r=skillFollowupActivities(skill,original.level).find(x=>x.id===activity);if(!r)return null;
+ const r=skillFollowupActivities(skill,original.level,context).find(x=>x.id===activity);if(!r)return null;
  const unit=original.roll%10,cf0=unit===0,cf5=unit===5;
  const t=r.mode==='split'||r.mode==='split-fishing'?(cf0?'Fumble':'Stumble'):r.test;
  if(r.mode==='decision')return {...r,requiresRoll:false,detail:r.id==='climb-easy-turn-failure'?'Easy Climbing F: lezení selhalo po jednom turnu, bez nového d100.':r.id==='climb-difficult-failure'?'Difficult Climbing F: pokračujte původním Success Value a jeho minutovou evidencí; žádný nový d100 nelze přidat automaticky.':'Balance F: bez zvláštního dalšího testu; GM vyhodnotí původní neúspěch a pohyb.'};
