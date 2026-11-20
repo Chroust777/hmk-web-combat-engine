@@ -1089,3 +1089,17 @@ form[data-hmk-animal-training] [data-animal-training-d3-status] {
 .hmk-simple-done-93915{border-left:3px solid #377a52;padding-left:6px}
 .hmk-simple-roll-status-93915{color:#a22727;font-weight:700;margin:6px 0;font-size:.92em}
 .hmk-simple-accept-93915[disabled],.hmk-simple-auto-93915[disabled]{opacity:.58}
+
+/* Character journal project spread */
+.hmk-project-page { min-width: 0; overflow-wrap: anywhere; }
+.hmk-project-page > label { display: grid; gap: .35rem; margin-bottom: 1rem; }
+.hmk-project-page :is(select, input, textarea, button) { max-width: 100%; }
+.hmk-project-page > button { margin: .25rem .4rem .25rem 0; }
+.hmk-project-create, .hmk-project-kind, .hmk-project-record { margin-block: .8rem; }
+.hmk-project-create { padding: .7rem; border: 1px solid #aa8d64; }
+.hmk-project-create > summary { cursor: pointer; font-weight: 700; }
+.hmk-project-create > form { margin-top: .75rem; }
+.hmk-project-record { border-inline-start: 3px solid #aa8d64; padding-inline-start: .65rem; }
+.hmk-project-record h4, .hmk-project-record p { margin-block: .3rem; }
+.hmk-project-return { margin: 0 0 .75rem; }
+.hmk-project-item-focus { outline: 2px solid #a4352f; outline-offset: -2px; }
