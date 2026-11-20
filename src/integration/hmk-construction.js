@@ -44,19 +44,22 @@ export function formatConstructionWork(workMinutes){
  const days=Math.floor(remainder/minutesPerDay), minutes=remainder%minutesPerDay;
  return [months&&`${months} prac. měs.`,days&&`${days} prac. dnů`,minutes&&`${minutes} min`].filter(Boolean).join(' ');
 }
-export function constructionPlan({structure,groups,master,designId,startMinute}){
- const item=Object.hasOwn(CONSTRUCTION_STRUCTURES,structure)?CONSTRUCTION_STRUCTURES[structure]:null;
- ensure(item&&integer(startMinute,0),'Vyberte typ stavby a platný začátek.');
+export function constructionCrew(groups){
  ensure(Array.isArray(groups)&&groups.length>0&&groups.every(g=>integer(g.count,1)&&integer(g.ml,1,1000)),
   'Každá skupina potřebuje skutečný počet dělníků a ML 1–1000.');
  const workerCount=groups.reduce((sum,g)=>sum+g.count,0),totalML=groups.reduce((sum,g)=>sum+g.count*g.ml,0);
  ensure(integer(workerCount,1)&&integer(totalML,1),'Příliš vysoký počet dělníků.');
+ return {workerCount,averageML:Math.floor(totalML/workerCount)};
+}
+export function constructionPlan({structure,groups,master,designId,startMinute}){
+ const item=Object.hasOwn(CONSTRUCTION_STRUCTURES,structure)?CONSTRUCTION_STRUCTURES[structure]:null;
+ ensure(item&&integer(startMinute,0),'Vyberte typ stavby a platný začátek.');
+ const {workerCount,averageML:baseML}=constructionCrew(groups);
  ensure(item.secondary?master&&typeof master.id==='string'&&master.id&&integer(master.ml,1,1000):master===null,
   item.secondary?`Stavba vyžaduje jednoho mistra s ${item.secondary}.`:'Tato stavba nemá sekundární dovednost.');
  ensure(item.design?typeof designId==='string'&&designId.length:designId===null,'Tento typ stavby vyžaduje odpovídající dokončený návrh.');
  const baseNumerator=item.workerMonths*workDaysPerMonth*minutesPerDay;
  const baseWorkMinutes=Math.ceil(baseNumerator/workerCount);
- const baseML=Math.floor(totalML/workerCount);
  const halfWorkMinutes=Math.ceil(baseNumerator/(2*workerCount));
  return {structure,groups:groups.map(({count,ml})=>({count,ml})),master:master&&{id:master.id,ml:master.ml},designId,startMinute,
   workerCount,baseML,baseWorkMinutes,halfwayMinute:constructionMinute(startMinute,halfWorkMinutes),

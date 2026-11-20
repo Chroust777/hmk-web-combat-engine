@@ -450,6 +450,17 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    (result?'Dokončení stavby · ':'Construction Roll v polovině · ')+row.title,
    result?.dueMinute??plan.halfwayMinute,'skills',{requiresAction:!result});
  }
+ for(const row of journal){
+  const plan=row.calendarShipwrightStart;
+  if(!plan||row.calendarCampaignId!==clock.campaignId||journal.some(x=>x.calendarShipwrightComplete?.startId===row.id))continue;
+  const person=characters.find(c=>c.id===row.characterId);
+  if(!person)continue;
+  const rolled=journal.find(x=>x.calendarShipwrightRoll?.startId===row.id);
+  const terms=journal.find(x=>x.calendarShipwrightFactors?.startId===row.id);
+  push(person,'shipwright-project',row.id,
+   (terms?'Dokončení plavidla · ':rolled?'Násobitele Shipwright · ':'Shipwright Roll · ')+row.title,
+   terms?.calendarShipwrightFactors.result.dueMinute??rolled?.campaignMinute??plan.startMinute,'skills',{requiresAction:false});
+ }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an
  // unconditional extra d100. Restore this obligation from immutable journal.
  for(const tracking of pendingTrackingAwareness(journal,clock.campaignId??null)){
