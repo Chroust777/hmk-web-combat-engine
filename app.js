@@ -2,7 +2,7 @@ import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFrom
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.972';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.980';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.988';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -116,7 +116,7 @@ import {prepareFailedNeutralSpellfire,persistFailedNeutralSpellfire,prepareCriti
 import {validateNeutralAlchemyHistory,validateNeutralAlchemyCombatLinks} from './src/integration/hmk-alchemy-neutral-history.js';
 import {validateNeutralTotalReleaseHistory} from './src/integration/hmk-neutral-total-release-invariant.js';
 import {prepareNeutralTotalReleaseCommit,persistNeutralTotalReleaseCommit} from './src/integration/hmk-neutral-total-release-writer.js';
-import {readCharacterHealth,writeCharacterHealth,assertCharacterHealthAuthority} from './src/integration/hmk-character-health-store.js?v=93.987';
+import {readCharacterHealth,writeCharacterHealth,assertCharacterHealthAuthority} from './src/integration/hmk-character-health-store.js?v=93.988';
 import {linkNewMoralePsycheAccrual,journalNewMoralePsycheSources} from './src/integration/hmk-morale-psyche-bridge.js';
 import {persistFearExposure,persistFearSafeRecovery,persistFearEndTurnReaction} from './src/integration/hmk-fear-aberrance-persistence.js';
 import {createG04ActionWizards} from './src/integration/hmk-g04-guided-actions-ui.js';
@@ -264,7 +264,7 @@ import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {createForagingCarry,createForagingCarryEat,foragedCarriedFood,projectForagedFoodInventory,validateForagingCarriedJournal} from './src/integration/hmk-foraging-carried-food.js';
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
-import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js?v=93.987';
+import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js?v=93.988';
 import {alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
@@ -313,7 +313,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=93.987';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=93.988';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -330,7 +330,7 @@ import {bloodCohortRef,validateGuidedBloodCohort} from './src/integration/hmk-gu
 import {guidedMoraleReactionReadiness,resolveGuidedMoraleReaction} from './src/integration/hmk-guided-morale-reaction.js';
 import {guidedRallyReadiness,resolveGuidedRally,resolveGuidedRallyReaction} from './src/integration/hmk-guided-rally.js';
 import {registerGuidedCohesion,groupCohesionDue,assessGuidedCohesion,recordGuidedFunctionalVanquished} from './src/integration/hmk-guided-group-cohesion.js';
-import {recordConfirmedSurrenderRelease} from './src/integration/persistent-combat-state.js?v=93.987';
+import {recordConfirmedSurrenderRelease} from './src/integration/persistent-combat-state.js?v=93.988';
 import {SPECIAL_MORALE_KINDS,registerSpecialMorale,dueSpecialMorale,resolveSpecialMorale} from './src/integration/hmk-guided-special-morale.js';
 import {createGuidedAttackJourney,guidedAttackRequirement,submitGuidedAttackDie,chooseGuidedAttack,submitGuidedAttackFact,advanceGuidedAttack,completeGuidedAttack} from './src/integration/hmk-guided-attack-journey.js';
 import {createGuidedMeleeMishapFollowup,guidedMeleeMishapFollowupRequirement,chooseGuidedMeleeMishapTechnique,submitGuidedMeleeMishapDie,advanceGuidedMeleeMishapFollowup,completeGuidedMeleeMishapFollowup} from './src/integration/hmk-guided-melee-mishap-followup.js';
@@ -356,12 +356,12 @@ import {markDeadlyAimStart,verifiedDeadlyAim} from './src/integration/hmk-deadly
 import {applyConfirmedWeaponWQ,applyConfirmedAreaStrike,applyConfirmedMountedControl,applyConfirmedMountedCharge} from './src/integration/hmk-combat-aftereffects.js';
 import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
 import {riderImpactAtRound} from './src/rules/mounted.js';
-import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock,projectLegacyAlchemyStun} from './src/integration/hmk-medical-origin.js?v=93.987';
+import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock,projectLegacyAlchemyShock,verifiedAlchemyComa} from './src/integration/hmk-medical-origin.js?v=93.988';
 import {prepareGMHealthOverride,gmWoundConsequenceAssessment,validateGMHealthOverrideEvidence} from './src/integration/hmk-gm-health-override.js';
 import {extendedShockAidEpisode,extendedShockAids,bestExtendedShockAid,validateExtendedShockAidJournal} from './src/integration/hmk-extended-shock-aid-93965.js?v=93.965';
 import {weatherPhysicianCandidates} from './src/integration/hmk-weather-healer.js';
 import {activeFearSources} from './src/integration/hmk-concurrent-fear.js';
-import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedAstralReembodiment,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,verifiedImmersionComa952,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext,shockFollowupReadiness,applyExtendedShockCourse,applyComaCourse,dueInjuryMorale,unresolvedInjuryMishaps,specialActionReadiness,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,applyConfirmedSpecialAftermath,applyConfirmedMoraleReaction,applyConfirmedBraveExpiry,beginConfirmedEncounter} from './src/integration/persistent-combat-state.js?v=93.987';
+import {initialCombatState,validateCombatState,combatFatigueTotals,applyConfirmedHit,applyConfirmedAstralReembodiment,applyConfirmedBloodLoss,applyConfirmedBloodStoppage,applyConfirmedShockRecovery,verifiedImmersionComa952,applyConfirmedFatigue,dueBloodLoss,applyConfirmedWoundContext,shockFollowupReadiness,applyExtendedShockCourse,applyComaCourse,dueInjuryMorale,unresolvedInjuryMishaps,specialActionReadiness,applyConfirmedInjuryMishap,applyConfirmedInjuryMorale,applyConfirmedSpecialAftermath,applyConfirmedMoraleReaction,applyConfirmedBraveExpiry,beginConfirmedEncounter} from './src/integration/persistent-combat-state.js?v=93.988';
 // v60: Bundled domain contract constructors; the 3-file deployment is self-contained.
 /** HMK domain contracts. Runtime objects are plain JSON-serialisable data. */
 const SCHEMA_VERSION = 1;
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.987';
+const APP_VERSION='93.988';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -9111,7 +9111,7 @@ function saveCombatDraftToHistory(draft){
 }
 // Persistent source of truth: c.hmk.healthState in localStorage-backed character records.
 // Preview-only session history remains independent; never replay it as committed wounds.
-function persistentStateOf(c){return projectLegacyAlchemyStun(readCharacterHealth(c),data.campaignClock,c?.id);}
+function persistentStateOf(c){return projectLegacyAlchemyShock(readCharacterHealth(c),data.campaignClock,c?.id);}
 function combatInjurySignature(id){const c=character(id);if(!c)return null;const s=persistentStateOf(c);return JSON.stringify({wounds:s.wounds,shock:s.shock,fatigue:s.fatigue,toxinCourses:s.toxinCourses??[],diseaseCourses:s.diseaseCourses??[],ailmentSequelae:s.ailmentSequelae??[],morale:s.morale??null,mishaps:s.mishaps??[],posture:s.posture??null,herbalParalysis:s.herbalParalysis??null,grabHold:s.grabHold??null,pendingManeuver:s.pendingManeuver??null,pendingAutomaticGrab:s.pendingAutomaticGrab??null,mountControl:s.mountControl??null,mountedRiderImpact:s.mountedRiderImpact??null,extendedShock:s.extendedShock??null});}
 function synchronizeCombatInjuries(c,state){
  // Authoritative commit boundary: date newly confirmed wounds and the first
@@ -13594,15 +13594,17 @@ function hskWeatherShockFollowup(actorId){
  const comaWoundIndex=state.wounds.findIndex(w=>w.id===comaCause.woundId);
  const comaWoundLabel=comaWoundIndex>=0?medicalWoundOptionLabel(actor,state.wounds[comaWoundIndex],comaWoundIndex+1):'Poranění z nehody';
  const grim=state.events.some(e=>e.id===q.sourceId&&e.type==='grim-wound-shock');
- const alchemy=q.domain===MEDICAL_ORIGIN.ALCHEMY;
+ const alchemy=q.domain===MEDICAL_ORIGIN.ALCHEMY,alchemyComa=verifiedAlchemyComa(state,q);
+ const alchemyInc=alchemy&&q.kind==='INC';
+ const pages=alchemy?'169, 267':'169, 185';
  return `<section class="panel wide hmk-weather-shock-followup"><h3>${alchemy?'Alchemy':grim?'Grim Wound':immersionComa?'Cold Water':q.domain==='gm-health'?'GM':q.domain==='skill-fall'?'Falling':q.domain==='travel-accident'?'Accident':'Weather'} Shock · ${esc(actor.name)} · ${esc(q.kind)}</h3>
- <p class="hc-hint">Samostatný Shock Reroll po ${alchemy?'Crucial Dissolution (HMK 267)':grim?'denním Grim Wound Shock':immersionComa?'ponoření do studené vody':q.domain==='gm-health'?'doloženém rozhodnutí GM':q.domain==='skill-fall'?'pádu':'cestovní události'}. Původ ${originValid?esc(displayCampaignMinute(q.originMinute)):'není časově doložen; GM musí nejprve v Kalendáři potvrdit výchozí minutu'}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK 169, 185).</p>
+ <p class="hc-hint">Samostatný Shock Reroll po ${alchemy?'Crucial Dissolution (HMK 267)':grim?'denním Grim Wound Shock':immersionComa?'ponoření do studené vody':q.domain==='gm-health'?'doloženém rozhodnutí GM':q.domain==='skill-fall'?'pádu':'cestovní události'}. Původ ${originValid?esc(displayCampaignMinute(q.originMinute)):'není časově doložen; GM musí nejprve v Kalendáři potvrdit výchozí minutu'}. ${q.phase==='after-all-bleeding-stopped'?'Okamžitý Shock Reroll po zastavení všech Bleederů':q.kind==='UNC'?'Počkat skutečných 10 minut':alchemyInc?'Počkat na okamžik odpovídající konci příštího tahu':'Po další skutečné akci mimo boj vyhodnoť tento hod'}. Kalendář je autoritou pro minuty; tento hod jej sám neposune. Combat pouze čte účinky na postavu (HMK ${pages}).</p>
  <p>Shock ML ${esc(String(shockML??'nedoloženo'))} · Fatigue ${fatigue} · ${q.kind==='STN'?'bez dalšího −20':'−20 při INC/UNC'} · EML ${esc(String(Number.isInteger(shockML)?eml:'nedoloženo'))}</p>
- <form data-weather-shock-followup data-shock-eml="${esc(String(Number.isFinite(eml)?eml:''))}" data-shock-coma-ready="${(comaCause.ready||immersionComa)&&canRoll?'yes':'no'}" data-shock-coma-mode="${immersionComa?'immersion':'injury'}"><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
+ <form data-weather-shock-followup data-shock-eml="${esc(String(Number.isFinite(eml)?eml:''))}" data-shock-coma-ready="${(comaCause.ready||immersionComa||alchemyComa)&&canRoll?'yes':'no'}" data-shock-coma-mode="${immersionComa?'immersion':alchemyComa?'alchemy':'injury'}"><input type="hidden" name="sourceId" value="${esc(q.sourceId)}">
  <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${canRoll?'':'disabled title="Shock ještě není splatný nebo chybí ověřená ML"'}></label>
- ${q.kind==='UNC'?`<p class="hc-hint">${immersionComa?'Při UNC + CF určí počáteční Coma HR GM, protože ponoření nemá anatomické zranění.':comaCause.ready?'Coma při CF: '+esc(comaWoundLabel)+' · ověřené Location Shock '+comaCause.locationShock+' · IL '+comaCause.injuryLevel+' · počáteční HR '+comaCause.initialHR+'. Hodnoty nejsou upravitelné.':'Coma při CF: '+esc(comaCause.reason)}</p>${immersionComa?'<label hidden>Počáteční Coma HR podle rozhodnutí GM<input name="immersionComaHR" type="number" min="1" max="20" disabled></label>':''}<input name="comaLocationShock" type="hidden" value="${comaCause.ready?comaCause.locationShock:''}"><input name="comaInjuryLevel" type="hidden" value="${comaCause.ready?comaCause.injuryLevel:''}"><label>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" required disabled title="Coma d10 je dostupné pouze po skutečném výsledku UNC + CF"><button type="button" class="hc-small" data-weather-coma-d10 disabled title="Vygenerovat skutečný d10 (bez potvrzení akce)">⚄ d10</button></label>`:''}
- <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný přesně po uplynutí deseti minut.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
- ${q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped'?'<label><input type="checkbox" name="actualActionConfirmed" required '+(canRoll?'':'disabled')+'> GM potvrzuje skutečnou následující akci mimo boj, na jejímž konci probíhá Shock Reroll</label>':''}
+ ${q.kind==='UNC'?`<p class="hc-hint">${alchemyComa?'Při UNC + CF určí počáteční Coma HR GM. Crucial Dissolution nezpůsobila doloženou anatomickou ránu.':immersionComa?'Při UNC + CF určí počáteční Coma HR GM, protože ponoření nemá anatomické zranění.':comaCause.ready?'Coma při CF: '+esc(comaWoundLabel)+' · ověřené Location Shock '+comaCause.locationShock+' · IL '+comaCause.injuryLevel+' · počáteční HR '+comaCause.initialHR+'. Hodnoty nejsou upravitelné.':'Coma při CF: '+esc(comaCause.reason)}</p>${(immersionComa||alchemyComa)?'<label hidden>Počáteční Coma HR podle rozhodnutí GM<input name="immersionComaHR" type="number" min="1" max="20" disabled></label>':''}<input name="comaLocationShock" type="hidden" value="${comaCause.ready?comaCause.locationShock:''}"><input name="comaInjuryLevel" type="hidden" value="${comaCause.ready?comaCause.injuryLevel:''}"><label>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" required disabled title="Coma d10 je dostupné pouze po skutečném výsledku UNC + CF"><button type="button" class="hc-small" data-weather-coma-d10 disabled title="Vygenerovat skutečný d10 (bez potvrzení akce)">⚄ d10</button></label>`:''}
+ <p class="hc-hint">${q.phase==='after-all-bleeding-stopped'?'Ihned po zastavení všech Bleederů – bez dalších deseti minut.':q.kind==='UNC'?'Test je dostupný po uplynutí deseti minut.':alchemyInc?'GM potvrdí čas zotavení mimo boj.':'Tlačítko vyhodnotí Shock po dokončení následující skutečné akce postavy; žádný bojový tah se nevytváří.'}</p>
+ ${q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped'?'<label><input type="checkbox" name="actualActionConfirmed" required '+(canRoll?'':'disabled')+'> '+(alchemyInc?'GM potvrzuje okamžik odpovídající konci příštího tahu postavy. Postava v INC nejedná.':'GM potvrzuje skutečnou následující akci mimo boj, na jejímž konci probíhá Shock Reroll')+'</label>':''}
  <button type="submit" ${canRoll?'':'disabled'}>Vyhodnotit a zapsat Shock d100</button><output role="status" aria-live="polite"></output></form>
  ${!canRoll?'<p class="notice">Zatím nesplatné nebo postava nemá doložené Shock ML.</p>':''}</section>`;
 }
@@ -13676,7 +13678,7 @@ function hskWeatherTraumaCourseForm(actorId){
  try{hb=guidedTraumaCourseReadiness({state,character:actor,kind}).healingBase;}
  catch(error){return '<p class="notice error">'+esc(error.message)+'</p>';}
  return `<section class="panel wide hmk-weather-trauma-course"><h3>${kind==='coma'?'Coma':'Extended Shock'} · ${esc(actor.name)}</h3>
- <p class="hc-hint">Samostatné zdravotní vyhodnocení z počasí · HMK str.179. 
+ <p class="hc-hint">Samostatné zdravotní vyhodnocení mimo boj · HMK str.179. 
  Doložený termín ${esc(displayCampaignMinute(expected))}; Kalendář se tímto hodem neposouvá.</p>
  <p>Healing Base ${hb} · aktuální HR ${course.hr} · skutečná minuta ${esc(String(clock.minute))}.</p>
  <form data-weather-trauma-course data-hmk-trauma-hr="${esc(String(course.hr))}" data-hmk-trauma-hb="${esc(String(hb))}" data-hmk-trauma-fatigue="${esc(String(combatFatigueTotals(state).total))}"><input type="hidden" name="kind" value="${kind}">
@@ -15242,7 +15244,7 @@ document.addEventListener('submit',event=>{
    synchronizeCombatInjuries(actor,result.state);
    logCalendarCombatResolution(actor,result.state,'weather-'+kind);
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignKey(clock),
-    campaignMinute:clock.minute,createdAt:stamp(),title:'Weather '+kind+' Course · HMK 179',
+    campaignMinute:clock.minute,createdAt:stamp(),title:(course.domain===MEDICAL_ORIGIN.ALCHEMY?'Alchemy · ':'Weather ')+kind+' Course · HMK 179',
     body:'Zdroj '+sourceId+' · skutečný d100 '+roll+' · HR '+course.hr+' → '+(kind==='coma'?result.hr:result.nextHR),
     skillTestProof:{type:'weather-trauma-course',kind,sourceId,originalEventId:eventId,
      actorId:actor.id,roll,confirmedMinute:clock.minute}});
@@ -15510,23 +15512,24 @@ document.addEventListener('submit',event=>{
   // Clicking the current mandatory action confirms that it has just been resolved.
   // The calendar's 10-minute UNC deadline remains enforced separately.
   const id=uuid(),turnEnded=q.kind!=='UNC'&&q.phase!=='after-all-bleeding-stopped';
-  if(turnEnded&&!form.elements.namedItem('actualActionConfirmed')?.checked)throw Error('Pro INC/STN musí GM potvrdit skutečnou další akci, nikoli fiktivní bojový tah');
+  if(turnEnded&&!form.elements.namedItem('actualActionConfirmed')?.checked)throw Error(alchemy&&q.kind==='INC'?'GM musí potvrdit okamžik odpovídající konci příštího tahu.':'GM musí potvrdit skutečnou další akci postavy.');
   const comaLocationShock=sl==='CF'&&form.elements.namedItem('comaLocationShock')?.value?Number(form.elements.namedItem('comaLocationShock').value):null;
   const comaInjuryLevel=sl==='CF'&&form.elements.namedItem('comaInjuryLevel')?.value?Number(form.elements.namedItem('comaInjuryLevel').value):null;
   const initialComaD10=form.elements.namedItem('initialComaD10')?.value?Number(form.elements.namedItem('initialComaD10').value):null;
   const immersionHR=form.elements.namedItem('immersionComaHR')?.value;
-  const immersionComaHR=immersionHR?Number(immersionHR):null;
+  const gmComaHR=immersionHR?Number(immersionHR):null;
+  const alchemyComaHR=alchemy?gmComaHR:null,immersionComaHR=alchemy?null:gmComaHR;
   if(q.kind==='UNC'&&sl==='CF'){
-   if(verifiedImmersionComa952(state,q)){
-    if(!Number.isSafeInteger(immersionComaHR)||immersionComaHR<1||immersionComaHR>20)
-     throw Error('GM musí určit počáteční Coma HR při doloženém ponoření (1–20).');
+   if(verifiedImmersionComa952(state,q)||verifiedAlchemyComa(state,q)){
+    if(!Number.isSafeInteger(gmComaHR)||gmComaHR<1||gmComaHR>20)
+     throw Error('GM musí určit počáteční Coma HR (1–20).');
    }else{
     const cause=verifiedNoncombatComaCause({actor,state,shockFollowup:q});
     if(!cause.ready)throw Error('Není doložena vyvolávající rána pro Coma: '+cause.reason);
     if(comaLocationShock!==cause.locationShock||comaInjuryLevel!==cause.injuryLevel)throw Error('Coma: Location Shock a IL neodpovídají původní ráně; upravená nebo zastaralá data se nesmí použít.');
    }
    if(!Number.isSafeInteger(initialComaD10)||initialComaD10<1||initialComaD10>10)throw Error('Chybí fyzický d10 pro první Coma Course.');
-  }else if(comaLocationShock!==null||comaInjuryLevel!==null||initialComaD10!==null||immersionComaHR!==null){
+  }else if(comaLocationShock!==null||comaInjuryLevel!==null||initialComaD10!==null||gmComaHR!==null){
    throw Error('Coma hody a anatomické parametry jsou nepřípustné, pokud Shock Reroll nemá UNC + CF.');
   }
   const outcome=q.phase==='after-all-bleeding-stopped'?completeTravelBloodShockReroll({
@@ -15535,25 +15538,26 @@ document.addEventListener('submit',event=>{
    round:Math.max(1,combatClock.round||1,state.lastRound||0),
    eventId:id,sl,timingConfirmed:true,characterId:actor.id,actorId:actor.id,
    turnEnded,elapsedMinutesSinceOriginal:elapsed,timelineId:null,shockML:ml,roll,
-   comaLocationShock,comaInjuryLevel,initialComaD10,immersionComaHR});
+   comaLocationShock,comaInjuryLevel,initialComaD10,immersionComaHR,alchemyComaHR});
   if(!mutate(()=>{
    if(data.campaignClock.minute!==clock.minute||campaignKey(data.campaignClock)!==campaignKey(clock))throw Error('Mezitím se změnil Kalendář');
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
-    title:(alchemy?'Alchemy · zotavení ze STN · HMK 169, 267':q.domain==='gm-health'?'GM Shock Reroll · HMK 169':q.domain==='skill-fall'?'Shock Reroll po pádu · HMK 169':'Weather Shock Reroll · HMK 169, 185'),createdAt:stamp(),
+    title:(alchemy?'Alchemy · zotavení ze '+q.kind+' · HMK 169, 267':q.domain==='gm-health'?'GM Shock Reroll · HMK 169':q.domain==='skill-fall'?'Shock Reroll po pádu · HMK 169':'Weather Shock Reroll · HMK 169, 185'),createdAt:stamp(),
     body:'Původní '+q.kind+' · ML '+ml+' · EML '+eml+' · d100 '+roll+' → '+sl+
      ' · nový Shock '+outcome.state.shock+'; žádný dodatečný posun Kalendáře.',
     skillTestProof:{type:'weather-shock-recovery',sourceId,originalEventId:id,actorId:actor.id,
      from:q.kind,to:outcome.state.shock,roll,eml,sl,originMinute:q.originMinute,confirmedMinute:clock.minute,
-     ...(immersionComaHR!==null?{immersionComaHR,initialComaD10}:{})}});
+     ...(immersionComaHR!==null?{immersionComaHR,initialComaD10}:{}),
+     ...(alchemyComaHR!==null?{alchemyComaHR,initialComaD10}:{})}});
   }))throw Error('Weather Shock nebyl potvrzen');
   const after=outcome.state,still=isNoncombatMedicalOrigin(after.shockFollowup?.domain);
   const pendingWeatherMishap=unresolvedInjuryMishaps(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,after.events))));
   const pendingWeatherMorale=dueInjuryMorale(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,after.events))));
   hskWeatherHealthLastReceipt={actorId:actor.id,message:'Shock d100 '+roll+' → '+sl+' byl zapsán v '+displayCampaignMinute(clock.minute)+'. Aktuální Shock: '+after.shock+'. '+
-   (alchemy?(still?'STN trvá. Po další skutečné akci postavy potvrď nový Shock d100.':'STN skončil. Aural Shock se řeší v samostatné povinnosti pro zotavení.'):
-    after.coma?.active?'V Kalendáři jsou termíny Coma Course'+(after.extendedShock?' a Extended Shock Course':'')+'. Otevři splatný krok tlačítkem Kontrola.':
+   (after.coma?.active?'V Kalendáři jsou termíny Coma Course'+(after.extendedShock?' a Extended Shock Course':'')+'. Otevři splatný krok tlačítkem Kontrola.':
     after.extendedShock?'V Kalendáři je další Extended Shock Course za čtyři hodiny. Otevři jej tlačítkem Kontrola.':
+    alchemy?(still?'Postava je STN. Po další skutečné akci potvrď nový Shock d100.':'Tělesný Shock skončil. Aural Shock má samostatnou povinnost pro zotavení.'):
     still?'Shock stále trvá: další test je samostatná následná povinnost. Treatment zůstává pozastaven.':pendingWeatherMishap?'Nyní následuje Injury Mishap.':pendingWeatherMorale?'Nyní následuje Injury Morale.':'Nyní pokračuj vyhodnocením jednotlivých ran a Treatment v této záložce.')};
   openHealthPatient952(actor);
   if(alchemy&&still)focusCalendarRuleAction(actor,'weather-shock',sourceId);
@@ -19661,12 +19665,13 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
     form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
    kind==='injury-mishap'?(form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
    kind==='bleeding'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name="physicianRoll"]:not([type="hidden"]),select[name="healerId"],input[name="strengthRoll"]')||form.querySelector('button[type="submit"]')):
+   kind==='aural-recovery'?form.elements.namedItem('die'):
    kind==='skill-fall'?((form.matches('[data-climbing-fall-form]')?hskClimbingFallGuide(form).active:form.elements.namedItem('heightFt'))||
     form.querySelector('[data-climb-fall-add]:not([disabled]),button[type="submit"]:not([disabled])')):
    form.querySelector('input:not([type="hidden"]):is([name="roll"],[name="courseD100"],[name="followRoll"],[name="enduranceD10"],[name="physicianRoll"])'));
   // Calendar/Travel rule links must land on the REAL original input and
   // visibly mark it, not merely open a whole module without a target.
-  if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding'].includes(kind)&&rollInput&&!rollInput.disabled){
+  if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding','aural-recovery'].includes(kind)&&rollInput&&!rollInput.disabled){
    for(const old of document.querySelectorAll('.hmk-medical-required-target'))old.classList.remove('hmk-medical-required-target');
    if(!rollInput.matches('[data-hmk-chain-value-93918]'))
     (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
