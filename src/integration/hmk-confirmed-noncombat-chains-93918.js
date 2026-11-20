@@ -7,7 +7,7 @@ import {successLevel} from '../rules/tests.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 const SELECTOR='form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
  'form[data-skill-cold-shock],form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
- '.hmk-weather-care form#hmk-frost-amputation-form';
+ 'form[data-parallel-cold-reroll],form[data-parallel-cold-course],.hmk-weather-care form#hmk-frost-amputation-form';
 const SELECTIONS={
  fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
  herbs:['singlePotencyRoll','actorId'],
@@ -25,7 +25,7 @@ const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n
 const stageKey=(step)=>step.key;
 function kindOf(form){return form.id==='hmk-frost-amputation-form'?'frost':form.matches('[data-weather-blood-complete]')?'bloodComplete':form.matches('[data-hmk-fishing-catch]')?'fishing':
  form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
- form.matches('[data-skill-cold-shock]')?'immersion':form.matches('[data-weather-shock-followup]')?'shock':form.matches('[data-weather-trauma-course]')?'trauma':'alchemy';}
+ form.matches('[data-skill-cold-shock]')?'immersion':form.matches('[data-weather-shock-followup],[data-parallel-cold-reroll]')?'shock':form.matches('[data-weather-trauma-course],[data-parallel-cold-course]')?'trauma':'alchemy';}
 function fieldsOf(form,kind){
  if(kind==='frost')return ['physicianRoll','amputationRoll','shockRoll'];
  if(kind==='bloodComplete')return ['physicianRoll','strengthRoll'].filter(name=>form.elements.namedItem(name));
@@ -105,6 +105,7 @@ function stepsFor(form,kind){
     add('initialComaD10',10,'UNC + CF · první Coma Course d10');
   }
  }else if(kind==='trauma'){
+  if(form.elements.namedItem('roll')?.disabled)return result;
   add('roll',100,(value(form,'kind')==='coma'?'Coma':'Extended Shock')+' Course d100');
   if(value(form,'kind')==='coma'&&die(value(form,'roll'),100)){
    const hr=Number(form.dataset.hmkTraumaHr),hb=Number(form.dataset.hmkTraumaHb),
