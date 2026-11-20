@@ -313,7 +313,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=93.988';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=93.989';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.988';
+const APP_VERSION='93.989';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -14089,6 +14089,7 @@ document.addEventListener('change',event=>{
  const skill=side==='B'?proof?.skills?.[1]:proof?.skills?.[0]||proof?.skill;
  const res=side==='B'?proof?.b:proof?.a||proof?.result;
  const plan=criticalFollowupPlan(skill,event.target.value,res,hskFollowupContext(proof));
+ event.target.closest('label')?.classList.toggle('hmk-medical-required-target',!plan);
  f.dataset.requiresFollowRoll=plan?.requiresRoll?'yes':'no';
  const techniques=plan?.test==='Fumble'?['Dexterity','Legerdemain']:plan?.test==='Stumble'?['Agility','Acrobatics']:plan?.requiresRoll?[plan.test]:[];
  const actor=character(side==='B'?proof?.opponentId:proof?.actorId);
@@ -19613,10 +19614,12 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   const side=sourceId.slice(-1),origin=sourceId.slice(0,-2);
   form=['A','B'].includes(side)?q('form[data-skill-critical-form]').find(f=>
    f.elements.namedItem('origin')?.value===origin&&f.elements.namedItem('side')?.value===side):null;
+  if(!form&&side==='A')form=q('form[data-skill-physical-impact]').find(f=>
+   f.elements.namedItem('sourceId')?.value===origin&&f.elements.namedItem('kind')?.value==='survival-accident')||null;
   break;
  }
  case 'skill-fall':form=byHidden('form[data-climbing-fall-form]')||byHidden('form[data-climbing-short-fall]');break;
- case 'skill-injury':form=byHidden('form[data-skill-physical-impact]');break;
+ case 'skill-injury':form=byHidden('form[data-skill-fishing-gear]')||byHidden('form[data-skill-physical-impact]');break;
  case 'weather-shock':form=byHidden('form[data-parallel-cold-reroll]')||byHidden('form[data-weather-shock-followup]');break;
  case 'weather-onset':form=byHidden('form[data-skill-weather-onset]');break;
  case 'weather-course':form=byHidden('form[data-skill-weather-course]');choose(form,'elapsedMinutes',elapsedText);break;
@@ -19657,6 +19660,8 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
    ['healerId','physicianRoll'].map(name=>form.elements.namedItem(name)).find(node=>
     node&&!node.disabled&&!node.closest('[hidden]')&&!String(node.value||'').trim()):null;
   const rollInput=(careTarget?.type!=='hidden'?careTarget:null)||
+   ((kind==='skill-critical'||kind==='skill-injury')?
+    form.querySelector('select:is([name="activity"],[name="itemId"],[name="targetId"]):not([disabled]),input[name="impactDie"]:not([disabled])'):null)||
    (['frost-amputation','coma','extended-shock','weather-shock'].includes(kind)?
     form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),[name="immersionComaHR"]:not([disabled])'):null)||
    (kind==='weather-skin'?skinTarget:
@@ -19671,7 +19676,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
    form.querySelector('input:not([type="hidden"]):is([name="roll"],[name="courseD100"],[name="followRoll"],[name="enduranceD10"],[name="physicianRoll"])'));
   // Calendar/Travel rule links must land on the REAL original input and
   // visibly mark it, not merely open a whole module without a target.
-  if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding','aural-recovery'].includes(kind)&&rollInput&&!rollInput.disabled){
+  if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding','aural-recovery','skill-critical','skill-injury'].includes(kind)&&rollInput&&!rollInput.disabled){
    for(const old of document.querySelectorAll('.hmk-medical-required-target'))old.classList.remove('hmk-medical-required-target');
    if(!rollInput.matches('[data-hmk-chain-value-93918]'))
     (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
