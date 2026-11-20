@@ -13,6 +13,7 @@ export function copySource(journal,sourceId,campaignId){
  if(!start?.writingPlan||!done.skillTestProof?.scribing)return null;
  return {id:sourceId,name:start.projectName,scope:start.scope,text:writingIsText(start),baseMinutes:start.baseMinutes,
   language:start.writingPlan.language,script:start.writingPlan.script,subject:done.skillTestProof.subjectSkill,insight:done.skillTestProof.insightStars,
+  ...(start.writingPlan.variation?{pages:start.writingPlan.variation.pages}:{}),
   ...(start.writingPlan.purpose?{purpose:start.writingPlan.purpose}:{})};
 }
 export function resolveScriptCopy(source,method,input){

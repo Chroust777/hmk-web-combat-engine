@@ -1,6 +1,6 @@
 /** HMK 83, 132: Reading, physical condition and timed reflection. */
 import {writingScripts} from './hmk-scribing-work.js?v=94.003';
-import {copySource} from './hmk-script-copy.js?v=94.002';
+import {copySource} from './hmk-script-copy.js?v=94.006';
 import {resolveSkillTest,adjustSkillResultForTrauma} from './hmk-skill-test-engine.js?v=93.986';
 import {automaticCriticalFailure} from './hmk-skill-consequence-resolution.js';
 
@@ -51,7 +51,7 @@ export function readingSource(journal,id,campaignId){
  if(!source)return null;
  const mod=start?copy.settlement?.readingModifier:row.skillTestProof?.scribing?.outcome?.readingModifier;
  if(!whole(-mod,0,20))return null;
- return {...source,id,originalId:origin,name:source.name+(start?' · opis':''),pages:scopePages[source.scope],legibility:mod};
+ return {...source,id,originalId:origin,name:source.name+(start?' · opis':''),pages:source.pages??scopePages[source.scope],legibility:mod};
 }
 export function resolveReading(source,condition,input){
  const penalty=READING_CONDITION[condition];

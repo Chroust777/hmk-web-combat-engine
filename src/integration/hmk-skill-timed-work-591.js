@@ -5,7 +5,7 @@ import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,
  */
 import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
 import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=93.995';
-import {validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.005';
+import {validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,writingPlannedMinutes,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.006';
 import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
 export const WRITING_WORK_MINUTES_591=Object.freeze({missive:10,tract:5*1440,treatise:30*1440,disquisition:120*1440});
@@ -88,7 +88,7 @@ export function writingProjectState(journal,start){
  const project=start?.calendarSkillProjectStart591;
  if(project?.kind!=='writing')return null;
  const rows=journal.filter(row=>row.calendarCampaignId===start.calendarCampaignId&&row.characterId===start.characterId);
- let state={phase:'initial',readyMinute:project.earliestMinute,startMinute:project.startMinute,baseMinutes:project.baseMinutes*writingDictationFactor(project.writingPlan)};
+ let state={phase:'initial',readyMinute:project.earliestMinute,startMinute:project.startMinute,baseMinutes:writingPlannedMinutes(project.baseMinutes,project.writingPlan)};
  for(const row of rows){
   const link=row.calendarSkillProjectSV591;
   if(link?.startId!==start.id||link.kind!=='writing')continue;
@@ -104,7 +104,7 @@ export function writingProjectState(journal,start){
   const dueMinute=writingCompletionMinute(attempt);
   if(project.scope==='missive'||result?.sv>=5){state={...attempt,phase:'finish',dueMinute};continue;}
   const startMinute=Math.max(dueMinute,row.campaignMinute,follow?.campaignMinute??0);
-  const baseMinutes=Math.ceil(project.baseMinutes*writingDictationFactor(project.writingPlan)*(result?.sv>=3?0.5:1));
+  const baseMinutes=Math.ceil(writingPlannedMinutes(project.baseMinutes,project.writingPlan)*(result?.sv>=3?0.5:1));
   state={...attempt,phase:'retry',startMinute,baseMinutes,readyMinute:startMinute+baseMinutes};
  }
  if(state.phase==='finish'&&rows.some(row=>row.calendarSkillProjectComplete591?.startId===start.id&&
@@ -120,7 +120,7 @@ export function validateSkillTimedWork591(data){
  for(const row of journal){
   const p=row.calendarSkillProjectStart591;if(!p)continue;
   const base=timedSkillBaseMinutes591(p.kind,p.scope);
-  const plannedBase=base*writingDictationFactor(p.writingPlan);
+  const plannedBase=writingPlannedMinutes(base,p.writingPlan);
   assert(p.format===SKILL_TIMED_WORK_FORMAT_591&&base!==null&&
    typeof p.projectName==='string'&&p.projectName.trim().length>=2&&p.projectName.length<=120&&
    p.actorId===row.characterId&&data.characters?.some(c=>c.id===p.actorId)&&
@@ -147,7 +147,7 @@ export function validateSkillTimedWork591(data){
      p.materialSourceConfirmed===true;})():
     (p.calendarDayEligibility600===true?
      (p.kind==='glassworking'&&base%1440===0&&p.earliestMinute===Math.floor((p.startMinute+base)/1440)*1440&&p.baseDueMinute===p.earliestMinute):
-     (p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,plannedBase)&&p.baseDueMinute===p.startMinute+plannedBase)))&&
+     (p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,plannedBase)&&p.baseDueMinute===p.startMinute+Math.ceil(plannedBase))))&&
    !starts.has(row.id)&&
    (!TIMED_CRAFT_ITEMS_599[p.kind]||(
      p.craftItemPriceD===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.priceD&&

@@ -32,12 +32,36 @@ export function writingRollSkills(plan){
  return poetics?{primary:'Creativity',secondary:'Folklore',routineId:'writing-poetics'}:
   {primary:plan?.language,secondary:'Creativity',routineId:'language-written'};
 }
+export const WRITING_PAGES=Object.freeze({missive:1,tract:8,treatise:32,disquisition:128});
+export function writingPageSpread(scope){
+ if(!Object.hasOwn(WRITING_PAGES,scope))return null;
+ const base=WRITING_PAGES[scope];
+ return {min:Math.ceil(base*4/5),max:Math.floor(base*6/5)};
+}
+export function writingVariation(scope,pageDie=null,timeDie=null){
+ const spread=writingPageSpread(scope);
+ const faces=spread?spread.max-spread.min+1:0;
+ const valid=(roll,max)=>Number.isSafeInteger(roll)&&roll>=1&&roll<=max;
+ if(!spread||pageDie===null&&timeDie===null||
+  pageDie!==null&&(faces<2||!valid(pageDie,faces))||timeDie!==null&&!valid(timeDie,41))
+  throw Error('Writing: chybí potvrzený hod v rozsahu kostky pro strany nebo dobu.');
+ return {pageDie,timeDie,pages:pageDie===null?WRITING_PAGES[scope]:spread.min+pageDie-1,
+  timePercent:timeDie===null?100:79+timeDie};
+}
 export function writingDictationFactor(plan){return plan?.mode==='dictation'?1.5:1;}
+export function writingPlannedMinutes(baseMinutes,plan){
+ return baseMinutes*writingDictationFactor(plan)*(plan?.variation?.timePercent??100)/100;
+}
 export function writingIsText(project){return project.writingPlan?.intent!=='missive'&&project.scope!=='missive';}
 export function writingSaleValueD(scope){
  return {tract:45,treatise:240,disquisition:900}[scope]??null;
 }
 export function validWritingPlan(plan,actorId,scope){
+ if(plan?.variation!==undefined){
+  try{
+   if(!plan.variation||JSON.stringify(writingVariation(scope,plan.variation.pageDie,plan.variation.timeDie))!==JSON.stringify(plan.variation))return false;
+  }catch{return false;}
+ }
  return !!plan&&['self','dictation'].includes(plan.mode)&&['missive','text'].includes(plan.intent)&&
   (scope!=='missive'||plan.intent==='missive')&&
   (plan.purpose===undefined||!!writingFixedSubject(plan)&&plan.intent==='text'&&scope!=='missive')&&typeof plan.scribeId==='string'&&plan.scribeId.length>0&&
