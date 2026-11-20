@@ -11,8 +11,9 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
-import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.992';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=93.994';
 import {copySource,findCopyStages} from './hmk-script-copy.js?v=93.993';
+import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=93.994';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
@@ -403,6 +404,19 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   if(done)continue;
   push(person,'script-copy',row.id,test?'Opis · rozdělit hvězdy a dokončit '+source.name:'Opis · nejčasnější hod pro '+source.name,
    test?test.campaignMinute:row.campaignMinute+Math.ceil(source.baseMinutes/2),'skills',{requiresAction:false});
+ }
+ for(const row of journal){
+  const read=row.calendarScriptReading;
+  if(read?.stage!=='start'||row.calendarCampaignId!==clock.campaignId)continue;
+  const person=characters.find(c=>c.id===row.characterId),source=readingSource(journal,read.sourceId,row.calendarCampaignId);
+  if(!person||!source)continue;
+  const stages=readingStages(readingRows(journal,row.calendarCampaignId,row.characterId),row);
+  if(stages.done)continue;
+  const allocation=stages.read?.calendarScriptReading.read;
+  const reflection=stages.reflect?.calendarScriptReading.reflection;
+  const time=allocation?Math.max(allocation.readDue,stages.read.campaignMinute)+(reflection?.reflectionMinutes??0):
+   stages.test?.campaignMinute??row.campaignMinute+Math.ceil(read.pages*5/2);
+  push(person,'script-reading',row.id,'Reading · '+source.name,time,'skills',{requiresAction:false});
  }
  // Tracking SV 3–4 has a *conditional* p.147 Awareness check, not an
  // unconditional extra d100. Restore this obligation from immutable journal.

@@ -3,8 +3,9 @@
  * Existing unscheduled historical skill tests are unchanged.
  */
 import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
-import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600} from './hmk-skill-crafts-600.js';
+import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600} from './hmk-skill-crafts-600.js?v=93.994';
 import {validWritingPlan,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=93.992';
+import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
 export const WRITING_WORK_MINUTES_591=Object.freeze({missive:10,tract:5*1440,treatise:30*1440,disquisition:120*1440});
 export const SKILL_TIMED_WORK_FORMAT_591='hmk-skill-timed-work-591-v1';
@@ -40,10 +41,14 @@ export const TIMED_CRAFT_LABELS_599=Object.freeze({glassworking:'Glassworking ·
 
 export function timedSkillBaseMinutes591(kind,scope){
  if(CRAFT_WORK_600[kind])return CRAFT_WORK_600[kind][scope]?.hours*60??null;
+ if(kind==='jewelcraft'){const days=Number(scope);return Number.isSafeInteger(days)&&days>=1&&days<=10000?days*1440:null;}
  if(kind==='engineering')return Number.isFinite(ENGINEERING_DESIGN_DAYS[scope])?ENGINEERING_DESIGN_DAYS[scope]*1440:null;
  if(kind==='writing')return WRITING_WORK_MINUTES_591[scope]??null;
- if(kind==='drawing'){const area=Number(scope);return Number.isInteger(area*4)&&area>=0.25&&area<=10?area*240:null;}
- if(kind==='cookery'){const diners=Number(scope);return Number.isInteger(diners)&&diners>=5&&diners<=100&&diners%5===0?(diners/5)*60:null;}
+ if(kind==='drawing'){
+  const area=Number(scope),minutes=Math.ceil(Number((area*240).toPrecision(12)));
+  return area>0&&Number.isSafeInteger(minutes)?minutes:null;
+ }
+ if(kind==='cookery'){const diners=Number(scope);return Number.isSafeInteger(diners)&&diners>0&&Number.isSafeInteger(diners*12)?diners*12:null;}
  if(kind==='glassworking'||kind==='woodworking'){
   const item=TIMED_CRAFT_ITEMS_599[kind]?.[scope];
   if(!item)return null;
@@ -104,10 +109,13 @@ export function validateSkillTimedWork591(data){
    typeof row.calendarCampaignId==='string'&&row.calendarCampaignId.length>0&&
    Number.isSafeInteger(p.startMinute)&&p.startMinute>=0&&p.startMinute===row.campaignMinute&&
    p.baseMinutes===base&&
+   (p.kind!=='jewelcraft'||p.materialSourceConfirmed===true&&Number(p.scope)===p.jewelcraft994?.days&&
+    JSON.stringify(jewelcraftWork994(p.jewelcraft994))===JSON.stringify(p.jewelcraft994))&&
    (!p.writingPlan||p.kind==='writing'&&validWritingPlan(p.writingPlan,p.actorId,p.scope))&&
    (CRAFT_WORK_600[p.kind]?(()=>{
-    const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls});
-    const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls);
+    const exactCalendar=p.kind==='ceramics'&&p.craftExact994===true;
+    const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls,exactCalendar});
+    const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls,{exactCalendar});
     return t&&p.earliestMinute===t.dueMinute&&p.baseDueMinute===t.dueMinute&&
      p.craftItemName===reference.craftItemName&&p.craftItemCostD===reference.craftItemCostD&&
      p.craftSourcePage===reference.craftSourcePage&&p.craftDayResolution===reference.craftDayResolution&&
@@ -139,7 +147,7 @@ export function validateSkillTimedWork591(data){
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
    (s.p.kind==='writing'?(s.p.writingPlan?skill===s.p.writingPlan.language:/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)):
-    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
+    skill===({engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
    (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
    (!CRAFT_WORK_600[s.p.kind]||row.campaignMinute>=s.p.earliestMinute),
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');

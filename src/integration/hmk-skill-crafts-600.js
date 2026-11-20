@@ -11,6 +11,13 @@ export const CRAFT_WORK_600=Object.freeze({
   wine:item('Wine · 5 gal',30,18,{agingBaseDays:76,agingDice:4,agingFaces:10,salePriceD:20})
  }),
  ceramics:Object.freeze({
+  amphora15:item('Amphora, 15 gal',112,14,{salePriceD:28,weightLb:28}),
+  bottle2p:item('Bottle, 2 pints',8,1,{salePriceD:2,weightLb:1}),
+  boxLidded:item('Box with lid, 12×8×6 in',12,1.5,{salePriceD:3,weightLb:2}),
+  religiousIcon:item('Icon, religious, 4 in',8,1,{salePriceD:2,weightLb:1}),
+  liddedJar1qt:item('Jar, lidded, 1 quart',20,2.5,{salePriceD:5,weightLb:3}),
+  pot2qt:item('Pot, 2 quart',16,2,{salePriceD:4,weightLb:3}),
+  tile:item('Tile, 4×4×1 in',4,0.5,{salePriceD:1,weightLb:2}),
   beads:item('Beads, 12',24,3,{salePriceD:6,weightLb:2}),
   brick:item('Brick',24,3,{salePriceD:6,weightLb:3}),
   bowl:item('Bowl, 8×4 in',24,3,{salePriceD:6,weightLb:3}),
@@ -62,7 +69,7 @@ export function projectTiming600(kind,scope,startMinute,options={}){
  const baseMinutes=item.hours*60;
  // Only an integral, explicitly day-sized rule is date-gated. Hour-based
  // work is never rounded to a calendar day, even when longer than 24h.
- const dayResolution=['ceramics','mineralogy'].includes(kind)&&Number.isInteger(item.hours/24);
+ const dayResolution=['ceramics','mineralogy'].includes(kind)&&!options.exactCalendar&&Number.isInteger(item.hours/24);
  const dueMinute=dayResolution?calendarDayStart600(startMinute+baseMinutes):startMinute+baseMinutes;
  let aging=null;
  if(kind==='brewing'){
@@ -73,11 +80,20 @@ export function projectTiming600(kind,scope,startMinute,options={}){
  }
  return {baseMinutes,dueMinute,mode:dayResolution?'day':'minute',aging};
 }
-export function confirmCraftStart600(kind,scope,startMinute,agingRolls){
- const entry=CRAFT_WORK_600[kind]?.[scope],schedule=projectTiming600(kind,scope,startMinute,{agingRolls});
+export function confirmCraftStart600(kind,scope,startMinute,agingRolls,{exactCalendar=false}={}){
+ const entry=CRAFT_WORK_600[kind]?.[scope],schedule=projectTiming600(kind,scope,startMinute,{agingRolls,exactCalendar});
  if(!entry||!schedule)throw Error('Nedoložený výrobek, čas nebo skutečné zrací kostky.');
  return Object.freeze({craftItemName:entry.name,craftItemCostD:entry.costD,
    craftSourcePage:({brewing:66,ceramics:66,hideworking:76,textilecraft:86,metalcraft:80,mineralogy:81})[kind],
    craftDayResolution:schedule.mode,craftAgingRolls:schedule.aging?.rolls||[],
    craftAgingDays:schedule.aging?.days??null,craftReadyMinute:schedule.aging?.readyMinute??null});
+}
+
+/** HMK 68: the meal affects the host/cook's persuasion throughout service. */
+export function cookeryEffect994(sv){
+ if(!Number.isSafeInteger(sv))throw Error('Cookery vyžaduje platné SV.');
+ if(sv<=0)return {quality:'Nejedlé',persuasion:-20,nauseaCheck:true};
+ if(sv<=2)return {quality:'Fádní',persuasion:-10,nauseaCheck:false};
+ if(sv<=4)return {quality:'Dostačující',persuasion:0,nauseaCheck:false};
+ return {quality:'Chutné',persuasion:5*Math.min(5,sv-4),nauseaCheck:false};
 }
