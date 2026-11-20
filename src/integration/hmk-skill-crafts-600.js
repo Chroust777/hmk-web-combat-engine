@@ -53,7 +53,10 @@ export const CRAFT_WORK_600=Object.freeze({
   hammer:item('Hammer',10,2),pan:item('Pan, copper',20,10),
   pitons:item('Pitons, iron, 6',10,3),platePewter:item('Plate, pewter',10,1.75),
   plateTin:item('Plate, tin',10,2.5),ploughshare:item('Ploughshare',60,15),
-  spade:item('Spade/Shovel',15,3),nails:item('Spikes/Nails, 24',5,1.25)
+  spade:item('Spade/Shovel',15,3),nails:item('Spikes/Nails, 24',5,1.25),
+  horseshoes:item('Horseshoes, 4',10,2.5),surgeryTools:item('Surgery tools',50,10),
+  // Page 80 prints 30d for Scythe, even though its other work times use hours.
+  scythe:item('Scythe',30*24,6,{durationDays:30})
  }),
  mineralogy:Object.freeze({
   firePot:item('Fire Pot · 1 pt',24,12,{mineralMix:'fire'}),
@@ -62,6 +65,7 @@ export const CRAFT_WORK_600=Object.freeze({
 });
 export const CRAFT_LABELS_600=Object.freeze({brewing:'Brewing · HMK 66',ceramics:'Ceramics · HMK 66',hideworking:'Hideworking · HMK 76',textilecraft:'Textilecraft · HMK 86',metalcraft:'Metalcraft · HMK 80',mineralogy:'Mineralogy · HMK 81'});
 export const CRAFT_SKILL_600=Object.freeze(Object.fromEntries(Object.keys(CRAFT_WORK_600).map(x=>[x,x.charAt(0).toUpperCase()+x.slice(1)])));
+export const craftDurationText600=entry=>entry.durationDays?entry.durationDays+' dní':entry.hours+' h';
 export const DAY_MINUTES_600=1440;
 export const calendarDayStart600=minute=>Math.floor(minute/DAY_MINUTES_600)*DAY_MINUTES_600;
 export function projectTiming600(kind,scope,startMinute,options={}){

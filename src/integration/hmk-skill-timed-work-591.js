@@ -5,7 +5,7 @@ import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,
  * Existing unscheduled historical skill tests are unchanged.
  */
 import {ENGINEERING_DESIGN_DAYS,recomputeEngineeringDesign,engineeringDesignWorkMinutes} from './hmk-engineering-design-548.js?v=94.007';
-import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=93.995';
+import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=94.011';
 import {validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,writingPlannedMinutes,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.006';
 import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
@@ -36,12 +36,12 @@ export const TIMED_CRAFT_ITEMS_599=Object.freeze({
   cup:Object.freeze({name:'Cup',priceD:3,weightLb:1}),
   ladder8:Object.freeze({name:'Ladder, 8 ft',priceD:6,weightLb:19}),
   chair:Object.freeze({name:'Chair',priceD:12,weightLb:7}),
-  chest:Object.freeze({name:'Chest, 1×2×2 ft',priceD:18,weightLb:24}),
+  chest:Object.freeze({name:'Chest, 1×2×2 ft',priceD:18,weightLb:24,decorative:true}),
   table:Object.freeze({name:'Table, 4×2×6 ft',priceD:36,weightLb:47}),
   wheelbarrow:Object.freeze({name:'Wheelbarrow',priceD:10,weightLb:24}),
-  decoratedBox:Object.freeze({name:'Box, 12×8×6 in',priceD:2,weightLb:3}),
+  decoratedBox:Object.freeze({name:'Box, 12×8×6 in',priceD:2,weightLb:3,decorative:true}),
   bucket3:Object.freeze({name:'Bucket, 3 gal',priceD:8,weightLb:10}),
-  cabinet:Object.freeze({name:'Cabinet',priceD:144,weightLb:60}),
+  cabinet:Object.freeze({name:'Cabinet',priceD:144,weightLb:60,decorative:true}),
   cage27:Object.freeze({name:'Cage, 27 ft³',priceD:15,weightLb:40}),
   cage1:Object.freeze({name:'Cage, 1 ft³',priceD:7,weightLb:4}),
   trunk:Object.freeze({name:'Trunk, 1½×2×3½ ft',priceD:12,weightLb:40}),

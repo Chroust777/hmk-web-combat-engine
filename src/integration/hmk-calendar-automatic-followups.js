@@ -446,11 +446,11 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
  }
  for(const row of journal){
   const project=row.calendarSkillProjectStart591;
-  if(!['glassworking','woodworking'].includes(project?.kind)||row.calendarCampaignId!==clock.campaignId||
+  if(!['glassworking','metalcraft','woodworking'].includes(project?.kind)||row.calendarCampaignId!==clock.campaignId||
    journal.some(x=>x.calendarSkillProjectSV591?.startId===row.id))continue;
   const person=characters.find(c=>c.id===row.characterId);
   if(person)push(person,'printed-craft-project',row.id,
-   (project.kind==='glassworking'?'Glassworking':'Woodworking')+' · '+project.projectName+' · provést Success Value',
+   project.kind[0].toUpperCase()+project.kind.slice(1)+' · '+project.projectName+' · provést Success Value',
    project.earliestMinute,'skills',{requiresAction:false});
  }
  for(const row of journal){

@@ -65,8 +65,8 @@ import {catchSource93908,createCatchCarry93908,createFreshCatchCarry93912,discar
 import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltStart93912,wildSaltFinish93912,validateWildFreshness93912,assertWildDueBeforeAdvance93912} from './src/integration/hmk-wild-freshness-93912.js?v=93.914';
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign,engineeringDesignWorkMinutes} from './src/integration/hmk-engineering-design-548.js?v=94.007';
-import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=93.995';
-import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.009';
+import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,craftDurationText600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=94.011';
+import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.011';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -222,7 +222,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.009';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.011';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -321,7 +321,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.009';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.011';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -395,7 +395,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.010';
+const APP_VERSION='94.011';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5689,7 +5689,7 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
  ${kind==='writing'?writingPlanFields992(actor):''}
  ${kind==='brewing'?`<input type="hidden" name="brewAgingDice"><label data-brew-spirit-months hidden>Dodatečné zrání destilátu
  <select name="spiritMonths"><option value="0">Bez prodloužení</option>${[3,4,5,6].map(n=>`<option value="${n}">${n} měsíce navíc</option>`).join('')}</select></label>`:''}
- <p class="hsk-project-time-preview" data-hmk-project-time-preview-591 aria-live="polite"></p>${(TIMED_CRAFT_ITEMS_599[kind]||CRAFT_WORK_600[kind])?`<p class="tiny">Pravidlová doba vychází z tištěné ceny zvoleného výrobku. Tímto zápisem <strong>nevznikne inventární předmět</strong> a <strong>neodečtou se automaticky materiály ani peníze</strong>. Výrobce musí mít skutečné materiály a příslušné podmínky.</p><label class="hsk-check"><input type="checkbox" name="materialSourceConfirmed" required> GM potvrzuje skutečné materiály, pracovní podmínky a že tato činnost opravdu začala</label>`:''}<button type="submit" class="secondary">Zapsat zahájení do kalendáře</button></form>
+ <p class="hsk-project-time-preview" data-hmk-project-time-preview-591 aria-live="polite"></p>${(TIMED_CRAFT_ITEMS_599[kind]||CRAFT_WORK_600[kind])?`<p class="tiny">Cena a doba vycházejí z pravidel pro zvolený výrobek. Tímto zápisem <strong>nevznikne inventární předmět</strong> a <strong>neodečtou se automaticky materiály ani peníze</strong>. Výrobce musí mít skutečné materiály a příslušné podmínky.</p><label class="hsk-check"><input type="checkbox" name="materialSourceConfirmed" required> GM potvrzuje skutečné materiály, pracovní podmínky a že tato činnost opravdu začala</label>`:''}<button type="submit" class="secondary">Zapsat zahájení do kalendáře</button></form>
  <div class="hsk-project-pending-list">${pending.map(j=>{
   const p=j.calendarSkillProjectStart591,linked=data.journal.find(x=>x.calendarSkillProjectSV591?.startId===j.id),nowDue=p.baseDueMinute;
   const writing=writingProjectState(data.journal,j);
@@ -5704,7 +5704,7 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
   const faerieLink=canLinkFaerie?'<button type="button" class="secondary" data-workshop-faerie-link="'+esc(j.id)+'">Zahájit Faeriecraft pro tuto zakázku</button>':'';
   const variation=p.writingPlan?.variation;
   const variant=variation?` · ${variation.pages} str. · doba ${variation.timePercent} %`:'';
-  return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong>${variant} · ${esc(TIMED_SKILL_NAMES_600[p.kind]||p.kind)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.scope)}<p>Začátek ${esc(displayCampaignMinute(p.startMinute))}. Nejčasnější možný test ${esc(displayCampaignMinute(p.earliestMinute))}${now<p.earliestMinute?' · zbývá '+esc(chronicleRemainingTime(p.earliestMinute-now)):''}. Základní dokončení ${esc(displayCampaignMinute(nowDue))}. ${linked?(p.kind==='brewing'?'SV kvality uložen; zrání čeká na potvrzení.':isWorkshopCraft(p.kind)?'SV uložen. Pokračujte výsledkem zakázky níže.':'SV již uložen.'):'Po skutečně uplynulé době proveď původní Success Value. Založení projektu není hod a nevytvoří inventář.'}</p>${faerieLink}</div>`;
+  return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong>${variant} · ${esc(TIMED_SKILL_NAMES_600[p.kind]||p.kind)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.craftItemName||p.scope)}<p>Začátek ${esc(displayCampaignMinute(p.startMinute))}. Nejčasnější možný test ${esc(displayCampaignMinute(p.earliestMinute))}${now<p.earliestMinute?' · zbývá '+esc(chronicleRemainingTime(p.earliestMinute-now)):''}. Základní dokončení ${esc(displayCampaignMinute(nowDue))}. ${linked?(p.kind==='brewing'?'SV kvality uložen; zrání čeká na potvrzení.':isWorkshopCraft(p.kind)?'SV uložen. Pokračujte výsledkem zakázky níže.':'SV již uložen.'):'Po skutečně uplynulé době proveď původní Success Value. Založení projektu není hod a nevytvoří inventář.'}</p>${faerieLink}</div>`;
  }).join('')||'<p class="tiny">Žádný otevřený projekt vybraného druhu.</p>'}</div>
  ${kind==='engineering'?engineeringFinishHTML(actor,now):kind==='brewing'?brewingFinishHTML995(actor,now):isWorkshopCraft(kind)?fletchingFinishHTML996(actor,now,kind):''}</section>`;
 }
@@ -5717,7 +5717,7 @@ function decorateTimedSkillProject591(root){
   const update=()=>{
    const rewriteScope=refreshWritingPlan992(create);
    const isText=create.elements.namedItem('writingIntent')?.value==='text';
-   const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD}d · ${item.hours} pracovních hodin${item.agingDice?' + '+item.agingDice+'d'+item.agingFaces+' zrání':''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name} · ${item.priceD}d · ${timedSkillBaseMinutes591(kind.value,key)/60} hodin`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
+   const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD} d · ${craftDurationText600(item)}${item.agingDice?' + '+item.agingDice+'d'+item.agingFaces+' zrání':''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name}${item.decorative?' [d]':''} · ${item.priceD} d · ${timedSkillBaseMinutes591(kind.value,key)/60} h`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
    const last=scope.value;
    if(scope.tagName==='SELECT'){
     scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${isWorkshopCraft(kind.value)?'':esc(key)+' · '}${esc(description)}</option>`).join('');
@@ -5773,7 +5773,10 @@ function decorateTimedSkillProject591(root){
     const glassDay=kind.value==='glassworking'&&base%1440===0;
     const due=timing?.dueMinute??(glassDay?calendarDayStart600(now+base):now+skillTimedEarliest591(kind.value,base,create.elements.namedItem('engineeringRandomTime')?.checked));
     const material=printedCraftMaterialCost(kind.value,scope.value);
-    preview.textContent=(material===null?'':'Materiál '+material.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' d · ')+'Pracovní doba '+(base/60)+' h. Nejčasnější SV '+displayCampaignMinute(due)+(timing?.mode==='day'||glassDay?' · termín dle herního dne (od 00:00).':' · přesný čas.')+(kind.value==='brewing'?' Zrání se doloží samostatnými skutečnými hody při zahájení; SV hodnotí kvalitu po práci.':'')+' Záznam není automatickým zaplacením materiálu ani vytvořením výrobku.';
+    const recipe=CRAFT_WORK_600[kind.value]?.[scope.value];
+    const label=recipe?craftDurationText600(recipe):(base/60)+' h';
+    const cost=material??recipe?.costD??null;
+    preview.textContent=(cost===null?'':'Materiál '+cost.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' d · ')+'Pracovní doba '+label+'. Nejčasnější SV '+displayCampaignMinute(due)+(timing?.mode==='day'||glassDay?' · termín dle herního dne (od 00:00).':' · přesný čas.')+(kind.value==='brewing'?' Zrání se doloží samostatnými skutečnými hody při zahájení; SV hodnotí kvalitu po práci.':'')+' Záznam není automatickým zaplacením materiálu ani vytvořením výrobku.';
    }
   };
   if(!create.dataset.timedInit591){create.dataset.timedInit591='yes';kind.addEventListener('change',update);scope.addEventListener('change',update);if(scope.tagName==='INPUT')scope.addEventListener('input',update);create.querySelector('[data-hmk-writing-plan]')?.addEventListener('change',update);create.elements.namedItem('engineeringRandomTime')?.addEventListener('change',update);create.elements.namedItem('jewelTime')?.addEventListener('change',update);create.elements.namedItem('fletchingProvider')?.addEventListener('change',update);}
@@ -5791,7 +5794,7 @@ function decorateTimedSkillProject591(root){
   writingRollSkills(j.calendarSkillProjectStart591.writingPlan).primary===skill:isWritingLanguage(skill)):skill===TIMED_SKILL_NAMES_600[j.calendarSkillProjectStart591.kind]));
  const signature=JSON.stringify(matches.map(j=>[j.id,timedProjectTestMinute591(j)]));
  if(picker.dataset.optionsSignature!==signature){
-  picker.innerHTML='<option value="">— vyberte doložený projekt —</option>'+matches.map(j=>{const p=j.calendarSkillProjectStart591;return `<option value="${esc(j.id)}">${esc(p.projectName)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.scope)} · test nejdříve ${esc(displayCampaignMinute(timedProjectTestMinute591(j)))}</option>`;}).join('');
+  picker.innerHTML='<option value="">— vyberte doložený projekt —</option>'+matches.map(j=>{const p=j.calendarSkillProjectStart591;return `<option value="${esc(j.id)}">${esc(p.projectName)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.craftItemName||p.scope)} · test nejdříve ${esc(displayCampaignMinute(timedProjectTestMinute591(j)))}</option>`;}).join('');
   picker.dataset.optionsSignature=signature;
  }
  const selectedProject=matches.some(j=>j.id===current)?current:matches[0]?.id||'';
