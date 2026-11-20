@@ -4,8 +4,8 @@ import {engineeringDesignCandidate,ENGINEERING_DESIGN_DAYS} from './hmk-engineer
 /** Skill Workbench v93.274: clearer HMK pp.60–62 separation.
  * Secondary Mastery is no longer a standalone d10-only gadget.
  */
-import {availableMasteries,canResolveOpposedTie} from './hmk-skill-test-engine.js';
-import {automaticSkillContext} from './hmk-skill-auto-context.js';
+import {availableMasteries,canResolveOpposedTie} from './hmk-skill-test-engine.js?v=93.979';
+import {automaticSkillContext} from './hmk-skill-auto-context.js?v=93.979';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './hmk-skill-load-evidence.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineEligible} from './hmk-skill-secondary-routines.js';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES} from './hmk-special-secondary-routines.js';
@@ -15,7 +15,7 @@ import {activeShamanSkillModifier} from './hmk-shaman-talisman-state.js';
 import {darkvisionSkillEvidence} from './hmk-alchemy-darkvision-skill.js';
 const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stars=n=>n>0?'★'.repeat(Math.min(10,n)):'—';
-function masteries(character,name,selected=''){const entries=availableMasteries(character);return `<select name="${name}" required>${entries.map(x=>`<option value="${E(x.name)}" ${x.name===selected?'selected':''}>${E(x.name)} · ML ${x.ml}</option>`).join('')}</select>`;}
+function masteries(character,name,selected=''){const entries=availableMasteries(character,{includeGMSenses:true});return `<select name="${name}" required>${entries.map(x=>`<option value="${E(x.name)}" ${x.name===selected?'selected':''}>${E(x.name)} · ML ${x.ml}</option>`).join('')}</select>`;}
 function optional(character,name){return `<select name="${name}"><option value="">— žádný —</option>${availableMasteries(character).map(x=>`<option value="${E(x.name)}">${E(x.name)} · ML ${x.ml}</option>`).join('')}</select>`;}
 function result(id){return `<output id="${id}" class="hsk-workbench-result hsk-result-slot" role="status" aria-live="polite">Výsledek testu se zobrazí zde.</output>`;}
 function automaticPreview(actor,inventory,skill,minute=null){try{
@@ -170,7 +170,7 @@ export function skillSpecificNextHTML(journal,actorId,campaignId,originId=null,o
   (only===null||only==='engineering'?engineeringDesignNextHTML(subset,actorId,campaignId):'');
 }
 export function skillWorkbenchHTML(character,roster,inventory=[],journal=[],activeTab='secondary',calendarMinute=null,campaignId=null,selectedFollowup='none'){
- const entries=availableMasteries(character),rivals=roster.filter(c=>c.id!==character.id),first=rivals[0],firstSkill=entries[0]?.name??'';
+ const entries=availableMasteries(character,{includeGMSenses:true}),rivals=roster.filter(c=>c.id!==character.id),first=rivals[0],firstSkill=entries[0]?.name??'';
  const last=[...journal].filter(x=>x.characterId===character.id&&x.skillTestProof&&['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(x.skillTestProof.type)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
  const prior=last?.skillTestProof?.result;
  const resolvedTies=new Set(journal.filter(x=>x.skillTestProof?.type==='opposed-tiebreak').map(x=>x.skillTestProof.originSkillTestId));

@@ -2,15 +2,16 @@
  * Existing src/rules/tests.js is the only numerical rule engine.
  */
 import {SL,indexOf,effectiveMasteryLevel,successLevel,successValue,secondaryModifier,secondaryRoll,opposed} from '../rules/tests.js';
-import {calculateSheetSkills} from './hmk-character-creation.js';
+import {calculateSheetSkills,gmSenseRows} from './hmk-character-creation.js?v=93.979';
 const ATTRIBUTE_LABELS={str:'Strength',end:'Endurance',dex:'Dexterity',agl:'Agility',per:'Perception',cml:'Comeliness',aur:'Aura',wil:'Will',rea:'Reasoning',cre:'Creativity',emp:'Empathy',elo:'Eloquence'};
 export const SUCCESS_LEVEL_NAMES=Object.freeze(['CF','F','S','CS']);
 const integer=(n,min,max,label)=>{if(!Number.isSafeInteger(n)||n<min||n>max)throw Error(label+' musí být celé číslo '+min+' až '+max);return n;};
-export function availableMasteries(character){
+export function availableMasteries(character,{includeGMSenses=false}={}){
  const h=character?.hmk??{};const result=[],seen=new Set();
+ let skillList;
  function add(kind,name,ml){if(!name||!Number.isSafeInteger(ml)||ml<1||ml>1000||seen.has(name))return;seen.add(name);result.push({kind,name,ml,index:indexOf(ml)});}
  if(h.creation){
-  const skillList=calculateSheetSkills(character);
+  skillList=calculateSheetSkills(character);
   // Weakness p.274 weakens STR-dependent skills but must NOT induce an
   // extra Shock-test penalty from lost STR (the torpor offsets the pain).
   const totalWeakness=(h.alchemyWeaknessLosses??[]).reduce((n,x)=>n+x.decrease,0);
@@ -20,10 +21,14 @@ export function availableMasteries(character){
    unaffected.hmk.attributes.str+=totalWeakness;
    naturalShock=calculateSheetSkills(unaffected).find(x=>x.name==='Shock')?.ml??null;
   }
-  for(const s of skillList)if(s.ml!==null&&s.sm>0)
+  for(const s of skillList)if(s.ml!==null&&s.sm>0&&(!includeGMSenses||!['Sight','Sound','Odour'].includes(s.name)))
    add('skill',s.name,s.name==='Shock'&&naturalShock!==null?naturalShock:s.ml);
  }
  else for(const s of h.skills??[])add('skill',s.name,s.ml);
+ if(includeGMSenses)for(const row of gmSenseRows(character,skillList)){
+  if(Number.isSafeInteger(row.score))add('attribute',row.attribute,row.score*5);
+  add('skill',row.skill,row.ml);
+ }
  for(const [key,label] of Object.entries(ATTRIBUTE_LABELS)){const x=h.attributes?.[key];if(Number.isSafeInteger(x)&&x>0)add('attribute',label,x*5);}
  return result.sort((a,b)=>a.name.localeCompare(b.name,'cs',{sensitivity:'base'})||a.kind.localeCompare(b.kind));
 }

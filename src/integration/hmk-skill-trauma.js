@@ -5,7 +5,7 @@ import {validateCombatState} from './persistent-combat-state.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {impairedTestZones} from '../rules/injury-effects.js';
 import {resolveCombatantLoad,bulkForTest} from './combatant-load.js';
-import {skillDefinition,perceptionDefinition} from './hmk-character-creation.js';
+import {skillDefinition,perceptionDefinition} from './hmk-character-creation.js?v=93.979';
 const BODY_ZONES=['head','arms','torso','legs'];
 // Healed wounds remain in the immutable character history, but no longer
 // count as a live injury unless HMK records a permanent impairment.
@@ -17,13 +17,14 @@ const num=(v,max,label)=>{if(v===null||v===undefined||String(v).trim()===''||!Nu
 const whichMode=(s,label)=>{if(!['auto','manual','omit'].includes(s))throw Error(label+': neznámé rozhodnutí');return s;};
 export function impairedSkillKind(actor,name){
  if(IMPAIRED_NAME[name])return IMPAIRED_NAME[name];
+ if(DERIVED_PER.has(name))return 'awareness';
  if(ATTRIBUTES.has(name))return null;
  const def=skillDefinition(actor,name);
  if(def?.group==='Craft')return 'crafts';
  return null;
 }
 export function skillPerceptionApplicability(actor,name){
- if(name==='Perception'||DERIVED_PER.has(name))return 'applies';
+ if(['Perception','Eyesight','Hearing','Smell'].includes(name)||DERIVED_PER.has(name))return 'applies';
  if(ATTRIBUTES.has(name))return 'not-applicable';
  const def=skillDefinition(actor,name);if(!def)return 'unknown';
  const sb=perceptionDefinition(actor,def);

@@ -136,6 +136,11 @@ export const SKILL_DEFINITIONS=Object.freeze(DEFINITIONS.map(([group,name,primar
  */
 export const PERCEPTION_MODES=Object.freeze(['standard','subattributes']);
 export const PERCEPTION_SENSES=Object.freeze(['eye','hrg','sml']);
+export const GM_SENSES=Object.freeze([
+ {key:'eye',attribute:'Eyesight',skill:'Sight'},
+ {key:'hrg',attribute:'Hearing',skill:'Sound'},
+ {key:'sml',attribute:'Smell',skill:'Odour'}
+]);
 const SUBATTRIBUTE_REPLACEMENTS=Object.freeze({
  'Brewing':['sml','rea'],'Cookery':['sml','rea'],'Embalming':['rea','sml'],
  'Mercantilism':['rea','eye'],'Perfumery':['sml','rea'],'Physician':['rea','eye'],'Script':['rea','eye'],
@@ -209,6 +214,43 @@ export function skillBase(primary,secondary){
  const average=(primary+secondary)/2;
  return primary>secondary?Math.ceil(average):Math.floor(average);
 }
+// Standalone GM tests use these projections. The campaign's PER mode and
+// ordinary skill calculations never read the optional dice or extra DP.
+export function gmSenseRows(character,skills){
+ const h=character?.hmk??{},attrs=h.attributes??{};
+ const rows=skills??(h.creation?calculateSheetSkills(character):h.skills??[]);
+ const awareness=rows.find(row=>row.name==='Awareness');
+ return GM_SENSES.map(sense=>{
+  const {key,skill}=sense;
+  const proof=[h.gmSenseProof?.[key],h.creation?.perceptionProof?.[key]].find(p=>
+   p&&p.folk===h.folk&&p.ageGroup===h.ageGroup&&p.kind===(character?.kind||'PC')&&Number.isSafeInteger(p.score));
+  const score=(proof?.score??attrs.per)??null;
+  const trained=perceptionMode(character)==='subattributes'?rows.find(row=>row.name===skill):awareness;
+  const dp=h.gmSenseDP?.[key]??0;
+  const sb=proof&&h.creation?skillBase(score,attrs.wil):trained?.sb??skillBase(attrs.per,attrs.wil);
+  let ml=trained?.ml??null;
+  if(sb!==null&&Number.isSafeInteger(trained?.sm)){
+   const multiple=trained.sm+(trained.boosts?.length??0)+dp;
+   ml=boostedMastery(sb,Math.min(5,multiple),Math.max(0,multiple-5)).ml;
+  }else if(sb!==null&&Number.isSafeInteger(ml)&&dp>0){
+   // Legacy sheets only document final ML. Keep that ML and add training
+   // from the current position without guessing its original DP ledger.
+   const ordinary=Math.min(dp,Math.max(0,5-Math.ceil(ml/sb)));
+   ml=boostedMastery(sb,0,dp-ordinary,ml+ordinary*sb).ml;
+  }
+  return {...sense,score,proof,sb,ml,dp};
+ });
+}
+
+function boostedMastery(sb,sm,boosts,ml=sb===null?null:sb*sm){
+ const increase=[];
+ while(boosts>0&&ml!==null){
+  const boost=ml<=39?10:ml<=44?9:ml<=49?8:ml<=59?7:ml<=69?6:ml<=79?5:ml<=99?4:3;
+  const applied=Math.min(boost,Math.max(0,sb*7-ml));
+  increase.push({from:ml,boost:applied});ml+=applied;boosts--;
+ }
+ return {ml,increase};
+}
 export function skillDefinition(character,name){
  const ordinary=SKILL_DEFINITIONS.find(x=>x.name===name);
  if(ordinary)return ordinary;
@@ -231,9 +273,8 @@ export function calculateSkill(definition,attributes,allocations={}){
  if(gmBonus)sources.push({stage:'GM Bonus Languages',dp:gmBonus});
  const totalDP=sources.reduce((n,x)=>n+x.dp,0);
  if(sources.some(x=>!Number.isSafeInteger(x.dp)||x.dp<0||x.dp>100))throw Error('Neplatná alokace Skill DP');
- const bonusSM=definition.foreignBoost??0;const sm=Math.min(5,definition.baseSM+totalDP+bonusSM);let boosts=Math.max(0,definition.baseSM+totalDP+bonusSM-5);
- let ml=sb===null?null:sb*sm;
- const increase=[];while(boosts>0&&ml!==null){const boost=ml<=39?10:ml<=44?9:ml<=49?8:ml<=59?7:ml<=69?6:ml<=79?5:ml<=99?4:3;const applied=Math.min(boost,Math.max(0,sb*7-ml));increase.push({from:ml,boost:applied});ml+=applied;boosts--;}
+ const bonusSM=definition.foreignBoost??0;const sm=Math.min(5,definition.baseSM+totalDP+bonusSM);
+ const {ml,increase}=boostedMastery(sb,sm,Math.max(0,definition.baseSM+totalDP+bonusSM-5));
  return {...definition,sb,sm,ml,bonusSM,primaryValue:a??null,secondaryValue:b??null,baseML:sb===null?null:sb*definition.baseSM,dp:sources,totalDP,boosts:increase,mlCap:sb===null?null:sb*7};
 }
 export function calculateSheetSkills(character){

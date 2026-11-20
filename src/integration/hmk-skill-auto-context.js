@@ -6,8 +6,8 @@
  */
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 import {completeParalysis,blockedLimbs} from './hmk-paralysis-sequela.js';
-import {resolveSkillConditions,skillConditionAvailability,encApplicability} from './hmk-skill-context.js';
-import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability,hasLiveInjury} from './hmk-skill-trauma.js';
+import {resolveSkillConditions,skillConditionAvailability,encApplicability} from './hmk-skill-context.js?v=93.979';
+import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability,hasLiveInjury} from './hmk-skill-trauma.js?v=93.979';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {resolveOwnedArmourArticle} from './live-combat-armour.js';
@@ -88,13 +88,13 @@ export function automaticSkillContext({actor,inventory=[],name,combatRound=null,
   throw Error('HMK str.184: ochrnutá noha – tento test může používat postiženou končetinu; bez rozhodnutí GM jej nelze vyhodnotit.');
  const hasDeafness=(state.ailmentSequelae||[]).some(x=>x.active&&x.condition==='deafness');
  const mayHear=['Awareness','Perception'].includes(name);
- const certainHearing=name==='Sound';
+ const certainHearing=['Sound','Hearing'].includes(name);
  if(hasDeafness&&mayHear&&!['hearing','other'].includes(sensoryBasis))
   throw Error('Trvalá hluchota (p184): GM musí označit, zda PER/Awareness test vyžaduje SLUCH (automatické CF), nebo jiný smysl.');
  const deafnessForcedCF=hasDeafness&&(certainHearing||(mayHear&&sensoryBasis==='hearing'));
  const hasBlindness=(state.ailmentSequelae||[]).some(x=>x.active&&x.condition==='blindness');
  const baseAttrs=encApplicability(base.actor,name);
- if(hasBlindness&&name==='Sight')throw Error('Trvalá slepota (HMK 184): Sight vyžaduje zrak; nelze provést běžný test. GM musí vyřešit nemožnou činnost.');
+ if(hasBlindness&&['Sight','Eyesight'].includes(name))throw Error('Trvalá slepota (HMK 184): Sight vyžaduje zrak; nelze provést běžný test. GM musí vyřešit nemožnou činnost.');
  if(hasBlindness&&mayHear){
   if(!['sight','other'].includes(visionBasis))throw Error('Trvalá slepota (HMK 184): GM musí u PER/Awareness potvrdit, zda je test založen na ZRAKU, nebo jiném smyslu.');
   if(visionBasis==='sight')throw Error('Trvalá slepota (HMK 184): čistě zrakový PER/Awareness test není možný; nehází se d100.');

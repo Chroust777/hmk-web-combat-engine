@@ -1,14 +1,14 @@
 /** Read-only Skill Workbench condition adapter (HMK v1.2 pp.60–62,112,122,176).
  * Never creates or updates combat status; unknown evidence is NOT treated as zero.
  */
-import {skillDefinition,perceptionDefinition} from './hmk-character-creation.js';
+import {skillDefinition,perceptionDefinition} from './hmk-character-creation.js?v=93.979';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
 import {fatigueEMLModifier} from './melee-fatigue.js';
 import {encumbranceTestPenalty} from '../rules/encumbrance.js';
 const I=(value,min,max,label)=>{const n=Number(value);if(value===null||value===undefined||(typeof value==='string'&&value.trim()==='')||!Number.isSafeInteger(n)||n<min||n>max)throw Error(label+': vyžaduje doložené celé číslo '+min+' až '+max);return n;};
 const DERIVED_SKILL_BASES=Object.freeze({Shock:['str','end'],Dodge:['agl','per'],Sight:['eye','wil'],Sound:['hrg','wil'],Odour:['sml','wil']});
-const ATTRIBUTE_NAMES=new Set(['Strength','Endurance','Dexterity','Agility','Perception','Comeliness','Aura','Will','Reasoning','Creativity','Empathy','Eloquence']);
+const ATTRIBUTE_NAMES=new Set(['Strength','Endurance','Dexterity','Agility','Perception','Eyesight','Hearing','Smell','Comeliness','Aura','Will','Reasoning','Creativity','Empathy','Eloquence']);
 export function encApplicability(actor,name){
  if(name==='Agility')return {kind:'applies',source:'attribute-agility'};
  if(ATTRIBUTE_NAMES.has(name))return {kind:'not-applicable',source:'attribute-without-agility'};
