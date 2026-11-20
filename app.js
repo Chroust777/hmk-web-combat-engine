@@ -40,7 +40,7 @@ import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} f
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
-import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js';
+import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=93.978';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.964';
 import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.972';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.977';
+const APP_VERSION='93.978';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -14017,10 +14017,10 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  }
  // Explicitly end this UI attempt after the original immutable Skill receipt was saved.
  // A fresh independent test requires a new click, not a new render or Enter.
+ if(view==='skills'&&proof?.type==='opposed-tiebreak')render();
  if(view==='skills'&&['secondary-mastery-test','secondary-mastery-value-test',
-   'opposed-success-test','assistance-success-test','special-secondary-roll','opposed-tiebreak'].includes(proof?.type)){
+   'opposed-success-test','assistance-success-test','special-secondary-roll'].includes(proof?.type)){
   const formId=proof.type==='special-secondary-roll'?'hsk-special-sr-form':
-   proof.type==='opposed-tiebreak'?'skill-tiebreak-form':
    proof.type==='assistance-success-test'?'skill-assistance-form':
    proof.type==='secondary-mastery-value-test'?'skill-value-form':'skill-secondary-form';
   skillCompletion93928={actorId:selected,tab:activeSkillTab,formId,receiptId:savedId};
