@@ -3,7 +3,7 @@ import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,
  * Read-only arithmetic/validation. Never invents a roll or a project.
  * Existing unscheduled historical skill tests are unchanged.
  */
-import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
+import {ENGINEERING_DESIGN_DAYS,recomputeEngineeringDesign,engineeringDesignWorkMinutes} from './hmk-engineering-design-548.js?v=94.007';
 import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=93.995';
 import {validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,writingPlannedMinutes,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.006';
 import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
@@ -76,7 +76,8 @@ export function printedCraftMaterialCost(kind,scope){
  if(!item)return null;
  return kind==='glassworking'?item.priceD*5/12:item.weightLb/30;
 }
-export function skillTimedEarliest591(kind,baseMinutes){
+export function skillTimedEarliest591(kind,baseMinutes,engineeringRandomTime=false){
+ if(kind==='engineering'&&engineeringRandomTime)return Math.ceil(baseMinutes*56/100);
  // Without optional randomization, up to 3 successful Maths dice AFTER the
  // first two reduce Engineering design time by 30%. Up to 5 SV stars may
  // reduce Writing Routine by 50%. This is only an earliest possible TEST,
@@ -127,6 +128,7 @@ export function validateSkillTimedWork591(data){
    typeof row.calendarCampaignId==='string'&&row.calendarCampaignId.length>0&&
    Number.isSafeInteger(p.startMinute)&&p.startMinute>=0&&p.startMinute===row.campaignMinute&&
    p.baseMinutes===base&&
+   (p.engineeringRandomTime===undefined||p.kind==='engineering'&&typeof p.engineeringRandomTime==='boolean')&&
    (p.kind!=='jewelcraft'||p.materialSourceConfirmed===true&&Number(p.scope)===p.jewelcraft994?.days&&
     JSON.stringify(jewelcraftWork994(p.jewelcraft994))===JSON.stringify(p.jewelcraft994))&&
    (!p.writingPlan||p.kind==='writing'&&validWritingPlan(p.writingPlan,p.actorId,p.scope))&&
@@ -147,7 +149,7 @@ export function validateSkillTimedWork591(data){
      p.materialSourceConfirmed===true;})():
     (p.calendarDayEligibility600===true?
      (p.kind==='glassworking'&&base%1440===0&&p.earliestMinute===Math.floor((p.startMinute+base)/1440)*1440&&p.baseDueMinute===p.earliestMinute):
-     (p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,plannedBase)&&p.baseDueMinute===p.startMinute+Math.ceil(plannedBase))))&&
+     (p.earliestMinute===p.startMinute+skillTimedEarliest591(p.kind,plannedBase,p.engineeringRandomTime)&&p.baseDueMinute===p.startMinute+Math.ceil(plannedBase))))&&
    !starts.has(row.id)&&
    (!TIMED_CRAFT_ITEMS_599[p.kind]||(
      p.craftItemPriceD===TIMED_CRAFT_ITEMS_599[p.kind][p.scope]?.priceD&&
@@ -188,6 +190,21 @@ export function validateSkillTimedWork591(data){
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');
   linked.add(link.startId);
  }
+ const scheduledDesigns=new Map();
+ for(const row of journal){
+  const timing=row.calendarEngineeringDesignTiming;
+  if(!timing)continue;
+  const start=starts.get(timing.startId),source=journalById.get(timing.sourceId),result=timing.result;
+  assert(start?.p.kind==='engineering'&&source?.calendarSkillProjectSV591?.startId===timing.startId&&
+   row.characterId===start.p.actorId&&row.calendarCampaignId===start.row.calendarCampaignId&&
+   !scheduledDesigns.has(timing.startId)&&Number.isSafeInteger(row.campaignMinute)&&
+   row.campaignMinute>=source.campaignMinute&&journal.indexOf(source)<journal.indexOf(row)&&
+   result.edifice===start.p.scope&&result.randomizeTime===!!start.p.engineeringRandomTime&&
+   JSON.stringify(result)===JSON.stringify(recomputeEngineeringDesign(source,result))&&
+   timing.workMinutes===engineeringDesignWorkMinutes(result)&&timing.dueMinute===start.p.startMinute+timing.workMinutes,
+   'Engineering: neplatné potvrzené hody nebo termín návrhu.');
+  scheduledDesigns.set(timing.startId,row);
+ }
  for(const row of journal){
   const done=row.calendarSkillProjectComplete591;if(!done)continue;
   const s=starts.get(done.startId),source=journalById.get(done.sourceId),sourceLink=source?.calendarSkillProjectSV591;
@@ -202,8 +219,12 @@ export function validateSkillTimedWork591(data){
     p?.type==='writing-work-complete-591'&&p.originId===done.sourceId),
    'Časovaný Skill Test: nesouhlasí dokončení, původní hod ani kalendář.');
   if(done.kind==='engineering'){
-   assert(p.edifice===s.p.scope&&!p.randomizeTime&&!p.combinedTimeNeedsGM&&
-    done.workMinutes===Math.ceil(p.timeAfterMathOnly*1440),
+   const schedule=scheduledDesigns.get(done.startId);
+   assert(p.edifice===s.p.scope&&p.randomizeTime===!!s.p.engineeringRandomTime&&
+    JSON.stringify(p)===JSON.stringify(recomputeEngineeringDesign(source,p))&&
+    done.workMinutes===engineeringDesignWorkMinutes(p)&&
+    (schedule?done.timingId===schedule.id&&journal.indexOf(schedule)<journal.indexOf(row)&&row.campaignMinute>=schedule.campaignMinute&&
+     JSON.stringify(p)===JSON.stringify(schedule.calendarEngineeringDesignTiming.result):done.timingId===undefined),
     'Engineering: dokončený čas neodpovídá skutečným Design Rolls.');
   }else{
    const sourceSV=source.skillTestProof?.a?.sv??source.skillTestProof?.result?.sv;
@@ -292,9 +313,9 @@ export function validateSkillTimedWork591(data){
  return true;
 }
 export function assertSkillTimedAppendOnly591(before,after){
- const next=new Map((after?.journal||[]).filter(j=>j.calendarSkillProjectStart591||j.calendarSkillProjectSV591||j.calendarSkillProjectComplete591||j.calendarSkillBrewReady600||j.calendarSkillFletchingAllocation996||j.calendarSkillFletching996).map(j=>[j.id,j]));
+ const next=new Map((after?.journal||[]).filter(j=>j.calendarSkillProjectStart591||j.calendarSkillProjectSV591||j.calendarSkillProjectComplete591||j.calendarEngineeringDesignTiming||j.calendarSkillBrewReady600||j.calendarSkillFletchingAllocation996||j.calendarSkillFletching996).map(j=>[j.id,j]));
  for(const old of before?.journal||[]){
-  if(!(old.calendarSkillProjectStart591||old.calendarSkillProjectSV591||old.calendarSkillProjectComplete591||old.calendarSkillBrewReady600||old.calendarSkillFletchingAllocation996||old.calendarSkillFletching996))continue;
+  if(!(old.calendarSkillProjectStart591||old.calendarSkillProjectSV591||old.calendarSkillProjectComplete591||old.calendarEngineeringDesignTiming||old.calendarSkillBrewReady600||old.calendarSkillFletchingAllocation996||old.calendarSkillFletching996))continue;
   assert(next.has(old.id)&&JSON.stringify(next.get(old.id))===JSON.stringify(old),
    'Časovaný Skill Test: neměnný kalendářní doklad byl upraven nebo vymazán.');
  }

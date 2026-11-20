@@ -12,7 +12,7 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
-import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.006';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.007';
 import {copySource,findCopyStages} from './hmk-script-copy.js?v=94.006';
 import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=94.006';
 const DAY=1440;
@@ -449,6 +449,18 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   if(person)push(person,'printed-craft-project',row.id,
    (project.kind==='glassworking'?'Glassworking':'Woodworking')+' · '+project.projectName+' · provést Success Value',
    project.earliestMinute,'skills',{requiresAction:false});
+ }
+ for(const row of journal){
+  const plan=row.calendarSkillProjectStart591;
+  if(plan?.kind!=='engineering'||row.calendarCampaignId!==clock.campaignId||
+   journal.some(x=>x.calendarSkillProjectComplete591?.startId===row.id))continue;
+  const person=characters.find(c=>c.id===row.characterId);
+  if(!person)continue;
+  const source=journal.find(x=>x.calendarSkillProjectSV591?.startId===row.id);
+  const schedule=journal.find(x=>x.calendarEngineeringDesignTiming?.startId===row.id)?.calendarEngineeringDesignTiming;
+  const step=schedule?'dokončit návrh':source?'vyhodnotit Design Roll':'provést Success Value';
+  push(person,'engineering-project',row.id,'Engineering · '+plan.projectName+' · '+step,
+   schedule?.dueMinute??source?.campaignMinute??plan.earliestMinute,'skills',{requiresAction:false});
  }
  for(const row of journal){
   const plan=row.calendarConstructionStart;

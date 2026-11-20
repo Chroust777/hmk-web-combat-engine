@@ -1,6 +1,6 @@
 import {fishingCatchCandidate} from './hmk-fishing-catch-548.js';
 import {animalTrainingCandidate} from './hmk-animal-training-548.js';
-import {engineeringDesignCandidate,ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
+import {engineeringDesignCandidate,ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js?v=94.007';
 /** Skill Workbench v93.274: clearer HMK pp.60–62 separation.
  * Secondary Mastery is no longer a standalone d10-only gadget.
  */
@@ -156,27 +156,28 @@ export function animalTrainingNextHTML(journal,actorId,campaignId){
 function engineeringDesignNextHTML(journal,actorId,campaignId){
  const pending=journal.filter(j=>j.characterId===actorId&&(!campaignId||j.calendarCampaignId===campaignId)&&
   engineeringDesignCandidate(j.skillTestProof)&&
-  !journal.some(q=>q.skillTestProof?.type==='engineering-design'&&q.skillTestProof.originId===j.id));
+  !journal.some(q=>q.skillTestProof?.type==='engineering-design'&&q.skillTestProof.originId===j.id||q.calendarEngineeringDesignTiming?.sourceId===j.id));
  if(!pending.length)return '';
  return '<section class="hsk-special-commits"><h3>Engineering · Design Roll (HMK 70)</h3>'+pending.map(j=>{
   const c=engineeringDesignCandidate(j.skillTestProof);
-  return `<form data-hmk-engineering-design class="hsk-critical-next"><input type="hidden" name="origin" value="${E(j.id)}"><h4>Engineering SV ${c.sv} · d100 ${c.roll}</h4>
+  const project=journal.find(q=>q.id===j.calendarSkillProjectSV591?.startId)?.calendarSkillProjectStart591;
+  return `<form data-hmk-engineering-design data-design-stars="${Math.min(5,Math.max(0,c.sv-4))}" class="hsk-critical-next"><input type="hidden" name="origin" value="${E(j.id)}"><h4>Engineering SV ${c.sv} · d100 ${c.roll}</h4>
   <p>Podle SV vznikne 0–5 hvězd. Za každou se hodí skutečný d10 proti Mathematics Index. První dva úspěchy dávají nejvýše +2 SV do následujícího Construction Rollu; další úspěchy zkracují dobu projektování. Náhodný časový rozptyl ±20 % je volitelný a vyžaduje dva skutečné d3.</p>
   <details class="hsk-followup-guide"><summary>Zdroj předvyplnění a nové hody · HMK 70</summary><p><b>Engineering SV</b> je již uložený výsledek výše, nikoli nové zadání. <b>Mathematics Index</b> se načítá z ověřené dovednosti návrháře při vyhodnocení. Za každou skutečnou hvězdu hoďte nové <b>Design d10</b> proti tomuto Indexu. <b>Dílo</b> určuje pravidlovou dobu z tabulky. Dva <b>d3</b> se zadávají pouze při zapnuté volitelné náhodné úpravě doby; Construction se tím ještě nevyhodnocuje.</p></details>
-  <div class="hsk-form-grid"><label>Dílo<select name="edifice" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${E(name)}">${E(name)} · ${days} dní</option>`).join('')}</select></label>
+  <div class="hsk-form-grid"><label>Dílo<select name="edifice" required ${project?'disabled':''}>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${E(name)}" ${project?.scope===name?'selected':''}>${E(name)} · ${days} dní</option>`).join('')}</select></label>
   <label>Design d10 dle hvězd · oddělené čárkami<input name="designD10" placeholder="např. 4, 7, 1"></label>
   <label>První d3 pro volitelný rozptyl času<input name="timeD3A" type="number" min="1" max="3" step="1"></label>
   <label>Druhý d3 pro volitelný rozptyl času<input name="timeD3B" type="number" min="1" max="3" step="1"></label></div>
-  <label><input type="checkbox" name="randomizeTime"> GM používá volitelný náhodný rozptyl projektování ±20 %</label>
+  <label><input type="checkbox" name="randomizeTime" ${project?.engineeringRandomTime?'checked':''} ${project?'disabled':''}> GM používá volitelný náhodný rozptyl projektování ±20 %</label>
   <label><input type="checkbox" name="constructionConfirmed" required> GM potvrzuje skutečného konstruktéra i budoucí stavitele (oba přímo zapojeni do projektu)</label>
   <label><input type="checkbox" name="baseSVConfirmed" required> Původní Engineering SV nemá již započtený výsledný design bonus do Construction Rollu</label>
-  <button type="submit">Spočítat Design Roll a předat Construction bonus</button><output role="status" aria-live="polite"></output></form>`;
+  <button type="submit">${project?'Uložit Design Roll a vypočítat termín':'Spočítat Design Roll'}</button><output role="status" aria-live="polite"></output></form>`;
  }).join('')+'</section>';
 }
 /** The latest source SV can open its specific next step immediately after
  * recording, without requiring tab navigation or repeating a primary d100. */
 export function skillSpecificNextHTML(journal,actorId,campaignId,originId=null,only=null){
- const subset=originId?journal.filter(j=>j.id===originId||j.skillTestProof?.originId===originId):journal;
+ const subset=originId?journal.filter(j=>j.id===originId||j.skillTestProof?.originId===originId||j.calendarEngineeringDesignTiming?.sourceId===originId||j.id===journal.find(row=>row.id===originId)?.calendarSkillProjectSV591?.startId):journal;
  // UI may select one concrete continuation. Keep the complete ledger in the
  // candidate functions so earlier completion proofs still suppress used rolls.
  return (only===null||only==='fishing'?fishingCatchNextHTML(subset,actorId,campaignId):'')+

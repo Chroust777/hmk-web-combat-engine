@@ -1,6 +1,6 @@
 /** HMK 70, 78, 91: construction plans, Construction Rolls and calendar receipts. */
 import {effectiveMasteryLevel,secondaryModifier,successLevel,successValue} from '../rules/tests.js';
-import {resolveEngineeringDesign} from './hmk-engineering-design-548.js';
+import {recomputeEngineeringDesign,engineeringDesignWorkMinutes} from './hmk-engineering-design-548.js?v=94.007';
 
 const masonry=[
  ['Castle, large',15700,9400],['Castle, medium',4700,2800],['Castle, small',1600,1000],
@@ -75,10 +75,8 @@ export function constructionDesignModifier(plan,rows,sourceRow,campaignId){
   design.characterId===proof.actorId&&original.characterId===proof.actorId&&startProof?.scope===expected&&original.calendarSkillProjectSV591?.startId===start.id&&
   integer(design.campaignMinute,done.dueMinute,plan.startMinute)&&proof.originId===original.id&&
   sourceRow?.characterId,'K této stavbě patří dokončený Engineering Design stejného typu ze stejné kampaně.');
- const verified=resolveEngineeringDesign({proof:original.skillTestProof,originId:original.id,actorId:proof.actorId,
-  edifice:expected,mathematicsML:proof.mathematicsML,designD10:proof.physicalDesignDice,
-  gmConfirmsConstructionParticipation:proof.designerInvolved,gmConfirmsNoPreviousModifiers:true});
- ensure(proof.constructionSVModifier===verified.constructionSVModifier&&done.workMinutes===Math.ceil(verified.timeAfterMathOnly*minutesPerDay)&&
+ const verified=recomputeEngineeringDesign(original,proof);
+ ensure(proof.constructionSVModifier===verified.constructionSVModifier&&done.workMinutes===engineeringDesignWorkMinutes(verified)&&
   done.dueMinute===startProof.startMinute+done.workMinutes,'Modifikátor návrhu nebo jeho dokončení nesouhlasí s původním Design Rollem.');
  return verified.constructionSVModifier;
 }

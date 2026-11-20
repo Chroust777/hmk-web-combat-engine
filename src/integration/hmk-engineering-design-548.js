@@ -12,6 +12,16 @@ const designs={
  'Stockade tower':6,'Townhouse, exclusive':9,'Townhouse, modest':6
 };
 export const ENGINEERING_DESIGN_DAYS=Object.freeze({...designs});
+export function engineeringDesignWorkMinutes(result){
+ // HMK 70 calls the optional fluctuation an adjustment to the final time.
+ return Math.ceil(result.baseDays*1440*(100-result.extraTimeReductionPercent)*(100+result.randomTimePercent)/10000);
+}
+export function recomputeEngineeringDesign(original,result){
+ return resolveEngineeringDesign({proof:original.skillTestProof,originId:original.id,actorId:result.actorId,
+  edifice:result.edifice,mathematicsML:result.mathematicsML,designD10:result.physicalDesignDice,
+  randomizeTime:result.randomizeTime,timeD3A:result.timeD3A,timeD3B:result.timeD3B,
+  gmConfirmsConstructionParticipation:result.designerInvolved,gmConfirmsNoPreviousModifiers:true});
+}
 export function engineeringDesignCandidate(proof){
  if(proof?.type!=='secondary-mastery-value-test'||(proof.skills?.[0]||proof.skill)!=='Engineering')return null;
  const a=proof.a||proof.result;
