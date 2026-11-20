@@ -9,6 +9,7 @@ import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
 import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
 import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hmk-medical-origin.js';
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
+import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
@@ -269,8 +270,12 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
      push(actor,'skill-fall',e.id,`Pád po ${context}: určit skutečnou výšku a dokončit Falling Routine (HMK 67)`,e.campaignMinute,'skills');
     }
    }
-   if((p.activity==='fishing-sv'&&p.result?.level==='CF')||p.activity==='trek-survival-hazard'){
-    if(!journal.some(z=>z.skillTestProof?.type==='skill-physical-consequence'&&z.skillTestProof.sourceId===e.id)){
+   const physicalResolved=journal.some(z=>z.skillTestProof?.type==='skill-physical-consequence'&&z.skillTestProof.sourceId===e.id);
+   if(fishingGearDue(journal,e)&&!physicalResolved){
+    const actor=characters.find(c=>c.id===p.actorId);
+    if(actor)push(actor,'skill-injury',e.id,'Fishing CF – doložit ztrátu nebo poškození výbavy (HMK 71)',e.campaignMinute,'skills');
+   }else if((p.activity==='fishing-sv'&&p.result?.level==='CF')||p.activity==='trek-survival-hazard'){
+    if(!physicalResolved){
      const actor=characters.find(c=>c.id===p.actorId);
      if(actor)push(actor,'skill-injury',e.id,'Následek Skill CF – dokončit přes původní Skill Test (HMK 71,148)',e.campaignMinute,'skills');
     }
@@ -281,6 +286,10 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   const sides=p.a?[{id:p.actorId,skill:p.skills?.[0],result:p.a,side:'A'},...(p.b?[{id:p.opponentId,skill:p.skills?.[1],result:p.b,side:'B'}]:[])]:[{id:p.actorId,skill:p.skill,result:p.result,side:'A'}];
   for(const x of sides){
    if(!['F','CF'].includes(x.result?.level)||x.result.forcedCF||!skillFollowupActivities(x.skill,x.result.level).length)continue;
+   // The corresponding executors require a documented routine. A generic
+   // Skill Test with the same skill must not stop the campaign clock.
+   if(x.skill==='Survival'&&!deferredAccident)continue;
+   if(x.skill==='Animalcraft'&&!p.animalTrainingSV590)continue;
    // An Orienteering Survival CF already has its mandatory p.148 Survival
    // Hazard resolved by the *same* confirmed travel episode. Do not create a
    // second, generic calendar CF for the identical d100. During atomic episode
