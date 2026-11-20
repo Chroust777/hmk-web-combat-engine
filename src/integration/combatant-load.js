@@ -8,7 +8,7 @@ import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js'
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
 import {identifyWornPrintedSuit} from './printed-suit-combat.js';
-import {resolveOwnedArmourArticle} from './live-combat-armour.js';
+import {resolveOwnedArmourArticle} from './live-combat-armour.js?v=94.010';
 import {evaluateOrderedArmour} from './armour-layer-evaluation.js';
 import {assessArmourFeasibility,prepareArmourForFeasibility} from './hmk-armour-feasibility.js';
 import {calculateGearLoad} from '../rules/gear-load.js';
@@ -62,6 +62,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   if(!checked.ready){issues.push(`${item.snapshot?.name||item.id}: ${checked.reason}`);continue;}
   articles.push({item,article:checked.article});
  }
+ const reduceArmourENC=enc=>Math.max(0,enc+articles.reduce((sum,{article})=>sum+(article.faerieENCAdjustment??0),0));
  const match=identifyWornPrintedSuit(inventory,id);
  // A FULL, unmodified printed suit is a separately validated p.113–116
  // preset. The generic p.117 mix-and-match feasibility engine cannot override
@@ -81,7 +82,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   const suit=SUITS.get(match.name);
   if(!suit)issues.push('Printed suit missing in HMK catalogue');
   else {
-   armourENC=suit.enc;knownArmourENC=suit.enc;extraEnc=null;conditionalArmENC=null;perceptionPenalty=-suit.per;
+   armourENC=reduceArmourENC(suit.enc);knownArmourENC=armourENC;extraEnc=null;conditionalArmENC=null;perceptionPenalty=-suit.per;
    armourSource=`printed-suit:${suit.name}`;
    // The exact, unchanged published suit (pp.113–116) is an approved assembled
    // outfit: no added layers and therefore no exception-driven Bulk. No GM
@@ -99,13 +100,14 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
   const conditionalCount=articles.filter(({article})=>article.enc==='a').length;
   const unknownBase=articles.some(({article})=>!Number.isSafeInteger(article.enc)&&!['a','p'].includes(article.enc));
   conditionalArmENC=conditionalCount>=3?5:0;
-  knownArmourENC=unknownBase?null:articles.reduce((sum,{article})=>sum+(Number.isSafeInteger(article.enc)?article.enc:0),0)+conditionalArmENC;
+  const printedArmourENC=unknownBase?null:articles.reduce((sum,{article})=>sum+(Number.isSafeInteger(article.enc)?article.enc:0),0)+conditionalArmENC;
+  knownArmourENC=printedArmourENC===null?null:reduceArmourENC(printedArmourENC);
   // Determine the printed article subtotal even when a chosen outfit is invalid.
   // A possible D/Q outermost article adds +5, but never guess its column.
   const outerArticle=/\b(cloak|mantle|vest|surcoat|coat|robe|cuisse|cuisses)\b/i;
   const possibleOuter=articles.filter(({article})=>['padded','quilted'].includes(String(article.material).toLowerCase())&&outerArticle.test(article.name));
   armourArithmeticENC=knownArmourENC;
-  armourENCUpperBound=knownArmourENC===null?null:knownArmourENC+5*possibleOuter.length;
+  armourENCUpperBound=printedArmourENC===null?null:reduceArmourENC(printedArmourENC+5*possibleOuter.length);
   unknownExtraENC=possibleOuter.length>0;
   if(!unknownExtraENC&&layeringFeasibility?.status!=='forbidden'&&knownArmourENC!==null){armourENC=knownArmourENC;extraEnc=0;}
   perceptionPenalty=-articles.reduce((s,{article})=>s+(article.enc==='p'?(article.perceptionPenalty??0):0),0);
@@ -160,7 +162,7 @@ export function resolveCombatantLoad({character,inventory,layerOptions={},bulkCo
     conditionalArmENC=articles.filter(({article})=>article.enc==='a').length>=3?5:0;
     const unknown=articles.filter(({article})=>!Number.isSafeInteger(article.enc)&&!['a','p'].includes(article.enc));
     if(unknown.length)issues.push(`Unknown printed article ENC: ${unknown.map(x=>x.article.id).join(', ')}`);
-    else {armourENC=articles.filter(({article})=>Number.isSafeInteger(article.enc)).reduce((s,{article})=>s+article.enc,0)+conditionalArmENC+extraEnc;
+    else {armourENC=reduceArmourENC(articles.filter(({article})=>Number.isSafeInteger(article.enc)).reduce((s,{article})=>s+article.enc,0)+conditionalArmENC+extraEnc);
      knownArmourENC=armourENC;armourENCUpperBound=armourENC;armourArithmeticENC=armourENC;}
     perceptionPenalty=-articles.reduce((s,{article})=>s+(article.enc==='p'?(article.perceptionPenalty??0):0),0);
     bulkByZone=Object.fromEntries(ZONES.map(z=>[z,layering.zoneReports.find(r=>r.zone===z)?.bulkArticleId?-5:0]));

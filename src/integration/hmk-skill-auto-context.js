@@ -9,8 +9,8 @@ import {completeParalysis,blockedLimbs} from './hmk-paralysis-sequela.js';
 import {resolveSkillConditions,skillConditionAvailability,encApplicability} from './hmk-skill-context.js?v=93.979';
 import {resolveSkillTrauma,impairedSkillKind,skillTraumaAvailability,hasLiveInjury} from './hmk-skill-trauma.js?v=93.979';
 import {projectLiveInjuries} from './live-injury-impairment.js';
-import {resolveCombatantLoad} from './combatant-load.js';
-import {resolveOwnedArmourArticle} from './live-combat-armour.js';
+import {resolveCombatantLoad} from './combatant-load.js?v=94.010';
+import {resolveOwnedArmourArticle} from './live-combat-armour.js?v=94.010';
 import {equipmentUsable} from './hmk-equipment-serviceability.js';
 import {strengthEncumbranceModifier,modifiedEncumbrance} from '../rules/encumbrance.js';
 
@@ -38,7 +38,8 @@ export function partialSkillArmourLoad(actor,inventory){
  // With invalid layering no overFar assignment is certified. Any possible
  // extra D/Q ENC remains unresolved, even if an explicit slot was recorded.
  const extra=0;
- const total=modifiedEncumbrance({armourENC:base+arms+extra,gearENC:checked.gearENC,str,mounted:false});
+ const armourENC=Math.max(0,base+arms+extra+parts.reduce((sum,part)=>sum+(part.faerieENCAdjustment??0),0));
+ const total=modifiedEncumbrance({armourENC,gearENC:checked.gearENC,str,mounted:false});
  const per=parts.reduce((n,x)=>n+(x.enc==='p'?x.perceptionPenalty??0:0),0);
  return {ready:true,enc:total,per:-per,complete:false,base,arms,extra,gearENC:checked.gearENC,strModifier:strengthEncumbranceModifier(str,{mounted:false}),
   source:'p118-known-components-only',reason:'Neověřené vrstvení: tento ENC zahrnuje doložené díly, nikoli neprokázané další příplatky za vrstvy.'};

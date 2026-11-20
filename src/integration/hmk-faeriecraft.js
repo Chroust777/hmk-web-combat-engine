@@ -1,3 +1,4 @@
+import {missingPrintedArmourCatalogEntries} from './armour-article-catalog.js';
 import {FLETCHING_ITEMS} from './hmk-fletching-work.js?v=94.009';
 import {resolveSkillTest,testSecondaryRoll} from './hmk-skill-test-engine.js';
 
@@ -14,6 +15,22 @@ export const isFaerieCrafter=person=>['Sinái','Sidhé','Hwæthârwyn','Ælrhin'
 const integer=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const require=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+
+export const FAERIE_ARMOUR_ARTICLES=Object.freeze(missingPrintedArmourCatalogEntries().filter(item=>
+ ['mail','scale','plate'].includes(item.properties.material)&&item.properties.coverageVerified));
+const armourById=new Map(FAERIE_ARMOUR_ARTICLES.map(item=>[item.id,item]));
+export function faerieArmourItem(plan,result,projectId,actorId){
+ const source=armourById.get(plan?.armourArticleId);
+ if(!source||!Number.isSafeInteger(result?.craft?.sv)||result.craft.sv<3)return null;
+ const snapshot=structuredClone(source);
+ if(result.trait?.kind==='metal-armour'){
+  snapshot.properties.faeriecraft='metal-armour';
+  snapshot.properties.weightLb=result.trait.weightLb;
+ }
+ return {id:'workshop-faerie:'+projectId,characterId:actorId,sourceItemId:source.id,snapshot,
+  workshopCraftId:projectId,quantity:1,currentWQ:null,
+  condition:result.trait?.kind==='metal-armour'?'Faeriecraft · −5 ENC':'',slot:'carried'};
+}
 
 export function faerieWorkshopKind(project){
  const recipe=FLETCHING_ITEMS[project?.scope];
@@ -134,6 +151,11 @@ export function resolveFaerieStep(journal,row){
   const kind=productKind(input);
   if(kind==='hartbow')require(['composite','longbow'].includes(input.bow)&&integer(input.baseDraw,1,500),'Hartbow vyžaduje kompozitní luk nebo longbow a jeho základní Draw.');
   if(kind==='metal-armour')require(['mail','scale','plate'].includes(input.armour)&&Number.isFinite(input.baseWeight)&&input.baseWeight>0,'Vyberte kovovou zbroj a zadejte její základní hmotnost.');
+  if(input.armourArticleId!==undefined){
+   const selected=armourById.get(input.armourArticleId);
+   require(kind==='metal-armour'&&selected?.properties.material===input.armour&&
+    selected.properties.weightLb===input.baseWeight,'Výrobek musí odpovídat tištěnému kusu zbroje HMK 118.');
+  }
   return spiritEntry(input);
  }
  const state=faerieState(journal,projectId);
@@ -177,6 +199,13 @@ export function validateFaeriecraft(journal){
   }
   require(typeof row.id==='string'&&row.id&&!ids.has(row.id)&&
    same(resolveFaerieStep(prior,row),row.calendarFaeriecraft.result),'Faeriecraft: hody, návaznost nebo čas nesouhlasí s dokladem.');
+  if(row.calendarFaeriecraft.stage==='finish'){
+   const project=prior.find(x=>x.id===row.calendarFaeriecraft.projectId);
+   if(project?.calendarFaeriecraft?.input.armourArticleId){
+    const item=faerieArmourItem(project.calendarFaeriecraft.input,row.calendarFaeriecraft.result,project.id,row.characterId);
+    require(row.calendarFaeriecraft.inventoryId===(item?.id??null),'Faeriecraft: doklad musí označit právě jeden hotový kus zbroje.');
+   }
+  }
   prior.push(row);ids.add(row.id);
  }
 }

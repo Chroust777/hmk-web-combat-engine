@@ -56,7 +56,8 @@ export function projectInventoryRows(inventory=[]){
   // This is the item's own catalogue value, not the body's combined ENC.
   const printedEnc=p.printedEncCode??p.encumbrance;
   const armourENC=isArmour&&item.slot==='worn'?
-   Number.isFinite(printedEnc)?String(printedEnc):typeof printedEnc==='string'?`podm. ${printedEnc}`:'nedoloženo':'—';
+   (Number.isFinite(printedEnc)?String(printedEnc):typeof printedEnc==='string'?`podm. ${printedEnc}`:'nedoloženo')+
+   (p.faeriecraft==='metal-armour'?' − 5':''):'—';
   const protection=isArmour&&p.locationProtection&&typeof p.locationProtection==='object'?
    Object.entries(p.locationProtection).filter(([,v])=>v&&typeof v==='object').map(([loc,v])=>({loc,b:v.b,e:v.e,p:v.p,f:v.f})):[];
   const kind=item.slot==='chest'?'chest':item.slot==='stable'?'stable':item.slot==='worn'||item.slot==='main_hand'||item.slot==='off_hand'?'equipped':'carried';

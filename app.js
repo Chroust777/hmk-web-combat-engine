@@ -9,7 +9,7 @@ import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFrom
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.009';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.010';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -45,7 +45,7 @@ import {PRINTED_STARTER_GEAR_P120,prepareStartingKit} from './src/integration/hm
 import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,interpretCharacterDescription} from './src/integration/hmk-generator-traits.js';
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
-import {FAERIE_CRAFTS,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.009';
+import {FAERIE_ARMOUR_ARTICLES,faerieArmourItem,FAERIE_CRAFTS,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.010';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=93.986';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.007';
@@ -92,7 +92,7 @@ import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,
 import {applyTalismanBestowal,projectTalismanStatus,validateTalismanEvidence,activeShamanSkillModifier,reconcileTalismanPossession} from './src/integration/hmk-shaman-talisman-state.js';
 import {HMK_OPPOSED_ACTIONS,opposedActionOptions,opposedPairIsPrinted,resolveOpposedDefenderMastery} from './src/integration/hmk-opposed-skill-pairs.js';
 import {skillNarrativeSolo,skillNarrativeOpposed,skillNarrativeTiebreak} from './src/integration/hmk-skill-narrative.js';
-import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js?v=93.979';
+import {automaticSkillContext} from './src/integration/hmk-skill-auto-context.js?v=94.010';
 import {resolveSkillConditions,skillConditionAvailability} from './src/integration/hmk-skill-context.js';
 import {resolveSkillTrauma,skillTraumaAvailability} from './src/integration/hmk-skill-trauma.js';
 import {automaticCriticalFailure,classifySkillConsequence,skillConsequenceProof,assertUniqueSkillConsequence,assertSkillProofAppendOnly} from './src/integration/hmk-skill-consequence-resolution.js';
@@ -202,11 +202,11 @@ import { ARMOUR_LAYER_COLUMNS, ARMOUR_LAYER_NOTES } from './src/rules/armour-lay
 import { auditArmourLoadout } from './src/integration/armour-loadout-audit.js';
 import {layerDisplayRows,readableLayerIssues} from './src/integration/hmk-armour-display.js';
 import {previewExistingArmourArrangement} from './src/integration/hmk-starting-armour-layout.js';
-import {projectInventoryRows,inventoryTotals} from './src/integration/hmk-inventory-overview.js?v=93.974';
+import {projectInventoryRows,inventoryTotals} from './src/integration/hmk-inventory-overview.js?v=94.010';
 import { projectCombatState } from './src/integration/combat-state-projection.js';
-import {resolveLiveCombatArmour} from './src/integration/live-combat-armour.js';
+import {resolveLiveCombatArmour} from './src/integration/live-combat-armour.js?v=94.010';
 import {compoundCompatible,injuryFromEffectiveImpact} from './src/rules/injury.js';
-import {resolveCombatantLoad,bulkForTest} from './src/integration/combatant-load.js';
+import {resolveCombatantLoad,bulkForTest} from './src/integration/combatant-load.js?v=94.010';
 import {resolveGuidedReadiedMove,createGuidedReadiedGropeSession} from './src/integration/hmk-guided-readied-followup.js';
 import {resolveGuidedShieldUnsling,resolveGuidedWeaponStow,startGuidedBackpackGrope,completeGuidedBackpackGrope} from './src/integration/hmk-guided-item-grope.js';
 import {startGuidedCrossbowSpan,startGuidedMissileLoad,startGuidedMissileAim,performGuidedFreeMissileLoad,performGuidedNearbyFreeMissileLoad,previewGuidedTestedNearbyFreeMissileLoad,performGuidedTestedNearbyFreeMissileLoad,registerInitiallyLoadedCrossbow,verifiedMissileAimBonus,completeGuidedMissilePreparation,requireLoadedMissile,consumeLoadedMissile} from './src/integration/hmk-guided-missile-preparation.js?v=94.009';
@@ -285,7 +285,7 @@ import {egosightTouchContext,createEgosightTouch,validateEgosightTouchJournal,as
 import {createAlchemyAcidApplication,alchemyAcidContactState,createAlchemyAcidRound,validateAlchemyAcidJournal,assertAlchemyAcidAppendOnly} from './src/integration/hmk-alchemy-acid-applied.js';
 import {alchemyAcidObjectDamage,createAlchemyMending,applyAlchemyMending,createAlchemyObjectAegis,alchemyObjectAegisState,createAlchemyObjectAegisTest,validateAlchemyAppliedObjectJournal,assertAlchemyAppliedObjectAppendOnly,validateAlchemyMendingInventory} from './src/integration/hmk-alchemy-applied-objects.js';
 import {acidWeaponInitialWQ,createAcidWeaponApplication,acidWeaponState,createAcidWeaponRound,validateAcidWeaponJournal,validateAcidWeaponInventory,assertAcidWeaponAppendOnly} from './src/integration/hmk-alchemy-acid-weapon.js';
-import {acidArmourDamage,acidArmourMaximumAV,createAcidArmourApplication,acidArmourState,createAcidArmourRound,validateAcidArmourJournal,validateAcidArmourInventory,assertAcidArmourAppendOnly} from './src/integration/hmk-alchemy-acid-armour.js';
+import {acidArmourDamage,acidArmourMaximumAV,createAcidArmourApplication,acidArmourState,createAcidArmourRound,validateAcidArmourJournal,validateAcidArmourInventory,assertAcidArmourAppendOnly} from './src/integration/hmk-alchemy-acid-armour.js?v=94.010';
 import {createAcidFleshApplication,acidFleshState,prepareAcidFleshRound,validateAcidFleshJournal,validateAcidFleshCombatLinks,assertAcidFleshAppendOnly} from './src/integration/hmk-alchemy-acid-flesh.js';
 import {createAcidThrownVial,validateAcidThrownJournal,assertAcidThrownAppendOnly,validateAcidThrownInventory} from './src/integration/hmk-alchemy-acid-thrown.js';
 import {prepareAlchemyAreaAtomicBattle,validateAlchemyAreaJournal,validateAlchemyAreaCombatLinks,assertAlchemyAreaAppendOnly} from './src/integration/hmk-alchemy-area-atomic-plan.js';
@@ -395,7 +395,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.009';
+const APP_VERSION='94.010';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6108,7 +6108,7 @@ function faeriecraftPanel(actor){
     '<label>Konkrétní výrobek<input name="item" required minlength="2" maxlength="120"></label>'+
     '<label>Doložená doba výroby od zahájení (herní hodiny včetně přestávek)<input name="hours" type="number" min="1" max="166666" required></label>'+
     '<fieldset data-faerie-product="hartbow" hidden disabled><legend>Hartbow</legend><label>Druh luku<select name="bow"><option value="composite">Kompozitní luk</option><option value="longbow">Longbow</option></select></label><label>Základní Draw<input name="baseDraw" type="number" min="1" max="500" required></label></fieldset>'+
-    '<fieldset data-faerie-product="longknife" hidden disabled><legend>Výrobek Weaponcraft</legend><label>Druh výrobku<select name="armour"><option value="">Vagorsereq (Longknife)</option><option value="mail">Kroužková zbroj</option><option value="scale">Šupinová zbroj</option><option value="plate">Plátová zbroj</option></select></label><label hidden>Základní hmotnost (lb)<input name="baseWeight" type="number" min="0.01" step="any" required disabled></label></fieldset>'+
+    '<fieldset data-faerie-product="longknife" hidden disabled><legend>Výrobek Weaponcraft</legend><label>Druh výrobku<select name="armourArticleId"><option value="">Vagorsereq (Longknife)</option>'+FAERIE_ARMOUR_ARTICLES.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+' · '+item.properties.weightLb+' lb</option>').join('')+'</select></label></fieldset>'+
     '<p>Weaponcraft nabízí Vagorsereq (Longknife) a tři druhy kovových zbrojí. Masonry je určené pro samostatnou plastiku. Čas posouvá Kalendář.</p>'+entryFields,
     'Potvrdit vstup do reverie a zahájit práci',true));
  }else{
@@ -6142,10 +6142,9 @@ function faeriecraftPanel(actor){
   (active?'<details><summary>Doklady rozpracovaného projektu</summary>'+data.journal.filter(x=>x.calendarFaeriecraft?.projectId===active.project.id).map(x=>'<p>'+displayCampaignMinute(x.campaignMinute)+' · '+esc(x.body)+'</p>').join('')+'</details>':'')+'</section>';
 }
 document.addEventListener('change',event=>{
- if(!event.target.matches?.('[data-faerie-step="start"] :is([name="craftSkill"],[name="armour"])'))return;
+ if(!event.target.matches?.('[data-faerie-step="start"] [name="craftSkill"]'))return;
  const form=event.target.form,kind=FAERIE_CRAFTS[form.elements.craftSkill.value];
  for(const group of form.querySelectorAll('[data-faerie-product]'))group.disabled=group.hidden=group.dataset.faerieProduct!==kind;
- const weight=form.elements.baseWeight;weight.disabled=weight.closest('label').hidden=kind!=='longknife'||!form.elements.armour.value;
 });
 document.addEventListener('submit',event=>{
  const form=event.target;
@@ -6168,7 +6167,11 @@ document.addEventListener('submit',event=>{
    }else Object.assign(input,{skill:read('craftSkill'),item:read('item').trim(),durationMinutes:num('hours')*60});
    skillActorMastery(actor,input.skill);
    if(!input.workshopId&&FAERIE_CRAFTS[input.skill]==='hartbow')Object.assign(input,{bow:read('bow'),baseDraw:num('baseDraw')});
-   if(!input.workshopId&&input.skill==='Weaponcraft'&&read('armour'))Object.assign(input,{armour:read('armour'),baseWeight:num('baseWeight')});
+   if(!input.workshopId&&input.skill==='Weaponcraft'&&read('armourArticleId')){
+    const article=FAERIE_ARMOUR_ARTICLES.find(item=>item.id===read('armourArticleId'));
+    if(!article)throw Error('Vyberte tištěný kus kovové zbroje.');
+    Object.assign(input,{armourArticleId:article.id,armour:article.properties.material,baseWeight:article.properties.weightLb});
+   }
    for(const secondary of faerieSecondarySkills(input))skillActorMastery(actor,secondary);
   }
   if(stage==='start'||stage==='enter'){
@@ -6188,16 +6191,25 @@ document.addEventListener('submit',event=>{
   const row={id,characterId:actor.id,calendarCampaignId:cid,campaignMinute:clock.minute,createdAt:stamp(),
    title:source?.title??'Faeriecraft · '+input.item,calendarFaeriecraft:step};
   const result=step.result=resolveFaerieStep(data.journal,row);
+  const armour=stage==='finish'&&plan.armourArticleId?faerieArmourItem(plan,result,projectId,actor.id):null;
   if(stage==='finish'){
+   if(plan.armourArticleId)step.inventoryId=armour?.id??null;
    const tr=result.trait,trait=tr?.kind==='hartbow'?' · Draw '+tr.draw:tr?.kind==='longknife'?' · +5 Melee':tr?.kind==='metal-armour'?' · ENC −5 · '+tr.weightLb+' lb':'';
    row.body=plan.skill+' · d100 ('+result.craft.roll+') · EML '+result.craft.eml+' · '+result.craft.level+' · Spirit SR '+(result.spirit.roll??'—')+
-    ' '+(result.spirit.success?'S':'F')+' · SV '+result.sv+' · '+result.stars+' ★'+trait;
+    ' '+(result.spirit.success?'S':'F')+' · SV '+result.sv+' · '+result.stars+' ★'+trait+
+    (armour?' · Přidáno do Arsenal & Gear':plan.armourArticleId?' · Vadný výrobek vyžaduje samostatné vyhodnocení AV a AQ.':'');
   }else if(stage==='start'||stage==='enter')row.body='Spirit SV '+result.spirit.sv+' · d100 ('+input.spiritRoll+') · '+result.spirit.level+' · '+input.location+
    (input.sacredRoll?' · Siemist d10 ('+input.sacredRoll+') '+(result.sacredSuccess?'S':'F'):'')+'.';
   else if(stage==='expire')row.body='Pětidenní reverie nedokončena. Započteno '+result.credited+' minut.';
   else row.body=(stage==='disturbance'?'Will d100 ('+input.willRoll+') · ':'')+
    (result.maintained?'Reverie udržena.':'Reverie opuštěna. Započteno '+result.credited+' minut.');
-  if(!mutate(()=>data.journal.push(row)))throw Error('Krok Faeriecraft nebyl uložen.');
+  if(!mutate(()=>{
+   if(armour){
+    if(data.inventory.some(item=>item.id===armour.id))throw Error('Tento kus zbroje už byl předán.');
+    data.inventory.push(armour);
+   }
+   data.journal.push(row);
+  }))throw Error('Krok Faeriecraft nebyl uložen.');
  }catch(error){out.textContent=error.message;}
 },true);
 
@@ -8214,7 +8226,7 @@ const BUILTIN_ITEMS=Object.freeze([
 function deepFreeze(obj){if(obj&&typeof obj==='object'){Object.values(obj).forEach(deepFreeze);Object.freeze(obj)}return obj}
 const PRINTED_ARMOUR_CATALOG_ADDITIONS=Object.freeze(missingPrintedArmourCatalogEntries(BUILTIN_ITEMS));
 function allCatalogItems(){return [...BUILTIN_ITEMS,...PRINTED_ARMOUR_CATALOG_ADDITIONS,...data.items]}
-function findCatalogItem(id){return BUILTIN_ITEMS.find(i=>i.id===id)||PRINTED_ARMOUR_CATALOG_ADDITIONS.find(i=>i.id===id)||data.items.find(i=>i.id===id)}
+function findCatalogItem(id){return BUILTIN_ITEMS.find(i=>i.id===id)||PRINTED_ARMOUR_CATALOG_ADDITIONS.find(i=>i.id===id)||FAERIE_ARMOUR_ARTICLES.find(i=>i.id===id)||data.items.find(i=>i.id===id)}
 function isKnownCatalogId(id){return !!findCatalogItem(id)}
 // Immutable armour MATERIAL reference (printed p.117). This is not an equipable article.
 // AV order is b=blunt, e=edge, p=point, f=fire/frost per the HMK table.

@@ -59,6 +59,7 @@ export function createAcidArmourApplication({journal=[],inventory=[],campaignId,
  return {format:ACID_ARMOUR_APPLY,campaignId,minute,actorId,finishId,vialId:vial.vialId,bindingId:vial.bindingId,
   targetItemId:item.id,targetLocation,targetOwnerId:item.characterId,targetName:item.snapshot.name,
   targetSourceItemId:item.sourceItemId,targetSlot:item.slot,targetSnapshot:structuredClone(item.snapshot),
+  ...(item.snapshot.properties.faeriecraft==='metal-armour'?{targetWorkshopCraftId:item.workshopCraftId}:{}),
   sourceArticleId:article.id,initialDamage:damage,maximumAV:cap,asAtApplication:dose.currentAS,
   noImbibingRoll:true,profusionExempt:true,armourConfirmed:true,contactConfirmed:true,gmConfirmed:true,sourcePages:[269,270,271]};
 }
@@ -104,7 +105,7 @@ export function validateAcidArmourJournal(journal=[]){
    check(row.characterId===a.actorId&&row.calendarCampaignId===a.campaignId&&row.campaignMinute===a.minute,'kontext aplikace');
    check(row.calendarAlchemyVialEmpty?.finishId===a.finishId&&row.calendarAlchemyVialEmpty?.vialId===a.vialId,'chybí společné vyprázdnění lahvičky');
    const inventory=[{id:a.targetItemId,characterId:a.targetOwnerId,quantity:1,slot:a.targetSlot,sourceItemId:a.targetSourceItemId,
-    snapshot:a.targetSnapshot,acidAVDamageByLocation:{[a.targetLocation]:a.initialDamage}}];
+    snapshot:a.targetSnapshot,workshopCraftId:a.targetWorkshopCraftId,acidAVDamageByLocation:{[a.targetLocation]:a.initialDamage}}];
    const rebuilt=createAcidArmourApplication({journal:prior,inventory,campaignId:a.campaignId,minute:a.minute,
     actorId:a.actorId,finishId:a.finishId,targetItemId:a.targetItemId,targetLocation:a.targetLocation,armourConfirmed:a.armourConfirmed,
     contactConfirmed:a.contactConfirmed,gmConfirmed:a.gmConfirmed});
@@ -115,7 +116,7 @@ export function validateAcidArmourJournal(journal=[]){
    const original=prior.find(x=>x.id===r.applicationId)?.calendarAlchemyAcidArmourApply;
    check(original&&row.characterId===prev.actorId&&row.calendarCampaignId===r.campaignId&&row.campaignMinute===r.minute,'kontext kola');
    const inventory=[{id:r.targetItemId,characterId:original.targetOwnerId,quantity:1,slot:original.targetSlot,
-    sourceItemId:original.targetSourceItemId,snapshot:original.targetSnapshot,acidAVDamageByLocation:{[original.targetLocation]:prev.damage}}];
+    sourceItemId:original.targetSourceItemId,snapshot:original.targetSnapshot,workshopCraftId:original.targetWorkshopCraftId,acidAVDamageByLocation:{[original.targetLocation]:prev.damage}}];
    const rebuilt=createAcidArmourRound({journal:prior,inventory,campaignId:r.campaignId,minute:r.minute,
     applicationId:r.applicationId,d10:r.d10,origin:r.origin,
     continuousContactConfirmed:r.continuousContactConfirmed,gmConfirmed:r.gmConfirmed});

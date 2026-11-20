@@ -80,6 +80,13 @@ export function resolveOwnedArmourArticle(item,{allowCarried=false,weightOnly=fa
  if(p.layerZoneByLocation!==undefined&&stableValue(p.layerZoneByLocation)!==stableValue(source.layerZoneByLocation))return fail('Snapshot layering zones differ from HMK p118');
  // When armour is stowed as gear, its REAL printed p.118 weight matters.
  // Reject a stale/lightened inventory snapshot rather than granting free ENC.
+ const faerie=p.faeriecraft==='metal-armour';
+ if(faerie){
+  if(!['mail','scale','plate'].includes(source.material)||p.weightLb!==source.weightLb/2||
+     !id.startsWith(prefix)||typeof item.workshopCraftId!=='string'||!item.workshopCraftId)
+   return fail('Faeriecraft armour must match the source material, half weight and craft record');
+  return {ready:true,article:{...source,weightLb:p.weightLb,faerieENCAdjustment:-5}};
+ }
  if(allowCarried&&p.weightLb!==source.weightLb)return fail('Carried armour weight differs from verified HMK p118 source');
  return {ready:true,article:source};
 }

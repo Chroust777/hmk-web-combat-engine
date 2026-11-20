@@ -10,7 +10,7 @@ const SELECTOR='form[data-skill-critical-form],form[data-hmk-fishing-catch],form
  'form[data-skill-cold-shock],form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
  'form[data-faerie-roll],form[data-hmk-engineering-design],form[data-shipwright-roll],form[data-construction-roll],form[data-fletching-finish="roll"],form[data-brew-start],form[data-brew-wine],form[data-jewelcraft-work],form[data-writing-spread],form[data-script-reading]:not([data-script-reading="done"]),form[data-script-copy="test"],form[data-hmk-scribing-work],form[data-parallel-cold-reroll],form[data-parallel-cold-course],.hmk-weather-care form#hmk-frost-amputation-form';
 const SELECTIONS={
- faerie:['consecration','craftSkill','bow','armour'],
+ faerie:['consecration','craftSkill','bow','armourArticleId'],
  design:['edifice','randomizeTime'],writingSpread:['scope','writingRewrite','writingPurpose','writingIntent','writingPagesRandom','writingTimeRandom'],
  shipwright:[],construction:[],
  fletching:['timeStars'],skillFollowup:['activity','technique'],
