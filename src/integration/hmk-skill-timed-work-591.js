@@ -53,7 +53,23 @@ export const TIMED_CRAFT_ITEMS_599=Object.freeze({
 });
 export const TIMED_CRAFT_LABELS_599=Object.freeze({glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91'});
 
+// HMK p. 80 sets the milling review at one TR year and leaves the
+// relationship between SV and output to the GM. Bread has no fixed baking time.
+const MILLING_YEAR_MINUTES=360*1440;
+export const MILLING_PROJECTS=Object.freeze({
+ milling:{skill:'Milling',label:'Milling · roční výsledek mlýna · HMK 80'},
+ breadBaking:{skill:'Cookery',label:'Pečení chleba · Cookery · HMK 80'}
+});
+export function millingBaseline(households){
+ return Number.isSafeInteger(households)&&households>=1&&households<=100000?
+  {households,bushels:36*households,typicalWeightLb:households===20?40000:null}:null;
+}
 export function timedSkillBaseMinutes591(kind,scope){
+ if(kind==='milling')return millingBaseline(Number(scope))?MILLING_YEAR_MINUTES:null;
+ if(kind==='breadBaking'){
+  const minutes=Number(scope);
+  return Number.isSafeInteger(minutes)&&minutes>0&&minutes<=1000000?minutes:null;
+ }
  if(CRAFT_WORK_600[kind])return CRAFT_WORK_600[kind][scope]?.hours*60??null;
  if(isWorkshopCraft(kind))return workshopCraftItem(kind,scope)?fletchingPlan(scope,1).workMinutes:null;
  if(kind==='jewelcraft'){const days=Number(scope);return Number.isSafeInteger(days)&&days>=1&&days<=10000?days*1440:null;}
@@ -185,7 +201,7 @@ export function validateSkillTimedWork591(data){
    proof?.type==='secondary-mastery-value-test'&&
    (s.p.kind==='writing'?(s.p.writingPlan?skill===writingRollSkills(s.p.writingPlan).primary&&
     (skill!=='Creativity'||proof.secondaryRollResult?.routineId==='writing-poetics'&&proof.secondaryRollResult?.name==='Folklore'&&Number.isInteger(proof.secondaryRollResult.roll)):/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)):
-    skill===({ ...Object.fromEntries(Object.entries(WORKSHOP_CRAFT_PROJECTS).map(([key,value])=>[key,value.primary])),engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
+    skill===(MILLING_PROJECTS[s.p.kind]?.skill||({ ...Object.fromEntries(Object.entries(WORKSHOP_CRAFT_PROJECTS).map(([key,value])=>[key,value.primary])),engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind]))&&
    (!isWorkshopCraft(s.p.kind)||validFletchingProof(s.p,proof))&&
    (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
    (!CRAFT_WORK_600[s.p.kind]||row.campaignMinute>=s.p.earliestMinute),
