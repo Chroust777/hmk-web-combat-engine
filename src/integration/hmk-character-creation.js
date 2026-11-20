@@ -215,7 +215,7 @@ export function skillBase(primary,secondary){
  return primary>secondary?Math.ceil(average):Math.floor(average);
 }
 // Standalone GM tests use these projections. The campaign's PER mode and
-// ordinary skill calculations never read the optional dice or extra DP.
+// ordinary skill calculations never read the GM adjustments.
 export function gmSenseRows(character,skills){
  const h=character?.hmk??{},attrs=h.attributes??{};
  const rows=skills??(h.creation?calculateSheetSkills(character):h.skills??[]);
@@ -225,20 +225,25 @@ export function gmSenseRows(character,skills){
   const proof=[h.gmSenseProof?.[key],h.creation?.perceptionProof?.[key]].find(p=>
    p&&p.folk===h.folk&&p.ageGroup===h.ageGroup&&p.kind===(character?.kind||'PC')&&Number.isSafeInteger(p.score));
   const score=(proof?.score??attrs.per)??null;
-  const trained=perceptionMode(character)==='subattributes'?rows.find(row=>row.name===skill):awareness;
+  const trained=perceptionMode(character)==='subattributes'||!h.creation?
+   rows.find(row=>row.name===skill)??awareness:awareness;
   const dp=h.gmSenseDP?.[key]??0;
-  const sb=proof&&h.creation?skillBase(score,attrs.wil):trained?.sb??skillBase(attrs.per,attrs.wil);
+  const sb=skillBase(score,attrs.wil);
   let ml=trained?.ml??null;
   if(sb!==null&&Number.isSafeInteger(trained?.sm)){
    const multiple=trained.sm+(trained.boosts?.length??0)+dp;
    ml=boostedMastery(sb,Math.min(5,multiple),Math.max(0,multiple-5)).ml;
-  }else if(sb!==null&&Number.isSafeInteger(ml)&&dp>0){
+  }else if(sb>0&&Number.isSafeInteger(ml)&&dp>0){
    // Legacy sheets only document final ML. Keep that ML and add training
    // from the current position without guessing its original DP ledger.
    const ordinary=Math.min(dp,Math.max(0,5-Math.ceil(ml/sb)));
    ml=boostedMastery(sb,0,dp-ordinary,ml+ordinary*sb).ml;
   }
-  return {...sense,score,proof,sb,ml,dp};
+  const adjustment=(kind)=>Number.isSafeInteger(h.gmSenseBonus?.[kind]?.[key])?h.gmSenseBonus[kind][key]:0;
+  const attributeBonus=adjustment('attribute'),skillBonus=adjustment('skill');
+  return {...sense,score,proof,sb,dp,attributeBonus,skillBonus,
+   attributeML:score===null?null:Math.max(0,score*5+attributeBonus),
+   ml:ml===null?null:Math.max(0,ml+skillBonus)};
  });
 }
 
