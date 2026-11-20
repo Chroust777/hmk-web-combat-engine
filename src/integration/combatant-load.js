@@ -8,7 +8,7 @@ import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js'
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
 import {identifyWornPrintedSuit} from './printed-suit-combat.js';
-import {resolveOwnedArmourArticle} from './live-combat-armour.js?v=94.010';
+import {resolveOwnedArmourArticle} from './live-combat-armour.js?v=94.012';
 import {evaluateOrderedArmour} from './armour-layer-evaluation.js';
 import {assessArmourFeasibility,prepareArmourForFeasibility} from './hmk-armour-feasibility.js';
 import {calculateGearLoad} from '../rules/gear-load.js';

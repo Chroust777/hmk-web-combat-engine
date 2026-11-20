@@ -2,6 +2,7 @@
 import {PRINTED_MISSILE_WEAPONS_P109_110} from '../rules/missile-weapons-printed-p109-110.js';
 
 import {MAKING_WEAPON_ITEMS,WEAPON_WORKSHOP_PROJECTS,weaponWorkshopTN,weaponWorkResult} from './hmk-making-weapons.js?v=94.001';
+import {ARMOUR_WORKSHOP_PROJECTS,MAKING_ARMOUR_ITEMS,armourWorkResult} from './hmk-making-armour.js?v=94.012';
 export {weaponWorkshopTN};
 
 const stock = Object.fromEntries([
@@ -31,6 +32,7 @@ for(const item of PRINTED_MISSILE_WEAPONS_P109_110){
   secondary:family==='kuzhanSteelbow'?['Metalcraft']:['Woodworking',family==='compositeBow'?'Hideworking':'Timbercraft']};
 }
 export const WORKSHOP_CRAFT_PROJECTS=Object.freeze({
+ ...ARMOUR_WORKSHOP_PROJECTS,
  ...WEAPON_WORKSHOP_PROJECTS,
  lockcraft:{label:'Lockcraft · HMK 78',primary:'Lockcraft'},
  fletching:{label:'Fletching · HMK 71–72',primary:'Fletching'},
@@ -38,7 +40,7 @@ export const WORKSHOP_CRAFT_PROJECTS=Object.freeze({
  missileMetalcraft:{label:'Střely a napínáky · Metalcraft · HMK 72',primary:'Metalcraft'}
 });
 export const isWorkshopCraft=kind=>Object.hasOwn(WORKSHOP_CRAFT_PROJECTS,kind);
-Object.assign(stock,MAKING_WEAPON_ITEMS,{
+Object.assign(stock,MAKING_ARMOUR_ITEMS,MAKING_WEAPON_ITEMS,{
  handSling:{kind:'slingcraft',name:'Prak',costD:2,hours:10,wq:9,secondary:[]},
  staffSling:{kind:'slingcraft',name:'Tyčový prak',costD:4,hours:20,wq:9,secondary:['Woodworking']},
  leadBullets:{kind:'missileMetalcraft',name:'Olověné střely do praku (12)',costD:4,hours:10,projectiles:true,secondary:[]},
@@ -64,9 +66,9 @@ export function fletchingPlan(scope,workshop,providerId='',hartbow=false,toolQua
  const item=Object.hasOwn(stock,scope)?stock[scope]:null;
  if(!item||!fieldValid(workshop,1,5)||typeof providerId!=='string'||providerId&&(!item.projectiles||item.kind)||
   typeof hartbow!=='boolean'||hartbow&&!item.bow)throw Error('Vyberte výrobek, dílnu 1–5 a odpovídající způsob výroby.');
- if(item.meleeWeapon&&(!fieldValid(toolQuality,0,3)||!Array.isArray(helperIds)||helperIds.length>2||new Set(helperIds).size!==helperIds.length||helperIds.some(id=>typeof id!=='string'||!id)))
+ if((item.meleeWeapon||item.armour)&&(!fieldValid(toolQuality,0,3)||!Array.isArray(helperIds)||helperIds.length>2||new Set(helperIds).size!==helperIds.length||helperIds.some(id=>typeof id!=='string'||!id)))
   throw Error('Vyberte kvalitu nástrojů 0–3 a nejvýše dva různé pomocníky.');
- return {workshop,providerId,hartbow,...(item.meleeWeapon?{toolQuality,helperIds:[...helperIds]}:{}),costD:item.costD*(providerId?2:1),
+ return {workshop,providerId,hartbow,...(item.meleeWeapon||item.armour?{toolQuality,helperIds:[...helperIds]}:{}),costD:item.costD*(providerId?2:1),
   workMinutes:(item.months?item.months*30*600:item.hours*60)/(providerId?2:1)};
 }
 export function fletchingDue(scope,start,plan,factor=1){
@@ -81,8 +83,8 @@ export function fletchingNeeds(scope,proof,timeStars){
  if(!Number.isSafeInteger(sv)||!['CF','F','S','CS'].includes(level))throw Error('Chybí původní Success Value výroby.');
  const stars=Math.max(0,Math.min(5,sv-4));
  if(!fieldValid(timeStars,0,Math.min(3,stars)))throw Error('Na čas lze použít nejvýše tři získané hvězdy.');
- const item=stock[scope],max=item.complexity||item.pull?5:item.projectiles?2:item.wq-8;
- if(item.meleeWeapon)return {flaw:sv<=2,count:stars-timeStars,max,faces:10,dice:stars-timeStars,
+ const item=stock[scope],max=item.armour?item.max:item.complexity||item.pull?5:item.projectiles?2:item.wq-8;
+ if(item.meleeWeapon||item.armour)return {flaw:sv<=2,count:stars-timeStars,max,faces:10,dice:stars-timeStars,
   factor:(100+(level==='CF'?50:0)-10*timeStars)/100};
  const faces=sv<=2?(item.complexity?6:2):10;
  return {flaw:sv<=2,count:stars-timeStars,max,faces,dice:sv<=2?(item.complexity?2:1):stars-timeStars,factor:(100+(level==='CF'?50:0)-10*timeStars)/100};
@@ -90,10 +92,12 @@ export function fletchingNeeds(scope,proof,timeStars){
 export function fletchingOutcome(project,proof,timeStars,rolls){
  const {scope,startMinute,fletching996:plan}=project;
  const need=fletchingNeeds(scope,proof,timeStars);
- if(!Array.isArray(rolls)||rolls.length!==need.dice||
+ const item=stock[scope];
+ if(!Array.isArray(rolls)||(item.armour?rolls.length>need.dice:rolls.length!==need.dice)||
   !rolls.every(n=>fieldValid(n,1,need.faces)))throw Error('Potvrďte všechny předepsané kostky zvlášť.');
- const item=stock[scope],successes=need.flaw?0:rolls.filter(n=>n<=plan.workshop).length;
+ const successes=need.flaw?0:rolls.filter(n=>n<=plan.workshop).length;
  const dueMinute=fletchingDue(scope,startMinute,plan,need.factor);
+ if(item.armour)return armourWorkResult(item,proof,timeStars,rolls,dueMinute,weaponWorkshopTN(plan));
  if(item.meleeWeapon)return weaponWorkResult(item,plan,proof,timeStars,rolls,dueMinute);
  if(item.complexity){
   const achieved=need.flaw?null:Math.min(item.complexity,4+successes);

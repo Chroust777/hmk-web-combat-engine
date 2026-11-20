@@ -59,7 +59,7 @@ export function createAcidArmourApplication({journal=[],inventory=[],campaignId,
  return {format:ACID_ARMOUR_APPLY,campaignId,minute,actorId,finishId,vialId:vial.vialId,bindingId:vial.bindingId,
   targetItemId:item.id,targetLocation,targetOwnerId:item.characterId,targetName:item.snapshot.name,
   targetSourceItemId:item.sourceItemId,targetSlot:item.slot,targetSnapshot:structuredClone(item.snapshot),
-  ...(item.snapshot.properties.faeriecraft==='metal-armour'?{targetWorkshopCraftId:item.workshopCraftId}:{}),
+  ...(item.snapshot.properties.faeriecraft==='metal-armour'||item.snapshot.properties.armourWork?{targetWorkshopCraftId:item.workshopCraftId}:{}),
   sourceArticleId:article.id,initialDamage:damage,maximumAV:cap,asAtApplication:dose.currentAS,
   noImbibingRoll:true,profusionExempt:true,armourConfirmed:true,contactConfirmed:true,gmConfirmed:true,sourcePages:[269,270,271]};
 }

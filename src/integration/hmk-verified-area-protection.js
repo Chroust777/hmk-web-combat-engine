@@ -4,7 +4,7 @@
  */
 import {PRINTED_ARMOUR_SUITS_P113_116} from '../rules/armour-suit-printed.js';
 import {HMK_BODY_LOCATIONS} from './armour-coverage-readiness.js';
-import {resolveLiveCombatArmour,resolveOwnedArmourArticle} from './live-combat-armour.js';
+import {resolveLiveCombatArmour,resolveOwnedArmourArticle} from './live-combat-armour.js?v=94.012';
 import {identifyWornPrintedSuit} from './printed-suit-combat.js';
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 
@@ -23,13 +23,14 @@ export function resolveVerifiedAreaProtection({inventory,targetId,method='weight
  if(!['weighted','quick'].includes(method))return blocked('Neznámá metoda Area AV');
  const worn=inventory.filter(x=>x.characterId===targetId&&x.slot==='worn');
  if(worn.some(x=>x.snapshot?.category!=='armor'||x.quantity!==1||x.destroyed===true||
-  equipmentUnusable(x)||x.aq!=null&&x.aq!==0||typeof x.condition==='string'&&x.condition.trim()!==''))
+  equipmentUnusable(x)||(!x.snapshot?.properties?.armourWork&&!x.snapshot?.properties?.faeriecraft&&
+   (x.aq!=null&&x.aq!==0||typeof x.condition==='string'&&x.condition.trim()!==''))))
   return blocked('Neověřená, poškozená nebo stavově nejednoznačná nasazená zbroj');
  const witness=snapshot(worn);
  if(worn.length===0)return {ready:true,areaAV:0,method:'no-armour',source:'HMK p133',targetId,inventoryWitness:witness,locations:[]};
  const match=identifyWornPrintedSuit(inventory,targetId);
  // The printed suite itself has an authoritative, published Area AV.
- if(match.ok&&method==='weighted'){
+ if(match.ok&&method==='weighted'&&!worn.some(x=>x.snapshot.properties.armourWork?.avDelta)){
   for(const item of worn){const checked=resolveOwnedArmourArticle(item);if(!checked.ready)return blocked(checked.reason);}
   const suit=PRINTED_ARMOUR_SUITS_P113_116.find(s=>s.name===match.name);
   if(!suit||!/^f\d+$/.test(suit.area))return blocked('Tištěná Area AV není doložena');

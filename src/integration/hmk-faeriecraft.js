@@ -1,5 +1,5 @@
 import {missingPrintedArmourCatalogEntries} from './armour-article-catalog.js';
-import {FLETCHING_ITEMS} from './hmk-fletching-work.js?v=94.009';
+import {FLETCHING_ITEMS} from './hmk-fletching-work.js?v=94.012';
 import {resolveSkillTest,testSecondaryRoll} from './hmk-skill-test-engine.js';
 
 export const FAERIE_SPAN=5*1440;
@@ -34,6 +34,7 @@ export function faerieArmourItem(plan,result,projectId,actorId){
 
 export function faerieWorkshopKind(project){
  const recipe=FLETCHING_ITEMS[project?.scope];
+ if(recipe?.armour&&recipe.article&&['scale','mail','plate'].includes(recipe.material))return 'metal-armour';
  if(project?.kind==='fletching'&&recipe?.bow)return 'hartbow';
  if(project?.kind==='weaponcraft'&&recipe?.name==='Longknife')return 'longknife';
  return null;
@@ -46,7 +47,7 @@ export function faerieWorkshopPlan(row){
  const project=row.calendarSkillProjectStart591,recipe=FLETCHING_ITEMS[project.scope],hartbow=faerieWorkshopKind(project)==='hartbow';
  return {workshopId:row.id,item:project.projectName,skill:hartbow?'Fletching':'Weaponcraft',
   durationMinutes:project.baseDueMinute-project.startMinute,
-  ...(hartbow?{bow:project.scope.includes(':compositeBow:')?'composite':'longbow',baseDraw:recipe.draw}:{})};
+  ...(hartbow?{bow:project.scope.includes(':compositeBow:')?'composite':'longbow',baseDraw:recipe.draw}:recipe.armour?{armour:recipe.material,baseWeight:recipe.article.properties.weightLb}:{})};
 }
 export function faerieWorkshopItem(catalog,allocation,spirit,startId,actorId){
  const snapshot=structuredClone(catalog),p=snapshot.properties;

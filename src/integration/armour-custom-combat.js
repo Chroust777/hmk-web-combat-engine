@@ -27,7 +27,7 @@ export function resolveCustomArmour({pieces,location,aspect,direction,layerOptio
   const coverage=validateArmourCoverage(source);
   if(!coverage.ready)return fail(`Unverified article: ${piece.id}`,coverage.issues);
   if(!Number.isSafeInteger(piece.layerOrder)||piece.layerOrder<0)return fail(`Explicit inner-to-outer layerOrder required: ${piece.id}`);
-  articles.push({...source,layerOrder:piece.layerOrder});
+  articles.push({...source,layerOrder:piece.layerOrder,craftedAV:piece.craftedAV});
  }
  const layering=evaluateOrderedArmour(articles,layerOptions);
  if(layering.status!=='compatible')return fail(`Layering ${layering.status}`,{errors:layering.errors,unresolved:layering.unresolved});
@@ -59,7 +59,7 @@ export function resolveCustomArmour({pieces,location,aspect,direction,layerOptio
   }
   return (marker!=='front-only'||direction==='front')&&(marker!=='rear-only'||direction==='rear');
  });
- const layers=covered.map(a=>({material:a.material,rigid:a.coverageMarkers[location]==='rigid'||(a.rigid&&['front-only','rear-only'].includes(a.coverageMarkers[location])),aq:0}));
+ const layers=covered.map(a=>({material:a.material,av:a.craftedAV,rigid:a.coverageMarkers[location]==='rigid'||(a.rigid&&['front-only','rear-only'].includes(a.coverageMarkers[location])),aq:0}));
  const value=locationArmourValue({layers,zone:location,aspect,options:armourOptions});
  return {ready:true,source:'HMK World of Kethira pp.117-119',location,aspect,direction,armourValue:value.av,rigidArmour:value.rigid,metalArmour:covered.some(a=>materialMetal.has(a.material)),articleIds:covered.map(a=>a.id),extraEnc:layering.extraEnc,bulkPenalty:layering.bulkPenalty,layering,directionalContext:areaHazard?{areaHazard:true,checkedArticleIds:directional.map(a=>a.id)}:{opponents,d10:directional.length&&opponents>1?d10:null,checkedArticleIds:directional.map(a=>a.id)}};
 }

@@ -13,7 +13,7 @@ const SELECTIONS={
  faerie:['consecration','craftSkill','bow','armourArticleId'],
  design:['edifice','randomizeTime'],writingSpread:['scope','writingRewrite','writingPurpose','writingIntent','writingPagesRandom','writingTimeRandom'],
  shipwright:[],construction:[],
- fletching:['timeStars'],skillFollowup:['activity','technique'],
+ fletching:['timeStars','armourDiceCount'],skillFollowup:['activity','technique'],
  fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
  herbs:['singlePotencyRoll','actorId'],
  blood:['method','healerId','hasWater','hasNeedleThread','hasHeatedTool','tourniquet'],
@@ -90,7 +90,11 @@ function stepsFor(form,kind){
    add('lost2',6,'Ztracené dny · d6 2/2','fletchingDice',1);
   }else if(form.dataset.fletchingFlaw==='2')add('flaw',2,'Vada výrobku d2','fletchingDice',0);
   else{
-   const count=Number(form.dataset.fletchingStars)-Number(value(form,'timeStars'));
+   const available=Number(form.dataset.fletchingStars)-Number(value(form,'timeStars'));
+   const select=form.elements.namedItem('armourDiceCount');
+   if(select)for(const option of select.options)option.disabled=Number(option.value)>available;
+   if(select&&Number(select.value)>available)select.value=String(available);
+   const count=select?Number(select.value):available;
    for(let i=0;i<count;i++)add('mws'+i,10,'Masterwork d10 '+(i+1)+'/'+count,'fletchingDice',i);
   }
  }else if(kind==='brewStart'){

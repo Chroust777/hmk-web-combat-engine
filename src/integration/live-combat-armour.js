@@ -6,7 +6,7 @@ import {PRINTED_ARMOUR_ARTICLES_P118} from '../rules/armour-articles-printed.js'
 import {equipmentUnusable} from './hmk-equipment-serviceability.js';
 import {locationArmourValue} from '../rules/armour-options.js';
 import {HMK_BODY_LOCATIONS} from './armour-coverage-readiness.js';
-import {resolveCustomArmour} from './armour-custom-combat.js';
+import {resolveCustomArmour} from './armour-custom-combat.js?v=94.012';
 const acidArmourDamage=(item,loc)=>{
  const map=item?.acidAVDamageByLocation;
  if(map===undefined)return 0;
@@ -66,12 +66,16 @@ export function resolveOwnedArmourArticle(item,{allowCarried=false,weightOnly=fa
  if(mat!==source.material||canonName(source.name)!==canonName(item.snapshot.name))return fail('Armour material/name differs from printed source');
  if(!sameArray(p.coveredLocations,source.coveredLocations))return fail('Snapshot covered locations differ from audited p118 source');
  if(!p.locationProtection||typeof p.locationProtection!=='object')return fail('Armour snapshot has no anatomical AV');
+ const craft=p.armourWork;
+ if(craft&&(!id.startsWith(prefix)||!item.workshopCraftId||
+    !['-2:-2','-1:-1','0:0','1:0','1:1','2:1','2:2','3:2'].includes(craft.aqDelta+':'+craft.avDelta)))
+  return fail('Armour Quality and AV must match a supported crafting result');
  const locations=Object.keys(p.locationProtection);
  if(!sameArray(locations,source.coveredLocations))return fail('Snapshot AV locations differ from audited p118 source');
  for(const loc of source.coveredLocations){
   for(const aspect of aspects){
    const expected=locationArmourValue({layers:[{material:source.material}],zone:loc,aspect}).av;
-   if(p.locationProtection[loc]?.[aspect]!==expected)return fail(`Owned AV differs from HMK for ${loc}/${aspect}`);
+   if(p.locationProtection[loc]?.[aspect]!==Math.max(0,expected+(craft?.avDelta??0)))return fail(`Owned AV differs from HMK for ${loc}/${aspect}`);
   }
  }
  if(p.coverageMarkers!==undefined&&stableValue(p.coverageMarkers)!==stableValue(source.coverageMarkers))return fail('Snapshot directional/rigid markers differ from HMK p118');
@@ -97,20 +101,27 @@ export function resolveOwnedArmourArticle(item,{allowCarried=false,weightOnly=fa
  * and aspect; never reduces a total below zero. Directional custom layers
  * use the set of articles which really participated in protection.
  */
-function acidAdjustedProtection(base,worn,location,aspect,direction,activeInventoryIds,areaHazard=false){
- let reduction=0;const sourceIds=[];
+function acidAdjustedProtection(base,worn,location,aspect,direction,activeInventoryIds,areaHazard=false,printedSuit=false){
+ let reduction=0,craftAdjustment=0;const sourceIds=[];
  for(const item of worn){
   const d=acidArmourDamage(item,location);
   if(d===null)return {ready:false,reason:'Invalid acidAVDamage on owned armour article',requiresGMResolution:true};
-  if(d===0||!activeInventoryIds.includes(item.id))continue;
+  if(!activeInventoryIds.includes(item.id))continue;
   const p=item.snapshot?.properties||{};
   const marker=p.coverageMarkers?.[location];
   if(!areaHazard&&(marker==='front-only'&&direction!=='front'||marker==='rear-only'&&direction!=='rear'))continue;
   const originalAV=p.locationProtection?.[location]?.[aspect];
+  if(printedSuit&&p.armourWork&&Number.isSafeInteger(originalAV)){
+   const material=materialCodes[p.material]??p.material;
+   const standard=locationArmourValue({layers:[{material}],zone:location,aspect}).av;
+   craftAdjustment+=originalAV-standard;
+  }
+  if(d===0)continue;
   if(!Number.isSafeInteger(originalAV)||originalAV<0)return {ready:false,reason:'Missing original article AV for Acid reduction',requiresGMResolution:true};
   const loss=Math.min(d,originalAV);
   if(loss){reduction+=loss;sourceIds.push(item.id);}
  }
+ base=Math.max(0,base+craftAdjustment);
  const actual=Math.min(base,reduction);
  return {ready:true,armourValue:base-actual,acidAVReduction:actual,acidDamagedInventoryIds:sourceIds,
   armourValueBeforeAcid:base};
@@ -139,7 +150,7 @@ export function resolveLiveCombatArmour({inventory,targetId,location,aspect,dire
   const rigid=selectPrintedSuitRigidStatus(p,rigidStatus);
   if(!rigid.ok)return fail(rigid.reason);
   if(mode==='reference'&&worn.some(x=>x.acidAVDamageByLocation&&Object.values(x.acidAVDamageByLocation).some(d=>d>0)))return fail('Acid-damaged armour requires inventory-specific protection, not GM suit reference');
-  const adjusted=acidAdjustedProtection(p.av[aspect],worn,location,aspect,direction,mode==='reference'?[]:match.inventoryIds);
+  const adjusted=acidAdjustedProtection(p.av[aspect],worn,location,aspect,direction,mode==='reference'?[]:match.inventoryIds,false,mode!=='reference');
   if(!adjusted.ready)return adjusted;
   return {ready:true,mode:mode==='reference'?'gm-reference':'exact-worn-suit',source:'HMK pp.113–116',targetId,location,aspect,direction,
    ...adjusted,rigidArmour:rigid.status==='yes',rigidStatus:rigid.status,rigidSource:rigid.source,
@@ -167,7 +178,7 @@ export function resolveLiveCombatArmour({inventory,targetId,location,aspect,dire
    if(bulkExceptionByZone[zone]!==undefined)return fail(`Several Bulk exception articles selected for ${zone}`);
    bulkExceptionByZone[zone]=id;
   }
-  pieces.push({id,layerOrder});
+  pieces.push({id,layerOrder,...(x.snapshot.properties.armourWork?{craftedAV:x.snapshot.properties.locationProtection[location]}:{})});
  }
  if(layerOptions.bulkExceptionByZone&&Object.entries(layerOptions.bulkExceptionByZone).some(([z,id])=>bulkExceptionByZone[z]!==undefined&&bulkExceptionByZone[z]!==id))return fail('Contradictory GM Bulk selections');
  const merged={...layerOptions,bulkExceptionByZone:{...bulkExceptionByZone,...(layerOptions.bulkExceptionByZone||{})},slotByArticleId:{...slotByArticleId,...(layerOptions.slotByArticleId||{})}};

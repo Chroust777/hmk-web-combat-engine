@@ -7,7 +7,7 @@ import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentPr
  * unsupported Kèthîran month/calendar names or real-world timezone.
  */
 import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly} from './hmk-calendar-planner.js';
-import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js?v=94.011';
+import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js?v=94.012';
 import {calendarMoraleProjection} from './hmk-calendar-morale-93891.js';
 import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
 import {automaticAilmentOnset} from './hmk-calendar-automatic-onsets.js';

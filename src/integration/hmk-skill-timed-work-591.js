@@ -1,5 +1,5 @@
-import {faerieWorkshopKind,faerieWorkshopState} from './hmk-faeriecraft.js?v=94.009';
-import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=94.009';
+import {faerieWorkshopKind,faerieWorkshopState} from './hmk-faeriecraft.js?v=94.012';
+import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,fletchingDue,fletchingOutcome,validFletchingProof} from './hmk-fletching-work.js?v=94.012';
 /** HârnMaster 1.2 pp.70,132: prospective scheduling of actual skill work.
  * Read-only arithmetic/validation. Never invents a roll or a project.
  * Existing unscheduled historical skill tests are unchanged.
@@ -317,6 +317,8 @@ export function validateSkillTimedWork591(data){
       link?.calendarFaeriecraft?.input.allocationId===done.allocationId&&link.campaignMinute===row.campaignMinute:
       done.reverieResultId===undefined),'Faeriecraft: dokončení musí odpovídat výrobku a dokladu Spirit SR.');
    }
+   const article=workshopCraftItem(start.p.kind,start.p.scope);
+   if(article?.armour)assert(done.inventoryId===(article.article?'workshop-faerie:'+startId:null),'Výroba zbroje: dokončení musí odkazovat na hotový kus.');
    finishedFletching.add(startId);
   }
  }

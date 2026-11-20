@@ -1,4 +1,4 @@
-import {isWorkshopCraft,WORKSHOP_CRAFT_PROJECTS} from './hmk-fletching-work.js?v=94.001';
+import {isWorkshopCraft,WORKSHOP_CRAFT_PROJECTS} from './hmk-fletching-work.js?v=94.012';
 /** Automatic HMK follow-up discovery. No dice, no guessed physical context.
  * Every obligation is derived from an actual persistent state or a committed
  * Skill Test. Calendar date is authoritative; combat rounds are not minutes.
@@ -12,10 +12,10 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
-import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.007';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.012';
 import {copySource,findCopyStages} from './hmk-script-copy.js?v=94.006';
 import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=94.006';
-import {faerieState,faerieNext,faerieWorkshopState} from './hmk-faeriecraft.js?v=94.009';
+import {faerieState,faerieNext,faerieWorkshopState} from './hmk-faeriecraft.js?v=94.012';
 const DAY=1440;
 const safe=(x)=>Number.isSafeInteger(x)&&x>=0&&x<=1000000000;
 const key=(...xs)=>xs.map(x=>encodeURIComponent(String(x))).join(':');
