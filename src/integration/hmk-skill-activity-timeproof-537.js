@@ -32,7 +32,9 @@ export function validateSkillActivityTimeProofs(journal=[]){
   if(w){
    const isLanguage=/^Language(?:\s|\(|:|$)/.test(originalSkill||'')||/\(Language\)$/.test(originalSkill||'');
    const factor=p.result?.level==='CF'?2:p.result?.level==='F'?1.5:1;
-   check(p.activity==='writing-routine'&&isLanguage&&w.format==='hmk-writing-cf-delay-p132-v1'&&
+   const isPoetics=originalSkill==='Creativity'&&origin?.secondaryRollResult?.routineId==='writing-poetics'&&
+    source.calendarSkillProjectSV591?.kind==='writing';
+   check(p.activity==='writing-routine'&&(isLanguage||isPoetics)&&w.format==='hmk-writing-cf-delay-p132-v1'&&
     w.sourcePage===132&&['missive','tract','treatise','disquisition'].includes(w.scope)&&
     w.completionTimeMultiplier===factor&&w.requiresOriginalCalendarPlan===true&&
     p.technique==='Will'&&!t,

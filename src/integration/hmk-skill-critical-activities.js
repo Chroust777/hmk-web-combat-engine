@@ -14,7 +14,7 @@ export const CF_ACTIVITIES=Object.freeze({
  Jumping:Object.freeze([{id:'jumping-sv',label:'Jumping · skok SV',page:77,mode:'test',test:'Stumble'}]),
  Fishing:Object.freeze([{id:'fishing-sv',label:'Fishing · lov ryb SV',page:71,mode:'split-fishing'}]),
  Survival:Object.freeze([{id:'trek-survival-hazard',label:'Trekking · náhodný Survival Hazard',page:148,mode:'hazard'}]),
- Language:Object.freeze([{id:'writing-routine',label:'Writing Routine · autor textu (Language + Creativity SR)',page:132,mode:'test',test:'Will'}]),
+ Language:Object.freeze([{id:'writing-routine',label:'Writing Routine · Will po CF při tvorbě',page:132,mode:'test',test:'Will'}]),
  Animalcraft:Object.freeze([{id:'animal-training',label:'Animal Training · CF: dodatečný d3 měsíců',page:65,mode:'animal-training'}]),
  Lockcraft:Object.freeze([{id:'lock-picking',label:'Picking Locks · otevírání zámku',page:77,mode:'lock'}])
 });
@@ -28,8 +28,8 @@ export const FAILURE_ACTIVITIES=Object.freeze({
   {id:'climb-easy-turn-failure',label:'Easy Climbing · F: neúspěch po 1 turn (bez hodu)',page:67,mode:'decision'},
   {id:'climb-difficult-failure',label:'Difficult Climbing · F: výsledek SV bez nového testu',page:67,mode:'decision'}])
 });
-export function skillFollowupActivities(skill,level,{climbingMode}={}){
- const options=level==='CF'?criticalActivities(skill):level==='F'?(FAILURE_ACTIVITIES[String(skill)]||[]):[];
+export function skillFollowupActivities(skill,level,{climbingMode,writingPoetics}={}){
+ const options=level==='CF'?(skill==='Creativity'&&writingPoetics?CF_ACTIVITIES.Language:criticalActivities(skill)):level==='F'?(FAILURE_ACTIVITIES[String(skill)]||[]):[];
  if(skill!=='Climbing'||!climbingMode)return options;
  return options.filter(option=>option.id.startsWith('climb-'+climbingMode));
 }

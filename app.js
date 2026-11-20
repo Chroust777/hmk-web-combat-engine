@@ -4,7 +4,7 @@ import {FLETCHING_ITEMS,isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECT
 import {JEWELLERY_D_PER_OZ,GEM_D,jewelcraftWork994} from './src/integration/hmk-jewelcraft-work.js?v=93.994';
 import {READING_CONDITION_RULES,readingCondition,readingSource,externalReadingSource,resolveReading,readingStars,readingComprehension,settleReading,settleReflection,readingRows,readingStages,readingCanStart,knownReadingInsights,validateReadingJournal,assertReadingAppendOnly} from './src/integration/hmk-script-reading.js?v=94.004';
 import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=94.002';
-import {WRITING_LANGUAGES,writingScripts,writingDictationFactor,writingIsText,validWritingPlan,writingFixedSubject,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=94.003';
+import {WRITING_LANGUAGES,writingScripts,writingDictationFactor,writingIsText,validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=94.005';
 import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
@@ -55,7 +55,7 @@ import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integra
 import {CHRONICLE_NOVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.962';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
-import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js?v=93.977';
+import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js?v=94.005';
 import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk-skill-balance-547.js';
 import {fishingCatchCandidate,resolveFishingCatch} from './src/integration/hmk-fishing-catch-548.js';
 import {FISH_START_V2,fishingStart93910,fishingProgress93910,fishingWork93910,fishingCancel93910,fishingSVLink93910,validateFishingTime93910} from './src/integration/hmk-fishing-time-93910.js?v=93.910';
@@ -65,7 +65,7 @@ import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltSta
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign} from './src/integration/hmk-engineering-design-548.js';
 import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=93.995';
-import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.002';
+import {WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.005';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -85,7 +85,7 @@ import {pendingGreatPoisons,requireGreatPoisonRoundMayAdvance,requireGreatPoison
 import {createHerbWeaponPaste,createHerbWeaponPasteHit,createHerbWeaponPasteDiscard,pendingWeaponPoisonPastes,validateHerbWeaponPasteJournal,assertHerbWeaponPasteAppendOnly,assertActiveHerbWeaponPastes} from './src/integration/hmk-herbal-weapon-paste.js';
 import {createWeaponPoisonResistance,pendingWeaponPoisonResistance,validateWeaponPoisonResistanceJournal,assertWeaponPoisonResistanceAppendOnly,requireWeaponPoisonResistanceRoundMayAdvance,requireWeaponPoisonResistanceGMTimeMayAdvance} from './src/integration/hmk-herbal-weapon-resistance.js';
 import {prepareDiseaseExposure,prepareDiseaseProfile,prepareDiseaseOnset,prepareDiseaseCourse} from './src/integration/hmk-disease-course.js';
-import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js';
+import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js?v=94.005';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
 import {applyTalismanBestowal,projectTalismanStatus,validateTalismanEvidence,activeShamanSkillModifier,reconcileTalismanPossession} from './src/integration/hmk-shaman-talisman-state.js';
@@ -221,7 +221,7 @@ import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from '.
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
-import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.004';
+import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.005';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
 import {calendarMemberIds,removeCalendarSafely,recoverCalendarEvidence,validateCalendarEvidenceArchives,assertCalendarEvidenceAppendOnly,assertCompatibleLiveEffectTimeAxis} from './src/integration/hmk-calendar-campaign-lifecycle.js';
 import {CALENDAR_DICE_FIELDS,verifiedCalendarDiceWitness,annotateNewCalendarRolls} from './src/integration/hmk-calendar-dice-evidence.js';
@@ -306,7 +306,7 @@ import {createNutritionPolicy,activeNutritionPolicies,finishDueNutritionDays,val
 import {createNutritionDayConditions,createNutritionConditionsCancel,nextNutritionDayStart,validateNutritionActivityJournal,assertNutritionActivityAppendOnly,dailyNutritionNeeds} from './src/integration/hmk-nutrition-activity.js';
 import {pendingTrackingBearing} from './src/integration/hmk-tracking-bearing-handoff.js';
 import {trackingAwarenessFromSkill,pendingTrackingAwareness,validateTrackingAwarenessJournal} from './src/integration/hmk-tracking-awareness-537.js';
-import {validateSkillActivityTimeProofs} from './src/integration/hmk-skill-activity-timeproof-537.js';
+import {validateSkillActivityTimeProofs} from './src/integration/hmk-skill-activity-timeproof-537.js?v=94.005';
 import {provenCarriedRations,assertExclusiveForagingProven} from './src/integration/hmk-inventory-provisions.js';
 import {characterProvisionsOverview,partyProvisionsOverview} from './src/integration/hmk-character-provisions-overview.js';
 import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,logbookRestoreEntry,validateLogbookVisibility} from './src/integration/hmk-logbook-visibility.js';
@@ -320,7 +320,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.004';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.005';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
 import {resolveHMKMissileAttack,missileProjectileDischarged} from './src/integration/hmk-missile-combat.js';
@@ -394,7 +394,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='94.004';
+const APP_VERSION='94.005';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -5036,8 +5036,11 @@ function completedWritingHTML992(actor){
   const proof=row.skillTestProof,scribe=proof?.scribing;
   if(!start)return '';
   const result=scribe?.outcome.result;
+  const revised=data.journal.find(entry=>entry.id===start.writingPlan?.rewrite?.sourceId)?.calendarSkillProjectComplete591;
+  const revisedName=revised?data.journal.find(entry=>entry.id===revised.startId)?.calendarSkillProjectStart591?.projectName:null;
   return `<article class="hsk-project-pending" data-hmk-written-result><strong>${esc(start.projectName)}</strong>
-   <p>${esc(displayCampaignMinute(receipt.dueMinute))} · Language SV ${proof.sourceSV} · Insight ${proof.insightStars} ★</p>
+   ${revisedName?`<p>Přepis díla · ${esc(revisedName)}</p>`:''}
+   <p>${esc(displayCampaignMinute(receipt.dueMinute))} ·  ${esc(writingRollSkills(start.writingPlan).primary==='Creativity'?'Creativity':'Language')} SV ${proof.sourceSV} · Insight ${proof.insightStars} ★</p>
    ${scribe?`<p>${start.writingPlan.mode==='dictation'?'Diktování · ':''}${esc(character(scribe.scribeId)?.name||'Písař')} ·
     ${esc(scribe.script)} · EML ${result.eml??'—'} · ${result.roll==null?'CF bez hodu':`d100 (${result.roll}) · ${result.level}`} · Scribing SV ${result.sv}</p>
     <p>Postih při čtení ${scribe.outcome.readingModifier}${scribe.outcome.saleValueD===null?'':` · prodejní hodnota ${scribe.outcome.saleValueD} d`}</p>`:''}</article>`;
@@ -5377,15 +5380,16 @@ function pendingWritingWorkHTML591(actor){
   const sp=start.calendarSkillProjectStart591,{attempt:j,result:{sv},factor}=state;
   const stars=Math.max(0,Math.min(5,Number(sv)-4));
   const mastered=availableMasteries(actor).filter(x=>Number.isFinite(x.ml)&&x.ml>0);
-  const isText=writingIsText(sp),plan=sp.writingPlan,fixed=writingFixedSubject(plan);
+  const isText=writingIsText(sp),plan=sp.writingPlan;
+  const fixed=writingFixedSubject(plan)||(plan?.rewrite?data.journal.find(row=>row.id===plan.rewrite.sourceId)?.skillTestProof?.subjectSkill:null);
   const scopeMax=isText?({tract:1,treatise:3,disquisition:5})[sp.scope]:0;
   return `<form class="hsk-form-grid hsk-writing-finish-591" data-hmk-writing-finish-591 ${plan?'data-hmk-scribing-work':''}>
-   <h4>${esc(sp.projectName)} · ${esc(scopeNames[sp.scope])} · Language SV ${esc(String(sv))}</h4>
+   <h4>${esc(sp.projectName)} · ${esc(scopeNames[sp.scope])} · ${esc(writingRollSkills(plan).primary==='Creativity'?'Creativity':'Language')} SV ${esc(String(sv))}</h4>
    <input type="hidden" name="origin" value="${esc(j.id)}"><input type="hidden" name="startId" value="${esc(start.id)}">
    ${plan?`<p>${plan.mode==='dictation'?'Diktování (+50 % času, −20 k Script): ':'Vlastní zápis: '}<strong>${esc(character(plan.scribeId)?.name||'Písař')}</strong> · ${esc(plan.script)} · ${esc(plan.language)}</p>`:''}
    <p>${stars} ★. ${factor>1?'Will prodloužil dobu tohoto pokusu na '+(factor*100)+' %.':''}</p>
    <label>Hvězdy použité na zkrácení času (10 % za každou)<select name="timeStars">${Array.from({length:stars+1},(_,n)=>`<option value="${n}">${n} ★ = −${n*10} % času</option>`).join('')}</select></label>
-   ${fixed?`<p>${esc(WRITING_PURPOSE_LABELS[plan.purpose])} · Subject Index ${Math.floor((mastered.find(m=>m.name===fixed)?.ml??0)/10)}.</p>`:''}
+   ${fixed?`<p>${esc((WRITING_PURPOSE_LABELS[plan.purpose]||'Předmět původního díla')+' · '+fixed)} · Subject Index ${Math.floor((mastered.find(m=>m.name===fixed)?.ml??0)/10)}.</p>`:''}
    ${isText?`${fixed?`<input type="hidden" name="subjectSkill" value="${fixed}">`:`<label>Ověřená předmětová dovednost pro Insight (Subject Index)<select name="subjectSkill"><option value="">— bez Insight / všechny hvězdy využity na čas —</option>${mastered.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} · ML ${m.ml} / Index ${Math.floor(m.ml/10)}</option>`).join('')}</select></label>`}
     <label>Skutečné Insight d10 · zbývající hvězdy<input name="insightD10" placeholder="Počet se vypočítá automaticky" autocomplete="off"></label><button type="button" class="secondary hc-small" data-hmk-writing-roll-591>⚄ Vygenerovat Insight d10</button>`:''}
    ${plan?`<input type="hidden" name="scribingD100">${isText?'':'<input type="hidden" name="insightD10">'}`:''}
@@ -5432,13 +5436,28 @@ const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','c
 const TIMED_SKILL_LABELS_600={...Object.fromEntries(Object.entries(WORKSHOP_CRAFT_PROJECTS).map(([key,value])=>[key,value.label])),engineering:'Engineering · HMK 70',writing:'Writing · HMK 132',drawing:'Drawing · HMK 69',cookery:'Cookery · HMK 68',glassworking:'Glassworking · HMK 73',woodworking:'Woodworking · HMK 91',jewelcraft:'Jewelcraft · HMK 76',...CRAFT_LABELS_600};
 const isWritingLanguage=skill=>typeof skill==='string'&&(/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill));
 const TIMED_SKILL_NAMES_600={...Object.fromEntries(Object.entries(WORKSHOP_CRAFT_PROJECTS).map(([key,value])=>[key,value.primary])),engineering:'Engineering',writing:'Writing',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',...CRAFT_SKILL_600};
-const WRITING_PURPOSE_LABELS={writ:'Právní podání · Law · HMK 77',cipher:'Tvorba šifry · Mathematics · HMK 79'};
+const WRITING_PURPOSE_LABELS={poem:'Poetics · báseň nebo hra',music:'Poetics · hudební skladba',writ:'Právní podání · Law · HMK 77',cipher:'Tvorba šifry · Mathematics · HMK 79'};
+function writingRewriteChoices(actor){
+ const journal=data.journal,cid=campaignKey(data.campaignClock),ML=name=>availableMasteries(actor).find(skill=>skill.name===name)?.ml??0;
+ const used=new Set(journal.map(row=>row.calendarSkillProjectStart591?.writingPlan?.rewrite?.sourceId).filter(Boolean));
+ return journal.flatMap(row=>{
+  if(used.has(row.id))return [];
+  const baseline=rewriteBaseline(journal,row,actor.id,cid);
+  if(!baseline)return [];
+  const languageML=ML(baseline.start.writingPlan.language),subjectML=ML(baseline.subject);
+  return languageML&&rewriteAllowed(baseline,languageML,subjectML)?[{...baseline,sourceId:row.id,languageML,subjectML}]:[];
+ });
+}
 function writingPlanFields992(actor){
  const languages=availableMasteries(actor).filter(m=>writingScripts(m.name).length);
  return `<fieldset data-hmk-writing-plan>
  <legend>Jazyk, písmo a písař · HMK 83, 132</legend>
+ <label>Zpracování<select name="writingRewrite"><option value="">Nové dílo</option>${writingRewriteChoices(actor).map(entry=>
+  `<option value="${esc(entry.sourceId)}">${esc('Přepis · '+entry.start.projectName)}</option>`).join('')}</select></label>
  <label>Účel díla<select name="writingPurpose"><option value="">Běžné dílo</option>${Object.entries(WRITING_PURPOSE_LABELS).map(([value,label])=>{
-  const fixed=writingFixedSubject({purpose:value}),eligible=availableMasteries(actor).some(m=>m.name===fixed);
+  const skills=availableMasteries(actor),requirements=({poem:['Creativity','Folklore'],music:['Creativity','Folklore','Musician']})[value]||[writingFixedSubject({purpose:value})];
+  const eligible=requirements.every(name=>skills.some(m=>m.name===name));
+  const fixed=requirements.join(' a ');
   return `<option value="${value}" ${eligible?'':'disabled'}>${esc(label+(eligible?'':' · vyžaduje '+fixed))}</option>`;
  }).join('')}</select></label>
  <label>Podoba díla<select name="writingIntent"><option value="missive">Dopis</option><option value="text">Text s předmětem a Insight</option></select></label>
@@ -5452,9 +5471,16 @@ function refreshWritingPlan992(form){
  const controls=form.elements;
  const language=controls.namedItem('writingLanguage');
  if(!language)return;
- const purpose=controls.namedItem('writingPurpose').value,intent=controls.namedItem('writingIntent');
- if(purpose)intent.value='text';
- intent.disabled=!!purpose;
+ const purposeField=controls.namedItem('writingPurpose'),intent=controls.namedItem('writingIntent');
+ const previous=writingRewriteChoices(character(selected)).find(entry=>entry.sourceId===controls.namedItem('writingRewrite').value);
+ if(previous){
+  purposeField.value=previous.start.writingPlan.purpose??'';
+  language.value=previous.start.writingPlan.language;
+ }
+ language.disabled=!!previous;
+ purposeField.disabled=!!previous;
+ if(purposeField.value||previous)intent.value='text';
+ intent.disabled=!!purposeField.value||!!previous;
  const script=controls.namedItem('writingScript'),scribe=controls.namedItem('writingScribe');
  const populate=(el,choices)=>{
   const last=el.value;el.replaceChildren(...choices.map(([value,label])=>new Option(label,value)));
@@ -5465,6 +5491,7 @@ function refreshWritingPlan992(form){
  populate(scribe,writingScribeOptions992(character(selected),language.value,script.value,mode).map(({person,masteries})=>
   [person.id,person.name+' · ML '+masteries.find(m=>m.name===script.value).ml]));
  if(!scribe.options.length)scribe.add(new Option('Žádný písař s tímto jazykem, písmem a Drawing',''));
+ return previous?.start.scope??null;
 }
 function isKuzhan996(actor){
  return /kuzh/i.test([actor?.hmk?.folk,actor?.hmk?.realm,actor?.hmk?.region]
@@ -5618,8 +5645,9 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
   const p=j.calendarSkillProjectStart591,linked=data.journal.find(x=>x.calendarSkillProjectSV591?.startId===j.id),nowDue=p.baseDueMinute;
   const writing=writingProjectState(data.journal,j);
   if(writing&&writing.phase!=='initial'){
-   const message=writing.phase==='retry'?`SV ${writing.result.sv}. Po ${chronicleRemainingTime(writing.baseMinutes)} další práce proveď Language (Creativity SR) znovu. Termín ${displayCampaignMinute(writing.readyMinute)}.`:
-    writing.phase==='will'?`Language CF, SV ${writing.result.sv}. Otevři navazující hod na Will.`:
+   const test=writingRollSkills(p.writingPlan),testLabel=test.primary==='Creativity'?'Creativity (Folklore SR)':'Language (Creativity SR)';
+   const message=writing.phase==='retry'?`SV ${writing.result.sv}. Po ${chronicleRemainingTime(writing.baseMinutes)} další práce proveď ${testLabel} znovu. Termín ${displayCampaignMinute(writing.readyMinute)}.`:
+    writing.phase==='will'?`${test.primary||'Language'} CF, SV ${writing.result.sv}. Otevři navazující hod na Will.`:
     `SV ${writing.result.sv}. Termín bez zkrácení ${displayCampaignMinute(writing.dueMinute)}.`;
    return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong> · ${esc(p.scope)}<p>${esc(message)}</p></div>`;
   }
@@ -5634,13 +5662,14 @@ function decorateTimedSkillProject591(root){
  if(create){
   const kind=create.elements.namedItem('kind'),scope=create.elements.namedItem('scope'),preview=create.querySelector('[data-hmk-project-time-preview-591]');
   const update=()=>{
-   refreshWritingPlan992(create);
+   const rewriteScope=refreshWritingPlan992(create);
    const isText=create.elements.namedItem('writingIntent')?.value==='text';
    const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD}d · ${item.hours} pracovních hodin${item.agingDice?' + '+item.agingDice+'d'+item.agingFaces+' zrání':''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name} · ${item.priceD}d · ${timedSkillBaseMinutes591(kind.value,key)/60} hodin`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
    const last=scope.value;
    if(scope.tagName==='SELECT'){
     scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${isWorkshopCraft(kind.value)?'':esc(key)+' · '}${esc(description)}</option>`).join('');
-    if(labels.some(x=>x[0]===last))scope.value=last;
+    if(rewriteScope||labels.some(x=>x[0]===last))scope.value=rewriteScope||last;
+    if(kind.value==='writing')scope.disabled=!!rewriteScope;
    }
    if(kind.value==='brewing'){
     const extra=create.elements.namedItem('spiritMonths');
@@ -5696,7 +5725,8 @@ function decorateTimedSkillProject591(root){
  if(!isTimed){picker.value='';delete primary.dataset.hmkWritingWaiting;return;}
  const current=picker.value,skill=primary.elements.namedItem('primary')?.value||'';
  const matches=pendingSkillProjects591(selected).filter(j=>j.calendarSkillProjectStart591.kind===skillSVChoice595.value&&timedProjectTestMinute591(j)!==null&&
- (j.calendarSkillProjectStart591.kind==='writing'?isWritingLanguage(skill):skill===TIMED_SKILL_NAMES_600[j.calendarSkillProjectStart591.kind]));
+ (j.calendarSkillProjectStart591.kind==='writing'?(j.calendarSkillProjectStart591.writingPlan?
+  writingRollSkills(j.calendarSkillProjectStart591.writingPlan).primary===skill:isWritingLanguage(skill)):skill===TIMED_SKILL_NAMES_600[j.calendarSkillProjectStart591.kind]));
  const signature=JSON.stringify(matches.map(j=>[j.id,timedProjectTestMinute591(j)]));
  if(picker.dataset.optionsSignature!==signature){
   picker.innerHTML='<option value="">— vyberte doložený projekt —</option>'+matches.map(j=>{const p=j.calendarSkillProjectStart591;return `<option value="${esc(j.id)}">${esc(p.projectName)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.scope)} · test nejdříve ${esc(displayCampaignMinute(timedProjectTestMinute591(j)))}</option>`;}).join('');
@@ -5988,7 +6018,8 @@ function applySelectedSV595(root){
  const wanted=choice.kind==='ordinary'?choice.value:({...TIMED_SKILL_NAMES_600,fishing:'Fishing',trapping:'Survival',animal:'Animalcraft'})[choice.value]||null;
  const options=[...primary.options];
  const writing=choice.kind==='timed'&&choice.value==='writing';
- const projectLanguage=writing?pendingSkillProjects591(selected).find(row=>row.calendarSkillProjectStart591.kind==='writing')?.calendarSkillProjectStart591.writingPlan?.language:null;
+ const projectLanguage=writing?writingRollSkills(pendingSkillProjects591(selected).find(row=>
+  row.calendarSkillProjectStart591.kind==='writing'&&timedProjectTestMinute591(row)!==null)?.calendarSkillProjectStart591.writingPlan).primary:null;
  const target=projectLanguage?options.find(x=>x.value===projectLanguage):writing?options.find(x=>x.selected&&isWritingLanguage(x.value))||options.find(x=>isWritingLanguage(x.value)):
   options.find(x=>x.value===wanted);
  if(writing)for(const option of options)option.disabled=projectLanguage?option.value!==projectLanguage:!isWritingLanguage(option.value);
@@ -13128,8 +13159,9 @@ function hskResultRichHTML(proof,body){
  if(proof.gmNarrative)html+='<section class="hsk-verdict-section hsk-verdict-narrative"><h4>Vyprávění pro GM</h4><p>'+esc(proof.gmNarrative)+'</p></section>';
  return html+'</div>';
 }
-function hskFollowupContext(proof){
- if(proof?.type==='secondary-mastery-value-test')return {climbingMode:'difficult'};
+function hskFollowupContext(proof,original){
+ if(proof?.type==='secondary-mastery-value-test')return {climbingMode:'difficult',
+  writingPoetics:original?.calendarSkillProjectSV591?.kind==='writing'&&proof.secondaryRollResult?.routineId==='writing-poetics'};
  if(['secondary-mastery-test','assistance-success-test'].includes(proof?.type))return {climbingMode:'easy'};
  return {};
 }
@@ -13179,7 +13211,7 @@ function hskCriticalNextHTML(originalId,proof,{includeAdvisory=false,actorId=nul
    if(staged)return '<section class="hsk-followup-advisory" role="status"><strong>Survival CF při Trekking · HMK str. 145, 148</strong><p>Původní d100 '+esc(String(x.result.roll??'—'))+' je již doložen. Žádný další d100 zde nezadávejte. Vraťte se do rozpracovaného Cestování; tam zadejte skutečný Survival Hazard d10 (1–3 Equipment, 4–6 Accident, 7–10 Complication). Následky se vyhodnotí ve svých pravidlových modulech. Rozpracované testy se uloží až potvrzením celé epizody GM.</p></section>';
    return '<p class="hsk-followup-advisory"><strong>Survival CF · HMK str. 148:</strong> Survival Hazard d10 je povinný pouze při doloženém Orienteering CF v Trekking. Nelze jej vyhodnotit pouhým uložením obecného následku Skill Testu. Použijte původní cestovní rutinu a její důkaz události; nový d100 se zde nehází.</p>';
   }
-  const options=skillFollowupActivities(x.skill,x.result.level,hskFollowupContext(proof));
+  const options=skillFollowupActivities(x.skill,x.result.level,hskFollowupContext(proof,data.journal.find(row=>row.id===originalId)));
   if(!options.length){if(!includeAdvisory)return '';const note=skillFailureGuidance(x.skill,x.result.level);return '<p class="hsk-followup-advisory"><strong>'+esc(x.skill)+' '+esc(x.result.level)+' · HMK '+(note?.page||60)+':</strong> '+esc(note?.text||'Další test není doložen.')+'</p>';}
   const choices=options.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.label)+' · HMK str. '+a.page+'</option>').join('');
   const trainingAnimalId=proof.animalTrainingSV590?.animalId;
@@ -14682,6 +14714,16 @@ document.addEventListener('submit',event=>{
    const purpose=value('writingPurpose');
    writingPlan={language:value('writingLanguage'),script:value('writingScript'),mode:value('writingMode'),
     scribeId:value('writingScribe'),intent:value('writingIntent'),...(purpose?{purpose}:{})};
+   const rewriteId=value('writingRewrite');
+   if(rewriteId){
+    const previous=writingRewriteChoices(actor).find(item=>item.sourceId===rewriteId);
+    if(!previous||scope!==previous.start.scope||purpose!==(previous.start.writingPlan.purpose??'')||
+     writingPlan.language!==previous.start.writingPlan.language)throw Error('Přepis vyžaduje vlastní text a nárůst Language nebo předmětu o 10 ML.');
+    writingPlan.rewrite={sourceId:rewriteId,languageML:previous.languageML,subjectML:previous.subjectML};
+   }
+   const test=writingRollSkills(writingPlan);
+   if(![test.primary,test.secondary].every(name=>availableMasteries(actor).some(m=>m.name===name)))
+    throw Error('Pro tento postup je nutné mít '+test.primary+' a '+test.secondary+'.');
    const fixed=writingFixedSubject(writingPlan);
    if(fixed&&!availableMasteries(actor).some(m=>m.name===fixed))throw Error('Účel díla vyžaduje osvojený '+fixed+'.');
    if(!validWritingPlan(writingPlan,actor.id,scope)||!availableMasteries(actor).some(m=>m.name===writingPlan.language)||
@@ -14763,7 +14805,9 @@ document.addEventListener('submit',event=>{
   const raw=f.elements.namedItem('insightD10')?.value.trim()||'';
   const dice=raw?raw.split(',').map(x=>{if(!/^\s*(?:[1-9]|10)\s*$/.test(x))throw Error('Insight d10 musí být skutečné celé hody 1–10.');return Number(x.trim());}):[];
   if(dice.length!==n)throw Error('Vyžadováno přesně '+n+'× d10 pro zbývající Insight hvězdy.');
-  const name=writingFixedSubject(start.writingPlan)||f.elements.namedItem('subjectSkill')?.value||'';
+  const rewrite=start.writingPlan?.rewrite;
+  const name=writingFixedSubject(start.writingPlan)||(rewrite?data.journal.find(j=>j.id===rewrite.sourceId)?.skillTestProof?.subjectSkill:null)
+   ||f.elements.namedItem('subjectSkill')?.value||'';
   const mastery=availableMasteries(character(selected)).find(x=>x.name===name);
   if(n>0&&!mastery)throw Error('Pro Insight d10 musí existovat doložená předmětová dovednost.');
   const subjectIndex=mastery?Math.floor(mastery.ml/10):0;
@@ -14782,8 +14826,9 @@ document.addEventListener('submit',event=>{
     rollOrigin:inputs.forcedCF?'rule-forced-no-die':field.dataset.hmkAutoDice===field.value?'software':'manual'};
   }
   const result={type:'writing-work-complete-591',format:SKILL_TIMED_WORK_FORMAT_591,originId:source.id,actorId:selected,scope:start.scope,
+   ...(plan?{authorLanguageML:availableMasteries(character(selected)).find(x=>x.name===plan.language)?.ml??0,subjectML:mastery?.ml??0}:{}),
    sourceSV:sv,sourceLevel:level,timeReductionStars:used,physicalInsightDice:dice,subjectSkill:name,subjectIndex,insightStars,sourcePage:132,...(start.writingPlan?.purpose?{purpose:start.writingPlan.purpose}:{}),...(scribing?{scribing}:{})};
-  const body='Writing · '+start.projectName+' · Language SV '+sv+'; '+used+' hvězd na čas, '+n+' Insight d10 ['+dice.join(', ')+'] → '+insightStars+' Insight ★; termín '+displayCampaignMinute(dueMinute)+'.'+(scribing?
+  const body='Writing · '+start.projectName+' · '+(writingRollSkills(plan).primary==='Creativity'?'Creativity':'Language')+' SV '+sv+'; '+used+' hvězd na čas, '+n+' Insight d10 ['+dice.join(', ')+'] → '+insightStars+' Insight ★; termín '+displayCampaignMinute(dueMinute)+'.'+(scribing?
    ' Písař '+character(plan.scribeId).name+' · '+plan.script+' · EML '+(scribing.outcome.result.eml??'—')+
    ' · d100 '+(scribing.inputs.roll??'bez hodu')+' → '+scribing.outcome.result.level+' · SV '+scribing.outcome.result.sv+
    ' · postih při čtení '+scribing.outcome.readingModifier+
@@ -14803,21 +14848,22 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  if(isSV&&currentChoice?.kind==='ordinary'&&actualSkill!==currentChoice.value)
   throw Error('Tento Success Value test patří k '+currentChoice.value+'. Pro jinou dovednost ji nejprve vyberte vlevo.');
  if(isSV&&currentChoice?.kind==='timed'){const expected=({...TIMED_SKILL_NAMES_600,fishing:'Fishing',trapping:'Survival',animal:'Animalcraft'})[currentChoice.value];
-  if(expected&&(currentChoice.value==='writing'?!isWritingLanguage(actualSkill):actualSkill!==expected))throw Error('Zvolený časovaný postup vyžaduje '+(currentChoice.value==='writing'?'Language':expected)+'; '+actualSkill+' nelze zaměnit.');}
+  if(expected&&(currentChoice.value==='writing'?!(actualSkill==='Creativity'||isWritingLanguage(actualSkill)):actualSkill!==expected))throw Error('Zvolený časovaný postup vyžaduje '+(currentChoice.value==='writing'?'Language':expected)+'; '+actualSkill+' nelze zaměnit.');}
  const timedId=isSV?document.querySelector('#skill-value-form [name="timedProjectId"]')?.value:null;
  const timedStart=timedId?data.journal.find(j=>j.id===timedId&&j.calendarSkillProjectStart591):null;
  const writing=writingProjectState(data.journal,timedStart);
  if(isSV&&view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&['engineering','writing',...CRAFT_TIMED_LIST_600].includes(skillSVChoice595.value)&&!timedId)throw Error('Časovaný projekt vyžaduje doložený začátek, správnou dovednost a uplynulý nejčasnější termín. Nelze uložit obecný SV jako dokončení projektu.');
  if(timedId){
   const p=timedStart?.calendarSkillProjectStart591,skill=proof?.skills?.[0]||proof?.skill;
+  const test=writingRollSkills(p?.writingPlan);
   if(!p||p.actorId!==selected||timedStart.calendarCampaignId!==campaignKey(data.campaignClock)||
    (p.kind==='writing'?writing.readyMinute==null||data.campaignClock.minute<writing.readyMinute:
     data.campaignClock.minute<p.earliestMinute||data.journal.some(j=>j.calendarSkillProjectSV591?.startId===timedId))||
-   (p.kind==='writing'?(p.writingPlan?skill!==p.writingPlan.language:!isWritingLanguage(skill)):skill!==TIMED_SKILL_NAMES_600[p.kind])||
+   (p.kind==='writing'?(p.writingPlan?skill!==test.primary:!isWritingLanguage(skill)):skill!==TIMED_SKILL_NAMES_600[p.kind])||
    (isWorkshopCraft(p.kind)&&!validFletchingProof(p,proof))||
-   (p.kind==='writing'&&(proof.secondaryRollResult?.routineId!=='language-written'||
-    proof.secondaryRollResult.name!=='Creativity'||!Number.isInteger(proof.secondaryRollResult.roll))))
-   throw Error('Časovaný projekt: vyber skutečný původní projekt, Language + Creativity SR (Writing), a nejdříve dosáhni doloženého termínu.');
+   (p.kind==='writing'&&(proof.secondaryRollResult?.routineId!==test.routineId||
+    proof.secondaryRollResult.name!==test.secondary||!Number.isInteger(proof.secondaryRollResult.roll))))
+   throw Error('Časovaný projekt: vyber skutečný původní projekt, dovednosti zvoleného postupu (Writing), a nejdříve dosáhni doloženého termínu.');
  }
  const stageForEpisode=!!(episodePendingSkillRequest?.status==='waiting'&&episodeSkillAuthorized(selected,actualSkill));
  if(!mutate(()=>{
@@ -15042,7 +15088,7 @@ document.addEventListener('change',event=>{
  const proof=original?.skillTestProof,side=f.elements.namedItem('side')?.value;
  const skill=side==='B'?proof?.skills?.[1]:proof?.skills?.[0]||proof?.skill;
  const res=side==='B'?proof?.b:proof?.a||proof?.result;
- const plan=criticalFollowupPlan(skill,event.target.value,res,hskFollowupContext(proof));
+ const plan=criticalFollowupPlan(skill,event.target.value,res,hskFollowupContext(proof,original));
  event.target.closest('label')?.classList.toggle('hmk-medical-required-target',!plan);
  f.dataset.requiresFollowRoll=plan?.requiresRoll?'yes':'no';
  const techniques=plan?.test==='Fumble'?['Dexterity','Legerdemain']:plan?.test==='Stumble'?['Agility','Acrobatics']:plan?.requiresRoll?[plan.test]:[];
@@ -15135,7 +15181,7 @@ document.addEventListener('submit',event=>{
   if(data.journal.some(x=>x.skillTestProof?.type==='critical-followup'&&x.skillTestProof.originId===originId&&x.skillTestProof.side===side))throw Error('Tento následný test už byl uložen');
   const skill=side==='B'?proof.skills?.[1]:proof.skills?.[0]||proof.skill;
   const old=side==='B'?proof.b:proof.a||proof.result;
-  const plan=criticalFollowupPlan(skill,f.elements.namedItem('activity')?.value,old,hskFollowupContext(proof));
+  const plan=criticalFollowupPlan(skill,f.elements.namedItem('activity')?.value,old,hskFollowupContext(proof,original));
   if(!plan)throw Error('Následný postup nelze doložit pro tuto činnost a CF');
   if(plan.id==='animal-training'&&data.journal.some(j=>j.skillTestProof?.type==='animal-training'&&j.skillTestProof.originId===originId))throw Error('Animal Training CF už byl doložen v kompletním výcviku; neházejte druhý d3.');
   if(['animal-training','writing-routine'].includes(plan.id)&&(!Number.isSafeInteger(data.campaignClock?.minute)||original.calendarCampaignId!==campaignKey(data.campaignClock)))
@@ -17222,7 +17268,10 @@ function hskRequiredSR(form,primary){
  if(primary==='Fletching'&&workshop?.fletching996.hartbow)return 'fletching-hartbow';
  if(primary==='Weaponcraft'&&FLETCHING_ITEMS[workshop?.scope]?.name==='Longknife'&&canCraftHartbow996(character(selected)))return 'weaponcraft-faerie';
  const writing=skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&skillSVChoice595.value==='writing';
- return writing&&isWritingLanguage(primary)?'language-written':'';
+ if(!writing)return '';
+ const work=pendingSkillProjects591(selected).find(row=>row.calendarSkillProjectStart591.kind==='writing'&&timedProjectTestMinute591(row)!==null);
+ const test=writingRollSkills(work?.calendarSkillProjectStart591.writingPlan);
+ return primary===test.primary||(!test.primary&&isWritingLanguage(primary))?test.routineId:'';
 }
 function hskSelectedSRRoutine(form,primary,side='A'){
  const id=hskRequiredSR(form,primary)||form.elements.namedItem('srActivity'+side)?.value||'';

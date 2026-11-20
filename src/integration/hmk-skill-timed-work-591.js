@@ -5,7 +5,7 @@ import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,
  */
 import {ENGINEERING_DESIGN_DAYS} from './hmk-engineering-design-548.js';
 import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=93.995';
-import {validWritingPlan,writingFixedSubject,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.002';
+import {validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,writingDictationFactor,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.005';
 import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
 export const WRITING_WORK_MINUTES_591=Object.freeze({missive:10,tract:5*1440,treatise:30*1440,disquisition:120*1440});
@@ -156,6 +156,15 @@ export function validateSkillTimedWork591(data){
      (!Object.hasOwn(p,'printedMaterialCostD')||p.printedMaterialCostD===printedCraftMaterialCost(p.kind,p.scope))&&
      p.materialSourceConfirmed===true)),
    'Časovaný Skill Test: začátek projektu nebo pravidlová doba byly pozměněny.');
+  if(p.writingPlan?.rewrite){
+   const {sourceId,languageML,subjectML}=p.writingPlan.rewrite,source=journalById.get(sourceId);
+   const baseline=rewriteBaseline(journal,source,row.characterId,row.calendarCampaignId);
+   assert(baseline&&journal.indexOf(source)<journal.indexOf(row)&&source.campaignMinute<=row.campaignMinute&&
+    ![...starts.values()].some(entry=>entry.p.writingPlan?.rewrite?.sourceId===sourceId)&&
+    p.scope===baseline.start.scope&&p.writingPlan.language===baseline.start.writingPlan.language&&
+    p.writingPlan.purpose===baseline.start.writingPlan.purpose&&rewriteAllowed(baseline,languageML,subjectML),
+    'Přepis vyžaduje vlastní dokončený text a doložený nárůst Language nebo předmětu o 10 ML.');
+  }
   starts.set(row.id,{row,p});
  }
  for(const [index,row] of journal.entries()){
@@ -170,7 +179,8 @@ export function validateSkillTimedWork591(data){
    row.characterId===s.p.actorId&&row.calendarCampaignId===s.row.calendarCampaignId&&
    Number.isSafeInteger(row.campaignMinute)&&row.campaignMinute>=s.p.earliestMinute&&
    proof?.type==='secondary-mastery-value-test'&&
-   (s.p.kind==='writing'?(s.p.writingPlan?skill===s.p.writingPlan.language:/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)):
+   (s.p.kind==='writing'?(s.p.writingPlan?skill===writingRollSkills(s.p.writingPlan).primary&&
+    (skill!=='Creativity'||proof.secondaryRollResult?.routineId==='writing-poetics'&&proof.secondaryRollResult?.name==='Folklore'&&Number.isInteger(proof.secondaryRollResult.roll)):/^Language(?:\s|\(|:|$)/.test(skill)||/\(Language\)$/.test(skill)):
     skill===({ ...Object.fromEntries(Object.entries(WORKSHOP_CRAFT_PROJECTS).map(([key,value])=>[key,value.primary])),engineering:'Engineering',drawing:'Drawing',cookery:'Cookery',glassworking:'Glassworking',woodworking:'Woodworking',jewelcraft:'Jewelcraft',brewing:'Brewing',ceramics:'Ceramics',hideworking:'Hideworking',textilecraft:'Textilecraft',metalcraft:'Metalcraft',mineralogy:'Mineralogy'})[s.p.kind])&&
    (!isWorkshopCraft(s.p.kind)||validFletchingProof(s.p,proof))&&
    (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
@@ -202,7 +212,13 @@ export function validateSkillTimedWork591(data){
    const originalLevel=source.skillTestProof?.a?.level??source.skillTestProof?.result?.level;
    const state=writingProjectState(journal,s.row);
    const insightDice=p.physicalInsightDice,required=writingIsText(s.p)?stars-t:0;
-   const fixedSubject=writingFixedSubject(s.p.writingPlan);
+   const rewrite=s.p.writingPlan?.rewrite;
+   const fixedSubject=writingFixedSubject(s.p.writingPlan)||(rewrite?journalById.get(rewrite.sourceId)?.skillTestProof?.subjectSkill:null);
+   if(p.authorLanguageML!==undefined||p.subjectML!==undefined||rewrite||writingRollSkills(s.p.writingPlan).primary==='Creativity'){
+    assert(Number.isSafeInteger(p.authorLanguageML)&&p.authorLanguageML>=1&&p.authorLanguageML<=1000&&
+     Number.isSafeInteger(p.subjectML)&&p.subjectML>=0&&p.subjectML<=1000&&Math.floor(p.subjectML/10)===p.subjectIndex&&
+     (p.subjectSkill||p.subjectML===0),'Writing: nedoložené ML autora nebo předmětu.');
+   }
    const subjectIndex=p.subjectIndex,successful=Array.isArray(insightDice)?insightDice.filter(d=>d<=subjectIndex).length:0;
    const insightLimit={missive:0,tract:1,treatise:3,disquisition:5}[s.p.scope];
    const expectedInsight=Math.min(successful,insightLimit,Math.max(0,subjectIndex-4));

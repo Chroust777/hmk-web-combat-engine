@@ -23,7 +23,14 @@ export function writingScripts(language){
 }
 export const WRITING_SUBJECTS=Object.freeze({writ:'Law',cipher:'Mathematics'});
 export function writingFixedSubject(plan){
+ if(plan?.purpose==='poem')return plan.language;
+ if(plan?.purpose==='music')return 'Musician';
  return Object.hasOwn(WRITING_SUBJECTS,plan?.purpose)?WRITING_SUBJECTS[plan.purpose]:null;
+}
+export function writingRollSkills(plan){
+ const poetics=['poem','music'].includes(plan?.purpose);
+ return poetics?{primary:'Creativity',secondary:'Folklore',routineId:'writing-poetics'}:
+  {primary:plan?.language,secondary:'Creativity',routineId:'language-written'};
 }
 export function writingDictationFactor(plan){return plan?.mode==='dictation'?1.5:1;}
 export function writingIsText(project){return project.writingPlan?.intent!=='missive'&&project.scope!=='missive';}
@@ -35,6 +42,25 @@ export function validWritingPlan(plan,actorId,scope){
   (scope!=='missive'||plan.intent==='missive')&&
   (plan.purpose===undefined||!!writingFixedSubject(plan)&&plan.intent==='text'&&scope!=='missive')&&typeof plan.scribeId==='string'&&plan.scribeId.length>0&&
   (plan.mode==='self'?plan.scribeId===actorId:plan.scribeId!==actorId)&&writingScripts(plan.language).includes(plan.script);
+}
+export function rewriteBaseline(journal,completed,actorId,campaignId){
+ if(completed?.characterId!==actorId||completed.calendarCampaignId!==campaignId||
+  completed.calendarSkillProjectComplete591?.kind!=='writing')return null;
+ const receipt=completed.calendarSkillProjectComplete591;
+ const start=journal.find(row=>row.id===receipt.startId&&row.characterId===actorId&&row.calendarCampaignId===campaignId)?.calendarSkillProjectStart591;
+ const proof=completed.skillTestProof;
+ if(!start?.writingPlan||!proof?.scribing||!writingIsText(start))return null;
+ const test=journal.find(row=>row.id===receipt.sourceId&&row.characterId===actorId&&row.calendarCampaignId===campaignId)?.skillTestProof;
+ const languageML=proof.authorLanguageML??(writingRollSkills(start.writingPlan).primary===start.writingPlan.language?test?.a?.ml:null);
+ const subject=proof.subjectSkill;
+ // Old completions kept only the Index. Its upper bound gives a provable
+ // increase if the exact old ML is unavailable.
+ const subjectML=proof.subjectML??(subject&&Number.isSafeInteger(proof.subjectIndex)?proof.subjectIndex*10+9:null);
+ return {start,languageML,subject,subjectML};
+}
+export function rewriteAllowed(baseline,languageML,subjectML){
+ const increased=(before,after)=>Number.isSafeInteger(before)&&before>0&&Number.isSafeInteger(after)&&after<=1000&&after>=before+10;
+ return !!baseline&&(increased(baseline.languageML,languageML)||increased(baseline.subjectML,subjectML));
 }
 export function resolveAuthoredScribing({mode,scriptML,languageML,drawingML,modifier,slPenalty,forcedCF,roll,scope,intent}){
  const situational=mode==='dictation'?-20:0;

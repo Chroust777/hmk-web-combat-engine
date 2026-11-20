@@ -4,7 +4,7 @@ import {isWorkshopCraft,WORKSHOP_CRAFT_PROJECTS} from './hmk-fletching-work.js?v
  * Skill Test. Calendar date is authoritative; combat rounds are not minutes.
  * HMK v1.2 pp.62,67,71,148,169,175–190.
  */
-import {criticalActivities,skillFollowupActivities} from './hmk-skill-critical-activities.js';
+import {criticalActivities,skillFollowupActivities} from './hmk-skill-critical-activities.js?v=94.005';
 import {trekkingOutstandingCases} from './hmk-trekking-followups.js';
 import {pendingTrackingAwareness} from './hmk-tracking-awareness-537.js';
 import {dueInjuryMorale,unresolvedInjuryMishaps} from './persistent-combat-state.js';
@@ -12,7 +12,7 @@ import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin} from './hm
 import {travelBleedingTerm} from './hmk-travel-blood-stoppage-93714.js';
 import {fishingGearDue} from './hmk-fishing-cf-gear-538.js';
 import {projectedVerifiedMalnutritionHealingMinute} from './hmk-nutrition-days.js';
-import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.002';
+import {writingProjectState} from './hmk-skill-timed-work-591.js?v=94.005';
 import {copySource,findCopyStages} from './hmk-script-copy.js?v=94.002';
 import {readingSource,readingRows,readingStages} from './hmk-script-reading.js?v=94.004';
 const DAY=1440;
@@ -289,7 +289,9 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   if(!['success-value-test','success-value-specific','secondary-mastery-value-test','secondary-mastery-test','assistance-success-test','opposed-success-test','success-test'].includes(p.type))continue;
   const sides=p.a?[{id:p.actorId,skill:p.skills?.[0],result:p.a,side:'A'},...(p.b?[{id:p.opponentId,skill:p.skills?.[1],result:p.b,side:'B'}]:[])]:[{id:p.actorId,skill:p.skill,result:p.result,side:'A'}];
   for(const x of sides){
-   if(!['F','CF'].includes(x.result?.level)||x.result.forcedCF||!skillFollowupActivities(x.skill,x.result.level).length)continue;
+   const writing=e.calendarSkillProjectSV591?.kind==='writing'&&x.side==='A';
+   const options=skillFollowupActivities(x.skill,x.result?.level,{writingPoetics:writing&&p.secondaryRollResult?.routineId==='writing-poetics'});
+   if(!['F','CF'].includes(x.result?.level)||x.result.forcedCF||!options.length)continue;
    // The corresponding executors require a documented routine. A generic
    // Skill Test with the same skill must not stop the campaign clock.
    if(x.skill==='Survival'&&!deferredAccident)continue;
@@ -329,9 +331,8 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
    if(episodeAlreadyHandled)continue;
    if(journal.some(z=>z.skillTestProof?.type==='critical-followup'&&z.skillTestProof.originId===e.id&&z.skillTestProof.side===x.side))continue;
    const c=characters.find(c=>c.id===x.id);
-   const writing=e.calendarSkillProjectSV591?.kind==='writing'&&x.side==='A';
-   if(c)push(c,'skill-critical',e.id+'-'+x.side,writing?'Writing · vyhodnotit Will po Language CF (HMK 132)':
-    `${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${skillFollowupActivities(x.skill,x.result.level)[0].page})`,actualDueMinute,'skills',
+   if(c)push(c,'skill-critical',e.id+'-'+x.side,writing?'Writing · vyhodnotit Will po CF při tvorbě (HMK 132)':
+    `${x.skill} ${x.result.level} – GM ověří konkrétní činnost a případný navazující test (HMK ${options[0].page})`,actualDueMinute,'skills',
     {originId:e.id,side:x.side,level:x.result.level,decisionRequired:!writing});
   }
  }
@@ -394,7 +395,7 @@ export function automaticHMKFollowups(clock,characters=[],journal=[],episodeAnch
   if(!person)continue;
   const state=writingProjectState(journal,row);
   if(state.phase==='retry')push(person,'writing-retry',row.id,
-   'Writing · volitelný nový Language (Creativity SR) · '+project.projectName+' (HMK 132)',state.readyMinute,'skills',{requiresAction:false});
+   'Writing · další pokus · '+project.projectName+' (HMK 132)',state.readyMinute,'skills',{requiresAction:false});
   if(state.phase==='finish'&&(project.writingPlan||state.result.level==='CF'||state.attempt.calendarSkillProjectSV591.previousAttemptId))push(person,'writing-completion',state.attempt.id,
    'Writing · potvrdit dokončení '+project.projectName+' (HMK 132)',state.dueMinute,'skills');
  }
