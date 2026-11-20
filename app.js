@@ -2,7 +2,7 @@ import {treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.972';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.952';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.975';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.974';
+const APP_VERSION='93.975';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -15037,7 +15037,14 @@ document.addEventListener('submit',event=>{
      ...(manual?{gmImmersionConfirmed:true,campaignMinute:clock.minute}:{}),
     ...(episodeId?{episodeId,originalSkillProofId:src?.id??null,passiveResistance:passive??null}: {})}});
   }))throw Error('Cold Shock nebyl uložen');
-  form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Cold Shock uložen jako Weather zdravotní událost; případný Shock Reroll řešte ve Zdraví & Expozice.'}));
+  if(manual){
+   // After a confirmed immersion, only a separately chosen new incident may open fresh dice.
+   hazardComposer={actorId:actor.id,kind:null};
+   notice='Cold Shock uložen · Endurance '+outcome.report.sl+' · SHK '+outcome.report.index+' · '+outcome.state.shock+'.';
+   render();
+  }else{
+   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Cold Shock uložen jako Weather zdravotní událost; případný Shock Reroll řešte ve Zdraví & Expozice.'}));
+  }
  }catch(e){if(out)out.textContent='Cold Shock nebyl zapsán: '+e.message;}
 },true);
 document.addEventListener('submit',event=>{

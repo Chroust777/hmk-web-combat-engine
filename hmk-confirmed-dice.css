@@ -28,6 +28,7 @@
 #app .hmk-confirmed-dice-row > button[hidden]{display:none!important;}
 /* Native hidden always wins over the shared display layout. */
 #app .hmk-confirmed-dice-label[hidden],#app .hmk-confirmed-dice-row[hidden]{display:none!important;}
+#app .hmk-chain-hidden-field-93918[hidden]{display:none!important;}
 #app .hmk-skill-saved-gate-93928{padding:10px 12px;margin:6px 0 12px;
   border:1px solid #967646;background:rgba(207,176,112,.12);border-radius:6px;
   color:#332818;line-height:1.5;}
