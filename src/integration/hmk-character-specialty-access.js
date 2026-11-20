@@ -7,9 +7,9 @@
  * Talent or an owned item as proof that a character can execute a procedure.
  * Action eligibility remains owned by the original rule-specific writer.
  */
-import {calculateSheetSkills,characterJournalReadiness} from './hmk-character-creation.js';
+import {calculateSheetSkills,characterJournalReadiness} from './hmk-character-creation.js?v=94.014';
 
-const DEFINITIONS=Object.freeze([
+export const CHARACTER_SPECIALTY_DEFINITIONS=Object.freeze([
  {id:'special-alchemy',label:'Alchemy',title:'Alchemy · elixíry',page:'HMK 265–274'},
  {id:'special-spellbook',label:'Spellbook',title:'Shèk-Pvâr · naučená kouzla',page:'HMK 200–205, 211'},
  {id:'special-talents',label:'Arcane Talents',title:'Arcane Talents',page:'HMK 40, 47, 259–264'},
@@ -28,7 +28,7 @@ export function characterSpecialtyChapters(character){
  const h=character.hmk,creation=h.creation,proofs=creation.values||{},skills=calculateSheetSkills(character);
  const chapters=[];
  const add=(id,reason,details=[],note='')=>{
-  const {label,title,page}=DEFINITIONS.find(x=>x.id===id);
+  const {label,title,page}=CHARACTER_SPECIALTY_DEFINITIONS.find(x=>x.id===id);
   chapters.push({id,label,title,page,reason,details,note});
  };
  const alchemy=rowFor(skills,'Alchemy');
@@ -37,7 +37,7 @@ export function characterSpecialtyChapters(character){
   add('special-alchemy','Osvojená Alchemy; nestačí samo povolání ani teoretické SB.',
    [detail('Alchemy ML',alchemy.ml),detail('Vývoj dovednosti',alchemy.totalDP+' DP'),
     ...(Array.isArray(known)?[detail('Doložené počáteční elixíry',known.length)]:[])],
-   'Výroba, AS, dávky a Decay zůstávají v původních alchymistických procedurách Kalendáře. Tato kapitola nedává automaticky právo vytvořit neznámý elixír.');
+   'V tomto oboru spravujete výrobu, AS, dávky a Decay. Čas a termíny určuje kalendář kampaně.');
  }
  const pvar=rowFor(skills,'Pvârism'),spells=proofs.startingPvarSpellsProof;
  // The starting spell proof identifies known spells. Occupation/Pvârism alone do not.
@@ -80,4 +80,4 @@ export function characterSpecialtyChapters(character){
  return chapters;
 }
 export const characterSpecialtyById=(character,id)=>characterSpecialtyChapters(character).find(ch=>ch.id===id)||null;
-export const isCharacterSpecialtySection=id=>DEFINITIONS.some(ch=>ch.id===id);
+export const isCharacterSpecialtySection=id=>CHARACTER_SPECIALTY_DEFINITIONS.some(ch=>ch.id===id);

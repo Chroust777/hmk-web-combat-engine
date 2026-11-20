@@ -2,7 +2,7 @@
  * Existing src/rules/tests.js is the only numerical rule engine.
  */
 import {SL,indexOf,effectiveMasteryLevel,successLevel,successValue,secondaryModifier,secondaryRoll,opposed} from '../rules/tests.js';
-import {calculateSheetSkills,gmSenseRows,GM_SENSES} from './hmk-character-creation.js?v=93.986';
+import {calculateSheetSkills,gmSenseRows,GM_SENSES} from './hmk-character-creation.js?v=94.014';
 const GM_SENSE_NAMES=new Set(GM_SENSES.flatMap(({skill,attribute})=>[skill,attribute]));
 const ATTRIBUTE_LABELS={str:'Strength',end:'Endurance',dex:'Dexterity',agl:'Agility',per:'Perception',cml:'Comeliness',aur:'Aura',wil:'Will',rea:'Reasoning',cre:'Creativity',emp:'Empathy',elo:'Eloquence'};
 export const SUCCESS_LEVEL_NAMES=Object.freeze(['CF','F','S','CS']);

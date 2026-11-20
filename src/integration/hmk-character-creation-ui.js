@@ -15,7 +15,7 @@ import {gmLanguageBudget} from './hmk-gm-bonus-language.js';
 import {veteranRoundCount,sumRound} from './hmk-veteran-rounds.js';
 import {SOCIETIES,SOCIETY_TABLES,VERIFIED_REGIONS,realmFromRegionRoll,realmFromRegionSelection,familyOccupationProfile,regionSubDieRequired,regionDialectDieRequired,regionRealmRows,regionNativeLanguageChoices,regionTrierzonDialectChoices,regionAzeriDialectChoices,regionHepekeriaCommunityChoices,regionHarnTribeDieRequired,regionHarnCommunityChoices,OCCUPATIONS,occupationVariantNames,priestReligionOf,ritualFollowerFromML,OCCUPATION_PAGES,availableBackgroundSkills,wealthDiceCounts,standingFromWealth,printedParentWealthDie,occupationWealthDie,REGION_D1000,ELDER_FOLK_REGIONS} from './hmk-creation-tables.js';
 import {CHARACTER_STEPS,SKILL_STAGES,FOLKS,AGE_GROUPS,SIGNS,MONTHS,SKILL_DEFINITIONS,ATTRIBUTES,
- SKILL_GROUPS,SIGN_TRAITS,creationOf,legacyTribalRegionNeedsReview,legacyParentInvokerNeedsReview,calculateSheetSkills,gmSenseRows,perceptionMode,physicalDiceRequirement,voiceDiceRequirement,signFromBirthday,calculateSkill} from './hmk-character-creation.js?v=93.986';
+ SKILL_GROUPS,SIGN_TRAITS,creationOf,legacyTribalRegionNeedsReview,legacyParentInvokerNeedsReview,calculateSheetSkills,gmSenseRows,perceptionMode,physicalDiceRequirement,voiceDiceRequirement,signFromBirthday,calculateSkill} from './hmk-character-creation.js?v=94.014';
 import {eligibleAges,eligibleRealms,eligibleSocietiesForRealm,eligibleParentClasses,eligibleFamilyOccupationNames,eligibleOccupations,eligibleSkills,eligibleBackgrounds} from './hmk-creation-eligibility.js';
 import {creationChoicesFromPhysicalDice} from './hmk-creation-roll-choices.js';
 import {SCRIPTS,languageChoices,religionChoices,nativeLanguageDP,nativeRitualDP} from './hmk-skill-instances.js';
@@ -262,7 +262,7 @@ const DP_COLUMNS=Object.freeze([
  ['Folk Skills','Folk'],['Arcane Talent Skills','Talent'],['Family Skills','Family'],
  ['Background Skills','Background'],['Occupation Skills','Occupation'],['Optional Skills','Optional'],
  ['Veteran Skills','Veteran'],['Sunsign Skills','Sunsign'],['Native Language / Religion','Native'],
- ['GM Bonus Languages','GM Bonus']]);
+ ['GM Bonus Languages','Jazykové DP']]);
 const SENSE_TEST_HELP=Object.freeze({
  Eyesight:'Aktivní test zraku. Použij ho, když se postava cíleně dívá, třeba když zkoumá okraj lesa a snaží se rozeznat postavu mezi stromy.',
  Hearing:'Aktivní test sluchu. Použij ho, když postava naslouchá, třeba když se snaží určit, odkud se ozvalo volání.',
@@ -286,6 +286,9 @@ export function chronicleSenseRows(character){
 function chronicleSenseName(row){
  return `<span data-hmk-help="${E(row.help)}" tabindex="0" aria-label="${E(row.name+': '+row.help)}">${E(row.name)}</span>`;
 }
+function gmMLBonusInput(name,field,value){
+ return `<input class="sheet-dp-input" name="${E(field)}" type="number" min="-100" max="100" step="1" required aria-label="${E(name)} · GM bonus k ML" value="${E(value??0)}" title="Každý bod přidá 1 k vypočtenému ML">`;
+}
 function chronicleSenseEdit(row){
  const {sense,attributeTest}=row;
  if(row.ml===null)return '';
@@ -302,12 +305,12 @@ export function groupedSkillTableHTML(character,{editing=false,includeChronicleS
  const names=new Set(calculated.map(x=>x.name)),expected=SKILL_DEFINITIONS.map(x=>x.name);
  if(expected.some(n=>!names.has(n)))throw Error('Chybí základní Skill definice');
  const Eattr=x=>x.basis??(x.perceptionParent?'Sdílené SM • Sight / Sound / Odour':`${x.primary?.toUpperCase()??'—'} (${x.primaryValue??'?'}) + ${x.secondary?.toUpperCase()??'—'} (${x.secondaryValue??'?'})`);
- const detailHeaders=['Skill','SB: atributy','SB','Base SM',...DP_COLUMNS.map(x=>x[1]),'DP Σ','SM','ML / Boost'];
+ const detailHeaders=['Skill','SB: atributy','SB','Base SM',...DP_COLUMNS.map(x=>x[1]),'DP Σ','SM','GM bonus k ML','ML / Boost'];
  const detailGroups=GROUPED_SKILLS.map(group=>{
   const rows=list.filter(x=>x.group===group).sort((a,b)=>a.name.localeCompare(b.name,'en'));
   const compact=rows.map(x=>`<tr><th scope="row">${x.sense?chronicleSenseName(x):E(x.name)}${x.subskillOf?` <span class="tiny muted">↳ ${E(x.subskillOf)}</span>`:''}</th><td>${E(Eattr(x))}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong></td></tr>`).join('');
   const detailed=rows.map(x=>{
-   if(x.sense)return `<tr><th scope="row">${chronicleSenseName(x)}</th><td>${E(x.basis)}</td><td>${E(x.sb??'—')}</td><td colspan="${DP_COLUMNS.length+3}">${editing?chronicleSenseEdit(x):''}</td><td><strong>${E(x.ml??'—')}</strong></td></tr>`;
+   if(x.sense)return `<tr><th scope="row">${chronicleSenseName(x)}</th><td>${E(x.basis)}</td><td>${E(x.sb??'—')}</td><td colspan="${DP_COLUMNS.length+3}"></td><td>${editing?chronicleSenseEdit(x):''}</td><td><strong>${E(x.ml??'—')}</strong></td></tr>`;
    const dp=DP_COLUMNS.map(([stage])=>{
     const n=x.dp.find(d=>d.stage===stage)?.dp??0;
     const origin=character.hmk?.creation?.skillDP?.[stage]?.[x.name];
@@ -319,13 +322,13 @@ export function groupedSkillTableHTML(character,{editing=false,includeChronicleS
    const legacy=(character.hmk?.skills??[]).find(r=>r.name===x.name&&!r.creationDerived);
    const conflict=legacy?`<div class="notice tiny">Legacy ML ${E(legacy.ml??'—')} vyžaduje sjednocení při Edit.</div>`:'';
    const bonus=x.boosts?.length?`<div class="tiny">Boost: ${E(x.boosts.map(b=>'+'+b.boost).join(', '))}</div>`:'';
-   return `<tr title="${E(sourceSummary)}"><th scope="row">${E(x.name)}</th><td>${E(Eattr(x))}</td><td>${x.sb===null?'—':E(x.sb)}</td><td>${E(x.baseSM)}</td>${dp}<td>${E(x.totalDP)}${x.subskillOf?'*':''}</td><td>${E(x.sm)}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong>${bonus}${conflict}</td></tr>`;
+   return `<tr title="${E(sourceSummary)}"><th scope="row">${E(x.name)}</th><td>${E(Eattr(x))}</td><td>${x.sb===null?'—':E(x.sb)}</td><td>${E(x.baseSM)}</td>${dp}<td>${E(x.totalDP)}${x.subskillOf?'*':''}</td><td>${E(x.sm)}</td><td>${editing&&x.ml!==null?gmMLBonusInput(x.name,'sheet_ml_bonus_'+encodeURIComponent(x.name),x.gmMLBonus):(x.gmMLBonus||'·')}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong>${bonus}${conflict}</td></tr>`;
   }).join('');
   return {group,compact,detailed,count:rows.length};
  });
  const compact=`<div class="table-scroll hsk-scroll"><table class="hsk-table hsk-compact"><thead><tr><th scope="col">Skill</th><th scope="col">Atributy (Skill Base)</th><th scope="col">ML</th></tr></thead>${detailGroups.map(x=>`<tbody class="hsk-group"><tr class="hsk-group-head"><th scope="rowgroup" colspan="3">${E(x.group)} · ${x.count}${x.group==='Physical'&&mode==='subattributes'?' (smyslové subskills)':''}</th></tr>${x.compact}</tbody>`).join('')}</table></div>`;
  const detailed=`<details class="hsk-dp-edit"><summary>Edit · rozpad DP, SB, SM a Boost (rozšířený pohled)</summary><p class="tiny">DP se přidělují přes Character Creation / Edit podle pravidel. Otevření podrobností nic nepřidává ani nepřepisuje.</p><div class="table-scroll hsk-scroll"><table class="hsk-table"><thead><tr>${detailHeaders.map(v=>`<th scope="col">${E(v)}</th>`).join('')}</tr></thead>${detailGroups.map(x=>`<tbody class="hsk-group"><tr class="hsk-group-head"><th scope="rowgroup" colspan="${detailHeaders.length}">${E(x.group)} · ${x.count}</th></tr>${x.detailed}</tbody>`).join('')}</table></div><p class="tiny muted">* Sdílené DP / SM nejsou další body; různé ML se odvozují podle vlastních SB.</p></details>`;
- return `<div class="hsk-skill-view">${editing?`<p class="muted">Aktuální DP podle jednotlivých zdrojů. Změny se ukládají jako vývoj postavy mimo historii 14 kroků; ML se přepočítá ze SB, SM a Boost. Sdílené poddovednosti jsou odvozené od rodičovské dovednosti.</p><div class="table-scroll hsk-scroll hsk-edit-scroll"><table class="hsk-table hsk-edit-detail"><thead><tr>${detailHeaders.map(v=>`<th scope="col">${E(v)}</th>`).join('')}</tr></thead>${detailGroups.map(x=>`<tbody class="hsk-group"><tr class="hsk-group-head"><th scope="rowgroup" colspan="${detailHeaders.length}">${E(x.group)} · ${x.count}</th></tr>${x.detailed}</tbody>`).join('')}</table></div>`:compact}</div>`;
+ return `<div class="hsk-skill-view">${editing?`<p class="muted">Aktuální DP podle jednotlivých zdrojů. Změny se ukládají jako vývoj postavy mimo historii 14 kroků; ML se přepočítá ze SB, SM a Boost. GM bonus se přičítá přímo k ML osvojené dovednosti. Sdílené poddovednosti mají vlastní GM bonus.</p><div class="table-scroll hsk-scroll hsk-edit-scroll"><table class="hsk-table hsk-edit-detail"><thead><tr>${detailHeaders.map(v=>`<th scope="col">${E(v)}</th>`).join('')}</tr></thead>${detailGroups.map(x=>`<tbody class="hsk-group"><tr class="hsk-group-head"><th scope="rowgroup" colspan="${detailHeaders.length}">${E(x.group)} · ${x.count}</th></tr>${x.detailed}</tbody>`).join('')}</table></div>`:compact}</div>`;
 }
 export function gmSensePanelHTML(character,{editing=false}={}){
  const rows=gmSenseRows(character);
@@ -347,7 +350,7 @@ export function characterCalculationHTML(character,{editing=false,embedded=false
  if(!h.creation){
   const rows=h.skills??[];const Erow=x=>E(x??'');
   const senses=embedded?chronicleSenseRows(character):[];
-  const tableRows=rows.map((r,i)=>senses.some(x=>x.name===r.name)?'':`<tr><td>${Erow(r.group)}</td><td>${Erow(r.name)}</td><td>${Erow(r.sb)}</td><td>${editing?`<input class="sheet-inline-input" type="number" name="sheet_legacy_ml_${i}" aria-label="ML ${Erow(r.name)}" min="0" max="200" step="1" required value="${Erow(r.ml)}">`:Erow(r.ml)}</td></tr>`).join('')+senses.map(row=>`<tr><td>Physical</td><td>${chronicleSenseName(row)} <small>${E(row.basis)}</small></td><td>${E(row.sb??'—')}</td><td>${E(row.ml??'—')}${editing?chronicleSenseEdit(row):''}</td></tr>`).join('');
+  const tableRows=rows.map((r,i)=>senses.some(x=>x.name===r.name)?'':`<tr><td>${Erow(r.group)}</td><td>${Erow(r.name)}</td><td>${Erow(r.sb)}</td><td>${editing?`<input class="sheet-inline-input" type="number" name="sheet_legacy_ml_${i}" aria-label="ML ${Erow(r.name)}" min="0" max="200" step="1" required value="${Erow(r.gmBaseML??r.ml)}"><label class="tiny">GM bonus k ML ${gmMLBonusInput(r.name,'sheet_legacy_bonus_'+i,r.gmMLBonus)}</label>`:Erow(r.ml)}</td></tr>`).join('')+senses.map(row=>`<tr><td>Physical</td><td>${chronicleSenseName(row)} <small>${E(row.basis)}</small></td><td>${E(row.sb??'—')}</td><td>${E(row.ml??'—')}${editing?chronicleSenseEdit(row):''}</td></tr>`).join('');
   if(embedded)return `<div class="journal-edit-skills-surface journal-edit-skills-surface--legacy"><p class="muted">Starší ruční profil: ${editing?'lze upravovat aktuální ML. Tento profil nemá doložené jednotlivé vývojové DP.':'přehled dostupných dovedností.'}</p><div class="table-scroll"><table class="catalog-spec"><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th></tr></thead><tbody>${tableRows}</tbody></table></div></div>`;
   return `<section class="panel wide"><h3>Character Sheet · Skills</h3><p class="muted">Starší ruční profil: ${editing?'lze upravovat aktuální ML. Tento profil nemá doložené jednotlivé vývojové DP.':'přehled dostupných dovedností.'}</p><div class="table-scroll"><table class="catalog-spec"><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th></tr></thead><tbody>${tableRows}</tbody></table></div></section>`;
  }

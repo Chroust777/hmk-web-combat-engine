@@ -1103,3 +1103,6 @@ form[data-hmk-animal-training] [data-animal-training-d3-status] {
 .hmk-project-record h4, .hmk-project-record p { margin-block: .3rem; }
 .hmk-project-return { margin: 0 0 .75rem; }
 .hmk-project-item-focus { outline: 2px solid #a4352f; outline-offset: -2px; }
+.hmk-project-page select option:disabled { color: #77736c; }
+.hmk-project-page .hc-wilderness,
+.hmk-project-page .hc-fields > * { min-width: 0; }

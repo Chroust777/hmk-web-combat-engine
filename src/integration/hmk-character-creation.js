@@ -360,7 +360,7 @@ export function calculateSheetSkills(character){
   {name:'Dodge',parent:'Melee',primary:'agl',secondary:perceptionMode(character)==='subattributes'?'eye':'per'}
  ];
 if(perceptionMode(character)==='subattributes')for(const [name,primary] of [['Sight','eye'],['Sound','hrg'],['Odour','sml']])inherited.push({name,parent:'Awareness',primary,secondary:'wil',group:'Physical'});
- return [...normal,...inherited.map(x=>{
+ const rows=[...normal,...inherited.map(x=>{
   const source=SKILL_DEFINITIONS.find(d=>d.name===x.parent);
   const parent=normal.find(row=>row.name===x.parent);
   // HMK p.49: Shock, Dodge and sensory Awareness use the parent's ENTIRE
@@ -374,6 +374,16 @@ if(perceptionMode(character)==='subattributes')for(const [name,primary] of [['Si
   }
   return {...calculateSkill({group:x.group??'Combat',name:x.name,primary:x.primary,secondary:x.secondary,baseSM:source.baseSM,sourcePage:x.parent==='Awareness'?57:49},attrs,sourceAlloc),subskillOf:x.parent};
  })];
+ const bonuses=h.advancement?.skillMLBonus??{};
+ const namesWithMastery=new Set(rows.filter(row=>row.ml!==null).map(row=>row.name));
+ for(const [name,value] of Object.entries(bonuses)){
+  if((!namesWithMastery.has(name)&&!skillDefinition(character,name))||!Number.isSafeInteger(value)||Math.abs(value)>100)
+   throw Error('Neplatný GM bonus ML: '+name);
+ }
+ return rows.map(row=>{
+  const gmMLBonus=bonuses[row.name]??0;
+  return gmMLBonus?{...row,gmMLBonus,ml:row.ml===null||row.sm===0?row.ml:Math.max(0,row.ml+gmMLBonus)}:row;
+ });
 }
 /** HMK pp.48–49: “received DP thus far” refers to the ACTUAL named
  * Skill on the sheet, not the printed generic occupation/family label.
