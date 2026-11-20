@@ -1123,3 +1123,11 @@ table.hmk-project-resources :is(th, td) {
   background: transparent;
   text-align: left;
 }
+
+.hmk-project-rule-page {
+  display: inline-block;
+  margin-inline: .25em;
+  font-size: .79em;
+  font-weight: normal;
+  color: inherit;
+}

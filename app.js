@@ -311,7 +311,7 @@ import {trackingAwarenessFromSkill,pendingTrackingAwareness,validateTrackingAwar
 import {validateSkillActivityTimeProofs} from './src/integration/hmk-skill-activity-timeproof-537.js?v=94.005';
 import {provenCarriedRations,assertExclusiveForagingProven} from './src/integration/hmk-inventory-provisions.js';
 import {characterProvisionsOverview,partyProvisionsOverview} from './src/integration/hmk-character-provisions-overview.js';
-import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,logbookRestoreEntry,validateLogbookVisibility} from './src/integration/hmk-logbook-visibility.js';
+import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,logbookRestoreEntry,validateLogbookVisibility} from './src/integration/hmk-logbook-visibility.js?v=94.019';
 import {isRoutineInventoryHistory} from './src/integration/hmk-routine-history-filter-549.js';
 import {createFreshRationStocks,recordPhysicalRationHandoff,recordPhysicalRationLoss,availableRationLots,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js';
 import {characterCarryProjection,partyCarryProjection,supplyDurationText} from './src/integration/hmk-provisions-simple-view.js';
@@ -399,7 +399,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.018';
+const APP_VERSION='94.019';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -713,7 +713,7 @@ function validate(d){
  const workData=workJournal===rawJournal?d:{...d,journal:workJournal};
  validateFaeriecraft(workJournal);validateSkillTimedWork591(workData);validateConstruction(workJournal,d.characters);validateShipwright(workJournal,d.characters);validateScriptCopies(workJournal);validateReadingJournal(workJournal);
  validateTrainingInterruption93902(d?.journal||[]);validateAnimalTrainingCalendar590(workData);
- validateLogbookVisibility(d);validateChroniclePresentation93889(d);
+ validateLogbookVisibility(d);validateLogbookVisibility(d,'hiddenProjectEntries');validateChroniclePresentation93889(d);
  validateLivestockEvidence(d);
  validateStableAutoHealth93861(d);
  validateStableHub(d,livestockOffer);
@@ -3904,6 +3904,41 @@ document.addEventListener('submit',event=>{
   }
  }catch(error){out.textContent=error.message;}
 },true);
+const projectRulePages=String.raw`\d+(?:[–—-]\d+)?(?:,\s*\d+(?:[–—-]\d+)?)*`;
+const projectRuleReference=new RegExp(String.raw`(?:\(HMK\s+(?:str\.\s*)?(${projectRulePages})\)|(?:\s*·\s*)?\bHMK\s+(?:str\.\s*)?(${projectRulePages})\b)`,'gu');
+function decorateProjectRuleReferences(root){
+ const headers=':is(h2,h3,h4,h5,legend,summary,option)';
+ const scope='.hmk-project-page,.hsk-timed-project-591,.hsk-sv-picker-595,.hmk-workshop-project-94019,.hsk-fishing-calendar,section:has(> form[data-construction-project],> form[data-shipwright-project],> form[data-faerie-step])';
+ for(const heading of root.querySelectorAll(`:is(${scope}) ${headers},.hsk-calendar-timed-row > strong:first-child`)){
+  if(heading.matches('option')&&heading.closest('select')?.matches('[data-character-project-discipline]'))continue;
+  const walker=document.createTreeWalker(heading,NodeFilter.SHOW_TEXT,{
+   acceptNode:node=>node.parentElement.closest('small')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT
+  });
+  const nodes=[];
+  while(walker.nextNode())nodes.push(walker.currentNode);
+  for(const node of nodes){
+   const text=node.data;
+   const matches=[...text.matchAll(projectRuleReference)];
+   if(!matches.length)continue;
+   if(heading.matches('option')){
+    node.data=text.replace(projectRuleReference,(_,parenthesized,pages)=>' (HMK str. '+(parenthesized||pages)+')').trim();
+    continue;
+   }
+   const fragment=document.createDocumentFragment();
+   let index=0;
+   for(const match of matches){
+    fragment.append(text.slice(index,match.index));
+    const label=document.createElement('small');
+    label.className='hmk-project-rule-page';
+    label.textContent='(HMK str. '+(match[1]||match[2])+')';
+    fragment.append(label);
+    index=match.index+match[0].length;
+   }
+   fragment.append(text.slice(index));
+   node.replaceWith(fragment);
+  }
+ }
+}
 function projectResourcesHTML(requirements){
  const lines=Array.isArray(requirements)?requirements:[requirements];
  return `<table class="hmk-project-resources"><thead><tr><th scope="col">Co je potřeba</th></tr></thead>
@@ -3923,11 +3958,24 @@ const projectFieldRequirements={
 function projectStartWithResources(requirements,startButton){
  return `<form>${projectResourcesHTML(requirements)}${startButton}${projectDraftCancelHTML}</form>`;
 }
-function alchemyWorkshopAccess(){
- return projectResourcesHTML([
-  'Alchymistická dílna a možnost nepřerušené přípravy. Vlastní dílna vyžaduje Wealth 10+.',
-  'Pro tekutý či plynný elixír připravte vhodnou lahvičku.'
- ]);
+const alchemyStartingNeeds={
+ create:'Běžný elixír: Alchemy ML 60+ a výběr elixíru z katalogu.',
+ invent:'Nová receptura: Alchemy ML 100+, název, princip, způsob použití, trvání a popsaný účinek.',
+ known:'Známý jedinečný elixír: Alchemy ML 60+ a přístup k doložené receptuře.'
+};
+const alchemyWorkshopNeeds=[
+ 'Alchymistická dílna a čas na nepřerušenou práci. Soukromá dílna vyžaduje Wealth 10+, u cechovní dílny zadejte její kvalitu.',
+ 'Dílna poskytuje příručky, suroviny a pomůcky podle elixíru, například hmoždíř, kotlík, kelímek a zdroj tepla.',
+ 'Pro dobu přípravy potřebujete 3d6 k základu 10 dní. Pro uložení hotového tekutého či plynného elixíru připravte lahvičku.'
+];
+const herbProjectNeeds={
+ assess:'Doložený nález bylin a počet dávek. Potence se určí d10, pokles potence po 2d6 dnech.',
+ preserve:'Účinná dávka, suchá tmavá dílna a Herblore Success Value.',
+ potion:'Vyhrazená účinná dávka, náčiní k zahřátí, vaření nebo drcení podle receptu a 10 minut práce. Herblore Success Value následuje při dokončení.',
+ mundane:'Vyhrazená účinná dávka, další suroviny a pomůcky podle receptu a příslušný test Brewing, Cookery, Embalming nebo Perfumery s Herblore jako Secondary Modifier.'
+};
+function alchemyWorkshopAccess(mode){
+ return projectResourcesHTML([alchemyStartingNeeds[mode],...alchemyWorkshopNeeds]);
 }
 function alchemyProjectRequirements(actor){
  const masteries=availableMasteries(actor);
@@ -3992,7 +4040,7 @@ function characterCraftPanel(clock,maker,discipline){
   const options=participants.filter(x=>x.id!==actorId).map(x=>({person:x,ml:availableMasteries(x).find(y=>y.name==='Alchemy')?.ml||0})).filter(x=>x.ml>=40);
   return `<fieldset><legend>Alchemy Assistance · nejvýše 2 osoby (HMK 268)</legend><p class="hc-hint">Pomocníky určete před zahájením. ML40+ dovoluje asistovat, Index přispěje do EML jen při ML alespoň polovině výrobce (${alchemyML}); celkový strop +10. Na konci se musí shodovat s původním Skill Workbench SV.</p><div class="hc-fields">${[1,2].map(i=>`<label>Pomocník ${i}<select name="alchemyAssist${i}"><option value="">— nikdo —</option>${options.map(x=>`<option value="${esc(x.person.id)}">${esc(x.person.name)} · Alchemy ML ${x.ml}${x.ml*2>=alchemyML?' · Index +'+Math.floor(x.ml/10):' · bez EML bonusu'}</option>`).join('')}</select></label>`).join('')}</div></fieldset>`;
  };
- if(discipline==='special-alchemy')return `<section class="hc-calendar hc-wilderness"><details data-calendar-alchemy-982 open><summary>HMK 265–268 · Alchemy · Create a Invent (${pendingAlchemy.length} rozpracovaných)</summary>
+ if(discipline==='special-alchemy')return `<section class="hc-calendar hc-wilderness hmk-workshop-project-94019"><details data-calendar-alchemy-982 open><summary>Alchemy · Create a Invent (${pendingAlchemy.length} rozpracovaných) (HMK str. 265–268)</summary>
  <details><summary>Arcane · Detect / Reveal / Dispel / Negation · alchymistické zdroje (${alchemyArcaneTargets.filter(x=>x.dossier?.targetable).length})</summary>
  <p class="hc-hint">Pouze pravidlová kontrola aktuálních cílů z originálního inventáře a kalendáře (HMK 251,254,263,270). Nejde o seslání kouzla ani jeho automatický úspěch. Dispel vyžaduje úspěšný Detect i Reveal téhož zdroje, vyřešenou ochranu Ward a skutečný casting; EML má postih −5 za každý aktuální AS. Soulcloak / True Sight / Spirit Sensing nejsou tímto přehledem automaticky aktivovány.</p>
  <p class="hc-hint"><strong>Shèk-Pvâr · skutečně doložená výchozí znalost</strong> (HMK 54,198,251,254): žádný výpis nezakládá spellfire ani dodatečné naučení kouzla.</p>
@@ -4002,7 +4050,7 @@ function characterCraftPanel(clock,maker,discipline){
   x.dossier.targetable?`<p class="hc-hint"><strong>${esc(x.dossier.elixirName)}</strong> · ${esc(x.dossier.phase==='stored'?'uložený fyzický kus':'aktivní Temporary na postavě')} · AS ${x.dossier.currentAS} · Dispel EML ${x.dossier.dispelEMLPenalty} · původ ${esc(x.dossier.sourceId||'')} · ${esc(x.dossier.targetId||'')}</p>`:
   `<p class="hc-hint">${esc(x.dossier.elixirName)}: ${esc(x.dossier.reason||'nyní bez ověřeného magického cíle')}.</p>`).join('')||'<p class="hc-hint">Žádná dokončená alchymistická dávka v kampani.</p>'}
  </details>
- <div data-character-craft-start><p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p>
+ <div data-character-craft-start><details><summary>Pravidla a vyhodnocení</summary><p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p></details>
  ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
   if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
@@ -4012,13 +4060,13 @@ function characterCraftPanel(clock,maker,discipline){
   <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label>
   <input type="hidden" name="wealth" value="${esc(c.hmk?.wealth??'')}"></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
-  ${alchemyWorkshopAccess()}
+  ${alchemyWorkshopAccess('create')}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   
   <button type="submit">Zahájit přípravu v čase GM (bez posunu)</button>${projectDraftCancelHTML}</form>`}).join('')}
  <h4>Invent · unikátní elixíry (HMK 267–268)</h4>
- <p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p>
+ <details><summary>Pravidla pro vlastní a převzaté receptury (HMK str. 267–268)</summary><p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p></details>
  ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
   if(ml<100||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
@@ -4032,7 +4080,7 @@ function characterCraftPanel(clock,maker,discipline){
   <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry (zvolit kvalitu)</option></select></label>
   <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
-  ${alchemyWorkshopAccess()}
+  ${alchemyWorkshopAccess('invent')}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje parametry unikátního elixíru a jejich znalost výrobcem</label>
@@ -4046,7 +4094,7 @@ function characterCraftPanel(clock,maker,discipline){
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="known"><input type="hidden" name="elixirName" value="${esc(recipe.title)}"><input type="hidden" name="knowledgeFinishId" value="${esc(source.id)}">
   <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry</option></select></label><label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
-  ${alchemyWorkshopAccess()}
+  ${alchemyWorkshopAccess('known')}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje přístup této postavy k doložené receptuře a veškerým parametrům</label>
@@ -4146,10 +4194,11 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje skutečný zvuk a u předmětů jejich současné držení</label>
   <button type="submit" ${foot.suspended||foot.overdue?'disabled':''}>Doložit zvuk bez hodu a posunu času</button></form>`;}).join('')}
  </details></section>`;
- return `<section class="hc-calendar hc-wilderness"><details data-calendar-character-herblore open><summary>HMK 74–75 · byliny, potence, konzervace a lektvary · ${herbCandidates.length} nálezů</summary>
- <div data-character-craft-start><p class="hc-hint">Každá nalezená dávka má skutečně doložený d10: Mild (1–6), Strong (7–9), Great (10); HMK dovoluje i jediný d10 pro všechny dávky téhož nálezu. Každý stupeň klesá po 2d6 dnech. Suchá tmavá dílna a skutečný Herblore SV umožňují konzervaci (30 + 10×SV dní na stupeň). Příprava lektvaru trvá 10 minut potvrzeného času GM. Podání, zdravotní účinky a alchymistické elixíry nejsou totožné s přípravou.</p>
+ return `<section class="hc-calendar hc-wilderness hmk-workshop-project-94019"><details data-calendar-character-herblore open><summary>Byliny, potence, konzervace a lektvary · ${herbCandidates.length} nálezů (HMK str. 74–75)</summary>
+ <div data-character-craft-start><details><summary>Pravidla a vyhodnocení</summary><p class="hc-hint">Každá nalezená dávka má skutečně doložený d10: Mild (1–6), Strong (7–9), Great (10); HMK dovoluje i jediný d10 pro všechny dávky téhož nálezu. Každý stupeň klesá po 2d6 dnech. Suchá tmavá dílna a skutečný Herblore SV umožňují konzervaci (30 + 10×SV dní na stupeň). Příprava lektvaru trvá 10 minut potvrzeného času GM. Podání, zdravotní účinky a alchymistické elixíry nejsou totožné s přípravou.</p></details>
  ${herbCandidates.map(l=>`<form data-herb-assess><h4>${esc(l.herbName)} · ${l.quantity} dávek · Foraging ${esc(displayCampaignMinute(l.minute))}</h4><input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}">
  <input type="hidden" name="actorId" value="${esc(actorId)}">
+ ${projectResourcesHTML(herbProjectNeeds.assess)}
  ${Array.from({length:l.quantity},(_,i)=>`<fieldset><legend>Dávka ${i+1}</legend><div class="hc-fields">${Array.from({length:7},(_,k)=>`<label>${k===0?'d10 potence':'Rozpad '+Math.ceil(k/2)+' · d6 '+(k%2?'A':'B')}<input type="number" name="dice_${i}_${k}" min="1" max="${k===0?10:6}" step="1" required></label>`).join('')}</div></fieldset>`).join('')}
  <label class="hc-check"><input type="checkbox" name="singlePotencyRoll"> Jeden d10 potence pro všechny dávky (HMK 74)</label>
  <button type="button" class="hc-small" data-herb-auto>⚄ Vygenerovat d10 a d6</button>
@@ -8189,15 +8238,21 @@ function projectCancelButton(row){
 }
 const projectRemainingHTML=(target,minute,now)=>Number.isSafeInteger(minute)?
  `<p><strong>${esc(target)}</strong> ${esc(medicalFullMoment(minute))} · ${minute>now?'zbývá '+esc(chronicleRemainingTime(minute-now)):'termín nastal'}</p>`:'';
+function characterProjectCancellation(start,own){
+ const workshopId=start.calendarFaeriecraft?.input?.workshopId;
+ return own.find(row=>row.calendarProjectCancellation?.startId===start.id||
+  (workshopId&&row.calendarProjectCancellation?.startId===workshopId)||
+  ['calendarAlchemyAbort','calendarFishingCancel93910','calendarTrappingCancel93909'].some(key=>row[key]?.startId===start.id));
+}
 function characterProjectRows(actor,kinds,agenda){
  const clock=data.campaignClock,cid=campaignKey(clock),now=clock.minute;
  const own=data.journal.filter(row=>row.calendarCampaignId===cid&&row.characterId===actor.id);
  const journal=projectJournal();
+ const hidden=hiddenLogbookIds(data,actor.id,'hiddenProjectEntries');
  const jump=(destination,label,id='')=>`<button type="button" class="secondary" data-character-project-open="${esc(destination)}" data-project-source="${esc(id)}">${esc(label)}</button>`;
- return own.filter(row=>kinds.includes(projectKind(row))).reverse().map(row=>{
+ return own.filter(row=>kinds.includes(projectKind(row))&&!hidden.has(row.id)).reverse().map(row=>{
   const kind=projectKind(row),timed=row.calendarSkillProjectStart591;
-  const cancelled=own.find(entry=>entry.calendarProjectCancellation?.startId===row.id||
-   (kind==='faeriecraft'&&entry.calendarProjectCancellation?.startId===row.calendarFaeriecraft.input.workshopId));
+  const cancelled=characterProjectCancellation(row,own);
   const open=!cancelled&&projectIsOpen(row,journal);
   const title=timed?.projectName||row.calendarAlchemyStart?.elixirName||row.calendarHerbPotionStart?.herbType||row.title;
   const linked=journal.filter(entry=>entry.calendarSkillProjectSV591?.startId===row.id).at(-1);
@@ -8251,7 +8306,7 @@ function characterProjectRows(actor,kinds,agenda){
   return `<article class="hmk-project-record" data-character-project-record="${esc(row.id)}"><h4>${esc(title)}</h4>
    <p><strong>${cancelled?'Zrušeno':open?'Rozpracováno':'Uzavřeno'}</strong> · zahájeno ${esc(medicalFullMoment(row.campaignMinute))}</p>
    ${cancelled?`<p>Zrušeno ${esc(medicalFullMoment(cancelled.campaignMinute))}</p>`:timing}
-   ${summary?`<p>${esc(summary)}</p>`:''}${roll&&MILLING_PROJECTS[kind]?`<p>${esc(result.body.split('\n').at(-1))}</p>`:''}${next}${open?projectCancelButton(row):''}
+   ${summary?`<p>${esc(summary)}</p>`:''}${roll&&MILLING_PROJECTS[kind]?`<p>${esc(result.body.split('\n').at(-1))}</p>`:''}${next}${open?projectCancelButton(row):cancelled?`<button type="button" class="secondary" data-project-remove="${esc(row.id)}">Odstranit z přehledu</button>`:''}
    ${item?`<button type="button" class="secondary" data-character-project-item="${esc(item.id)}">Zobrazit výrobek · ${esc(slotLabel(item.slot))}</button>`:''}</article>`;
  }).join('');
 }
@@ -8263,6 +8318,17 @@ document.addEventListener('click',event=>{
   const details=draft.closest('.hmk-project-create');
   if(details)details.open=false;
   render();
+  return;
+ }
+ const remove=event.target.closest?.('[data-project-remove]');
+ if(remove&&view==='sheet'&&activeSheetSection==='projects'&&data.campaignClock){
+  mutate(()=>{
+   const cid=campaignKey(data.campaignClock);
+   const own=data.journal.filter(row=>row.characterId===selected&&row.calendarCampaignId===cid);
+   const source=own.find(row=>row.id===remove.dataset.projectRemove&&projectKind(row));
+   if(!source||!characterProjectCancellation(source,own))throw Error('Z přehledu lze odstranit jen zrušený projekt.');
+   logbookHideEntry(data,selected,source.id,'hiddenProjectEntries');
+  });
   return;
  }
  const button=event.target.closest?.('[data-project-cancel]');
@@ -8298,14 +8364,23 @@ function characterProjectsChapter(actor){
  const agenda=active?campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory):{all:[]};
  if(section?.specialty){
   const sp=section.specialty;
-  available.push(`<h4>${esc(sp.title)}</h4><p>${esc(sp.page)} · ${esc(sp.reason)}</p>
+  const specialtyPage=sp.id==='special-herblore'?'HMK str. 74–75':sp.page;
+  available.push(`<h4>${esc(sp.title)} (${esc(specialtyPage)})</h4>
+   <details><summary>O oboru a způsobilosti postavy</summary><p>${esc(sp.reason)}</p>
    ${sp.details.map(fact=>`<div class="list-row"><strong>${esc(fact.name)}</strong><span>${esc(fact.value)}</span></div>`).join('')}
-   <p>${esc(sp.note)}</p>`);
-  if(sp.id==='special-alchemy')available.push(alchemyProjectRequirements(actor));
-  if(sp.id==='special-herblore')available.push(projectResourcesHTML([
-   'Bylinný lektvar: jedna vyhrazená účinná dávka a pomůcky k vaření či drcení podle receptu. Lze připravit v terénu.',
-   'Konzervace: suchá a tmavá dílna a Herblore Success Value.'
-  ]));
+   <p>${esc(sp.note)}</p></details>`);
+  if(sp.id==='special-alchemy')available.push(projectResourcesHTML([...Object.values(alchemyStartingNeeds),...alchemyWorkshopNeeds]),alchemyProjectRequirements(actor));
+  else if(sp.id==='special-herblore')available.push(projectResourcesHTML(Object.values(herbProjectNeeds)));
+  else {
+   const requirements={
+    'special-spellbook':'Znalost konkrétního kouzla a splněné podmínky jeho seslání.',
+    'special-talents':'Doložený vhodný Talent. Vědomá invokace vyžaduje ML 20+.',
+    'special-runes':'Osvojená Runecraft a doložená konkrétní runa a vzor pro zvolený postup.',
+    'special-rituals':'Odpovídající Ritual a vyznání. Některé obřady vyžadují Circle of Command a postavení.',
+    'special-spirits':'Doložená konkrétní Spirit Power a podmínky dané schopnosti.'
+   };
+   available.push(projectResourcesHTML(requirements[sp.id]));
+  }
   if(active&&['special-alchemy','special-herblore'].includes(sp.id)){
    const [panel]=folioHTMLNodes(characterCraftPanel(clock,actor,sp.id));
    const start=panel.querySelector('[data-character-craft-start]');
@@ -8321,6 +8396,7 @@ function characterProjectsChapter(actor){
    const content=folioHTMLNodes(panel)[0];
    const forms=[...content.querySelectorAll('form[data-hmk-project-start-591],form[data-construction-project="start"],form[data-shipwright-project="start"],form[data-faerie-step="start"]')];
    if(known&&forms.length)available.push(`<details class="hmk-project-create"><summary>${esc(label)}</summary>${forms.map(form=>form.outerHTML).join('')}</details>`);
+   if(known&&kind==='faeriecraft'&&!forms.length)available.push(projectResourcesHTML('Způsobilá postava Ælrhin, osvojený Spirit a odpovídající řemeslo, klidné místo pro reverie a vybavení pro vybranou zakázku.'));
    for(const form of forms)form.remove();
    let quickActions='';
    if(content.querySelector('.hsk-project-pending-list')){
@@ -8333,6 +8409,10 @@ function characterProjectsChapter(actor){
    let actions='';
    if(kind==='writing'){
     actions=pendingWritingWorkHTML591(actor)+completedWritingHTML992(actor);
+    available.push(projectResourcesHTML([
+     'Opis: přístup k doložené předloze a materiál a pomůcky pro opis.',
+     'Čtení: dostupná a čitelná předloha a znalost jejího jazyka a písma.'
+    ]));
     for(const html of [scriptCopyHTML993(actor),readingHTML994(actor)]){
      for(const panel of folioHTMLNodes(html)){
       const startForms=panel.querySelectorAll('form[data-script-copy="start"],form[data-script-reading="start"]');
@@ -13457,6 +13537,7 @@ function render(){
  decorateSkillContinuationHelp(app);
  updateFollowupDiceGuides(app);
  decorateTimedSkillProject591(app);
+ decorateProjectRuleReferences(app);
  refreshWritingWork591(app);
  decorateFishingCalendarStart590(app);
  decorateTrappingCalendar93908(app);
