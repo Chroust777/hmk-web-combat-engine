@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.983';
+const APP_VERSION='93.984';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -12562,7 +12562,7 @@ function hskClimbingFallForm(entry){
  <li><strong>Compound d10:</strong> vyplňte POUZE pokud nové zranění zasáhlo stejnou kompatibilní lokalitu jako <em>už existující</em> nezhojené zranění. Pro první zásah do zdravé lokality se nehází. Nesouvisí s tím, že test dopadu skončil CF.</li>
  <li><strong>Další celý dopad:</strong> jen když test Jumping / Acrobatics skončí <b>CF</b> (hvězdička u Falling tabulky); tlačítkem přidejte <em>novou řadu</em> s novými d10 Impact, ZD, LD a d100. Opakujte, dokud poslední test není F, S nebo CS. Bez všech povinných dopadů se nic nezapíše.</li></ol>
  <p>Pokud předchozí dopad způsobil INC nebo UNC, může GM potvrdit další dopad bez zmírnění. Tato volba je rozhodnutí GM o průběhu téhož pádu. Zachová hody na místo a sílu dopadu i zdravotní následky.</p><p>Níže se po potvrzení potřebných kostek přepočítá <b>EML, Success Level, Impact po zbroji a povinnost jednotlivých hodů</b>. Náhled není uložené zranění.</p></details>
- <div class="field-grid"><label>Výška pádu (stop, nejméně 6)<input name="heightFt" type="number" min="6" max="1000" required></label>
+ <div class="field-grid"><label class="hmk-simple-current-93915">Výška pádu (stop, nejméně 6)<input name="heightFt" type="number" min="6" max="1000" required></label>
  <label>Povrch<select name="surface"><option value="rock">Skála / tvrdý kámen (0)</option><option value="paving">Dlažba (−2)</option><option value="earth">Tráva / hlína (−4)</option><option value="snow">Sníh / seno (−8)</option><option value="mud">Bláto / bažina (−12)</option><option value="water">Hluboká voda (−16)</option></select></label>
  <label>Sklon svahu<select name="slope"><option value="sheer">Svislý pád / bez Climbing úprav</option>${proof.skill==='Climbing'?'<option value="very-steep">Very steep · 40–59° (poloviční Impact)</option><option value="steep">Steep · 20–39° (S/CS bez nárazu)</option>':''}</select></label>
  <label>Směr nárazu pro skutečnou ochranu zbroje<select name="direction"><option value="front">Zepředu</option><option value="rear">Zezadu</option><option value="side">Z boku</option></select></label></div>
@@ -14288,6 +14288,8 @@ function hskClimbingFallGuide(form){
  const actor=character(source?.skillTestProof?.actorId);
  const [height,surface,slope,direction]=settings.map(field=>field.value);
  const fallHeightFt=Number(height);
+ const needsHeight=!Number.isSafeInteger(fallHeightFt)||fallHeightFt<6||fallHeightFt>1000;
+ settings[0].closest('label').classList.toggle('hmk-simple-current-93915',needsHeight);
  const updates=[];
  let active=null,chosenTechnique=null,passiveButton=null,canAdd=false,complete=false;
  const request=(node,name,i)=>{
@@ -14297,7 +14299,7 @@ function hskClimbingFallGuide(form){
  };
  try{
   if(!actor)throw Error('Nelze najít postavu z původní události.');
-  if(!Number.isSafeInteger(fallHeightFt)||fallHeightFt<6||fallHeightFt>1000)
+  if(needsHeight)
    throw Error('Nejprve zadejte skutečnou výšku pádu 6–1000 stop.');
   let state=persistentStateOf(actor);
   const round=Math.max(1,combatClock.round||1,state.lastRound||0),timelineId='skill-falling:'+source.id;
@@ -14360,7 +14362,9 @@ function hskClimbingFallGuide(form){
  guide.textContent=updates.join(' ');
  add.disabled=!canAdd||nodes.length>=20;
  submit.disabled=!complete;
- return {active:active||passiveButton,complete};
+ add.classList.toggle('hmk-simple-current-93915',!add.disabled);
+ submit.classList.toggle('hmk-simple-current-93915',complete);
+ return {active:needsHeight?settings[0]:active||passiveButton,complete};
 }
 document.addEventListener('input',event=>{
  const field=event.target,form=field.closest?.('[data-climbing-fall-form]');if(!form)return;
@@ -19653,14 +19657,17 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
     form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
    kind==='injury-mishap'?(form.querySelector('input[name="roll"]:not([type="hidden"])')||form.querySelector('button[type="submit"]')):
    kind==='bleeding'?(form.querySelector('[data-hmk-chain-value-93918]:not([disabled]),input[name="physicianRoll"]:not([type="hidden"]),select[name="healerId"],input[name="strengthRoll"]')||form.querySelector('button[type="submit"]')):
-   kind==='skill-fall'?form.elements.namedItem('heightFt'):
+   kind==='skill-fall'?((form.matches('[data-climbing-fall-form]')?hskClimbingFallGuide(form).active:form.elements.namedItem('heightFt'))||
+    form.querySelector('[data-climb-fall-add]:not([disabled]),button[type="submit"]:not([disabled])')):
    form.querySelector('input:not([type="hidden"]):is([name="roll"],[name="courseD100"],[name="followRoll"],[name="enduranceD10"],[name="physicianRoll"])'));
   // Calendar/Travel rule links must land on the REAL original input and
   // visibly mark it, not merely open a whole module without a target.
   if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding'].includes(kind)&&rollInput&&!rollInput.disabled){
    for(const old of document.querySelectorAll('.hmk-medical-required-target'))old.classList.remove('hmk-medical-required-target');
-   (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
+   if(!rollInput.matches('[data-hmk-chain-value-93918]'))
+    (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
   }
+  rollInput?.scrollIntoView({block:'center',behavior:'instant'});
   rollInput?.focus({preventScroll:true});
   return true;
  }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival','trek-survival-test','trek-drover-test'].includes(kind)){
