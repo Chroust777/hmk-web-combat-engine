@@ -220,12 +220,14 @@ export function gmSenseRows(character,skills){
  const h=character?.hmk??{},attrs=h.attributes??{};
  const rows=skills??(h.creation?calculateSheetSkills(character):h.skills??[]);
  const awareness=rows.find(row=>row.name==='Awareness');
+ const separateSenses=perceptionMode(character)==='subattributes';
  return GM_SENSES.map(sense=>{
   const {key,skill}=sense;
-  const proof=[h.gmSenseProof?.[key],h.creation?.perceptionProof?.[key]].find(p=>
-   p&&p.folk===h.folk&&p.ageGroup===h.ageGroup&&p.kind===(character?.kind||'PC')&&Number.isSafeInteger(p.score));
-  const score=(proof?.score??attrs.per)??null;
-  const trained=perceptionMode(character)==='subattributes'||!h.creation?
+  // Switching back to standard PER retains the dice as history only.
+  const usesPer=!separateSenses||!Number.isSafeInteger(attrs[key]);
+  const proof=usesPer?null:h.creation?.perceptionProof?.[key];
+  const score=(usesPer?attrs.per:attrs[key])??null;
+  const trained=separateSenses||!h.creation?
    rows.find(row=>row.name===skill)??awareness:awareness;
   const dp=h.gmSenseDP?.[key]??0;
   const sb=skillBase(score,attrs.wil);
@@ -241,7 +243,7 @@ export function gmSenseRows(character,skills){
   }
   const adjustment=(kind)=>Number.isSafeInteger(h.gmSenseBonus?.[kind]?.[key])?h.gmSenseBonus[kind][key]:0;
   const attributeBonus=adjustment('attribute'),skillBonus=adjustment('skill');
-  return {...sense,score,proof,sb,dp,attributeBonus,skillBonus,
+  return {...sense,score,proof,usesPer,sb,dp,attributeBonus,skillBonus,
    attributeML:score===null?null:Math.max(0,score*5+attributeBonus),
    ml:ml===null?null:Math.max(0,ml+skillBonus)};
  });

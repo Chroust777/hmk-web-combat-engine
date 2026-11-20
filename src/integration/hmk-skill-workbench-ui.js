@@ -4,7 +4,7 @@ import {engineeringDesignCandidate,ENGINEERING_DESIGN_DAYS} from './hmk-engineer
 /** Skill Workbench v93.274: clearer HMK pp.60–62 separation.
  * Secondary Mastery is no longer a standalone d10-only gadget.
  */
-import {availableMasteries,canResolveOpposedTie} from './hmk-skill-test-engine.js?v=93.985';
+import {availableMasteries,canResolveOpposedTie} from './hmk-skill-test-engine.js?v=93.986';
 import {automaticSkillContext} from './hmk-skill-auto-context.js?v=93.979';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './hmk-skill-load-evidence.js';
 import {skillSecondaryRoutines,skillSecondaryRoutineEligible} from './hmk-skill-secondary-routines.js';

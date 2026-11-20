@@ -15,7 +15,7 @@ import {gmLanguageBudget} from './hmk-gm-bonus-language.js';
 import {veteranRoundCount,sumRound} from './hmk-veteran-rounds.js';
 import {SOCIETIES,SOCIETY_TABLES,VERIFIED_REGIONS,realmFromRegionRoll,realmFromRegionSelection,familyOccupationProfile,regionSubDieRequired,regionDialectDieRequired,regionRealmRows,regionNativeLanguageChoices,regionTrierzonDialectChoices,regionAzeriDialectChoices,regionHepekeriaCommunityChoices,regionHarnTribeDieRequired,regionHarnCommunityChoices,OCCUPATIONS,occupationVariantNames,priestReligionOf,ritualFollowerFromML,OCCUPATION_PAGES,availableBackgroundSkills,wealthDiceCounts,standingFromWealth,printedParentWealthDie,occupationWealthDie,REGION_D1000,ELDER_FOLK_REGIONS} from './hmk-creation-tables.js';
 import {CHARACTER_STEPS,SKILL_STAGES,FOLKS,AGE_GROUPS,SIGNS,MONTHS,SKILL_DEFINITIONS,ATTRIBUTES,
- SKILL_GROUPS,SIGN_TRAITS,creationOf,legacyTribalRegionNeedsReview,legacyParentInvokerNeedsReview,calculateSheetSkills,gmSenseRows,perceptionMode,physicalDiceRequirement,voiceDiceRequirement,signFromBirthday,calculateSkill} from './hmk-character-creation.js?v=93.985';
+ SKILL_GROUPS,SIGN_TRAITS,creationOf,legacyTribalRegionNeedsReview,legacyParentInvokerNeedsReview,calculateSheetSkills,gmSenseRows,perceptionMode,physicalDiceRequirement,voiceDiceRequirement,signFromBirthday,calculateSkill} from './hmk-character-creation.js?v=93.986';
 import {eligibleAges,eligibleRealms,eligibleSocietiesForRealm,eligibleParentClasses,eligibleFamilyOccupationNames,eligibleOccupations,eligibleSkills,eligibleBackgrounds} from './hmk-creation-eligibility.js';
 import {creationChoicesFromPhysicalDice} from './hmk-creation-roll-choices.js';
 import {SCRIPTS,languageChoices,religionChoices,nativeLanguageDP,nativeRitualDP} from './hmk-skill-instances.js';
@@ -263,13 +263,28 @@ const DP_COLUMNS=Object.freeze([
  ['Background Skills','Background'],['Occupation Skills','Occupation'],['Optional Skills','Optional'],
  ['Veteran Skills','Veteran'],['Sunsign Skills','Sunsign'],['Native Language / Religion','Native'],
  ['GM Bonus Languages','GM Bonus']]);
+const SENSE_TEST_HELP=Object.freeze({
+ Eyesight:'Aktivní test zraku. Použij ho, když se postava cíleně dívá, třeba když zkoumá okraj lesa a snaží se rozeznat postavu mezi stromy.',
+ Hearing:'Aktivní test sluchu. Použij ho, když postava naslouchá, třeba když se snaží určit, odkud se ozvalo volání.',
+ Smell:'Aktivní test čichu. Použij ho, když postava cíleně čichá, třeba když hledá zdroj podivného zápachu.',
+ Sight:'Zraková větev Awareness. Použij ji, když může postava něco zahlédnout bez cíleného hledání, třeba když při pochodu koutkem oka zachytí pohyb.',
+ Sound:'Sluchová větev Awareness. Použij ji, když může postava zaslechnout nečekaný zvuk, třeba kroky za zády během rozhovoru.',
+ Odour:'Čichová větev Awareness. Použij ji, když si postava může všimnout nečekaného pachu, třeba když při práci ucítí kouř.',
+});
 export function chronicleSenseRows(character){
- return gmSenseRows(character).filter(row=>row.score!==null||row.ml!==null).flatMap(sense=>[
-  {name:sense.attribute,group:'Physical',ml:sense.attributeML,
-   basis:sense.key.toUpperCase()+(sense.proof?'':' (= PER)')+' × 5',sense,attributeTest:true},
-  {name:sense.skill,group:'Physical',ml:sense.ml,sb:sense.sb,
-   basis:sense.key.toUpperCase()+(sense.proof?'':' (= PER)')+' + WIL',sense}
- ]);
+ return gmSenseRows(character).filter(row=>row.score!==null||row.ml!==null).flatMap(sense=>{
+  const attribute=sense.key.toUpperCase()+(sense.usesPer?' (= PER)':'');
+  const attributeBasis=attribute+' × 5',skillBasis=attribute+' + WIL';
+  return [
+   {name:sense.attribute,group:'Physical',ml:sense.attributeML,basis:attributeBasis,sense,attributeTest:true,
+    help:SENSE_TEST_HELP[sense.attribute]+' Házej d100 proti '+attributeBasis+' s případnými úpravami (HMK str. 93).'},
+   {name:sense.skill,group:'Physical',ml:sense.ml,sb:sense.sb,basis:skillBasis,sense,
+    help:SENSE_TEST_HELP[sense.skill]+' Skill Base vychází z '+skillBasis+'. Hod d100 se porovnává s EML (HMK str. 57 a 93).'},
+  ];
+ });
+}
+function chronicleSenseName(row){
+ return `<span data-hmk-help="${E(row.help)}" tabindex="0" aria-label="${E(row.name+': '+row.help)}">${E(row.name)}</span>`;
 }
 function chronicleSenseEdit(row){
  const {sense,attributeTest}=row;
@@ -290,9 +305,9 @@ export function groupedSkillTableHTML(character,{editing=false,includeChronicleS
  const detailHeaders=['Skill','SB: atributy','SB','Base SM',...DP_COLUMNS.map(x=>x[1]),'DP Σ','SM','ML / Boost'];
  const detailGroups=GROUPED_SKILLS.map(group=>{
   const rows=list.filter(x=>x.group===group).sort((a,b)=>a.name.localeCompare(b.name,'en'));
-  const compact=rows.map(x=>`<tr><th scope="row">${E(x.name)}${x.subskillOf?` <span class="tiny muted">↳ ${E(x.subskillOf)}</span>`:''}</th><td>${E(Eattr(x))}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong></td></tr>`).join('');
+  const compact=rows.map(x=>`<tr><th scope="row">${x.sense?chronicleSenseName(x):E(x.name)}${x.subskillOf?` <span class="tiny muted">↳ ${E(x.subskillOf)}</span>`:''}</th><td>${E(Eattr(x))}</td><td><strong>${x.ml===null?'—':E(x.ml)}</strong></td></tr>`).join('');
   const detailed=rows.map(x=>{
-   if(x.sense)return `<tr><th scope="row">${E(x.name)}</th><td>${E(x.basis)}</td><td>${E(x.sb??'—')}</td><td colspan="${DP_COLUMNS.length+3}">${editing?chronicleSenseEdit(x):''}</td><td><strong>${E(x.ml??'—')}</strong></td></tr>`;
+   if(x.sense)return `<tr><th scope="row">${chronicleSenseName(x)}</th><td>${E(x.basis)}</td><td>${E(x.sb??'—')}</td><td colspan="${DP_COLUMNS.length+3}">${editing?chronicleSenseEdit(x):''}</td><td><strong>${E(x.ml??'—')}</strong></td></tr>`;
    const dp=DP_COLUMNS.map(([stage])=>{
     const n=x.dp.find(d=>d.stage===stage)?.dp??0;
     const origin=character.hmk?.creation?.skillDP?.[stage]?.[x.name];
@@ -332,7 +347,7 @@ export function characterCalculationHTML(character,{editing=false,embedded=false
  if(!h.creation){
   const rows=h.skills??[];const Erow=x=>E(x??'');
   const senses=embedded?chronicleSenseRows(character):[];
-  const tableRows=rows.map((r,i)=>senses.some(x=>x.name===r.name)?'':`<tr><td>${Erow(r.group)}</td><td>${Erow(r.name)}</td><td>${Erow(r.sb)}</td><td>${editing?`<input class="sheet-inline-input" type="number" name="sheet_legacy_ml_${i}" aria-label="ML ${Erow(r.name)}" min="0" max="200" step="1" required value="${Erow(r.ml)}">`:Erow(r.ml)}</td></tr>`).join('')+senses.map(row=>`<tr><td>Physical</td><td>${E(row.name)}</td><td>${E(row.sb??'—')}</td><td>${E(row.ml??'—')}${editing?chronicleSenseEdit(row):''}</td></tr>`).join('');
+  const tableRows=rows.map((r,i)=>senses.some(x=>x.name===r.name)?'':`<tr><td>${Erow(r.group)}</td><td>${Erow(r.name)}</td><td>${Erow(r.sb)}</td><td>${editing?`<input class="sheet-inline-input" type="number" name="sheet_legacy_ml_${i}" aria-label="ML ${Erow(r.name)}" min="0" max="200" step="1" required value="${Erow(r.ml)}">`:Erow(r.ml)}</td></tr>`).join('')+senses.map(row=>`<tr><td>Physical</td><td>${chronicleSenseName(row)} <small>${E(row.basis)}</small></td><td>${E(row.sb??'—')}</td><td>${E(row.ml??'—')}${editing?chronicleSenseEdit(row):''}</td></tr>`).join('');
   if(embedded)return `<div class="journal-edit-skills-surface journal-edit-skills-surface--legacy"><p class="muted">Starší ruční profil: ${editing?'lze upravovat aktuální ML. Tento profil nemá doložené jednotlivé vývojové DP.':'přehled dostupných dovedností.'}</p><div class="table-scroll"><table class="catalog-spec"><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th></tr></thead><tbody>${tableRows}</tbody></table></div></div>`;
   return `<section class="panel wide"><h3>Character Sheet · Skills</h3><p class="muted">Starší ruční profil: ${editing?'lze upravovat aktuální ML. Tento profil nemá doložené jednotlivé vývojové DP.':'přehled dostupných dovedností.'}</p><div class="table-scroll"><table class="catalog-spec"><thead><tr><th>Skupina</th><th>Dovednost</th><th>SB</th><th>ML</th></tr></thead><tbody>${tableRows}</tbody></table></div></section>`;
  }
