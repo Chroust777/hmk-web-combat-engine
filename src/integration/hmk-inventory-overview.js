@@ -13,8 +13,11 @@ const knownPrice=(item)=>{
 };
 export function projectInventoryRows(inventory=[]){
  return inventory.map(item=>{
-  const p=item.snapshot?.properties||{},isPrintedRation=['hmk:gear:hmk-p120-026','hmk:gear:hmk-p120-027'].includes(item.sourceItemId),
-   qty=(Number.isSafeInteger(item.quantity)||isPrintedRation&&Number.isSafeInteger(item.quantity*2))&&item.quantity>0?item.quantity:null;
+  const p=item.snapshot?.properties||{};
+  const isPrintedRation=['hmk:gear:hmk-p120-026','hmk:gear:hmk-p120-027'].includes(item.sourceItemId);
+  const isForagedFood=typeof item._foragingCarryReceipt==='string'&&!!item._foragingCarryReceipt;
+  const fractionalPortion=(isPrintedRation||isForagedFood)&&Number.isSafeInteger(item.quantity*2);
+  const qty=(Number.isSafeInteger(item.quantity)||fractionalPortion)&&item.quantity>0?item.quantity:null;
   const bandage=isBandageInventoryItem(item);
   const price=knownPrice(item),weight=isFiniteNonnegative(p.weightLb)&&isFiniteNonnegative(item.waterContentsLb??0)?p.weightLb+(item.waterContentsLb??0)/(item.quantity||1):null;
   const totalPrice=bandage&&qty!==null?bandageLinePriceD(qty):qty!==null&&price.unit!==null?qty*price.unit:
