@@ -1,8 +1,8 @@
-import {treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
+import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
 import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
 import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.972';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.975';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=93.976';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
 import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
@@ -387,7 +387,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 }
 
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
-const APP_VERSION='93.975';
+const APP_VERSION='93.976';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7860,9 +7860,10 @@ function stableEquipmentReference93839(ownerId){
 
 function stableHubAnimalHTML(a,campaignId){
  const p=stableBurden(data,campaignId,a),dead=!!p.exit;
- const liveHealthActor=data.characters.find(c=>c.id===a.id&&c.hmk?.verifiedMountedBreed&&c.hmk?.healthState);
+ const liveHealthActor=data.characters.find(c=>c.id===a.id&&c.hmk?.verifiedMountedBreed===a.spec.breed&&c.hmk?.healthState);
  const encounters=encounterBeastHistory(data,campaignId).filter(x=>x.ownerAnimalId===a.id&&x.ownerId===a.ownerId);
- const last=encounters.at(-1),health=last?animalHealthProjection567(data.journal,campaignId,last.id):null;
+ const last=encounters.at(-1),encounterHealth=last?animalHealthProjection567(data.journal,campaignId,last.id):null;
+ const health=liveHealthActor?persistentStateOf(liveHealthActor):encounterHealth;
  const training=data.journal.filter(j=>j.livestockTraining?.animalId===a.id&&j.calendarCampaignId===campaignId);
  const siblings=verifiedLivestock(data,campaignId).filter(other=>other.id!==a.id&&other.ownerId===a.ownerId&&!stableBurden(data,campaignId,other).exit);
  const rows=(array,kind)=>array.map(e=>{
@@ -7873,7 +7874,11 @@ function stableHubAnimalHTML(a,campaignId){
   return `<tr><td class="hmk-stable-gear-name" tabindex="0" data-hmk-help="${esc(transfer?stableGearDescription580(gear):'Skutečný zaevidovaný náklad')}" title="${esc(transfer?stableGearDescription580(gear):e.name)} · Původ: ${esc(e.reason)}">${esc(transfer?gear?.name||'Předmět':e.name)}</td><td class="hmk-stable-gear-lb">${e.weightLb} lb</td><td class="hmk-stable-gear-source" title="${esc(e.reason)}">${esc(e.reason)}</td><td class="hmk-stable-gear-action">${dead?'—':action}</td></tr>`;
  }).join('');
  const options=VEHICLES_TACK_P122.filter(x=>!['Wheel','Cart, 2-wheel','Sled','Wagon, 4-wheel'].includes(x.name)&&stableGearFit93838(x,a).ok);
- const z=stableAnimalZones575(data,campaignId,a,health);
+ const mapHealth=liveHealthActor?{wounds:health.wounds.map(wound=>({
+  ...wound,infected:wound.healing?.infected===true,
+  amputation:wound.amputation?.severed===true,grimDueMinute:wound.healing?.nextGrimShockDay??null
+ }))}:encounterHealth;
+ const z=stableAnimalZones575(data,campaignId,a,mapHealth);
  const trainingState=stableTraining575(data,campaignId,a);
  const looseGear=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none'].includes(i.slot)&&i.quantity===1&&VEHICLES_TACK_P122.some(t=>t.id===i.snapshot?.properties?.stableTackId&&t.name!=='Wheel'&&stableGearFit93838(t,a).ok));
  const userItems=data.inventory.filter(i=>i.characterId===a.ownerId&&['carried','none','main_hand','off_hand'].includes(i.slot)&&
@@ -7899,7 +7904,7 @@ function stableHubAnimalHTML(a,campaignId){
  ${z.rows.map(r=>{const live=r.wounds.filter(w=>!w.healed),loss=r.wounds.some(w=>!!w.amputation),pattern=r.segments.map(t=>`${t.znMin}${t.znMin!==t.znMax?'–'+t.znMax:''} / ${t.lnMin}–${t.lnMax}`).join(', ');
  return `<tr class="${live.length?'hmk-stable-zone-hurt':loss?'hmk-stable-zone-loss':''}"><th>${esc(r.name)}</th><td>${esc(pattern)}</td><td>${r.shock}</td><td>${r.wounds.length?esc(r.wounds.map(w=>(w.level>=4?'G':w.level===1?'M':'S')+w.level+w.aspect+(w.healed?' (zahojeno)':'')+(w.amputation?' · amputace':'')).join('; ')):'—'}</td><td>${live.length?`${live.length} aktivní · ${live.some(w=>w.bleeding)?'krvácení · ':''}${live.some(w=>w.infected)?'infekce · ':''}${live.some(w=>w.grimDue!==null)?'Grim · ':''}léčení dle záznamu`:loss?'Trvalá amputace':'Bez evidovaného zranění'}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="hc-hint">Pro tento druh není doložená zónová tabulka. Nelze zobrazit bezpečné smyšlené rozdělení těla.</p>'}
  ${stableEquipmentReference93839(a.ownerId)}
- <p><strong>Shock:</strong> ${esc(health?.shock??'neexistuje zdravotní doklad')} · ${health?.wounds?.filter(w=>!w.healed).length??0} aktivních ran. ${health?'Uzdravené rány a amputace zůstávají v historii.':'Bez encounteru zatím nelze potvrdit, že zvíře není zraněno.'}</p></div>
+ <p><strong>Shock:</strong> ${esc(health?.shock??'neexistuje zdravotní doklad')} · ${health?.wounds?.filter(w=>!w.healed).length??0} aktivních ran. ${health?'Uzdravené rány a amputace zůstávají v historii.':'Zdravotní stav tohoto zvířete zatím nebyl doložen.'}</p></div>
  <p>Výcvik: ${training.length} identitou propojených dokladů · encountery: ${encounters.length} · ${health?`aktivní rány ${health.wounds.filter(w=>!w.healed).length} · Shock ${esc(health.shock)} · Blood loss ${health.bloodLoss.bp} BP`:'žádný doložený zdravotní stav (nikoli automaticky zdravé zvíře)'}</p>
  ${last?`<p>Poslední encounter: ${esc(last.name)}. Zdravotní historie pokračuje pod trvalou identitou.</p>`:''}
  <div class="actions"><button type="button" class="secondary hc-small" data-hmk-stable-go-travel>Otevřít cestovní hlídku</button></div></section>
@@ -13524,8 +13529,10 @@ function hskWeatherBleedingCarePanel(actorId,woundId=null){
  Weakness ${state.bloodLoss.weaknessFatigue}. Bez vstupu do Combatu, bez fiktivních hodů či okamžitého 5minutového skoku.</p>${items}</section>`;
 }
 function hskEnvironmentalWoundCarePanel(actor){
- const pending=persistentStateOf(actor).wounds.some(w=>!w.healed&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,persistentStateOf(actor).events)));
+ const health=persistentStateOf(actor);
+ const pending=health.wounds.some(w=>!w.healed&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,health.events)));
  if(!pending)return '';
+ if(health.shock==='KIA')return '<p class="notice">Stav KIA. Záznamy ran zůstávají v historii a léčebné hody se již neprovádějí.</p>';
  if(persistentStateOf(actor).wounds.some(w=>w.bleeding&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,persistentStateOf(actor).events))))
   return '<p class="notice">Před dalším Treatment nebo Healing nejprve uzavřete Blood Stoppage v Zdraví & Expozice.</p>';
  if(persistentStateOf(actor).extendedShock)
@@ -13583,18 +13590,20 @@ function hskParallelColdHealthPanel(actorId){
  const actor=character(actorId),clock=data.campaignClock;
  if(!actor||!clock)return '';
  const s=persistentStateOf(actor),rows=s.parallelColdShocks??[];
+ if(!rows.length)return '';
+ const fatigue=combatFatigueTotals(s).total;
  return rows.filter(x=>x.followup||x.extendedShock||x.coma?.active).map(x=>{
   const items=[];
   if(x.followup){
    const due=x.followup.dueMinute,ml=availableMasteries(actor).find(z=>z.name==='Shock')?.ml;
-   const eml=Number(ml)-combatFatigueTotals(s).total-(x.shock==='STN'?0:20);
+   const eml=Number(ml)-fatigue-(x.shock==='STN'?0:20);
    const rerollReady=clock.minute>=due&&Number.isInteger(ml);
-   items.push(`<form data-parallel-cold-reroll><input type="hidden" name="sourceId" value="${esc(x.sourceId)}">
+   items.push(`<form data-parallel-cold-reroll data-shock-eml="${eml}" data-shock-coma-mode="immersion" data-shock-coma-ready="${rerollReady&&x.shock==='UNC'?'yes':'no'}"><input type="hidden" name="sourceId" value="${esc(x.sourceId)}">
     <h4>Cold Water Shock Reroll · ${esc(x.sourceId)}</h4>
     <p class="hc-hint">Původní Shock ${esc(x.shock)}, termín ${esc(displayCampaignMinute(due))}; žádný další bojový krok ani časový posun se nevytváří. Původní Extended Shock/Coma běží nezávisle.</p>
     <p>Shock ML ${esc(String(ml??'neznámá'))} · EML ${esc(String(Number.isInteger(ml)?eml:'neznámá'))}.</p>
     <label>Skutečný Shock d100<input name="roll" type="number" min="1" max="100" required ${rerollReady?'':'disabled'}></label>
-    ${x.shock==='UNC'?`<label>Jen při UNC+CF: GM výslovně určený Coma HR pro ponoření bez Injury Level<input name="initialComaHR" type="number" min="1" max="20" ${rerollReady?'':'disabled'}></label><label>Jen při UNC+CF: první skutečný Coma d10 dní<input name="initialComaD10" type="number" min="1" max="10" ${rerollReady?'':'disabled'}></label>`:''}
+    ${x.shock==='UNC'?`<label hidden>Počáteční Coma HR podle rozhodnutí GM<input name="immersionComaHR" type="number" min="1" max="20" disabled></label><label hidden>První skutečný d10 dní do Coma Course<input name="initialComaD10" type="number" min="1" max="10" disabled></label>`:''}
     <button type="submit" ${rerollReady?'':'disabled'}>Zapsat samostatný Shock Reroll</button><output role="status" aria-live="polite"></output></form>`);
   }
   for(const kind of ['extended-shock','coma']){
@@ -13602,11 +13611,13 @@ function hskParallelColdHealthPanel(actorId){
    if(!c)continue;
    const due=kind==='extended-shock'?c.startMinute+(c.elapsedHours+4)*60:c.startMinute+(c.elapsedDays+c.nextCourseDays)*DAY_MINUTES;
    const courseReady=clock.minute===due;
-   items.push(`<form data-parallel-cold-course><input type="hidden" name="sourceId" value="${esc(x.sourceId)}"><input type="hidden" name="kind" value="${kind}">
+   const end=actor.hmk?.attributes?.end,wil=actor.hmk?.attributes?.wil;
+   const hb=Number.isInteger(end)&&Number.isInteger(wil)?healingBase({endurance:end,will:wil}):'';
+   items.push(`<form data-parallel-cold-course data-hmk-trauma-hr="${c.hr}" data-hmk-trauma-hb="${hb}" data-hmk-trauma-fatigue="${fatigue}"><input type="hidden" name="sourceId" value="${esc(x.sourceId)}"><input type="hidden" name="kind" value="${kind}">
     <h4>${kind==='extended-shock'?'Extended Shock':'Coma'} · samostatný Cold Water Course</h4>
     <p class="hc-hint">Zdroj ${esc(x.sourceId)} · HR${c.hr} · pravidlový termín ${esc(displayCampaignMinute(due))} · aktuální minuta ${esc(displayCampaignMinute(clock.minute))}.</p>
     <label>Skutečný Course d100<input name="roll" type="number" min="1" max="100" required ${courseReady?'':'disabled'}></label>
-    ${kind==='extended-shock'?`<label>Nejvyšší skutečné Physician SV hvězdy<input name="physicianStars" type="number" min="0" max="10" value="0" required ${courseReady?'':'disabled'}></label>`:`<label>Klidné chráněné prostředí<select name="restfulShelter" ${courseReady?'':'disabled'}><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label><label>Nový skutečný d10, pouze pokud Coma pokračuje<input name="nextComaD10" type="number" min="1" max="10" ${courseReady?'':'disabled'}></label>`}
+    ${kind==='extended-shock'?`<label>Nejvyšší skutečné Physician SV hvězdy<input name="physicianStars" type="number" min="0" max="10" value="0" required ${courseReady?'':'disabled'}></label>`:`<label>Klidné chráněné prostředí<select name="restfulShelter" ${courseReady?'':'disabled'}><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label><label hidden>Nový skutečný d10, pouze pokud Coma pokračuje<input name="periodD10" type="number" min="1" max="10" ${courseReady?'':'disabled'}></label>`}
     <label>Doložený Arcane bonus<input name="arcaneBonus" type="number" min="0" max="100" value="0" required ${courseReady?'':'disabled'}></label>
     <button type="submit" ${courseReady?'':'disabled'}>Zapsat právě splatný Course</button><output role="status" aria-live="polite"></output></form>`);
   }
@@ -15337,12 +15348,12 @@ document.addEventListener('submit',event=>{
   if(kind==='shock-reroll'){
    const shockML=availableMasteries(actor).find(x=>x.name==='Shock')?.ml;
    result=resolveParallelColdReroll({state,sourceId,round,eventId:id,minute,shockML,
-    roll:integer('roll',1,100),initialComaHR:integer('initialComaHR',1,20,true),
+    roll:integer('roll',1,100),initialComaHR:integer('immersionComaHR',1,20,true),
     initialComaD10:integer('initialComaD10',1,10,true),gmConfirmed:true});
   }else result=resolveParallelColdCourse({state,actor,sourceId,kind,round,eventId:id,minute,
    roll:integer('roll',1,100),physicianStars:kind==='extended-shock'?integer('physicianStars',0,10):0,
    arcaneBonus:integer('arcaneBonus',0,100),restfulShelter:val('restfulShelter')!=='no',
-   nextComaD10:integer('nextComaD10',1,10,true),gmConfirmed:true});
+   nextComaD10:integer('periodD10',1,10,true),gmConfirmed:true});
   const previous=JSON.stringify(state),camp=campaignKey(clock);
   if(!mutate(()=>{
    if(data.campaignClock.minute!==minute||campaignKey(data.campaignClock)!==camp||
