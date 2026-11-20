@@ -8,7 +8,7 @@ import {secondaryModifier,secondaryRoll,indexOf,successLevel,SL} from '../rules/
 import {shockRollModifier,shockStateFromIndex} from '../rules/shock.js';
 import {initialCombatState,validateCombatState,combatFatigueTotals,finalizeFatalState} from './persistent-combat-state.js';
 import {STARTING_ELIXIR_NAMES} from './hmk-creation-starting-elixirs.js';
-import {MEDICAL_ORIGIN} from './hmk-medical-origin.js?v=93.987';
+import {MEDICAL_ORIGIN} from './hmk-medical-origin.js?v=93.988';
 export const ALCHEMY_START_FORMAT='hmk-alchemy-preparation-start-v1';
 export const ALCHEMY_FINISH_FORMAT='hmk-alchemy-preparation-finish-v1';
 export const ALCHEMY_ABORT_FORMAT='hmk-alchemy-preparation-abort-v1';
@@ -321,7 +321,7 @@ export function applyAlchemyDissolution({state=null,arcane=null,proof,eventId}={
   ok(shock&&shock.baseSHK===8&&shock.fatigue===fatigueBefore+cf.weaknessAdded&&
    s.shock==='NONE'&&!s.shockFollowup&&!s.extendedShock&&!s.coma?.active&&!s.bloodShockPending,
    'Crucial Dissolution: Shock musí vycházet ze skutečného Fatigue po Aural Shock a z nekolizního Combat State');
-  // Reuse the ordinary Shock recovery queue with the original calendar source for STN.
+  // Reuse the ordinary Shock recovery queue with the original calendar source.
   ok(['STN','INC','UNC','KIA'].includes(shock.state),'Crucial Dissolution: nedoložený výsledný Shock State');
   const technicalRound=Math.max(1,s.lastRound||1); // schema field, NOT an elapsed combat round
   s.shock=shock.state;
@@ -332,7 +332,7 @@ export function applyAlchemyDissolution({state=null,arcane=null,proof,eventId}={
    ok(dueRound<=9999,'Crucial Dissolution: Recovery překračuje rozsah kola');
    s.shockFollowup={kind:s.shock,originRound:technicalRound,timelineId:null,dueRound,
     phase:s.shock==='UNC'?'after-ten-minutes':'end-next-turn',
-    ...(s.shock==='STN'?{domain:MEDICAL_ORIGIN.ALCHEMY,sourceId:eventId,originMinute:proof.minute}:{})};
+    domain:MEDICAL_ORIGIN.ALCHEMY,sourceId:eventId,originMinute:proof.minute};
   }else finalizeFatalState(s); // same canonical cleanup as other terminal Shock sources
  }
  a.auralShockLevels=before+cf.auralShockAdded;

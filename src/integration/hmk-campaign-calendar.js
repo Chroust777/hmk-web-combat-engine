@@ -1,4 +1,4 @@
-import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock,projectLegacyAlchemyStun} from './hmk-medical-origin.js?v=93.987';
+import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock,projectLegacyAlchemyShock} from './hmk-medical-origin.js?v=93.988';
 import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentProceduresAppendOnly,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './hmk-concurrent-procedures.js';
 /**
  * HMK v1.2 p.178–182: absolute campaign-time *evidence*, not an alternative
@@ -194,7 +194,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
  journal=projectedCalendarJournal(clock,journal);
  characters=characters.map(c=>{
-  const state=c.hmk?.healthState,projected=projectLegacyAlchemyStun(projectLegacyGrimShock(state,clock,c.id),clock,c.id);
+  const state=c.hmk?.healthState,projected=projectLegacyAlchemyShock(projectLegacyGrimShock(state,clock,c.id),clock,c.id);
   return projected===state?c:{...c,hmk:{...c.hmk,healthState:projected}};
  });
  const all=[],unknown=[],suspended=[];
@@ -228,8 +228,8 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
     all.push({id:KEY('weather-shock',c.id,q.sourceId),characterId:c.id,name:c.name,
      kind:'weather-shock',sourceId:q.sourceId,
      description:q.phase==='after-all-bleeding-stopped'?'Blood Loss Shock Reroll – ihned po zastavení všech Bleederů':q.domain==='gm-health'?(q.kind==='UNC'?'GM Shock Reroll – po 10 skutečných minutách':'GM Shock Reroll – po následující skutečné akci'):
-      (q.domain===MEDICAL_ORIGIN.ALCHEMY?'Alchemy · zotavení ze STN po Crucial Dissolution':
-       q.domain==='skill-fall'?'Shock Reroll po pádu':'Cestovní Shock Reroll')+(q.kind==='UNC'?' – po 10 minutách':' – GM potvrdí další skutečnou akci'),
+      (q.domain===MEDICAL_ORIGIN.ALCHEMY?'Alchemy · zotavení ze '+q.kind+' po Crucial Dissolution':
+       q.domain==='skill-fall'?'Shock Reroll po pádu':'Cestovní Shock Reroll')+(q.kind==='UNC'?' – po 10 minutách':(q.domain===MEDICAL_ORIGIN.ALCHEMY&&q.kind==='INC'?' – GM potvrdí konec příštího tahu':' – GM potvrdí další skutečnou akci')),
      minute:dueMinute,anchorMinute:q.originMinute,status:dueMinute<=clock.minute?'due':'future'});
    }
   }else if(pendingReroll)unknown.push({characterId:c.id,name:c.name,kind:'shock-followup',

@@ -7,17 +7,22 @@ export const MEDICAL_ORIGIN=Object.freeze({WEATHER:'travel-weather',TRAVEL:'trav
 export const isNoncombatMedicalOrigin=origin=>origin===MEDICAL_ORIGIN.WEATHER||origin===MEDICAL_ORIGIN.TRAVEL||origin===MEDICAL_ORIGIN.FALL||origin===MEDICAL_ORIGIN.ALCHEMY||origin===MEDICAL_ORIGIN.GM||origin==='gm-health';
 
 // Older alchemy saves recorded the real minute and Aural anchor already, but
-// the pending STN roll was untagged. Only recover a directly witnessed origin.
-export function projectLegacyAlchemyStun(state,clock,characterId){
+// the pending Shock roll was untagged. Only recover a directly witnessed origin.
+export function projectLegacyAlchemyShock(state,clock,characterId){
  const pending=state?.shockFollowup;
- if(pending?.kind!=='STN'||pending.phase!=='end-next-turn'||pending.domain||pending.timelineId||!clock)return state;
+ if(!['STN','INC','UNC'].includes(pending?.kind)||pending.phase!==(pending.kind==='UNC'?'after-ten-minutes':'end-next-turn')||pending.domain||pending.timelineId||!clock)return state;
  const event=state.events?.at(-1);
  if(event?.type!=='hmk-alchemy-dissolution-aural'||event.round!==pending.originRound||
-    event.details?.nonCombat!==true||event.details?.crucialShock?.state!=='STN')return state;
+    event.details?.nonCombat!==true||event.details?.crucialShock?.state!==pending.kind)return state;
  const minute=event.details.calendarMinute;
  if(!Number.isSafeInteger(minute)||minute<0||minute>clock.minute||!clock.anchors?.some(
   a=>a.kind==='aural'&&a.characterId===characterId&&a.episodeId===event.id&&a.minute===minute))return state;
  return {...state,shockFollowup:{...pending,domain:MEDICAL_ORIGIN.ALCHEMY,sourceId:event.id,originMinute:minute}};
+}
+export function verifiedAlchemyComa(state,q){
+ return q?.domain===MEDICAL_ORIGIN.ALCHEMY&&q.kind==='UNC'&&!q.woundId&&state.events.some(event=>
+  event.id===q.sourceId&&event.type==='hmk-alchemy-dissolution-aural'&&event.details?.nonCombat===true&&
+  event.details?.crucialShock?.state==='UNC'&&event.details.calendarMinute===q.originMinute);
 }
 export function medicalOriginOfWound(wound,events=[]){
  if(!wound||typeof wound.id!=='string')return null;

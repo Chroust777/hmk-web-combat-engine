@@ -40,9 +40,9 @@ function fieldsOf(form,kind){
  return ['cfWillD10','dissolutionD100','crucialShockD100',
   ...[...form.querySelectorAll('input[name^="aug"]')].map(x=>x.name)].filter(name=>form.elements.namedItem(name));
 }
-function needsImmersionComaHR(form){
+function needsGMComaHR(form){
  const eml=Number(form.dataset.shockEml);
- return form.dataset.shockComaMode==='immersion'&&form.dataset.shockComaReady==='yes'&&
+ return ['immersion','alchemy'].includes(form.dataset.shockComaMode)&&form.dataset.shockComaReady==='yes'&&
   die(value(form,'roll'),100)&&Number.isFinite(eml)&&successLevel(Number(value(form,'roll')),eml)===0;
 }
 function stepsFor(form,kind){
@@ -106,7 +106,7 @@ function stepsFor(form,kind){
    const roll=Number(value(form,'roll')),eml=Number(form.dataset.shockEml);
    if(form.dataset.shockComaReady==='yes'&&die(value(form,'roll'),100)&&
     Number.isFinite(eml)&&successLevel(roll,eml)===0&&
-    (!needsImmersionComaHR(form)||die(value(form,'immersionComaHR'),20)))
+    (!needsGMComaHR(form)||die(value(form,'immersionComaHR'),20)))
     add('initialComaD10',10,'UNC + CF · první Coma Course d10');
   }
  }else if(kind==='trauma'){
@@ -224,7 +224,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
    !die(accepted.get(step.key).value,step.faces));}
   function repaint(){
    const steps=stepsFor(form,kind),next=pending();
-   const showHR=!!comaHR&&needsImmersionComaHR(form),waitHR=showHR&&!die(comaHR.value,20);
+   const showHR=!!comaHR&&needsGMComaHR(form),waitHR=showHR&&!die(comaHR.value,20);
    const done=!next&&!waitHR;
    const missingTechnique=kind==='skillFollowup'&&form.dataset.requiresFollowRoll==='yes'&&!value(form,'technique');
    if(comaHR){
@@ -287,7 +287,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
    if(!step&&mustHaveSteps&&!stepsFor(form,kind).length){
     event.preventDefault();event.stopImmediatePropagation();return;
    }
-   if(comaHR&&needsImmersionComaHR(form)&&!die(comaHR.value,20)){
+   if(comaHR&&needsGMComaHR(form)&&!die(comaHR.value,20)){
     event.preventDefault();event.stopImmediatePropagation();comaHR.focus();return;
    }
    if(!step&&!(kind==='fishing'&&value(form,'conditionsMode')==='gm'&&!value(form,'gmCondition')))return;
