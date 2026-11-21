@@ -278,7 +278,7 @@ import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pend
 import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.034';
 import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
-import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
+import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js?v=94.036';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
 import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {eruditionSkillEvidence,applyEruditionSkillResult} from './src/integration/hmk-alchemy-erudition-skill.js';
@@ -401,7 +401,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.035';
+const APP_VERSION='94.036';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4300,6 +4300,19 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   return `<form data-alchemy-vial-bind><strong>${esc(a.elixirName)} · dokončeno ${esc(displayCampaignMinute(a.minute))}</strong><input name="finishId" type="hidden" value="${esc(x.id)}"><input name="actorId" type="hidden" value="${esc(x.characterId)}">
    ${vials.length?`<label>Existující samostatná Vial, 4 oz<select name="vialId" required>${vials.map(v=>`<option value="${esc(v.id)}">${esc(v.snapshot?.name||'Vial')} · ${esc(v.id)}</option>`).join('')}</select></label><label>Materiál nádoby<select name="material" required><option value="glass">Sklo</option><option value="ceramic">Keramika</option></select></label>${a.elixirName==='Fumebomb'?`<label class="hc-check"><input type="checkbox" name="gasConfirmed" value="yes" required> GM potvrzuje plyn Fumebomb v původní uzavřené nádobě</label>`:`<label class="hc-check"><input type="checkbox" name="liquidConfirmed" value="yes" required> GM potvrzuje, že jde o tekutou podobu tohoto elixíru</label>`}<label class="hc-check"><input type="checkbox" name="corkConfirmed" value="yes" required> GM potvrzuje fyzickou korkovou zátku</label><label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje skutečné uložení elixíru do této nádoby při dokončení přípravy, i když je důkaz zapsán později</label><button type="submit">Doložit fyzickou nádobu bez posunu času</button>`:'<p class="hc-hint">Chybí volná prázdná lahvička Vial, 4 oz.</p>'}</form>${vials.length?'':craftVialAcquisition(x.characterId)}`;
  }).join('')}
+ <h4>Physic · změny účinků po podání (HMK 273)</h4>
+ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.campaignMinute<=clock.minute&&
+  j.calendarAlchemyImbibing?.elixirName==='Physic'&&[j.characterId,j.calendarAlchemyImbibing.targetId].includes(actorId))
+  .slice(-10).reverse().map(j=>{
+   const use=j.calendarAlchemyImbibing;
+   const targets=use.physicEffects.map(change=>{
+    const name=data.journal.find(row=>row.id===change.finishId)?.calendarAlchemyFinish?.elixirName??'Elixír';
+    return `<li>${esc(name)} · AS ${change.asBefore} → ${change.asAfter}${change.asAfter===0?' · účinek skončil':''}</li>`;
+   });
+   return `<article class="hc-event"><strong>Physic · ${esc(character(use.targetId)?.name??'Příjemce')}</strong>
+    <p>${esc(displayCampaignMinute(use.minute))} · d100 (${use.d100}) · ${esc(use.sl)} · AS ${use.finalAS}</p>
+    ${targets.length?`<ul>${targets.join('')}</ul>`:'<p>Žádný aktivní elixír nebyl oslaben.</p>'}</article>`;
+  }).join('')||'<p data-craft-empty>Žádné použití Physic.</p>'}
  <h4>Egosight · dotyk a rozpoznání artefaktu (HMK 271)</h4>
 <p class="hc-hint" data-craft-rule>Rozliší minor artefakt, major artefakt s Ego a Ego Subversion nebo major artefakt s vlastní vůlí Will. Neposkytuje neznámé schopnosti minor artefaktu ani přesný Will. GM musí artefakt skutečně předložit a potvrdit jeho stav. Během Aural Shock není prospěch z Egosight dostupný.</p>
  ${onlyMaker.map(c=>{const shock=c.hmk?.arcane?.auralShockLevels??0,ctx=egosightTouchContext({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,actorId:c.id,auralShockLevels:shock});if(!ctx.sourceUseIds.length)return '';
@@ -21011,7 +21024,13 @@ document.addEventListener('submit',e=>{
     title:'Alchemy · Physic · Imbibing Roll',body:'HMK 273 · '+v.testSkill+' '+actual+' · d100 '+die+' ('+origin+'), '+proof.sl+', AS '+proof.asBefore+' → '+proof.finalAS+'; '+proof.physicEffects.map(x=>x.finishId+': '+x.asBefore+' → '+x.asAfter).join('; ')+(resolved?'; Aural Shock +1, Weakness +5':'')+'.',
     calendarAlchemyImbibing:proof});
    data.journal.push(...secondary.rows);
-  }))notice='Physic doložen: '+proof.physicEffects.length+' aktivních elixírů ovlivněno'+(resolved?', Aural Shock +1':'')+'. Čas GM nezměněn.';
+  })){
+   notice='Physic · '+proof.sl+' · AS '+proof.finalAS+(proof.physicEffects.length?' · '+proof.physicEffects.map(x=>{
+    const dose=data.journal.find(row=>row.id===x.finishId)?.calendarAlchemyFinish;
+    return (dose?.elixirName??'Elixír')+' '+x.asBefore+' → '+x.asAfter;
+   }).join(', '):' · příjemce nemá aktivní elixíry')+(resolved?' · Aural Shock +'+(1+secondary.auralCount):'')+'.';
+   render();
+  }
  }catch(err){alert('Physic: '+err.message)}
 },true);
 document.addEventListener('submit',e=>{
