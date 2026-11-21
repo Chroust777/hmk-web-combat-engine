@@ -275,7 +275,8 @@ import {createForagingCarry,createForagingCarryEat,foragedCarriedFood,projectFor
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
 import {elixirHelp,herbalPotionHelp} from './src/integration/hmk-craft-item-help.js?v=94.032';
 import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js?v=93.988';
-import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.038';
+import {alchemyDoseProof,startingDoseProofFromCharacter,assertAlchemyStartingDoses,assertAlchemyStartingDosesAppendOnly} from './src/integration/hmk-alchemy-starting-doses.js?v=94.039';
+import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.039';
 import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js?v=94.036';
@@ -401,7 +402,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.038';
+const APP_VERSION='94.039';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -710,6 +711,7 @@ function validate(d){
  validateGlobalActionLedger(d);
  validateExtendedShockAidJournal(d?.journal||[]);
  validateAlchemyExaminations(d?.journal||[]);
+ assertAlchemyStartingDoses(d);
  const rawJournal=d.journal||[];
  validateProjectCancellations(rawJournal,projectIsOpen);
  const workJournal=operationalProjectJournal(rawJournal);
@@ -1095,6 +1097,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
   // permanent PC/NPC health deadlines remain enforced by the original agenda.assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});
   assertGlobalActionLedgerAppendOnly(previous,data);assertChroniclePresentationAppendOnly93889(previous,data);
   assertAlchemyExaminationsAppendOnly(previous.journal,data.journal);
+  assertAlchemyStartingDosesAppendOnly(previous.journal,data.journal);
   assertPCShelteredStayAppendOnly(previous.journal,data.journal);
   validatePCShelteredStayJournal(data.journal,data.characters);
   validate(data);
@@ -4266,7 +4269,7 @@ function characterCraftPanel(clock,maker,discipline){
  ${!h.pendingStart&&clock.minute===h.nextDueMinute&&attrs?.end&&attrs?.wil?`<form data-darkvision-healing-roll><input type="hidden" name="useId" value="${esc(h.useId)}"><input type="hidden" name="targetId" value="${esc(h.targetId)}"><p>END ${attrs.end}, WIL ${attrs.wil}; Healing Base a EML se vypočítají ze stávajících pravidel.</p><label>Skutečný Healing d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" data-darkvision-roll-heal class="hc-small">⚄ d100</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje skutečný Healing Roll v termínu</label><button type="submit">Zapsat zotavení / HR</button></form>`:''}</article>`}).join('')}
  <h4>Applied Elixirs · Mending / Object Aegis (HMK 269,273)</h4>
 <p class="hc-hint" data-craft-rule>Mending: plná oprava několika poškozených předmětů do celkové hmotnosti AS ×2 lb, jednu dávku nelze rozdělit. Object Aegis: jeden předmět do AS ×5 lb; GM musí spojit konkrétní pozdější Attunement/Psychometry test s d10 proti aktuální AS. Úspěch sníží původní SL o jeden stupeň a AS o 1. Původní d100 nikdy nepřepisujeme.</p>
-${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyFinish?.result==='completed'&&['Mending','Object Aegis'].includes(j.calendarAlchemyFinish.elixirName)&&makerElixirs.some(x=>x.finishId===j.id)).map(j=>{const st=alchemyStates.find(z=>z.finishId===j.id),v=alchemyVialState(data.journal,campaignKey(clock),j.id,clock.minute);if(!st||!v?.full||v.ownerId!==actorId||!['none','carried'].includes(v.slot)||st.currentAS<=0||st.nextDueMinute<=clock.minute)return '';const candidates=data.inventory.filter(i=>participants.some(c=>c.id===i.characterId)&&i.quantity===1&&i.slot!=='chest'&&i.id!==v.vialId&&Number(i.snapshot?.properties?.weightLb)>0);return st.elixirName==='Mending'?`<form data-alchemy-mending><strong>Mending · AS ${st.currentAS} · maximum ${st.currentAS*2} lb</strong><input type="hidden" name="finishId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(v.ownerId)}"><p>Vyberte všechny skutečně poškozené předměty. Ctrl+klik pro více kusů; součet hmotnosti ověří engine. Weapon Quality, Acid AV a doložený stav předmětu se obnoví ve stejném inventáři.</p><select multiple name="targetItemId" size="5" required>${candidates.filter(i=>i.currentWQ!==undefined&&i.snapshot?.properties?.quality>i.currentWQ||Object.values(i.acidAVDamageByLocation||{}).some(x=>x>0)||(i.condition||'').trim()||alchemyAcidObjectDamage(data.journal,campaignKey(clock),i.id,clock.minute)>0).map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot?.name||i.id)} · ${esc(i.snapshot.properties.weightLb)} lb · ${esc(i.id)}</option>`).join('')}</select><label class="hc-check"><input name="accessConfirmed" type="checkbox" required> GM potvrzuje skutečně dostupné předměty a jediné úplné vylití do jednoho kola</label><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplnou opravu a spotřebu skutečné lahvičky bez posunu času</label><button type="submit">Mending: obnovit předměty a vyprázdnit lahvičku</button></form>`:`<form data-alchemy-aegis-apply><strong>Object Aegis · AS ${st.currentAS} · maximum ${st.currentAS*5} lb</strong><input type="hidden" name="finishId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(v.ownerId)}"><label>Jediný skutečný předmět<select name="targetItemId" required>${candidates.filter(i=>Number(i.snapshot.properties.weightLb)<=st.currentAS*5).map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot.name)} · ${i.snapshot.properties.weightLb} lb · ${esc(i.id)}</option>`).join('')}</select></label><label class="hc-check"><input name="accessConfirmed" type="checkbox" required> GM potvrzuje aplikaci na tento fyzický kus v jednom kole</label><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje spotřebu původní lahvičky</label><button type="submit">Object Aegis: vytvořit ochranu</button></form>`;}).join('')}
+${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&alchemyDoseProof(j)?.result==='completed'&&['Mending','Object Aegis'].includes(alchemyDoseProof(j).elixirName)&&makerElixirs.some(x=>x.finishId===j.id)).map(j=>{const st=alchemyStates.find(z=>z.finishId===j.id),v=alchemyVialState(data.journal,campaignKey(clock),j.id,clock.minute);if(!st||!v?.full||v.ownerId!==actorId||!['none','carried'].includes(v.slot)||st.currentAS<=0||st.nextDueMinute<=clock.minute)return '';const candidates=data.inventory.filter(i=>participants.some(c=>c.id===i.characterId)&&i.quantity===1&&i.slot!=='chest'&&i.id!==v.vialId&&Number(i.snapshot?.properties?.weightLb)>0);return st.elixirName==='Mending'?`<form data-alchemy-mending><strong>Mending · AS ${st.currentAS} · maximum ${st.currentAS*2} lb</strong><input type="hidden" name="finishId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(v.ownerId)}"><p>Vyberte všechny skutečně poškozené předměty. Ctrl+klik pro více kusů; součet hmotnosti ověří engine. Weapon Quality, Acid AV a doložený stav předmětu se obnoví ve stejném inventáři.</p><select multiple name="targetItemId" size="5" required>${candidates.filter(i=>i.currentWQ!==undefined&&i.snapshot?.properties?.quality>i.currentWQ||Object.values(i.acidAVDamageByLocation||{}).some(x=>x>0)||(i.condition||'').trim()||alchemyAcidObjectDamage(data.journal,campaignKey(clock),i.id,clock.minute)>0).map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot?.name||i.id)} · ${esc(i.snapshot.properties.weightLb)} lb · ${esc(i.id)}</option>`).join('')}</select><label class="hc-check"><input name="accessConfirmed" type="checkbox" required> GM potvrzuje skutečně dostupné předměty a jediné úplné vylití do jednoho kola</label><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplnou opravu a spotřebu skutečné lahvičky bez posunu času</label><button type="submit">Mending: obnovit předměty a vyprázdnit lahvičku</button></form>`:`<form data-alchemy-aegis-apply><strong>Object Aegis · AS ${st.currentAS} · maximum ${st.currentAS*5} lb</strong><input type="hidden" name="finishId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(v.ownerId)}"><label>Jediný skutečný předmět<select name="targetItemId" required>${candidates.filter(i=>Number(i.snapshot.properties.weightLb)<=st.currentAS*5).map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot.name)} · ${i.snapshot.properties.weightLb} lb · ${esc(i.id)}</option>`).join('')}</select></label><label class="hc-check"><input name="accessConfirmed" type="checkbox" required> GM potvrzuje aplikaci na tento fyzický kus v jednom kole</label><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje spotřebu původní lahvičky</label><button type="submit">Object Aegis: vytvořit ochranu</button></form>`;}).join('')}
 ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyObjectAegis).map(j=>{const st=alchemyObjectAegisState(data.journal,campaignKey(clock),j.id,clock.minute);if(!st.active)return `<p class="hc-hint">Object Aegis · ${esc(j.calendarAlchemyObjectAegis.targetName)} · AS vyčerpána</p>`;const attempts=data.journal.slice(data.journal.indexOf(j)+1).filter(k=>k.calendarCampaignId===campaignKey(clock)&&k.skillTestProof&&k.campaignMinute<=clock.minute&&[...(k.skillTestProof.skills||[]),k.skillTestProof.skill,k.skillTestProof.primarySkill,k.skillTestProof.name].some(x=>['Attunement','Psychometry'].includes(x))&&!data.journal.some(a=>a.calendarAlchemyObjectAegisTest?.sourceTestId===k.id));return `<form data-alchemy-aegis-test><strong>Object Aegis · ${esc(j.calendarAlchemyObjectAegis.targetName)} · AS ${st.remainingAS}</strong><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Typ skutečně proběhlého testu<select name="kind"><option value="Attunement">Attunement</option><option value="Psychometry">Psychometry</option></select></label><label>Originální Skill Workbench důkaz<select name="sourceTestId" required>${attempts.map(k=>`<option value="${esc(k.id)}">${esc(k.id)} · ${esc(k.skillTestProof.skills?.[0]||k.skillTestProof.skill||k.skillTestProof.name||'')} · ${esc(k.skillTestProof.a?.level||k.skillTestProof.result?.level||'')}</option>`).join('')}</select></label><label>Skutečný Aegis d10 proti AS ${st.remainingAS}<input name="d10" type="number" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-aegis>⚄ d10</button><label class="hc-check"><input type="checkbox" name="targetConfirmed" required> GM potvrdil tento konkrétní předmět jako cíl doloženého testu</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje d10 a neměnný odvozený SL</label><button type="submit">Vyhodnotit Object Aegis proti originálnímu testu</button></form>`;}).join('')}
  <h4>Acid · přímý kontakt se zbraní · WQ (HMK 271)</h4>
 <p class="hc-hint" data-craft-rule>Pro skutečnou zbraň se každý doložený úspěch d10 proti AS promítá přímo do její aktuální WQ. AS každým kolem −1. Mimo boj, bez předpokládaného zásahu či splash; WQ musí být doložené. Není to útok proti AV ani zranění živé postavy.</p>
@@ -4280,8 +4283,8 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyAcidApply).map(j=>{const a=j.calendarAlchemyAcidApply,state=alchemyAcidContactState(data.journal,campaignKey(clock),j.id,clock.minute);return `<article class="hc-event"><strong>Acid · ${esc(a.targetName)} · ${esc(a.material)}</strong><p>AS ${state.as}; ${state.successes}/${state.destroyAtSuccesses} úspěchů; doložená kola ${state.rounds}. ${state.guideReached?'Dosažena HMK orientační hranice poškození; případné vyřazení původního kusu provede GM v inventáři.':state.as===0?'Acid vyčerpán.':'Každé další kolo: skutečný d10, úspěch 1 poškození, AS vždy −1.'}</p>${!state.spent?`<form data-alchemy-acid-round><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Další skutečné d10 proti AS ${state.as}<input type="number" name="d10" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-acid>⚄ d10</button><label class="hc-check"><input type="checkbox" name="contactConfirmed" required> GM potvrzuje pokračování přímého kontaktu s týmž objektem právě po jedno další kolo</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje původ d10 a výsledek bez posunu GM času</label><button type="submit">Zapsat další Acid round</button></form>`:''}</article>`;}).join('')}
  <h4>Fyzické alchymistické nádoby · HMK 268</h4>
 <p class="hc-hint" data-craft-rule>Tekuté i plynné elixíry: skleněná/keramická nádoba s korkem, plná 0,5 lb (prázdná Vial, 4 oz: 0,25 lb). Používá se jediný již vlastněný inventární kus. Hmotnost plné nádoby se promítá do stávajících přehledů, ENC a Combat Load; přesuny používají existující Truhlici a předání. Pozdní doložení vyžaduje potvrdit uložení již při dokončení. Plynný Fumebomb se ukládá do stejného typu fyzické nádoby, ale jako plyn (HMK 268). Applied Acid na neživý 6palcový objekt lze nyní přímo doložit; jiné aplikované účinky čekají na samostatnou implementaci.</p>
- ${data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&x.calendarAlchemyFinish?.result==='completed'&&makerElixirs.some(elixir=>elixir.finishId===x.id)).map(x=>{
-  const a=x.calendarAlchemyFinish,bind=alchemyVialBinding(data.journal,campaignKey(clock),x.id),state=bind?alchemyVialState(data.journal,campaignKey(clock),x.id,clock.minute):null;
+ ${data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&alchemyDoseProof(x)?.result==='completed'&&makerElixirs.some(elixir=>elixir.finishId===x.id)).map(x=>{
+  const a=alchemyDoseProof(x),bind=alchemyVialBinding(data.journal,campaignKey(clock),x.id),state=bind?alchemyVialState(data.journal,campaignKey(clock),x.id,clock.minute):null;
   if(bind){const target=data.inventory.find(v=>v.id===state?.vialId);
    return `<article class="hc-event"><strong>${esc(a.elixirName)} · AS ${alchemyStates.find(z=>z.finishId===x.id)?.currentAS??a.baseAS}</strong> · nádoba ${esc(state?.vialId)} · ${esc(character(state?.ownerId)?.name||state?.ownerId)} · ${esc(state?.slot)} · ${state?.full?'plná 0,5 lb':'vyprázdněná 0,25 lb'}
     ${state?.full&&['Eruption','Fumebomb','Weakness'].includes(a.elixirName)&&
@@ -4325,7 +4328,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   .slice(-10).reverse().map(j=>{
    const use=j.calendarAlchemyImbibing;
    const targets=use.physicEffects.map(change=>{
-    const name=data.journal.find(row=>row.id===change.finishId)?.calendarAlchemyFinish?.elixirName??'Elixír';
+    const name=alchemyDoseProof(data.journal.find(row=>row.id===change.finishId))?.elixirName??'Elixír';
     return `<li>${esc(name)} · AS ${change.asBefore} → ${change.asAfter}${change.asAfter===0?' · účinek skončil':''}</li>`;
    });
    return `<article class="hc-event"><strong>Physic · ${esc(character(use.targetId)?.name??'Příjemce')}</strong>
@@ -8716,6 +8719,51 @@ document.addEventListener('submit',event=>{
  }catch(error){uiAlert(error.message);}
 },true);
 
+function alchemyStartingDosesHTML(clock,actor){
+ const issued=data.journal.find(row=>row.calendarCampaignId===campaignKey(clock)&&row.characterId===actor.id&&row.calendarAlchemyStartingDose)?.calendarAlchemyStartingDose;
+ const doses=(issued?.selection??actor.hmk?.startingElixirs)?.elixirs;
+ if(!doses?.length)return '';
+ const list=doses.map(dose=>'<li>'+esc(dose.name)+' · AS '+esc(dose.alchemicalStrength)+'</li>').join('');
+ const initialMessage=issued?'Počáteční dávky už byly v této kampani vydány. Najdete je u fyzických lahviček.':
+  'Dávky z tvorby postavy jsou už připravené. Vydáním je vložíte do inventáře v uzavřených lahvičkách. První Decay připadne na 30 dní od vydání.';
+ return '<details><summary>Počáteční elixíry (HMK str. 269)</summary><p>'+initialMessage+'</p><ul>'+list+'</ul>'+
+  (issued?'':'<form data-alchemy-starting-doses aria-label="Počáteční elixíry"><button type="submit">Převzít počáteční elixíry</button></form>')+'</details>';
+}
+document.addEventListener('submit',event=>{
+ if(!event.target.matches?.('[data-alchemy-starting-doses]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const clock=data.campaignClock,actor=character(selected),catalog=findCatalogItem(PRINTED_VIAL);
+ if(!clock||!actor||view!=='sheet'||activeSheetSection!=='projects'||!calendarMemberIds(clock,[actor]).length){
+  uiAlert('Otevřete Alchemy u postavy v aktivní kampani.');return;
+ }
+ if(!catalog||combatActorLocked93725(actor.id)){
+  uiAlert('Převzetí vyžaduje dostupné lahvičky a postavu mimo Initiative.');return;
+ }
+ const campaignId=campaignKey(clock),minute=clock.minute;
+ mutate(()=>{
+  if(data.journal.some(row=>row.calendarCampaignId===campaignId&&row.characterId===actor.id&&row.calendarAlchemyStartingDose))
+   throw Error('Počáteční elixíry už byly v této kampani vydány.');
+  const current=character(actor.id),doses=current?.hmk?.startingElixirs?.elixirs;
+  if(!doses?.length)throw Error('Chybí výběr počátečních elixírů z tvorby postavy.');
+  const stampAt=stamp();
+  const context={characterId:actor.id,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stampAt};
+  for(let doseIndex=0;doseIndex<doses.length;doseIndex++){
+   const vialId=uuid(),finishId=uuid();
+   const proof=startingDoseProofFromCharacter(current,{campaignId,minute,doseIndex,vialId});
+   data.inventory.push({id:vialId,characterId:actor.id,sourceItemId:catalog.id,snapshot:structuredClone(catalog),
+    slot:'carried',quantity:1,condition:'',currentWQ:null});
+   data.journal.push({...context,id:finishId,title:'Počáteční elixír · '+proof.elixirName,
+    body:'Počáteční AS '+proof.baseAS+'. Převzato v uzavřené lahvičce.',calendarAlchemyStartingDose:proof});
+   const gas=proof.elixirName==='Fumebomb';
+   const binding=createAlchemyVialBinding({journal:data.journal,inventory:data.inventory,campaignId,minute,
+    actorId:actor.id,finishId,vialId,confirmedByGM:true,storageAtCompletionConfirmed:true,
+    liquidConfirmed:!gas,gasConfirmed:gas,material:'glass',corkConfirmed:true});
+   data.journal.push({...context,id:uuid(),title:'Počáteční lahvička · '+proof.elixirName,
+    body:'Nesená plná lahvička, 0,5 lb.',calendarAlchemyVialBinding:binding});
+  }
+ });
+},true);
+
 function characterCraftProcedures(clock,actor,discipline){
  const [panel]=folioHTMLNodes(characterCraftPanel(clock,actor,discipline));
  const container=panel.firstElementChild;
@@ -8850,6 +8898,7 @@ function characterProjectsChapter(actor){
    if(active){
     const craft=characterCraftProcedures(clock,actor,sp.id);
     if(craft.preparationRules)available.push(craft.preparationRules);
+    if(sp.id==='special-alchemy')available.push(alchemyStartingDosesHTML(clock,actor));
     procedures.push(...craft.procedures);
     progress.push(characterProjectRows(actor,[sp.id],agenda),craft.progress?'<section class="hmk-workshop-project-94019">'+craft.progress+'</section>':'');
    }else available.push(projectResourcesHTML(sp.id==='special-alchemy'?alchemyWorkshopNeeds:Object.values(herbProjectNeeds)));
@@ -21065,7 +21114,7 @@ document.addEventListener('submit',e=>{
    data.journal.push(...secondary.rows);
   })){
    notice='Physic · '+proof.sl+' · AS '+proof.finalAS+(proof.physicEffects.length?' · '+proof.physicEffects.map(x=>{
-    const dose=data.journal.find(row=>row.id===x.finishId)?.calendarAlchemyFinish;
+    const dose=alchemyDoseProof(data.journal.find(row=>row.id===x.finishId));
     return (dose?.elixirName??'Elixír')+' '+x.asBefore+' → '+x.asAfter;
    }).join(', '):' · příjemce nemá aktivní elixíry')+(resolved?' · Aural Shock +'+(1+secondary.auralCount):'')+'.';
    render();
