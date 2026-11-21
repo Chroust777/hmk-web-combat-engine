@@ -211,7 +211,8 @@ export function validateAlchemyAppliedObjectJournal(journal=[]){
    check(row.calendarAlchemyVialEmpty?.finishId===p.finishId&&row.calendarAlchemyVialEmpty?.vialId===p.vialId&&
     row.calendarAlchemyVialEmpty?.actorId===p.actorId&&!row.calendarAlchemyVialEmpty?.vialShattered,
     'application requires original vial emptied atomically, not shattered');
-   const fakeVial={id:p.vialId,characterId:p.actorId,quantity:1,slot:'carried',snapshot:{name:'Vial'}};
+   const vial=alchemyVialState(prior,p.campaignId,p.finishId,p.minute);
+   const fakeVial={id:p.vialId,characterId:p.actorId,quantity:1,slot:vial?.slot};
    let expected;
    if(m){
     const inv=p.targets.map(x=>({id:x.itemId,characterId:x.ownerId,quantity:1,slot:'carried',condition:x.conditionBefore,
