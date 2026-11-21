@@ -74,7 +74,7 @@ export function characterSpecialtyChapters(character){
  }
  const herblore=rowFor(skills,'Herblore');
  if(herblore)add('special-herblore','Osvojená Herblore bez ohledu na zapsané povolání.',
-  [detail('Herblore ML',herblore.ml)],
+  [detail('Herblore ML',herblore.ml),detail('Vývoj dovednosti',herblore.totalDP+' DP')],
   'Získání a příprava konkrétních rostlin stále vyžaduje dostupné suroviny a příslušné GM procedury.');
  return chapters;
 }

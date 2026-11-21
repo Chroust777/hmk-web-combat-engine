@@ -1142,3 +1142,8 @@ table.hmk-project-resources :is(th, td) {
 .hmk-project-page .hmk-specialty-facts > p > * {
   font-size: inherit;
 }
+
+[data-herbal-potion-type][hidden],
+[data-herbal-potion-unavailable][hidden] {
+  display: none !important;
+}
