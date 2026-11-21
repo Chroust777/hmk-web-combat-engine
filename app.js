@@ -275,6 +275,8 @@ import {createForagingCarry,createForagingCarryEat,foragedCarriedFood,projectFor
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
 import {elixirHelp,herbalPotionHelp} from './src/integration/hmk-craft-item-help.js?v=94.032';
 import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js?v=93.988';
+import {PERFUMERY_GOODS,AGRICULTURE_ACRES,WEATHER_SKILLS,WEATHER_DETAIL,EMBALMING_CLIMATES,fieldCraftRoll,perfumeryBatch,perfumeryMarket,weatherForecast,regionalWind,embalmingState} from './src/integration/hmk-field-craft.js?v=94.040';
+import {TIMBER_SPECIES,TIMBER_PHASES,startTimberWork,timberWork,planTimberRound,resolveTimberRound,cancelTimberWork,validateTimberWork,assertTimberWorkAppendOnly} from './src/integration/hmk-timbercraft-work.js?v=94.040';
 import {alchemyDoseProof,startingDoseProofFromCharacter,assertAlchemyStartingDoses,assertAlchemyStartingDosesAppendOnly} from './src/integration/hmk-alchemy-starting-doses.js?v=94.039';
 import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.039';
 import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
@@ -361,7 +363,7 @@ import {baseMove} from './src/rules/movement.js';
 import {projectChronicleMovement} from './src/integration/hmk-chronicle-movement-556.js';
 import {projectChronicleConditions,CHRONICLE_FATIGUE_HELP} from './src/integration/hmk-chronicle-conditions-557.js';
 import {projectChronicleHealth_558,HR_HELP_558} from './src/integration/hmk-chronicle-health-558.js?v=93.971';
-import {successLevel} from './src/rules/tests.js';
+import {SL,successLevel} from './src/rules/tests.js';
 import {createLiveGuidedMelee,createLiveGuidedMissile,createLiveGuidedDeadlyMelee} from './src/integration/hmk-guided-live-attack-inputs.js';
 import {verifiedDeadlyHelplessReason} from './src/integration/hmk-deadly-attack.js';
 import {resolvePendingAsphyxiaComa} from './src/integration/hmk-asphyxia-coma.js';
@@ -402,7 +404,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.039';
+const APP_VERSION='94.040';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -713,6 +715,7 @@ function validate(d){
  validateAlchemyExaminations(d?.journal||[]);
  assertAlchemyStartingDoses(d);
  const rawJournal=d.journal||[];
+ validateTimberWork(rawJournal);
  validateProjectCancellations(rawJournal,projectIsOpen);
  const workJournal=operationalProjectJournal(rawJournal);
  const workData=workJournal===rawJournal?d:{...d,journal:workJournal};
@@ -1097,6 +1100,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
   // permanent PC/NPC health deadlines remain enforced by the original agenda.assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});
   assertGlobalActionLedgerAppendOnly(previous,data);assertChroniclePresentationAppendOnly93889(previous,data);
   assertAlchemyExaminationsAppendOnly(previous.journal,data.journal);
+  assertTimberWorkAppendOnly(previous.journal,data.journal);
   assertAlchemyStartingDosesAppendOnly(previous.journal,data.journal);
   assertPCShelteredStayAppendOnly(previous.journal,data.journal);
   validatePCShelteredStayJournal(data.journal,data.characters);
@@ -4809,6 +4813,12 @@ function campaignCalendarView(){
      details:'Po hodině v dílně zadejte d100 u rozpracovaného Identify.'});
    }
   }
+  for(const row of data.journal){
+   if(row.calendarCampaignId!==cid||row.calendarTimbercraft?.stage!=='start')continue;
+   const current=timberWork(data.journal,cid,row.id),work=current?.pending;
+   if(work)starts.push({id:row.id,name:'Timbercraft · '+current.start.label,actor:character(row.characterId)?.name||'Postava',
+    start:work.minute,due:work.dueMinute,details:TIMBER_PHASES[work.phase]+' · samostatný výsledek každého pracovníka.'});
+  }
   starts.sort((a,b)=>a.due-b.due);
   return starts.length?`<section class="panel hc-calendar hsk-calendar-timed-skills"><h3>Časované Skill Tests · ${starts.length}</h3><p class="hc-hint">Skutečně zahájené činnosti; zobrazované termíny jsou odvozené z neměnných zápisů. Hod lze provést až po splnění pravidlové doby.</p>${starts.map(a=>`<p class="hsk-calendar-timed-row"><strong>${esc(a.name)}</strong> · ${esc(a.actor)} · ${esc(displayCampaignMinute(a.start))} → <strong>${esc(displayCampaignMinute(a.due))}</strong> · ${a.due>clock.minute?'zbývá '+esc(chronicleRemainingTime(a.due-clock.minute)):'základní termín dosažen'}<small>${esc(a.details)}</small><button type="button" class="secondary hc-small" data-calendar-character-project="${esc(a.id)}">Otevřít projekt postavy</button></p>`).join('')}</section>`:'';
  })();
@@ -8419,6 +8429,9 @@ function characterProjectDisciplines(actor){
   return {id,label,enabled:!!specialty||preview,preview,specialty:specialty||(preview?
    {...definition,reason:'Postava zatím nemá osvojenou Alchemy.',details:[{name:'Alchemy ML',value:0}]}:null)};
  });
+ sections.push({id:'work:Timbercraft',label:'Timbercraft',enabled:true,projects:[]});
+ for(const name of fieldDisciplines)sections.push({id:'work:'+name,label:name,enabled:name==='Weather Lore'||
+  masteries.some(row=>row.name===name&&row.ml>0),projects:[]});
  const bySkill=new Map();
  for(const [kind,label] of TIMED_PROJECT_CHOICES){
   const skill=TIMED_SKILL_NAMES_600[kind]||PROJECT_DISCIPLINES[kind];
@@ -8834,6 +8847,262 @@ function characterCraftProcedures(clock,actor,discipline){
  const examination=alchemy?alchemyExaminationHTML(clock,actor,mastery):{procedures:[],progress:''};
  return {procedures:[...procedures,...examination.procedures],progress:examination.progress+progress+arcaneProgress,preparationRules};
 }
+const fieldDisciplines=['Perfumery','Embalming','Agriculture','Weather Lore'];
+function fieldCraftPanel(actor,clock,discipline){
+ const cid=campaignKey(clock),journal=data.journal;
+ const list=Object.keys;
+ const select=(name,label,values)=>'<label>'+label+'<select name="'+name+'">'+values.map(value=>'<option>'+esc(value)+'</option>').join('')+'</select></label>';
+ const number=(name,label,min,max,required=true)=>'<label>'+label+'<input type="number" name="'+name+'" min="'+min+'" max="'+max+'" '+(required?'required':'')+'></label>';
+ const die=(name,label,sides,required=true)=>number(name,label,1,sides,required)+
+  '<button type="button" class="secondary" data-timber-die="'+name+'" data-faces="'+sides+'">Hodit d'+sides+'</button>';
+ const subject=label=>'<label>'+label+'<input name="subject" required maxlength="100"></label>';
+ const observation=label=>'<label>'+label+'<textarea name="note" maxlength="500"></textarea></label>';
+ const form=(task,html,button)=>'<form data-field-craft="'+task+'">'+html+'<button type="submit">'+button+'</button></form>';
+ const work=(id,label,html)=>({id,label,html});
+ const test=die('d100','Hlavní hod d100',100);
+ const masteries=new Set(availableMasteries(actor).filter(row=>row.ml>0).map(row=>row.name));
+ const methods=WEATHER_SKILLS.filter(skill=>masteries.has(skill));
+ const forecast=work('forecast','Weather Lore · předpověď (HMK str. 64)',
+  projectResourcesHTML('Předpověď se týká čtyřhodinové hlídky. CF neodhalí nic, F poskytne neúplné údaje, S obecné a CS konkrétní údaje. Při CS určete 2d3 hlídek. Počasí a míru detailu vyplňuje GM.')+
+  (methods.length?form('forecast',select('skill','Dovednost',methods)+subject('Oblast')+test+
+   die('watch1','První d3 hlídek, jen při CS',3,false)+die('watch2','Druhé d3 hlídek, jen při CS',3,false)+
+   ['Teplota','Srážky a oblačnost','Vítr'].map((label,i)=>'<label>'+label+'<input name="'+['temperature','precipitation','wind'][i]+'" maxlength="180"></label>').join(''),
+   'Uložit předpověď'):'<p>Postava potřebuje Agriculture, Piloting, Seamanship nebo Survival.</p>'));
+ let procedures=[];
+ if(discipline==='Weather Lore')procedures=[forecast,work('wind','Určit regionální vítr (HMK str. 64)',
+  projectResourcesHTML('Tento hod GM určí stav větru v oblasti. Předpověď postavy se vyhodnocuje zvlášť.')+
+  form('wind',subject('Oblast')+die('force','Síla d100',100)+die('direction','Směr d12',12)+
+   [1,2,3].map(n=>die('duration'+n,'Délka · d4 č. '+n,4)).join(''),'Uložit vítr'))];
+ if(discipline==='Agriculture')procedures=[work('farm','Práce na hospodářství (HMK str. 64)',
+  projectResourcesHTML('Agriculture pokrývá pěstování, péči o pastviny, sady a lesní část usedlosti i odhad kvality půdy, vybavení nebo úrody. Pravidla na této straně neurčují univerzální dobu práce ani tabulku výnosu.')+
+  '<p>Typická výměra v akrech: '+Object.entries(AGRICULTURE_ACRES).map(([name,value])=>esc(name)+' '+value).join(' · ')+'</p>'+
+  (masteries.has('Agriculture')?form('farm',select('activity','Úkon',['Pěstování a péče o plodiny','Pastviny, sady a les','Posouzení půdy','Posouzení vybavení','Odhad hodnoty úrody'])+
+   subject('Pole nebo předmět zkoumání')+test+observation('Výsledek práce nebo zjištění'),'Uložit práci'):'<p>Vyžaduje Agriculture.</p>')),forecast];
+ if(discipline==='Perfumery')procedures=[
+  work('batch','Příprava parfému, mýdla, oleje nebo kadidla (HMK str. 82)',
+   projectResourcesHTML('Bylinné a minerální přísady. Náklady činí 80 % ceníkové ceny. Bylinné přísady se řeší v Herblore u běžných bylinných výrobků.')+
+   form('batch',select('product','Výrobek',list(PERFUMERY_GOODS).map(name=>name))+number('quantity','Počet dávek',1,10000),
+    'Zapsat výrobní dávku a náklady')),
+  work('market','Denní prodejní kapacita (HMK str. 82)',
+   projectResourcesHTML('Denní strop prodeje v pencích je počet hvězd SV × MKT². Bez MKT činí strop počet hvězd × 0,5d.')+
+   form('market',subject('Sídlo')+number('market','MKT (0 = bez MKT)',0,100)+test,'Uložit denní prodejní kapacitu'))];
+ if(discipline==='Embalming')procedures=[
+  work('preserve','Konzervace těla (HMK str. 69)',
+   projectResourcesHTML('Pomůcky pro odpovídající pohřební postup, například alkohol, obinadla, byliny, koření nebo bavlna. Zadejte stáří těla. Pokud dosvědčujete vznik Shadow, zadejte stáří při aplikaci Shadow.')+
+   form('preserve',subject('Tělo')+select('climate','Podnebí',list(EMBALMING_CLIMATES))+
+    number('age','Stáří těla ve dnech',0,100000)+number('shadow','Shadow Strength (0 = žádný)',0,100)+test,'Uložit konzervaci a prahové doby')),
+  work('forensics','Ohledání těla (HMK str. 69)',
+   projectResourcesHTML('Přístup k tělu. Hod určuje míru zjištění o příčině nebo době smrti.')+
+   form('forensics',subject('Tělo')+test+observation('Zjištění GM podle výsledku'),'Uložit ohledání'))];
+ const logs=journal.filter(row=>row.calendarCampaignId===cid&&row.characterId===actor.id&&
+  (row.calendarFieldCraft?.discipline===discipline||discipline==='Agriculture'&&row.calendarFieldCraft?.task==='forecast')).reverse();
+ return {procedures,progress:logs.map(row=>'<article class="hc-event"><strong>'+esc(row.title)+'</strong><p>'+
+  esc(displayCampaignMinute(row.campaignMinute))+' · '+esc(row.body)+'</p></article>').join('')};
+}
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(!form.matches?.('[data-field-craft]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const actor=character(selected),clock=data.campaignClock;
+ if(!clock||!actor||view!=='sheet'||activeSheetSection!=='projects'||!calendarMemberIds(clock,[actor]).length)return;
+ const fields=new FormData(form),value=name=>fields.get(name),number=name=>Number(value(name));
+ const rollInput=form.elements.namedItem('d100');
+ const task=form.dataset.fieldCraft,campaignId=campaignKey(clock),minute=clock.minute;
+ const discipline={batch:'Perfumery',market:'Perfumery',preserve:'Embalming',forensics:'Embalming',farm:'Agriculture',forecast:'Weather Lore',wind:'Weather Lore'}[task];
+ const skill=task==='forecast'?value('skill'):discipline;
+ const ml=availableMasteries(actor).find(row=>row.name===skill)?.ml??0;
+ if(combatActorLocked93725(actor.id)||!episodeActorCanAct(persistentStateOf(actor))){
+  uiAlert('Postava teď nemůže činnost provést.');return;
+ }
+ if(task!=='wind'&&!ml){uiAlert('Postava nemá potřebnou dovednost.');return;}
+ const roll={ml,penalty:combatFatigueTotals(persistentStateOf(actor)).total,d100:number('d100'),
+  origin:rollInput?.dataset.generated===rollInput?.value?'cryptographic-software-die':'manual'};
+ const input={subject:value('subject'),note:value('note')??''};
+ try{
+  let result,body;
+  switch(task){
+   case 'batch':
+    result=perfumeryBatch(value('product'),number('quantity'));
+    input.subject=result.product;
+    body=result.quantity+' dávek · '+result.ounces+' oz · ceník '+result.listPence+'d · náklady '+(result.costFifths/5)+'d';
+    break;
+   case 'market':
+    if(data.journal.some(row=>row.calendarCampaignId===campaignId&&row.characterId===actor.id&&row.calendarFieldCraft?.task==='market'&&
+     Math.floor(row.campaignMinute/1440)===Math.floor(minute/1440)))throw Error('Prodejní kapacita postavy už byla pro tento den určena.');
+    result=perfumeryMarket(roll,number('market'));
+    body='d100 ('+result.d100+') · '+result.stars+' ★ · denní strop '+result.limitHalfPence/2+'d';
+    break;
+   case 'preserve':{
+    const rolled=fieldCraftRoll(roll);
+    result={rolled,...embalmingState({climate:value('climate'),ageDays:number('age'),shadow:number('shadow'),sv:rolled.sv})};
+    body='SV '+rolled.sv+' · '+result.thresholds.map(row=>row.phase+' '+row.days+' d').join(' · ');
+    break;
+   }
+   case 'farm':
+   case 'forensics':
+    result=fieldCraftRoll(roll);
+    if(task==='forensics'&&result.sl==='CF'&&input.note.trim())throw Error('Při CF nelze zapsat nález z ohledání.');
+    body='EML '+result.eml+' · d100 ('+result.d100+') · '+result.sl+
+     (task==='forensics'?' · '+WEATHER_DETAIL[result.sl]:' · '+value('activity'))+(input.note.trim()?' · '+input.note.trim():'');
+    break;
+   case 'forecast':
+    result=weatherForecast({skill,roll,extension:['watch1','watch2'].filter(name=>value(name)).map(number),
+     temperature:value('temperature'),precipitation:value('precipitation'),wind:value('wind')});
+    body=skill+' · d100 ('+result.d100+') · '+result.sl+' · '+result.detail+' · '+result.watches*4+' h'+
+     Object.values(result.readings).filter(Boolean).map(reading=>' · '+reading).join('');
+    break;
+   case 'wind':
+    result=regionalWind({forceD100:number('force'),directionD12:number('direction'),duration:[1,2,3].map(n=>number('duration'+n))});
+    body='WF '+result.force+' · ze směru '+result.direction+' · '+result.hours+' h';
+    break;
+   default:return;
+  }
+  if(!input.subject?.trim())throw Error('Zadejte označení.');
+  mutate(()=>data.journal.push({id:uuid(),calendarCampaignId:campaignId,characterId:actor.id,campaignMinute:minute,createdAt:stamp(),
+   title:discipline+' · '+input.subject.trim(),body,calendarFieldCraft:{discipline,task,result}}));
+ }catch(error){uiAlert(error.message);}
+},true);
+
+function timbercraftPanel(actor,clock){
+ const cid=campaignKey(clock),journal=data.journal;
+ const members=calendarMemberIds(clock,data.characters);
+ const options=members.map(member=>'<option value="'+esc(member.id)+'" '+(member.id===actor.id?'selected':'')+'>'+esc(member.name)+'</option>').join('');
+ const attach=(action,body,id='')=>'<form data-timbercraft="'+action+'"><input type="hidden" name="startId" value="'+esc(id)+'">'+body+'</form>';
+ const dice=(name,label,faces)=>'<label>'+label+'<input type="number" name="'+name+'" min="1" max="'+faces+'" required></label>'+
+  '<button type="button" class="secondary" data-timber-die="'+name+'" data-faces="'+faces+'">Hodit d'+faces+'</button>';
+ const species=Object.keys(TIMBER_SPECIES).map(name=>'<option>'+esc(name)+'</option>').join('');
+ const start=projectResourcesHTML('Kácení, odvětvování a řezání vyžadují odpovídající sekery a pily. Pro jedno kolo vyhraďte 10 minut práce každého pracovníka.')+
+  attach('start','<label>Označení stromu<input name="label" maxlength="100" required></label>'+
+   '<label>Druh stromu<select name="species">'+species+'</select></label>'+
+   '<label>Skutečný průměr kmene ve stopách, pokud se liší od typického<input type="number" name="diameter" min="0.01" max="100" step="any"></label>'+
+   '<label>Výchozí stav<select name="condition"><option value="standing">Stojící</option><option value="felled">Pokácený</option><option value="limbed">Pokácený a odvětvený</option></select></label>'+
+   '<button type="submit">Založit práci se stromem</button>');
+ const lore=projectResourcesHTML('Timbercraft slouží k určení druhu, posouzení zdraví stromu a volbě správné výsadby. Zapište konkrétní zjištění podle situace a výsledku hodu.')+
+  attach('lore','<label>Úkon<select name="task"><option>Určení druhu</option><option>Zdraví stromu</option><option>Výsadba</option></select></label>'+
+   '<label>Předmět zkoumání nebo výsadby<input name="label" required maxlength="100"></label>'+
+   dice('d100','Timbercraft d100',100)+'<label>Zjištění nebo provedená práce<textarea name="note" maxlength="500"></textarea></label>'+
+   '<button type="submit">Zapsat výsledek Timbercraft</button>');
+ const active=journal.filter(row=>row.calendarCampaignId===cid&&row.characterId===actor.id&&row.calendarTimbercraft?.stage==='start').reverse().map(row=>{
+  const state=timberWork(journal,cid,row.id),{tree}=state.start;
+  const header='<h4>'+esc(state.start.label)+' · '+esc(tree.species)+'</h4><p>Průměr '+tree.diameter+
+   ' ft · tvrdost '+tree.hardness+' · typický objem '+tree.referenceVol+' vol (1 vol = 100 ft³) · '+tree.wholesalePerVol+
+   'd velkoobchod a '+tree.retailPerVol+'d maloobchod za vol.</p>';
+  const phases=Object.entries(TIMBER_PHASES).map(([id,name])=>{
+   const target=tree.diameter*tree.hardness*(id==='bucking'?2:1);
+   return '<li>'+name+' · '+(state.completed.has(id)?'hotovo':state.totals[id]+' SV, potřeba '+(id==='felling'?'více než ':'alespoň ')+target)+'</li>';
+  }).join('');
+  const rounds=journal.filter(entry=>entry.calendarTimbercraft?.stage==='round'&&entry.calendarTimbercraft.startId===row.id).map(entry=>
+   '<p>'+esc(displayCampaignMinute(entry.campaignMinute))+' · '+esc(entry.body)+'</p>').join('');
+  const pending=state.pending;
+  let action='';
+  if(pending){
+   action=projectRemainingHTML(TIMBER_PHASES[pending.phase],pending.dueMinute,clock.minute);
+   if(clock.minute>=pending.dueMinute)action+=attach('round',pending.workers.map((workerId,i)=>
+    '<fieldset><legend>'+esc(character(workerId)?.name??'Pracovník')+'</legend>'+dice('d100-'+i,'Hlavní hod d100',100)+
+    (pending.phase==='felling'?dice('end-'+i,'Endurance SR d10',10)+'<label>Osobní únava, jen pokud ENC nelze určit<input name="pf-'+i+'" type="number" min="5" max="1000" step="5"></label>':'')+'</fieldset>'
+   ).join('')+'<button type="submit">Uložit výsledky intervalu</button>',row.id);
+  }else if(!state.closed){
+   const phases=Object.entries(TIMBER_PHASES).filter(([id])=>!state.completed.has(id)&&(id==='felling'||state.completed.has('felling')))
+    .map(([id,label])=>'<option value="'+id+'">'+label+'</option>').join('');
+   action=attach('plan','<label>Další práce<select name="phase">'+phases+'</select></label>'+
+    '<label>Pracovníci<select name="workers" multiple size="4" required>'+options+'</select></label>'+
+    (state.completed.has('felling')?'<label>Kolik pracovníků se vejde ke kmeni (2–6)<input name="limit" type="number" min="2" max="6" value="2" required></label>':'<p>Kácet mohou nejvýše dva pracovníci.</p>')+
+    '<button type="submit">Zahájit 10 minut práce</button>',row.id);
+  }
+  if(!state.closed)action+=attach('cancel','<button type="submit" class="secondary">Ukončit práci se stromem</button>',row.id);
+  return '<article class="hc-event" data-project-calendar-record="'+esc(row.id)+'">'+header+'<ul>'+phases+'</ul>'+action+rounds+'</article>';
+ });
+ const notes=journal.filter(row=>row.calendarCampaignId===cid&&row.characterId===actor.id&&row.calendarTimberLore).reverse().map(row=>
+  '<article class="hc-event"><strong>'+esc(row.title)+'</strong><p>'+esc(row.body)+'</p></article>');
+ return {procedures:[{id:'timber-work',label:'Práce se stromem (HMK str. 87)',html:start},
+  {id:'timber-lore',label:'Znalost stromů a výsadba (HMK str. 87)',html:lore}],progress:active.join('')+notes.join('')};
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-timber-die]');
+ if(!button)return;
+ const input=button.form.elements.namedItem(button.dataset.timberDie);
+ input.value=String(secureAutoDie(Number(button.dataset.faces)));
+ input.dataset.generated=input.value;
+ input.focus();
+},true);
+document.addEventListener('input',event=>{
+ if(event.target.matches?.('[data-timbercraft] input[type="number"],[data-field-craft] input[type="number"]'))delete event.target.dataset.generated;
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(!form.matches?.('[data-timbercraft]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ const actor=character(selected),clock=data.campaignClock;
+ if(!actor||!clock||view!=='sheet'||activeSheetSection!=='projects'||!calendarMemberIds(clock,[actor]).length)return;
+ const journal=data.journal,campaignId=campaignKey(clock),minute=clock.minute;
+ const input=new FormData(form),value=name=>input.get(name);
+ const typedDie=name=>{
+  const field=form.elements.namedItem(name);
+  return {value:Number(field.value),origin:field.dataset.generated===field.value?'cryptographic-software-die':'manual'};
+ };
+ const members=new Map(calendarMemberIds(clock,data.characters).map(person=>[person.id,person]));
+ const canWork=person=>person&&episodeActorCanAct(persistentStateOf(person))&&!combatActorLocked93725(person.id);
+ const ml=person=>availableMasteries(person).find(skill=>skill.name==='Timbercraft')?.ml??0;
+ const stage=form.dataset.timbercraft,startId=value('startId');
+ if(stage==='cancel'&&!ask('Ukončit práci se stromem a zrušit otevřený termín?'))return;
+ try{
+  const args={journal,campaignId,actorId:actor.id,startId,minute};
+  if(stage==='lore'){
+   if(!canWork(actor)||!ml(actor))throw Error('Znalost stromů a výsadba vyžadují způsobilou postavu s Timbercraft.');
+   const roll=typedDie('d100'),skill=ml(actor),fatigue=combatFatigueTotals(persistentStateOf(actor)).total;
+   const eml=effectiveMasteryLevel(skill-fatigue),sl=Object.keys(SL).find(name=>SL[name]===successLevel(roll.value,eml));
+   mutate(()=>data.journal.push({id:uuid(),calendarCampaignId:campaignId,characterId:actor.id,
+    campaignMinute:minute,createdAt:stamp(),title:value('task')+' · '+value('label'),
+    body:'EML '+eml+' · d100 ('+roll.value+') · '+sl+(value('note').trim()?' · '+value('note').trim():''),
+    calendarTimberLore:{task:value('task'),subject:value('label'),ml:skill,fatigue,eml,sl,d100:roll.value,origin:roll.origin}}));
+   return;
+  }
+  let proof;
+  if(stage==='start'){
+   proof=startTimberWork({...args,species:value('species'),diameter:value('diameter')?Number(value('diameter')):null,label:value('label'),condition:value('condition')});
+  }else if(stage==='plan'){
+   const workers=input.getAll('workers');
+   if(workers.some(id=>!canWork(members.get(id))))throw Error('Jeden z pracovníků teď nemůže pracovat.');
+   proof=planTimberRound({...args,phase:value('phase'),workers,limit:Number(value('limit'))});
+  }else if(stage==='round'){
+   const pending=timberWork(journal,campaignId,startId)?.pending;
+   if(!pending)throw Error('Neexistuje otevřený pracovní interval.');
+   const rolls=pending.workers.map((workerId,i)=>{
+    const worker=members.get(workerId);
+    if(!canWork(worker))throw Error('Pracovník už není způsobilý. Rozpracovanou práci můžete ukončit.');
+    const state=persistentStateOf(worker),roll=typedDie('d100-'+i);
+    const entry={workerId,timberML:ml(worker),strength:worker.hmk?.attributes?.str,
+     penalty:combatFatigueTotals(state).total,d100:roll.value,origin:roll.origin};
+    if(pending.phase==='felling'){
+     const load=resolveCombatantLoad({character:worker,inventory:activeRationInventory()});
+     const end=typedDie('end-'+i);
+     Object.assign(entry,{endurance:worker.hmk?.attributes?.end,enduranceDie:end.value,enduranceOrigin:end.origin,
+      pf:load.encReady?load.personalFatiguePerPeriod:Number(value('pf-'+i))});
+    }
+    return entry;
+   });
+   proof=resolveTimberRound({...args,rolls});
+  }else if(stage==='cancel'){
+   proof=cancelTimberWork(args);
+  }else return;
+  const eventId=uuid();
+  const body=stage==='round'?proof.rolls.map(roll=>members.get(roll.workerId).name+' '+roll.sl+' · d100 ('+roll.d100+') · SV '+roll.sv+
+   (roll.tn===null?'':' · Endurance d10 ('+roll.enduranceDie+') proti '+roll.tn+' · Weariness +'+roll.weariness)).join(' / ')+
+   ' · celkem '+proof.total+' SV'+(proof.complete?' · dokončeno':''):
+   stage==='plan'?'10 minut práce · '+TIMBER_PHASES[proof.phase]:stage==='cancel'?'Práce ukončena.':proof.tree.species;
+  mutate(()=>{
+   for(const roll of proof.rolls??[]){
+    if(!roll.weariness)continue;
+    const worker=character(roll.workerId),state=persistentStateOf(worker);
+    worker.hmk.healthState=applyConfirmedFatigue({state,round:Math.max(state.lastRound,1),eventId:eventId+'::'+worker.id,
+     kind:'weariness',delta:roll.weariness}).state;
+   }
+   data.journal.push({id:eventId,calendarCampaignId:campaignId,characterId:actor.id,campaignMinute:minute,
+    createdAt:stamp(),title:'Timbercraft · '+(proof.label??TIMBER_PHASES[proof.phase]??'ukončeno'),body,calendarTimbercraft:proof});
+  });
+ }catch(error){uiAlert(error.message);}
+},true);
+
 function characterProjectsChapter(actor){
  const disciplines=characterProjectDisciplines(actor);
  const section=disciplines.find(item=>item.enabled&&item.id===characterProjectSelections.get(actor.id))||disciplines.find(item=>item.enabled&&!item.preview)||disciplines.find(item=>item.enabled);
@@ -8856,6 +9125,17 @@ function characterProjectsChapter(actor){
    ${Number.isFinite(row.totalDP)?`<span>Vývoj dovednosti · ${esc(row.totalDP)} DP</span>`:''}</p>`).join('')}</div>
    <p>${section.id==='work:'+PROJECT_DISCIPLINES.faeriecraft?'Faeriecraft vyžaduje původ Ælrhin, Spirit a odpovídající řemeslo.':'Způsobilost závisí na osvojené dovednosti a podmínkách vybraného postupu.'}</p>
   </details>`);
+ }
+ if(active&&section?.id==='work:Timbercraft'){
+  const timber=timbercraftPanel(actor,clock);
+  procedures.push(...timber.procedures);
+  progress.push(timber.progress);
+ }
+
+ if(active&&fieldDisciplines.includes(section?.label)&&section.id==='work:'+section.label){
+  const field=fieldCraftPanel(actor,clock,section.label);
+  procedures.push(...field.procedures);
+  progress.push(field.progress);
  }
  if(section?.specialty){
   const sp=section.specialty;
@@ -9010,6 +9290,10 @@ document.addEventListener('click',event=>{
   const row=data.journal.find(x=>x.id===button.dataset.calendarCharacterProject&&x.calendarCampaignId===campaignKey(data.campaignClock));
   const actor=row&&character(row.characterId);
   if(!actor||!characterJournalReadiness(actor).ready)return;
+  if(row.calendarTimbercraft?.stage==='start'){
+   characterProjectSelections.set(actor.id,'work:Timbercraft');
+   view='sheet';selected=actor.id;activeSheetSection='projects';render();focusCharacterCraftRecord(row.id);return;
+  }
   if(row.calendarAlchemyStart||row.calendarAlchemyExaminationStart){openCharacterCraft(actor,'special-alchemy',row.id);return;}
   const kind=row.calendarSkillProjectStart591?.kind||(row.calendarFishingStart590?'fishing':row.calendarAnimalTrainingStart590?'animal':null);
   const section=characterProjectDisciplines(actor).find(item=>item.enabled&&item.projects?.some(p=>p.kind===kind));
