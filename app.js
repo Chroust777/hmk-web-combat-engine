@@ -46,7 +46,7 @@ import {PRINTED_STARTER_GEAR_P120,prepareStartingKit} from './src/integration/hm
 import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,interpretCharacterDescription} from './src/integration/hmk-generator-traits.js';
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
-import {FAERIE_ARMOUR_ARTICLES,faerieArmourItem,FAERIE_CRAFTS,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.012';
+import {FAERIE_ARMOUR_ARTICLES,faerieArmourItem,FAERIE_CRAFTS,FAERIE_SPAN,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.012';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=94.014';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.046';
@@ -407,7 +407,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.047';
+const APP_VERSION='94.048';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -8579,6 +8579,10 @@ function characterProjectRows(actor,kinds,agenda){
    return step?.projectId===row.id&&['finish','workshop','expire'].includes(step.stage);
   }):null;
   const result=resultRows.at(-1)||linked||specialtyResult||faerieReceipt;
+  const faerieTiming=faerieReceipt?.calendarFaeriecraft.stage==='expire'?
+   `<p>Lhůta vypršela ${esc(medicalFullMoment(row.campaignMinute+FAERIE_SPAN))}</p>
+   <p>Uzavřeno ${esc(medicalFullMoment(faerieReceipt.campaignMinute))}</p>`:
+   faerieReceipt?`<p>Dokončeno ${esc(medicalFullMoment(faerieReceipt.campaignMinute))}</p>`:'';
   const roll=result?.calendarSkillProjectSV591?(result.skillTestProof?.a||result.skillTestProof?.result):null;
   const craftResult=roll&&kind==='ceramics'?ceramicsQuality(roll.sv).quality:
    roll&&kind==='mineralogy'?`${timed.mineralogyQuantity??1} ks · TN ${roll.sv} pro d10`:'';
@@ -8623,7 +8627,7 @@ function characterProjectRows(actor,kinds,agenda){
   }
   return `<article class="hmk-project-record" data-character-project-record="${esc(row.id)}"><h4>${esc(title)}</h4>
    <p><strong>${cancelled?'Zrušeno':open?'Rozpracováno':'Uzavřeno'}</strong> · zahájeno ${esc(medicalFullMoment(row.campaignMinute))}</p>
-   ${cancelled?`<p>Zrušeno ${esc(medicalFullMoment(cancelled.campaignMinute))}</p>`:faerieReceipt?`<p>${faerieReceipt.calendarFaeriecraft.stage==='expire'?'Lhůta vypršela':'Dokončeno'} ${esc(medicalFullMoment(faerieReceipt.campaignMinute))}</p>`:timing}
+   ${cancelled?`<p>Zrušeno ${esc(medicalFullMoment(cancelled.campaignMinute))}</p>`:(faerieTiming||timing)}
    ${summary?`<p>${esc(summary)}</p>`:''}${craftResult?`<p>${esc(craftResult)}</p>`:''}${timed?.mineralogyQuantity?`<p>${timed.mineralogyQuantity} ks · materiál ${timed.craftItemCostD} d</p>`:''}${roll&&MILLING_PROJECTS[kind]?`<p>${esc(result.body.split('\n').at(-1))}</p>`:''}${next}${open?projectCancelButton(row):cancelled?`<button type="button" class="secondary" data-project-remove="${esc(row.id)}">Odstranit z přehledu</button>`:''}
    ${item?`<button type="button" class="secondary" data-character-project-item="${esc(item.id)}">Zobrazit výrobek · ${esc(slotLabel(item.slot))}</button>`:''}</article>`;
  }).join('');
