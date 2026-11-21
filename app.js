@@ -67,7 +67,7 @@ import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltSta
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign,engineeringDesignWorkMinutes} from './src/integration/hmk-engineering-design-548.js?v=94.007';
 import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,craftDurationText600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=94.011';
-import {MILLING_PROJECTS,millingBaseline,WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.018';
+import {MILLING_PROJECTS,millingBaseline,WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.042';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -260,6 +260,8 @@ import {episodeEncounterPartyWatchfulness,episodeEncounterGMReceipt93902,validat
 import {createTrainingInterruption93902,trainingEffectiveDue93902,validateTrainingInterruption93902,assertTrainingInterruptionAppendOnly93902} from './src/integration/hmk-animal-training-interruption-93902.js';
 import {createDirectionGMResolution,directionGMResolution,validateDirectionGMJournal,assertDirectionGMAppendOnly,lastDocumentedDirectionStatus} from './src/integration/hmk-trekking-direction-gm.js';
 import {TREK_WEATHER_VOID_FORMAT,activeAreaWeather,activeWeatherAreas,canVoidWeather,validateWeatherLifecycle,assertWeatherVoidAppendOnly,weatherAreaKey} from './src/integration/hmk-trekking-weather-lifecycle.js';
+import {DALMORVRIN_TEMPLATE,dalmorvrinRepairState,validateDalmorvrinRepairLinks} from './src/integration/hmk-dalmorvrin-repair.js?v=94.042';
+import {activeCampaignWind,travelWindSegments,windDescription,travelWindProse,validateTravelWind} from './src/integration/hmk-campaign-wind.js?v=94.042';
 import {currentCampaignWeatherRows} from './src/integration/hmk-calendar-current-weather-93736.js';
 import {WEATHER_SHIFT_FORMAT,latestWeatherShift,createWeatherShift,validateWeatherShifts,assertWeatherShiftAppendOnly} from './src/integration/hmk-trekking-weather-shift.js';
 import {runningTravelForWeatherChange,splitRunningTravelOnWeatherChange} from './src/integration/hmk-trekking-weather-travel-split.js';
@@ -404,7 +406,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.041';
+const APP_VERSION='94.042';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -716,6 +718,8 @@ function validate(d){
  assertAlchemyStartingDoses(d);
  const rawJournal=d.journal||[];
  validateTimberWork(rawJournal);
+ validateTravelWind(rawJournal);
+ validateDalmorvrinRepairLinks(rawJournal);
  validateProjectCancellations(rawJournal,projectIsOpen);
  const workJournal=operationalProjectJournal(rawJournal);
  const workData=workJournal===rawJournal?d:{...d,journal:workJournal};
@@ -3691,6 +3695,9 @@ function chronicleParagraphs951(clock,entry,presentation,source,{gm=false}={}){
  };
  const beats=legacy?personalChronicleBeats(entry,p,tests,{hazard,encounter:!presentation.shared?encounter:null,name,calendar}):
   composeTravelChronicle(entry,p,{hazard,name,calendar,priorInjuries,flow,animalKind:source.animalKind,language,ordinal:source.sequence.get(entry.id)});
+ const intro=!legacy&&beats.find(beat=>beat.kind==='intro'&&beat.text);
+ const wind=travelWindProse(p);
+ if(intro&&wind)intro.text+=' '+wind;
  if(!legacy&&presentation.paragraphs?.length>beats.length){
   const ending=composeTravelChronicle(entry,p,{hazard,name,calendar,priorInjuries,animalKind:source.animalKind,language,ordinal:source.sequence.get(entry.id)}).at(-1);
   if(ending?.kind==='aftermath')beats.push(ending);
@@ -3799,7 +3806,13 @@ function personalTimeEpisodeChronicleHTML(clock,personalId,{gm=false}={}){
   `<details class="${klass}" data-personal-chronicle><summary><strong>${caption}</strong></summary>${body}</details>`;
 }
 function chronicleWeather954(episode){
- return episode?.weather||episode?.precipitation?.precipitation?personalEpisodeWeather(episode):'';
+ const weather=episode?.weather||episode?.precipitation?.precipitation?personalEpisodeWeather(episode):'';
+ const wind=(episode?.windSegments??[]).map(segment=>{
+  const label=windDescription(segment);
+  return segment.from===episode.startMinute&&segment.until===episode.endMinute?label:
+   label+' · '+displayCampaignMinute(segment.from)+' až '+displayCampaignMinute(segment.until);
+ });
+ return [weather,wind.join(' / ')].filter(Boolean).join(' · ');
 }
 const chronicleDayByCampaign=new Map();
 function activeCampaignChronicle(){
@@ -4865,6 +4878,12 @@ function campaignCalendarView(){
  const clockLabel=date?formatTRDate(date):'Den kampaně '+(Math.floor(clock.minute/1440)+1);
  const folio=folioChapterSpread('Svět · Kalendář kampaně','Doložený čas, zásoby a procedury rozdělené do přehledných kapitol.',calendarPage,'journal-book--calendar');
  const confirmedWeather=currentCampaignWeatherRows({journal:data.journal,clock});
+ const activeWind=activeCampaignWind(data.journal,campaignKey(clock),clock.minute);
+ const windByArea=new Map(activeWind.map(wind=>[weatherAreaKey(wind.area),wind]));
+ const windLine=wind=>windDescription(wind)+' · do '+displayCampaignMinute(wind.until);
+ const recordedAreas=new Set(confirmedWeather.map(row=>weatherAreaKey(row.area)));
+ const windOnly=activeWind.filter(wind=>!recordedAreas.has(weatherAreaKey(wind.area))).map(wind=>
+  '<div class="hc-clock-weather-row">'+esc(wind.area)+': '+esc(windLine(wind))+'</div>').join('');
  const weatherHeading=confirmedWeather.length?confirmedWeather.map(w=>{
   const day=trekWeatherWords(w.weather,false),night=trekWeatherWords(w.weather,true);
   const active=w.period==='night'?night:w.period==='day'?day:null;
@@ -4874,10 +4893,10 @@ function campaignCalendarView(){
   const detail=active?`${active.icon} ${compact(active)}`:
    compact(day)===compact(night)?`${day.icon} ${compact(day)}`:
    `☀️ ${compact(day)}; 🌙 ${compact(night)}`;
-  return `<div class="hc-clock-weather-row">${weatherAreaHoverHTML(w.area,w.weather,{highlightMinute:clock.minute%1440})}: ${esc(detail)}${w.changed?' <small>· změna GM</small>':''}</div>`;
+  return `<div class="hc-clock-weather-row">${weatherAreaHoverHTML(w.area,w.weather,{highlightMinute:clock.minute%1440})}: ${esc(detail)}${w.changed?' <small>· změna GM</small>':''}${windByArea.has(weatherAreaKey(w.area))?' · '+esc(windLine(windByArea.get(weatherAreaKey(w.area)))):''}</div>`;
  }).join(''):'<span class="hc-clock-weather-row">Denní počasí dosud nebylo GM potvrzeno.</span>';
  const withClock=folio.replace('</header><div class="folio-chapter-content">',
-  `<div class="hc-clock-heading" role="status" aria-label="Aktuální herní datum, čas a počasí"><span>AKTUÁLNÍ ČAS KAMPANĚ</span><strong>${esc(clockLabel)} · ${esc(timeLabel)}</strong><div class="hc-clock-weather"><span class="hc-clock-weather-label">POČASÍ · AKTUÁLNÍ DEN</span>${weatherHeading}</div>${date?'':'<small>Datum TR nebylo v tomto kalendáři ještě přiřazeno.</small>'}</div></header><div class="folio-chapter-content">`);
+  `<div class="hc-clock-heading" role="status" aria-label="Aktuální herní datum, čas a počasí"><span>AKTUÁLNÍ ČAS KAMPANĚ</span><strong>${esc(clockLabel)} · ${esc(timeLabel)}</strong><div class="hc-clock-weather"><span class="hc-clock-weather-label">POČASÍ · AKTUÁLNÍ DEN</span>${weatherHeading}${windOnly}</div>${date?'':'<small>Datum TR nebylo v tomto kalendáři ještě přiřazeno.</small>'}</div></header><div class="folio-chapter-content">`);
  return journalShell(`${calendarTabs}${withClock}`,`journal-book--chapter journal-book--calendar`,false);
 }
 // Ephemeral presentation state only. Completion still comes from the persisted HMK
@@ -6155,7 +6174,7 @@ function decorateTimedSkillProject591(root){
    const base=printedBase===null?null:writingPlannedMinutes(printedBase,{mode:create.elements.namedItem('writingMode')?.value});
    if(preview&&base===null)preview.textContent='Zadej platný rozsah.';
    if(preview&&base!==null){const now=data.campaignClock?.minute??0;
-    const timing=CRAFT_WORK_600[kind.value]?projectTiming600(kind.value,scope.value,now,{agingRolls:kind.value==='brewing'?Array(CRAFT_WORK_600.brewing[scope.value]?.agingDice||0).fill(1):[],exactCalendar:kind.value==='ceramics'}):null;
+    const timing=CRAFT_WORK_600[kind.value]?projectTiming600(kind.value,scope.value,now,{agingRolls:kind.value==='brewing'?Array(CRAFT_WORK_600.brewing[scope.value]?.agingDice||0).fill(1):[],exactCalendar:['ceramics','mineralogy'].includes(kind.value)}):null;
     const glassDay=kind.value==='glassworking'&&base%1440===0;
     const due=timing?.dueMinute??(glassDay?calendarDayStart600(now+base):now+skillTimedEarliest591(kind.value,base,create.elements.namedItem('engineeringRandomTime')?.checked));
     const material=printedCraftMaterialCost(kind.value,scope.value);
@@ -8898,13 +8917,11 @@ function fieldCampaignWeather(clock,area){
  const night=weather.period==='night',words=trekWeatherWords(weather.weather,night);
  const hazard=night?weather.weather.nightHazard:weather.weather.daylightHazard;
  const temperature=hazard==='cold'?'chladový hazard':hazard==='heat'?'tepelný hazard':'běžná teplota';
- const wind=data.journal.findLast(row=>row.calendarCampaignId===cid&&row.campaignMinute<=clock.minute&&
-  row.calendarFieldCraft?.task==='wind'&&weatherAreaKey(row.calendarFieldCraft.area??'')===key&&
-  clock.minute<row.campaignMinute+row.calendarFieldCraft.result.hours*60);
+ const wind=activeCampaignWind(data.journal,cid,clock.minute).find(row=>weatherAreaKey(row.area)===key);
  const shifted=weather.changed?effectiveTrekShift(cid,clock.minute,area):null;
  return {sourceId:shifted?.id??base.id,temperature,precipitation:words.kind,
-  wind:wind?'WF '+wind.calendarFieldCraft.result.force+' · '+wind.calendarFieldCraft.result.direction:'',
-  windSourceId:wind?.id??null};
+  wind:wind?windDescription(wind):'',
+  windSourceId:wind?.sourceId??null};
 }
 function fieldCraftPanel(actor,clock,discipline){
  const cid=campaignKey(clock),journal=data.journal;
@@ -8961,10 +8978,21 @@ function fieldCraftPanel(actor,clock,discipline){
    projectResourcesHTML('Přístup k tělu. Hod určuje míru zjištění o příčině nebo době smrti.')+
    form('forensics',subject('Tělo')+test+observation('Zjištění GM podle výsledku'),'Uložit ohledání'))];
  const repairs=discipline==='Embalming'?openDalmorvrinRepairs(cid).filter(row=>row.characterId===actor.id):[];
- if(discipline==='Embalming')procedures.push(work('repair','Oprava Dalmôrvrin (HMK str. 69, 381)',
-  projectResourcesHTML('Môrgathian clergy od Circle III. Každý pracovní cyklus trvá d3 dní. Hvězdy Embalming SV odstraní stejný počet Injury Levels.')+
-  (isDalmorvrinRepairCleric(actor)?form('repair-plan',subject('Dalmôrvrin')+number('injury','Doložené zbývající IL',1,1000)+die('days','Trvání d3',3),'Naplánovat opravu'):
-   '<p>Je potřeba doložené kněžství Môrgatha a Circle III či vyšší.</p>')));
+ if(discipline==='Embalming'){
+  const targets=encounterBeastHistory(data,cid).filter(row=>row.active&&row.templateId===DALMORVRIN_TEMPLATE);
+  const targetOptions=targets.map(target=>{
+   const state=dalmorvrinRepairState(journal,cid,target.id);
+   return '<option value="'+esc(target.id)+'" '+(state.pending||state.injury===0?'disabled':'')+'>'+esc(target.name)+
+    (state.injury===null?' · dosud bez evidovaných IL':' · '+state.injury+' IL')+'</option>';
+  }).join('');
+  procedures.push(work('repair','Oprava Dalmôrvrin (HMK str. 69, 381)',
+   projectResourcesHTML('Kněz Môrgatha od Circle III může provést opravu za d3 dní. Každá hvězda Embalming SV odstraní jeden Injury Level.')+
+   (!isDalmorvrinRepairCleric(actor)?'<p>Je potřeba doložené kněžství Môrgatha a Circle III či vyšší.</p>':
+    !targets.length?'<p>Přidejte Dalmôrvrin do soupisky encounteru v Bestiáři.</p>':
+    form('repair-plan','<label>Dalmôrvrin z encounteru<select name="repairTarget" required><option value="">Vybrat tvora</option>'+
+     targetOptions+'</select></label>'+number('injury','Počáteční doložené IL, pokud zatím chybějí v profilu',1,1000,false)+
+     die('days','Trvání d3',3),'Naplánovat opravu'))));
+ }
  const pending=repairs.map(row=>{
   const plan=row.calendarFieldCraft.result;
   return '<article class="hc-event" data-project-calendar-record="'+esc(row.id)+'"><strong>'+esc(plan.subject)+' · Dalmôrvrin</strong>'+
@@ -8997,7 +9025,7 @@ document.addEventListener('submit',event=>{
   origin:rollInput?.dataset.generated===rollInput?.value?'cryptographic-software-die':'manual'};
  const input={subject:value('subject'),note:value('note')??''};
  try{
-  let result,body,inventoryOutput=null,soldItem=null,cashChange=null,weatherSource=null;
+  let result,body,inventoryOutput=null,soldItem=null,cashChange=null,weatherSource=null,repairTargetId=null;
   switch(task){
    case 'batch':
     result=perfumeryBatch(value('product'),number('quantity'));
@@ -9031,22 +9059,23 @@ document.addEventListener('submit',event=>{
    }
    case 'repair-plan':{
     if(!isDalmorvrinRepairCleric(actor))throw Error('Opravu provádí kněz Môrgatha od Circle III.');
-    if(openDalmorvrinRepairs(campaignId).some(row=>row.characterId===actor.id||
-     row.calendarFieldCraft.result.subject.toLocaleLowerCase()===input.subject.trim().toLocaleLowerCase()))
+    const creature=encounterBeastHistory(data,campaignId).find(row=>row.active&&row.templateId===DALMORVRIN_TEMPLATE&&row.id===value('repairTarget'));
+    if(!creature)throw Error('Vyberte skutečného Dalmôrvrin v encounteru.');
+    const health=dalmorvrinRepairState(data.journal,campaignId,creature.id);
+    if(health.pending||openDalmorvrinRepairs(campaignId).some(row=>row.characterId===actor.id))
      throw Error('Postava nebo tento Dalmôrvrin už mají otevřenou opravu.');
     const field=form.elements.namedItem('days');
-    result=planDalmorvrinRepair({subject:input.subject,injury:number('injury'),days:number('days'),
+    repairTargetId=creature.id;
+    input.subject=creature.name;
+    result=planDalmorvrinRepair({subject:creature.name,injury:health.injury??number('injury'),days:number('days'),
      origin:field.dataset.generated===field.value?'cryptographic-software-die':'manual',minute});
-    const last=data.journal.findLast(row=>row.calendarCampaignId===campaignId&&row.calendarFieldCraft?.task==='repair-finish'&&
-     row.calendarFieldCraft.subject.toLocaleLowerCase()===result.subject.toLocaleLowerCase());
-    if(last&&last.calendarFieldCraft.result.remaining!==result.injury)
-     throw Error('Pokračování opravy musí navazovat na evidované zbývající IL.');
     body=result.injury+' IL · d3 ('+result.days+') · termín '+displayCampaignMinute(result.dueMinute);
     break;
    }
    case 'repair-cancel':{
     const row=openDalmorvrinRepairs(campaignId).find(entry=>entry.id===value('startId')&&entry.characterId===actor.id);
     if(!row)throw Error('Chybí otevřená oprava.');
+    repairTargetId=row.calendarFieldCraft.targetId??null;
     input.subject=row.calendarFieldCraft.result.subject;
     result={remaining:row.calendarFieldCraft.result.injury};
     body='Oprava ukončena · zbývá '+result.remaining+' IL.';
@@ -9056,6 +9085,9 @@ document.addEventListener('submit',event=>{
     if(!isDalmorvrinRepairCleric(actor))throw Error('Opravu provádí kněz Môrgatha od Circle III.');
     const row=openDalmorvrinRepairs(campaignId).find(entry=>entry.id===value('startId')&&entry.characterId===actor.id);
     if(!row)throw Error('Chybí otevřená oprava.');
+    repairTargetId=row.calendarFieldCraft.targetId??null;
+    if(repairTargetId&&!encounterBeastHistory(data,campaignId).some(row=>row.id===repairTargetId&&row.active))
+     throw Error('Dalmôrvrin už není v encounteru. Opravu lze ukončit.');
     const plan=row.calendarFieldCraft.result;
     result=finishDalmorvrinRepair(plan,minute,roll);
     input.subject=plan.subject;
@@ -9116,7 +9148,7 @@ document.addEventListener('submit',event=>{
    }
    data.journal.push({id,calendarCampaignId:campaignId,characterId:actor.id,campaignMinute:minute,createdAt,
     title:discipline+' · '+input.subject.trim(),body,calendarFieldCraft:{discipline,task,result,subject:input.subject.trim(),
-     ...(cash?{cash}:{}),...(inventoryOutput||soldItem?{inventoryId:(inventoryOutput??soldItem).id}:{}),
+     ...(repairTargetId?{targetId:repairTargetId}:{}),...(cash?{cash}:{}),...(inventoryOutput||soldItem?{inventoryId:(inventoryOutput??soldItem).id}:{}),
      ...(['repair-finish','repair-cancel'].includes(task)?{startId:value('startId')}:{}),...(task==='wind'?{area:input.subject.trim()}:{}),
      ...(weatherSource?{weatherSourceId:weatherSource.sourceId,windSourceId:weatherSource.windSourceId}:{})}});
   });
@@ -10309,10 +10341,15 @@ function bestiaryEncounterPanel({combat=false,stableOnly=false,ownerId=null}={})
   const preFatigueMove=Number.isFinite(move)&&Number.isFinite(b.adjustedENC)?Math.max(0,move-b.adjustedENC):null;
   return `<p class="hc-hint"><strong>${esc(x.name)} · aktuální zátěž ze stáje: ${b.minimumLb} lb</strong> (jezdec ${b.riderWeightLb} lb + výstroj a náklad ${b.gearAndCargoLb} lb). Upravená ENC ${b.adjustedENC??'—'}; <strong>Move po ENC ${preFatigueMove??'—'}</strong> (před skutečně utrpěnou Fatigue a Impairment, HMK 160). PF pro cestování ${b.pf??'—'}. Bojové náhledy útoku a obrany níže odečítají ENC od EML; nejde ještě o plný Combat Outcome ani o automatický zápis zranění. PF není automaticky již utrpěná Fatigue.</p>`;
  }).filter(Boolean).join('');
+ const dalmorvrinStatus=active.filter(row=>row.templateId===DALMORVRIN_TEMPLATE).map(creature=>{
+  const state=dalmorvrinRepairState(data.journal,cid,creature.id);
+  return '<p><strong>'+esc(creature.name)+'</strong> · '+(state.injury===null?'IL dosud nejsou doložené':state.injury+' zbývajících IL')+
+   (state.pending?' · oprava probíhá':'')+'</p>';
+ }).join('');
  const table=active.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Účastník</th><th>Druh / varianta</th><th>STR / END / AGL / PER</th><th>Move</th><th>Pravidlový podklad</th><th>Akce</th></tr></thead><tbody>${active.map(x=>{const p=x.profile||{},a=p.attributes||{},status=bestiaryEncounterStatus564(x),enc=combatStableEncumbrance586(x,cid),move=Number.isFinite(p.move)?Math.max(0,p.move-enc):null;return `<tr><td><strong>${esc(x.name)}</strong></td><td>${esc(p.name||'neznámý')}</td><td>${[a.str,a.end,a.agl,a.per].map(v=>v??'—').join(' / ')}</td><td>${move??'—'}${enc?' (po ENC '+enc+')':''}</td><td>str. ${p.page??'—'} · ${x.ownerAnimalId?'stáj':'dočasný'} · ${status.profiled?'základní statistiky':'generace dle příslušné tabulky'}${x.gmNotes?' · GM: '+esc(x.gmNotes):''}</td><td><label>Výsledek GM<select data-hmk-beast-departure-outcome="${esc(x.id)}"><option value="">— zvolit výsledek GM —</option>${Object.entries(BESTIARY_DEPARTURE_OUTCOMES_93760).map(([value,label])=>`<option value="${value}">${esc(label)}</option>`).join('')}</select></label><button type="button" class="hc-small secondary" data-hmk-beast-dismiss="${esc(x.id)}" ${combatInitiativeSequence?'disabled title="Ukončete nejprve Initiative"':''}>Ukončit účast</button></td></tr>`}).join('')}</tbody></table></div>`:'<p>V této kampani nejsou zařazeni žádní dočasní tvorové.</p>';
  return `<section class="panel hmk-bestiary-roster" id="hmk-bestiary-encounter"><h3>${combat?'Bestiář · účastníci encounteru':'Generátor dočasných tvorů'}</h3>
  <p class="hc-hint">Vytvoření samostatného dočasného tvora <strong>není</strong> založením PC/NPC. Dočasný protivník nemá povinné Healing ani Shock termíny v kalendáři; po potvrzení konce účasti je jeho zdravotní historie zmrazená. Skutečná stájová zvířata mají nezávislý autoritativní Health State.  Základní statistiky a všechny originální tabulky jsou dostupné v Bestiáři. Náhodné generování speciálních variant vyžaduje skutečné hody dle originálu; aplikace si je nevymýšlí. Výběr neprovádí útok ani nezakládá zranění.</p>
- ${stableCombatLoad}${table}${archived}
+ ${stableCombatLoad}${table}${dalmorvrinStatus}${archived}
  ${active.length?bestiaryHealthPanel567(active,cid,clock?.minute??null):''}
  ${clock&&(!stableOnly||stable.length)?`<form data-hmk-beast-spawn class="hc-fields hmk-bestiary-generator" id="hmk-bestiary-generator"><label>Zdroj účastníka<select name="source">${stableOnly?'':'<option value="new">Nový dočasný tvor</option>'}${stable.map(a=>`<option value="stable:${esc(a.id)}">Vlastněné zvíře · ${esc(a.name)} (${esc(a.spec.name)})</option>`).join('')}</select></label>
  <label>Druh / příklad z bestiáře<select name="templateId">${opts}</select></label>
@@ -16556,7 +16593,7 @@ document.addEventListener('submit',event=>{
   const rawAging=form.elements.namedItem('brewAgingDice')?.value;
   const agingRolls=rawAging?rawAging.split(',').map(Number):[];
   const spiritMonths=scope==='spirits'?Number(form.elements.namedItem('spiritMonths')?.value??0):0;
-  const exactCalendar=kind==='ceramics'||brew;
+  const exactCalendar=['ceramics','mineralogy'].includes(kind)||brew;
   const schedule=recipe?projectTiming600(kind,scope,start,{agingRolls,exactCalendar,spiritMonths}):null;
   const calendarDayEligibility600=kind==='glassworking'&&base%1440===0;
   let writingPlan=null;
@@ -16607,7 +16644,7 @@ document.addEventListener('submit',event=>{
    ...(engineeringRandomTime?{engineeringRandomTime:true}:{}),
    ...(fletching?{fletching996:fletching}:{}),
    ...(fletching&&faerieWorkshopKind({kind,scope})?{faerieLinked:true}:{}),
-   ...(kind==='ceramics'?{craftExact994:true}:{}),
+   ...(['ceramics','mineralogy'].includes(kind)?{craftExact994:true}:{}),
    ...(brew?{brewing995:true,spiritMonths995:spiritMonths}:{}),
    ...(jewelcraft?{jewelcraft994:jewelcraft,materialSourceConfirmed:true}:{}),
    earliestMinute:fletching?fletchingDue(scope,start,fletching,0.7):schedule?.dueMinute??(calendarDayEligibility600?calendarDayStart600(start+base):start+skillTimedEarliest591(kind,plannedBase,engineeringRandomTime)),baseDueMinute:fletching?fletchingDue(scope,start,fletching):schedule?.dueMinute??(calendarDayEligibility600?calendarDayStart600(start+base):start+Math.ceil(plannedBase)),
@@ -35607,6 +35644,7 @@ document.addEventListener('submit',e=>{
      description:x.description??null,report:x.report??null,sourceKey:x.key??null})),
     incapacitationDecision:v.episodeIncapChoice||null,gmReviews:gm.reviewed.map(p=>({id:p.id,title:p.title,dueMinute:p.dueMinute})),area:weather.area,weatherOrigin:weather.origin,weatherSourceId:weather.sourceId,weatherDailySourceId:episodeWeatherSourceId,
     precipitation,settings:{...v,confirmed:undefined},narrative:v.narrative||'',mapScale:Number(v.mapScale),recovery};
+   if(p.kind==='travel')p.windSegments=travelWindSegments(data.journal,campaignKey(clock),p.area,p.startMinute,p.endMinute);
    if(sharedWindowMarker){p.sharedWindowId=sharedWindowMarker;p.sharedGroupId=sharedGroupMarker;}
    data.journal.push({id:sourceId,characterId:v.guideId,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'HMK · epizoda · '+(v.area||weather.area)+' · '+result.minutes+' min',
