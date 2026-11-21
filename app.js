@@ -66,8 +66,8 @@ import {catchSource93908,createCatchCarry93908,createFreshCatchCarry93912,discar
 import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltStart93912,wildSaltFinish93912,validateWildFreshness93912,assertWildDueBeforeAdvance93912} from './src/integration/hmk-wild-freshness-93912.js?v=93.914';
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
 import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign,engineeringDesignWorkMinutes} from './src/integration/hmk-engineering-design-548.js?v=94.007';
-import {brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,craftDurationText600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=94.011';
-import {MILLING_PROJECTS,millingBaseline,WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.042';
+import {CERAMICS_BATCH_LIMIT,MINERALOGY_BATCH_LIMIT,batchCraftQuantity,ceramicsQuality,brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,craftDurationText600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=94.044';
+import {MILLING_PROJECTS,millingBaseline,WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.044';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
 import {woundFromFall,humanLocation} from './src/integration/hmk-mounted-fall-injury-join.js';
 import {prepareSkillPhysicalInjury} from './src/integration/hmk-skill-physical-consequences.js';
@@ -407,7 +407,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.043';
+const APP_VERSION='94.044';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6123,8 +6123,10 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
    kind==='milling'?'<label>Počet domácností obsluhovaných mlýnem<input name="scope" type="number" min="1" max="100000" step="1" value="20" required></label>':
    kind==='breadBaking'?'<label>Doložená doba přípravy a pečení v herních minutách<input name="scope" type="number" min="1" max="1000000" step="1" required></label>':
    kind==='cookery'?'<label>Počet strávníků<input name="scope" type="number" min="1" step="1" value="5" required></label>':
-   `<label>${isWorkshopCraft(kind)?'Výrobek':'Rozsah nebo stavba'}<select name="scope" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${esc(name)}">${esc(name)} · ${days} dnů</option>`).join('')}</select></label>`}
+   `<label>${isWorkshopCraft(kind)||kind==='ceramics'||kind==='mineralogy'?'Výrobek':'Rozsah nebo stavba'}<select name="scope" required>${Object.entries(ENGINEERING_DESIGN_DAYS).map(([name,days])=>`<option value="${esc(name)}">${esc(name)} · ${days} dnů</option>`).join('')}</select></label>`}
  ${isWorkshopCraft(kind)?fletchingStartFields996(actor,kind):timedProjectResourcesHTML(kind)}
+ ${kind==='ceramics'||kind==='mineralogy'?`<label>${kind==='ceramics'?'Počet kusů':'Počet nádob ve várce'}<input name="craftQuantity" type="number" min="1" max="${kind==='ceramics'?CERAMICS_BATCH_LIMIT:MINERALOGY_BATCH_LIMIT}" step="1" value="1" required></label>
+ <p class="tiny">${kind==='ceramics'?'Všechny kusy se vyrábějí souběžně. Každý kus má samostatný hod kvality.':'Várka trvá jeden den a má jeden společný Mineralogy SV. Náklady rostou podle počtu nádob.'}</p>`:''}
  ${kind==='milling'?'<p class="tiny">Po roce lze provést Milling Success Value k posouzení odchylky od obvyklé produkce. Konkrétní skutečný výnos určuje GM.</p>':
  kind==='breadBaking'?'<p class="tiny">Cookery Success Value určí kvalitu chleba. HMK pro samotný chléb neurčuje dobu pečení ani výtěžnost. Při podávání v rámci jídla použijte běžný projekt Cookery.</p>':''}
  ${kind==='engineering'?'<label><input type="checkbox" name="engineeringRandomTime"> Volitelný rozptyl konečné doby návrhu (±20 %, 2× d3 při Design Rollu)</label>':''}
@@ -6161,7 +6163,7 @@ function decorateTimedSkillProject591(root){
    const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD} d · ${craftDurationText600(item)}${item.agingDice?' + '+item.agingDice+'d'+item.agingFaces+' zrání':''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name}${item.decorative?' [d]':''} · ${item.priceD} d · ${timedSkillBaseMinutes591(kind.value,key)/60} h`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
    const last=scope.value;
    if(scope.tagName==='SELECT'){
-    scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${isWorkshopCraft(kind.value)?'':esc(key)+' · '}${esc(description)}</option>`).join('');
+    scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${isWorkshopCraft(kind.value)||['ceramics','mineralogy'].includes(kind.value)?'':esc(key)+' · '}${esc(description)}</option>`).join('');
     if(rewriteScope||labels.some(x=>x[0]===last))scope.value=rewriteScope||last;
     if(kind.value==='writing')scope.disabled=!!rewriteScope;
    }
@@ -6223,11 +6225,15 @@ function decorateTimedSkillProject591(root){
     const recipe=CRAFT_WORK_600[kind.value]?.[scope.value];
     const milling=kind.value==='milling'?millingBaseline(Number(scope.value)):null;
     const label=milling?'1 rok (360 dní)':recipe?craftDurationText600(recipe):chronicleRemainingTime(base);
-    const cost=material??recipe?.costD??null;
+    const unitCost=material??recipe?.costD??null;
+    const quantityField=create.elements.namedItem('craftQuantity');
+    const quantity=quantityField?Number(quantityField.value):1;
+    if(quantityField&&!quantityField.validity.valid){preview.textContent='Zadej platné množství.';return;}
+    const cost=unitCost===null?null:unitCost*quantity;
     preview.textContent=(milling?'Výchozí roční potřeba '+milling.bushels.toLocaleString('cs-CZ')+' bušlů'+(milling.typicalWeightLb?' · v typickém dvoře přibližně 40 000 lb':'')+'. ':'')+(cost===null?'':'Materiál '+cost.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' d · ')+'Pracovní doba '+label+'. Nejčasnější SV '+displayCampaignMinute(due)+(timing?.mode==='day'||glassDay?' · termín dle herního dne (od 00:00).':' · přesný čas.')+(kind.value==='brewing'?' Zrání se doloží samostatnými skutečnými hody při zahájení; SV hodnotí kvalitu po práci.':'')+' Záznam není automatickým zaplacením materiálu ani vytvořením výrobku.';
    }
   };
-  if(!create.dataset.timedInit591){create.dataset.timedInit591='yes';kind.addEventListener('change',update);scope.addEventListener('change',update);if(scope.tagName==='INPUT')scope.addEventListener('input',update);create.querySelector('[data-hmk-writing-plan]')?.addEventListener('change',update);create.elements.namedItem('engineeringRandomTime')?.addEventListener('change',update);create.elements.namedItem('jewelTime')?.addEventListener('change',update);create.elements.namedItem('fletchingProvider')?.addEventListener('change',update);}
+  if(!create.dataset.timedInit591){create.dataset.timedInit591='yes';kind.addEventListener('change',update);scope.addEventListener('change',update);create.elements.namedItem('craftQuantity')?.addEventListener('input',update);if(scope.tagName==='INPUT')scope.addEventListener('input',update);create.querySelector('[data-hmk-writing-plan]')?.addEventListener('change',update);create.elements.namedItem('engineeringRandomTime')?.addEventListener('change',update);create.elements.namedItem('jewelTime')?.addEventListener('change',update);create.elements.namedItem('fletchingProvider')?.addEventListener('change',update);}
   update();
  }
  const primary=root.querySelector('#skill-value-form');if(!primary||!data.campaignClock||!selected)return;
@@ -8565,8 +8571,10 @@ function characterProjectRows(actor,kinds,agenda){
   ].some(key=>entry[key]?.startId===row.id));
   const result=resultRows.at(-1)||linked||specialtyResult;
   const roll=result?.calendarSkillProjectSV591?(result.skillTestProof?.a||result.skillTestProof?.result):null;
+  const craftResult=roll&&kind==='ceramics'?ceramicsQuality(roll.sv).quality:
+   roll&&kind==='mineralogy'?`${timed.mineralogyQuantity??1} ks · TN ${roll.sv} pro d10`:'';
   const summary=roll?`Success Value ${roll.sv} · ${roll.level}${Number.isInteger(roll.roll)?` · d100 (${roll.roll})`:''}`:result?.body;
-  const inventoryId=result?.calendarSkillFletching996?.inventoryId;
+  const inventoryId=result?.calendarSkillFletching996?.inventoryId??result?.calendarSkillProjectSV591?.inventoryId;
   const item=inventoryId?data.inventory.find(x=>x.id===inventoryId&&x.characterId===actor.id):null;
   let timing='',next='';
   if(open){
@@ -8607,7 +8615,7 @@ function characterProjectRows(actor,kinds,agenda){
   return `<article class="hmk-project-record" data-character-project-record="${esc(row.id)}"><h4>${esc(title)}</h4>
    <p><strong>${cancelled?'Zrušeno':open?'Rozpracováno':'Uzavřeno'}</strong> · zahájeno ${esc(medicalFullMoment(row.campaignMinute))}</p>
    ${cancelled?`<p>Zrušeno ${esc(medicalFullMoment(cancelled.campaignMinute))}</p>`:timing}
-   ${summary?`<p>${esc(summary)}</p>`:''}${roll&&MILLING_PROJECTS[kind]?`<p>${esc(result.body.split('\n').at(-1))}</p>`:''}${next}${open?projectCancelButton(row):cancelled?`<button type="button" class="secondary" data-project-remove="${esc(row.id)}">Odstranit z přehledu</button>`:''}
+   ${summary?`<p>${esc(summary)}</p>`:''}${craftResult?`<p>${esc(craftResult)}</p>`:''}${timed?.mineralogyQuantity?`<p>${timed.mineralogyQuantity} ks · materiál ${timed.craftItemCostD} d</p>`:''}${roll&&MILLING_PROJECTS[kind]?`<p>${esc(result.body.split('\n').at(-1))}</p>`:''}${next}${open?projectCancelButton(row):cancelled?`<button type="button" class="secondary" data-project-remove="${esc(row.id)}">Odstranit z přehledu</button>`:''}
    ${item?`<button type="button" class="secondary" data-character-project-item="${esc(item.id)}">Zobrazit výrobek · ${esc(slotLabel(item.slot))}</button>`:''}</article>`;
  }).join('');
 }
@@ -16624,6 +16632,11 @@ document.addEventListener('submit',event=>{
    jewelcraft=jewelcraftWork994({material:value('material'),ounces:Number(value('ounces')),gems,days,daysDice});scope=String(days);
   }
   const projectName=form.elements.namedItem('projectName').value.trim();
+  const quantity=batchCraftQuantity(kind,Number(form.elements.namedItem('craftQuantity')?.value??1));
+  if(kind==='ceramics'||kind==='mineralogy'){
+   const skill=TIMED_SKILL_NAMES_600[kind];
+   if(!actor||!availableMasteries(actor).some(record=>record.name===skill&&record.ml>0))throw Error('Postava nemá osvojenou dovednost '+skill+'.');
+  }
   const base=timedSkillBaseMinutes591(kind,scope);
   if(!actor||!Number.isSafeInteger(minute)||combatInitiativeSequence||base===null||projectName.length<2||projectName.length>120)throw Error('Vyberte postavu, skutečnou práci a platný čas kampaně mimo boj.');
   if(MILLING_PROJECTS[kind]&&!availableMasteries(actor).some(skill=>skill.name===MILLING_PROJECTS[kind].skill&&skill.ml>0))
@@ -16688,6 +16701,8 @@ document.addEventListener('submit',event=>{
    ...(fletching&&faerieWorkshopKind({kind,scope})?{faerieLinked:true}:{}),
    ...(['ceramics','mineralogy'].includes(kind)?{craftExact994:true}:{}),
    ...(brew?{brewing995:true,spiritMonths995:spiritMonths}:{}),
+   ...(kind==='ceramics'?{ceramicsPiece:true}:{}),
+   ...(kind==='mineralogy'?{mineralogyQuantity:quantity}:{}),
    ...(jewelcraft?{jewelcraft994:jewelcraft,materialSourceConfirmed:true}:{}),
    earliestMinute:fletching?fletchingDue(scope,start,fletching,0.7):schedule?.dueMinute??(calendarDayEligibility600?calendarDayStart600(start+base):start+skillTimedEarliest591(kind,plannedBase,engineeringRandomTime)),baseDueMinute:fletching?fletchingDue(scope,start,fletching):schedule?.dueMinute??(calendarDayEligibility600?calendarDayStart600(start+base):start+Math.ceil(plannedBase)),
    ...(calendarDayEligibility600?{calendarDayEligibility600:true}:{}),
@@ -16699,11 +16714,17 @@ document.addEventListener('submit',event=>{
      craftItemWeightLb:TIMED_CRAFT_ITEMS_599[kind][scope].weightLb,
      materialSourceConfirmed:true
    }:{})};
+  if(kind==='mineralogy')p.craftItemCostD*=quantity;
+  const pieceCount=kind==='ceramics'?quantity:1;
   mutate(()=>{if(data.campaignClock.minute!==minute||campaignKey(data.campaignClock)!==cid)throw Error('Kalendář se změnil.');
-   data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:start,createdAt:stamp(),
-    title:'HMK '+({milling:'80 Milling',breadBaking:'80 Pečení chleba',writing:'132 Writing',engineering:'70 Engineering',drawing:'69 Drawing',cookery:'68 Cookery',jewelcraft:'76 Jewelcraft',glassworking:'73 Glassworking',woodworking:'91 Woodworking',...Object.fromEntries(Object.keys(WORKSHOP_CRAFT_PROJECTS).map(key=>[key,WORKSHOP_CRAFT_PROJECTS[key].label])),...Object.fromEntries(Object.entries(CRAFT_LABELS_600).map(([k,v])=>[k,v]))}[kind])+' · zahájení · '+projectName,
+   for(let index=1;index<=pieceCount;index++){
+    const name=pieceCount>1?`${projectName.slice(0,105)} · kus ${index}/${pieceCount}`:projectName;
+    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:start,createdAt:stamp(),
+    title:'HMK '+({milling:'80 Milling',breadBaking:'80 Pečení chleba',writing:'132 Writing',engineering:'70 Engineering',drawing:'69 Drawing',cookery:'68 Cookery',jewelcraft:'76 Jewelcraft',glassworking:'73 Glassworking',woodworking:'91 Woodworking',...Object.fromEntries(Object.keys(WORKSHOP_CRAFT_PROJECTS).map(key=>[key,WORKSHOP_CRAFT_PROJECTS[key].label])),...Object.fromEntries(Object.entries(CRAFT_LABELS_600).map(([k,v])=>[k,v]))}[kind])+' · zahájení · '+name,
     body:'Doložený začátek '+displayCampaignMinute(start)+'; základní doba '+plannedBase+' minut, nejčasnější možný SV '+displayCampaignMinute(p.earliestMinute)+(p.craftDayResolution==='day'?' (od začátku herního dne)':'')+(recipe?.agingDice?'; zrání '+p.craftAgingDays+' dní, skutečné kostky ['+p.craftAgingRolls.join(', ')+'], připraveno '+displayCampaignMinute(p.craftReadyMinute):'')+'. Čas se neposunul, výrobek ani výdaje se nevytvořily.',
-    calendarSkillProjectStart591:p});});
+    calendarSkillProjectStart591:{...p,projectName:name}});
+   }
+  });
  }catch(err){alert('Časovaný projekt: '+err.message);}
 },true);
 document.addEventListener('change',e=>{
@@ -16908,6 +16929,22 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
    body+='\nCookery · '+quality+' · Persuasion hostitele nebo kuchaře během jídla '+(persuasion>0?'+':'')+persuasion+
     (nauseaCheck?' · Strávníci testují HB × 5 proti nevolnosti.':'')+'.';
   }
+  const ceramicProject=timedStart?.calendarSkillProjectStart591;
+  const ceramic=ceramicProject?.ceramicsPiece?ceramicsQuality((proof.a??proof.result).sv):null;
+  const ceramicInventoryId=ceramic?.usable?'ceramics:'+timedId:null;
+  if(ceramic){
+   body+='\nCeramics · '+ceramic.quality+'.';
+   if(ceramicInventoryId){
+    if(data.inventory.some(item=>item.id===ceramicInventoryId))throw Error('Tento keramický kus už je v inventáři.');
+    const definition=CRAFT_WORK_600.ceramics[ceramicProject.scope];
+    data.inventory.push({id:ceramicInventoryId,characterId:selected,slot:'carried',quantity:1,
+     snapshot:{id:ceramicInventoryId,name:definition.name,category:'other',description:ceramic.quality,
+      properties:{weightLb:definition.weightLb,pricePence:definition.salePriceD}}});
+   }
+  }
+  if(ceramicProject?.kind==='mineralogy'){
+   body+='\nMineralogy · '+(ceramicProject.mineralogyQuantity??1)+' ks · TN '+(proof.a??proof.result).sv+' pro d10.';
+  }
   const recordedProof=animalSVSource?{...proof,animalTrainingSV590:animalSVSource}:proof;
   data.journal.push({id:savedId,characterId:selected,title,body,createdAt:stamp(),skillTestProof:recordedProof,
     ...(explicitEpisodeLink?{calendarEpisodeSkillLink:explicitEpisodeLink}:
@@ -16915,7 +16952,7 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
       {calendarIndependentSkillTest:{format:'hmk-independent-skill-test-v1',
        campaignId:campaignKey(data.campaignClock),minute:data.campaignClock.minute,actorId:selected}}:{}),...(extra||{}),
     ...(timedId?{calendarSkillProjectSV591:{startId:timedId,kind:timedStart.calendarSkillProjectStart591.kind,
-     ...(writing?.phase==='retry'?{previousAttemptId:writing.attempt.id}:{})}}:{}),
+     ...(writing?.phase==='retry'?{previousAttemptId:writing.attempt.id}:{}),...(ceramic?{inventoryId:ceramicInventoryId}:{})}}:{}),
     ...(data.campaignClock?{calendarCampaignId:campaignKey(data.campaignClock),campaignMinute:data.campaignClock.minute}:{}),
     ...(craftLink?{calendarCharacterCraftSkill:craftLink}:{}),
     ...(fishingLink?{calendarFishingSVStart590:fishingLink}:{}),
