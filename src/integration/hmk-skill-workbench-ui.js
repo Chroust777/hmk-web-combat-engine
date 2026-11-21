@@ -156,6 +156,8 @@ export function animalTrainingNextHTML(journal,actorId,campaignId){
 function engineeringDesignNextHTML(journal,actorId,campaignId){
  const pending=journal.filter(j=>j.characterId===actorId&&(!campaignId||j.calendarCampaignId===campaignId)&&
   engineeringDesignCandidate(j.skillTestProof)&&
+  (!j.calendarSkillProjectSV591||journal.some(q=>q.id===j.calendarSkillProjectSV591.startId)&&
+   !journal.some(q=>q.calendarProjectCancellation?.startId===j.calendarSkillProjectSV591.startId))&&
   !journal.some(q=>q.skillTestProof?.type==='engineering-design'&&q.skillTestProof.originId===j.id||q.calendarEngineeringDesignTiming?.sourceId===j.id));
  if(!pending.length)return '';
  return '<section class="hsk-special-commits"><h3>Engineering · Design Roll (HMK 70)</h3>'+pending.map(j=>{
@@ -177,7 +179,9 @@ function engineeringDesignNextHTML(journal,actorId,campaignId){
 /** The latest source SV can open its specific next step immediately after
  * recording, without requiring tab navigation or repeating a primary d100. */
 export function skillSpecificNextHTML(journal,actorId,campaignId,originId=null,only=null){
- const subset=originId?journal.filter(j=>j.id===originId||j.skillTestProof?.originId===originId||j.calendarEngineeringDesignTiming?.sourceId===originId||j.id===journal.find(row=>row.id===originId)?.calendarSkillProjectSV591?.startId):journal;
+ const startId=originId?journal.find(row=>row.id===originId)?.calendarSkillProjectSV591?.startId:null;
+ const subset=originId?journal.filter(j=>j.id===originId||j.skillTestProof?.originId===originId||
+  j.calendarEngineeringDesignTiming?.sourceId===originId||(startId&&(j.id===startId||j.calendarProjectCancellation?.startId===startId))):journal;
  // UI may select one concrete continuation. Keep the complete ledger in the
  // candidate functions so earlier completion proofs still suppress used rolls.
  return (only===null||only==='fishing'?fishingCatchNextHTML(subset,actorId,campaignId):'')+

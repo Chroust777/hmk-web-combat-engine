@@ -12,6 +12,12 @@ const designs={
  'Stockade tower':6,'Townhouse, exclusive':9,'Townhouse, modest':6
 };
 export const ENGINEERING_DESIGN_DAYS=Object.freeze({...designs});
+export function engineeringSecondarySkill(edifice){
+ if(!Object.hasOwn(designs,edifice))return null;
+ if(edifice.startsWith('Mill'))return 'Milling';
+ if(edifice==='Mine')return 'Mineralogy';
+ return edifice.startsWith('Siege Engine')?'Weaponcraft':null;
+}
 export function engineeringDesignWorkMinutes(result){
  // HMK 70 calls the optional fluctuation an adjustment to the final time.
  return Math.ceil(result.baseDays*1440*(100-result.extraTimeReductionPercent)*(100+result.randomTimePercent)/10000);
@@ -36,7 +42,7 @@ export function resolveEngineeringDesign({proof,originId,actorId,edifice,mathema
  ensure(Object.hasOwn(designs,edifice),'HMK str. 70: zvolte konstrukci z tabulky, nikoli Cottage small / Hovel');
  ensure(gmConfirmsConstructionParticipation===true,'Konstruktér i stavitel musí být přímo zapojeni do díla');
  ensure(gmConfirmsNoPreviousModifiers===true,'GM musí potvrdit, že původní SV ještě neobsahuje příplatky výsledku Design Rollu');
- const requiredSecondary=edifice.startsWith('Mill')?'Milling':edifice==='Mine'?'Mineralogy':edifice.startsWith('Siege Engine')?'Weaponcraft':null;
+ const requiredSecondary=engineeringSecondarySkill(edifice);
  ensure(!requiredSecondary||source.secondarySkills.includes(requiredSecondary),`Konstrukce ${edifice} vyžaduje Engineering (${requiredSecondary}) SV`);
  ensure(integer(mathematicsML,0,1000),'Mathematics ML musí být doložená celá hodnota');
  const mathematicsIndex=Math.floor(mathematicsML/10);
