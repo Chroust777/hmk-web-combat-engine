@@ -399,7 +399,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.025';
+const APP_VERSION='94.026';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4053,7 +4053,17 @@ function characterCraftPanel(clock,maker,discipline){
   x.dossier.targetable?`<p class="hc-hint" data-alchemy-targetable-source><strong>${esc(x.dossier.elixirName)}</strong> · ${esc(x.dossier.phase==='stored'?'uložený fyzický kus':'aktivní Temporary na postavě')} · AS ${x.dossier.currentAS} · Dispel EML ${x.dossier.dispelEMLPenalty} · původ ${esc(x.dossier.sourceId||'')} · ${esc(x.dossier.targetId||'')}</p>`:
   `<p class="hc-hint">${esc(x.dossier.elixirName)}: ${esc(x.dossier.reason||'nyní bez ověřeného magického cíle')}.</p>`).join('')||'<p class="hc-hint">Žádná dokončená alchymistická dávka v kampani.</p>'}
  </section>
- <section data-craft-procedure="create" data-label="Připravit běžný elixír (HMK str. 267–268)">${alchemyWorkshopAccess('create')}<details open data-alchemy-preparation-rules><summary>Pravidla a vyhodnocení</summary><p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p></details>
+ <section data-craft-procedure="create" data-label="Připravit běžný elixír (HMK str. 267–268)">${alchemyWorkshopAccess('create')}<details open data-alchemy-preparation-rules>
+  <summary>Pravidla a vyhodnocení</summary>
+  <ol>
+   <li><strong>Zahajte přípravu.</strong> Vyberte elixír nebo recepturu a dílnu. Určete dobu hodem 3d6 + 10 dní a v termínu pokračujte vyhodnocením.</li>
+   <li><strong>Proveďte Preparation Roll.</strong> V termínu otevřete Alchemy Success Value. Použijte Herblore, Mineralogy, Mathematics SR a modifikátor Sunsign. Úspěšnou dávku může posílit Augmentation d10 podle kvality dílny.</li>
+   <li><strong>Uložte dávku.</strong> Tekutý nebo plynný elixír přiřaďte k volné lahvičce Vial, 4 oz. Plná nádoba váží 0,5 lb. Chybějící lahvičku pořídíte u hotové dávky.</li>
+  </ol>
+  <details><summary>Kritický neúspěch a Dissolution</summary>
+   <p>Při kritickém neúspěchu proveďte Will SR d10. Pokud neuspěje, následuje Dissolution d100, které určí Aural Shock a Weakness. Při Crucial Dissolution (poslední číslice 5 nebo 0) pokračujte hodem na Shock se základním SHK 8. Případné zotavení se řeší v Combat.</p>
+  </details>
+ </details>
  ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
   if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
@@ -4180,7 +4190,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
    !data.journal.some(y=>y.calendarCampaignId===campaignKey(clock)&&y.calendarAlchemyVialBinding?.vialId===v.id&&alchemyVialState(data.journal,campaignKey(clock),y.calendarAlchemyVialBinding.finishId,clock.minute)?.full)&&
    !data.journal.some(y=>y.calendarCampaignId===campaignKey(clock)&&y.calendarHerbVialBinding?.vialId===v.id&&clock.minute<(data.journal.find(z=>z.id===y.calendarHerbVialBinding.completeId)?.calendarHerbPotionComplete?.expiryMinute??0)&&!data.journal.some(z=>z.calendarCampaignId===campaignKey(clock)&&(z.calendarHerbPotionAdminister?.completeId===y.calendarHerbVialBinding.completeId||z.calendarHerbVialDiscard?.completeId===y.calendarHerbVialBinding.completeId||z.calendarHerbWeaponPaste?.completeId===y.calendarHerbVialBinding.completeId))));
   return `<form data-alchemy-vial-bind><strong>${esc(a.elixirName)} · dokončeno ${esc(displayCampaignMinute(a.minute))}</strong><input name="finishId" type="hidden" value="${esc(x.id)}"><input name="actorId" type="hidden" value="${esc(x.characterId)}">
-   ${vials.length?`<label>Existující samostatná Vial, 4 oz<select name="vialId" required>${vials.map(v=>`<option value="${esc(v.id)}">${esc(v.snapshot?.name||'Vial')} · ${esc(v.id)}</option>`).join('')}</select></label><label>Materiál nádoby<select name="material" required><option value="glass">Sklo</option><option value="ceramic">Keramika</option></select></label>${a.elixirName==='Fumebomb'?`<label class="hc-check"><input type="checkbox" name="gasConfirmed" value="yes" required> GM potvrzuje plyn Fumebomb v původní uzavřené nádobě</label>`:`<label class="hc-check"><input type="checkbox" name="liquidConfirmed" value="yes" required> GM potvrzuje, že jde o tekutou podobu tohoto elixíru</label>`}<label class="hc-check"><input type="checkbox" name="corkConfirmed" value="yes" required> GM potvrzuje fyzickou korkovou zátku</label><label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje skutečné uložení elixíru do této nádoby při dokončení přípravy, i když je důkaz zapsán později</label><button type="submit">Doložit fyzickou nádobu bez posunu času</button>`:'<p class="hc-hint">Chybí samostatná skutečně nesená a prázdná Vial, 4 oz (1 ks).</p>'}</form>`;
+   ${vials.length?`<label>Existující samostatná Vial, 4 oz<select name="vialId" required>${vials.map(v=>`<option value="${esc(v.id)}">${esc(v.snapshot?.name||'Vial')} · ${esc(v.id)}</option>`).join('')}</select></label><label>Materiál nádoby<select name="material" required><option value="glass">Sklo</option><option value="ceramic">Keramika</option></select></label>${a.elixirName==='Fumebomb'?`<label class="hc-check"><input type="checkbox" name="gasConfirmed" value="yes" required> GM potvrzuje plyn Fumebomb v původní uzavřené nádobě</label>`:`<label class="hc-check"><input type="checkbox" name="liquidConfirmed" value="yes" required> GM potvrzuje, že jde o tekutou podobu tohoto elixíru</label>`}<label class="hc-check"><input type="checkbox" name="corkConfirmed" value="yes" required> GM potvrzuje fyzickou korkovou zátku</label><label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje skutečné uložení elixíru do této nádoby při dokončení přípravy, i když je důkaz zapsán později</label><button type="submit">Doložit fyzickou nádobu bez posunu času</button>`:'<p class="hc-hint">Chybí volná prázdná lahvička Vial, 4 oz.</p>'}</form>${vials.length?'':alchemyVialAcquisition(x.characterId)}`;
  }).join('')}
  <h4>Egosight · dotyk a rozpoznání artefaktu (HMK 271)</h4>
 <p class="hc-hint" data-craft-rule>Rozliší minor artefakt, major artefakt s Ego a Ego Subversion nebo major artefakt s vlastní vůlí Will. Neposkytuje neznámé schopnosti minor artefaktu ani přesný Will. GM musí artefakt skutečně předložit a potvrdit jeho stav. Během Aural Shock není prospěch z Egosight dostupný.</p>
@@ -9844,14 +9854,20 @@ function catalogCoveragePanel(){const coverage=catalogCoverage(allCatalogItems()
 function armourCoverageReadinessPanel(){const a=auditArmourCoverage();return `<section class="panel wide"><h3>HMK · ověření anatomického pokrytí</h3><p><b>${a.ready} / ${a.total}</b> položek připravených pro pravidlový výpočet · ${a.pending} vyžaduje vizuální přepis pokrytí z PDF.</p><p class="muted">Bez ověřených míst zásahu, zón, směrových omezení a příznaku pevné zbroje je výpočet zablokován. Propojení ${a.matched}/${a.suitParts} součástí kompletů potvrzuje pouze identitu položek, nikoli ochranu.</p></section>`;}
 function suitArticleCrosswalkPanel(){const r=reconcileSuitArticles();return `<section class="panel wide"><h3>HMK · propojení součástí 12 kompletů s katalogem</h3><p class="muted">Kontrola názvů jednotlivých součástí proti 92 referenčním položkám. Shoda názvu neznamená ověřené anatomické pokrytí ani povolení automatického oblékání.</p><p><b>${r.matched} / ${r.parts}</b> jednoznačně přiřazených součástí · ${r.unmatched.length} bez shody · ${r.ambiguous.length} nejednoznačných.</p>${r.unmatched.length||r.ambiguous.length?`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Komplet</th><th>Součást</th><th>Stav</th></tr></thead><tbody>${[...r.unmatched,...r.ambiguous].map(e=>`<tr><td>${esc(e.suit)}</td><td>${esc(e.label)}</td><td>${esc(e.status)}</td></tr>`).join('')}</tbody></table></div>`:'<p>Všechny názvy mají jednoznačnou shodu. Anatomické pokrytí je zapsáno; kontrola skutečného pořadí vrstev zatím není uzavřena.</p>'}</section>`;}
 function libraryCharacterOptions(){const people=registryCharacters93813(data.characters);const preferred=libraryRecipientId||selected||people[0]?.id;return people.map(c=>{const cash=cashForCharacter(c);return `<option value="${esc(c.id)}" ${c.id===preferred?'selected':''}>${esc(c.name)}${c.occupation?' · '+esc(c.occupation):''} · ${cash.ok?esc(cash.balance)+'d':'hotovost nedoložena'}</option>`}).join('')}
-function libraryAssignForm(itemId,kind='item',available=true,offer=null){
+function alchemyVialAcquisition(actorId){
+ const vial=item(PRINTED_VIAL);
+ return `<div class="hc-event"><strong>Pořídit lahvičku Vial, 4 oz</strong>
+  ${libraryAssignForm(PRINTED_VIAL,'item',!!vial,vial?libraryPurchaseOffer(vial):null,{recipientId:actorId})}</div>`;
+}
+function libraryAssignForm(itemId,kind='item',available=true,offer=null,{recipientId=null}={}){
  if(!registryCharacters93813(data.characters).length)return '<span class="library-warning">Nejdříve vytvořte postavu.</span>';
  if(!available)return '<span class="library-warning">Přiřazení není doložené katalogem.</span>';
  const people=registryCharacters93813(data.characters);
- const preferred=people.find(c=>c.id===(libraryRecipientId||selected))||people[0];
+ const preferred=recipientId?people.find(c=>c.id===recipientId):people.find(c=>c.id===(libraryRecipientId||selected))||people[0];
+ if(!preferred)return '<span class="library-warning">Příjemce předmětu už není mezi aktivními postavami.</span>';
  const cash=cashForCharacter(preferred),price=offer?.pricePence??null,canBuy=price!==null&&cash.ok&&cash.balance>=price;
  const reason=price===null?'Nákup nedostupný: chybí jednoznačná cena v d.':!cash.ok?cash.reason:cash.balance<price?`Nedostatek hotovosti (${cash.balance}d).`:'';
- return `<form class="library-assign" data-library-form="${esc(kind)}"><input type="hidden" name="itemId" value="${esc(itemId)}"><select name="recipientId" aria-label="Postava pro převzetí nebo nákup" title="Komu bude předmět patřit" required>${libraryCharacterOptions()}</select><div class="library-acquire-actions"><button type="submit" name="acquisition" value="buy" ${canBuy?'':`disabled title="${esc(reason)}"`}>Koupit${price!==null?' '+(offer.quantity>1?esc(offer.quantity)+' ks · ':'· ')+esc(price)+'d':''}</button><button type="submit" name="acquisition" value="free" class="secondary">Vzít zdarma</button></div>${reason?`<small class="library-purchase-hint">${esc(reason)}</small>`:''}</form>`;
+ return `<form class="library-assign" data-library-form="${esc(kind)}"${recipientId?' data-fixed-library-recipient':''}><input type="hidden" name="itemId" value="${esc(itemId)}">${recipientId?`<input type="hidden" name="recipientId" value="${esc(recipientId)}">`:`<select name="recipientId" aria-label="Postava pro převzetí nebo nákup" title="Komu bude předmět patřit" required>${libraryCharacterOptions()}</select>`}<div class="library-acquire-actions"><button type="submit" name="acquisition" value="buy" ${canBuy?'':`disabled title="${esc(reason)}"`}>Koupit${price!==null?' '+(offer.quantity>1?esc(offer.quantity)+' ks · ':'· ')+esc(price)+'d':''}</button><button type="submit" name="acquisition" value="free" class="secondary">Vzít zdarma</button></div>${reason?`<small class="library-purchase-hint">${esc(reason)}</small>`:''}</form>`;
 }
 /** UI-only grouping; inventory IDs and original `category` stay untouched. */
 function libraryItemKind(i){
@@ -25318,7 +25334,7 @@ document.addEventListener('submit',e=>{
  if(!receiver)return alert('Vyberte existující aktivní postavu.');
  if(combatInitiativeSequence?.order?.includes(receiver.id))return alert('Inventář účastníka Initiative musí být měněn pravidlovou Combat akcí.');
  if(activeCampaignCashKey(receiver)===undefined)return alert('Postava musí být účastníkem právě aktivní kampaně.');
- libraryRecipientId=receiver.id;
+ if(!f.hasAttribute('data-fixed-library-recipient'))libraryRecipientId=receiver.id;
  let sources=[],totalPrice=null,suitName=null,buyQuantity=1;
  if(f.hasAttribute('data-hmk-stable-guide-buy')){
   const beast=BEASTS_P122.find(b=>b.id===f.dataset.hmkGuideSpecies);
