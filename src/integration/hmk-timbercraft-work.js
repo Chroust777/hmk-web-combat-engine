@@ -105,7 +105,7 @@ export function validateTimberWork(journal){
    const {stage,actorId,minute,campaignId}=proof;
    requireValue(actorId===row.characterId&&minute===row.campaignMinute&&campaignId===row.calendarCampaignId,
     'Neplatný původ záznamu Timbercraft.');
-   const stages={start:startTimberWork,plan:planTimberRound,round:resolveTimberRound,cancel:cancelTimberWork};
+   const stages={start:startTimberWork,plan:planTimberRound,round:resolveTimberRound,cancel:cancelTimberWork,harvest:timberHarvest};
    requireValue(Object.hasOwn(stages,stage)&&same(stages[stage]({...proof,journal:prior,
     ...(stage==='start'?{species:proof.tree?.species,diameter:proof.tree?.diameter}:{})}),proof),
    'Záznam Timbercraft neodpovídá původním vstupům nebo hodům.');
@@ -121,4 +121,19 @@ export function assertTimberWorkAppendOnly(before,after){
    requireValue(same(next.get(row.id),row),'Potvrzenou práci Timbercraft nelze změnit ani odstranit.');
   }
  }
+}
+
+export function timberHarvest({journal,campaignId,actorId,startId,minute,quantity,volume,weightLb,inventoryId}){
+ const state=timberWork(journal,campaignId,startId);
+ requireValue(state?.completed.has('bucking')&&state.start.actorId===actorId&&
+  !journal.some(row=>row.calendarCampaignId===campaignId&&row.calendarTimbercraft?.stage==='harvest'&&row.calendarTimbercraft.startId===startId),
+  'Výtěžek lze převzít jednou po dokončeném řezání na klády.');
+ const cut=journal.find(row=>row.calendarCampaignId===campaignId&&row.calendarTimbercraft?.startId===startId&&
+  row.calendarTimbercraft.phase==='bucking'&&row.calendarTimbercraft.complete);
+ requireValue(whole(minute,cut?.campaignMinute??Infinity,1e9)&&whole(quantity,1,10000)&&
+  Number.isFinite(volume)&&volume>0&&volume<=10000&&Number.isFinite(weightLb)&&weightLb>0&&weightLb<=1000000&&
+  typeof inventoryId==='string'&&inventoryId,'Doložte počet, celkový objem a hmotnost klád.');
+ return {format,stage:'harvest',campaignId,actorId,startId,minute,inventoryId,quantity,volume,weightLb,
+  species:state.start.tree.species,wholesalePence:volume*state.start.tree.wholesalePerVol,
+  retailPence:volume*state.start.tree.retailPerVol};
 }

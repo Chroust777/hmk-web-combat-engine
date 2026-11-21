@@ -66,3 +66,34 @@ export function embalmingState({climate,ageDays,shadow,sv}){
   phase:phases[index],days:Math.max(0,days*(index<3?factor:1)+(factor===1||index<3?sv:0))
  }))};
 }
+
+export function fieldCashSettlement(previousTenths,changeTenths,balance){
+ check(Number.isSafeInteger(previousTenths)&&Math.abs(previousTenths)<10&&Number.isSafeInteger(changeTenths)&&
+  Number.isSafeInteger(balance)&&balance>=0,'Neplatný stav finančního vypořádání.');
+ const net=previousTenths+changeTenths;
+ check(balance*10+net>=0,'Postava nemá dost hotovosti na výrobní náklady.');
+ const deltaPence=Math.trunc(net/10)||0;
+ return {deltaPence,carryTenths:net-deltaPence*10,changeTenths};
+}
+
+export function perfumerySale({product,quantity,onHand,limitHalfPence,soldPence}){
+ const batch=perfumeryBatch(product,quantity);
+ check(whole(onHand,1,999999)&&quantity<=onHand,'V inventáři není dost výrobků.');
+ check(whole(limitHalfPence,0,100000)&&whole(soldPence,0,100000)&&2*(soldPence+batch.listPence)<=limitHalfPence,
+  'Prodej překračuje zbývající denní strop podle Perfumery.');
+ return batch;
+}
+
+export function planDalmorvrinRepair({subject,injury,days,origin,minute}){
+ check(typeof subject==='string'&&subject.trim()&&subject.trim().length<=100&&whole(injury,1,1000)&&
+  whole(days,1,3)&&['manual','cryptographic-software-die'].includes(origin)&&whole(minute,0,1e9-4320),
+  'Doložte Dalmôrvrin, zbývající Injury Levels a hod d3.');
+ return {subject:subject.trim(),injury,days,origin,dueMinute:minute+days*1440};
+}
+
+export function finishDalmorvrinRepair(plan,minute,roll){
+ check(plan&&whole(minute,plan.dueMinute,1e9),'Opravu lze vyhodnotit až po uplynutí d3 dní.');
+ const result=fieldCraftRoll(roll);
+ const removed=Math.min(plan.injury,result.stars);
+ return {...result,removed,remaining:plan.injury-removed};
+}
