@@ -275,7 +275,8 @@ import {createForagingCarry,createForagingCarryEat,foragedCarriedFood,projectFor
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
 import {elixirHelp,herbalPotionHelp} from './src/integration/hmk-craft-item-help.js?v=94.032';
 import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js?v=93.988';
-import {alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
+import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.034';
+import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
@@ -400,7 +401,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.033';
+const APP_VERSION='94.034';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -708,6 +709,7 @@ function validate(d){
  validateGMHealthOverrideEvidence(d?.characters||[],d?.journal||[],d?.trash||[]);
  validateGlobalActionLedger(d);
  validateExtendedShockAidJournal(d?.journal||[]);
+ validateAlchemyExaminations(d?.journal||[]);
  const rawJournal=d.journal||[];
  validateProjectCancellations(rawJournal,projectIsOpen);
  const workJournal=operationalProjectJournal(rawJournal);
@@ -1092,6 +1094,7 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
   }assertProjectCancellationsAppendOnly(previous.journal,data.journal);assertHerbalJournalAppendOnly(previous.journal,data.journal);assertMundaneHerbalAppendOnly(previous.journal,data.journal);assertAlchemyAppendOnly(previous.journal,data.journal);assertAlchemyDecayAppendOnly(previous.journal,data.journal);assertAlchemyVialAppendOnly(previous.journal,data.journal);assertAlchemyAcidAppendOnly(previous.journal,data.journal);assertAlchemyAppliedObjectAppendOnly(previous.journal,data.journal);assertAcidWeaponAppendOnly(previous.journal,data.journal);assertAcidArmourAppendOnly(previous.journal,data.journal);assertAcidFleshAppendOnly(previous.journal,data.journal);assertAcidThrownAppendOnly(previous.journal,data.journal);assertAlchemyAreaAppendOnly(previous.journal,data.journal);assertAlchemyImbibingAppendOnly(previous.journal,data.journal);assertEgosightTouchAppendOnly(previous.journal,data.journal);assertEgosightProfusionAppendOnly(previous.journal,data.journal);assertFootpadAcousticAppendOnly(previous.journal,data.journal);assertDarkvisionProfusionAppendOnly(previous.journal,data.journal);assertEruditionProfusionAppendOnly(previous.journal,data.journal);assertFootpadProfusionAppendOnly(previous.journal,data.journal);assertDarkvisionHealingAppendOnly(previous.journal,data.journal);assertHerbVialAppendOnly(previous.journal,data.journal);assertHerbAdministrationAppendOnly(previous.journal,data.journal);assertHallucinogenicAppendOnly(previous.journal,data.journal);assertTranscendenceWillAppendOnly(previous.journal||[],data.journal||[]);assertHerbalPoisonExposureAppendOnly(previous.journal,data.journal);assertGreatPoisonAppendOnly(previous.journal,data.journal);assertHerbWeaponPasteAppendOnly(previous.journal,data.journal);assertWeaponPoisonResistanceAppendOnly(previous.journal,data.journal);assertStimulantInitiativeAppendOnly(previous.journal,data.journal);assertEmeticShockAppendOnly(previous.journal,data.journal);assertParalyticEnduranceAppendOnly(previous.journal,data.journal);assertSoporificAppendOnly(previous.journal,data.journal);assertPhysicalRationAppendOnly(previous.journal,data.journal);assertChestTransferAppendOnly(previous.journal,data.journal);assertInventoryDispositionAppendOnly(previous.journal,data.journal);assertWaterAppendOnly(previous.journal,data.journal);if(campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWaterBacking(previous,data,campaignKey(data.campaignClock));assertPhysicalRationBacking(previous,data);assertTimeEpisodeAppendOnly(previous.journal,data.journal);assertTrekDayAppendOnly(previous.journal,data.journal);assertTrekDailyWeatherAppendOnly(previous.journal,data.journal);assertWeatherVoidAppendOnly(previous.journal,data.journal);assertWeatherShiftAppendOnly(previous.journal,data.journal);assertEncounterGMAppendOnly(previous.journal,data.journal);assertEpisodeEncounterGMAppendOnly93902(previous.journal,data.journal);assertDirectionGMAppendOnly(previous.journal,data.journal);assertNutritionJournalAppendOnly(previous.journal,data.journal);assertAssistedIntakeAppendOnly(previous.journal,data.journal);assertNutritionAnimalAppendOnly(previous.journal,data.journal);assertNutritionActivityAppendOnly(previous.journal,data.journal);assertMalnutritionMedicalAppendOnly(previous.journal,data.journal);const campaignSwitched=!!previous.campaignClock&&!!data.campaignClock&&campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock);if(!campaignSwitched){synchronizeAutomaticCalendarOrigins(previous,data);annotateNewCalendarRolls(previous,data,calendarDiceWitness);reconcileTalismanPossession(previous,data);}validateChestTransferJournal(data.journal);validateTrekLinkedEvidence(data.journal);assertCashLedgerAppendOnly(previous,data);assertLivestockAppendOnly(previous,data);assertStableHubAppendOnly(previous,data);assertAnimalTrainingCalendarAppendOnly590(previous,data);assertTrainingInterruptionAppendOnly93902(previous.journal,data.journal);assertAnimalTrainingWorkAppendOnly93914(previous.journal,data.journal);assertSkillTimedAppendOnly591(previous,data);assertFaerieAppendOnly(previous.journal,data.journal);assertConstructionAppendOnly(previous.journal,data.journal);assertShipwrightAppendOnly(previous.journal,data.journal);assertScriptCopiesAppendOnly(previous.journal,data.journal);assertReadingAppendOnly(previous.journal,data.journal);assertBestiaryAppendOnly(previous,data);assertAnimalTraumaAppendOnly567(previous.journal,data.journal);// Temporary Bestiary participants never impose calendar healing obligations;
   // permanent PC/NPC health deadlines remain enforced by the original agenda.assertCreationHistoryAppendOnly(previous,data);assertSkillProofAppendOnly(previous,data);assertCampaignActorTimeIsolation(previous,data);assertCampaignPortfolioAppendOnly(previous,data);assertCalendarEvidenceAppendOnly(previous,data);assertLegacyMutationDoesNotChangeCombat(previous,data,{sequence:combatInitiativeSequence,participantIds:combatInitiativeSequence?.order??[]});
   assertGlobalActionLedgerAppendOnly(previous,data);assertChroniclePresentationAppendOnly93889(previous,data);
+  assertAlchemyExaminationsAppendOnly(previous.journal,data.journal);
   assertPCShelteredStayAppendOnly(previous.journal,data.journal);
   validatePCShelteredStayJournal(data.journal,data.characters);
   validate(data);
@@ -8521,6 +8524,140 @@ function projectProcedurePicker(actor,discipline,procedures){
  </select></label>`:''}
  <section class="hmk-project-procedure"><h4>${esc(procedure.label)}</h4>${procedure.html}</section>`;
 }
+function alchemyExaminationTargets(clock){
+ const cid=campaignKey(clock),journal=data.journal;
+ const members=new Map(calendarMemberIds(clock,data.characters).map(person=>[person.id,person]));
+ const inventory=new Map(data.inventory.filter(item=>item.quantity===1&&members.has(item.characterId)&&
+  ['carried','none','main_hand','off_hand'].includes(item.slot)).map(item=>[item.id,item]));
+ const boundVials=new Set();
+ const elixirs=journal.flatMap(row=>{
+  const binding=row.calendarAlchemyVialBinding;
+  if(row.calendarCampaignId!==cid||!binding||row.campaignMinute>clock.minute)return [];
+  boundVials.add(binding.vialId);
+  const item=inventory.get(binding.vialId);
+  if(!item||!alchemyVialState(journal,cid,binding.finishId,clock.minute)?.full)return [];
+  const strength=alchemyElixirStrength(journal,cid,binding.finishId,clock.minute);
+  return strength.currentAS>0&&strength.nextDueMinute>clock.minute?
+   [{kind:'vial',id:binding.finishId,label:'Vzorek v lahvičce · '+members.get(item.characterId).name}]:[];
+ });
+ const samples=[...inventory.values()].filter(item=>!boundVials.has(item.id)&&item.snapshot?.category==='other')
+  .map(item=>({kind:'sample',id:item.id,label:item.snapshot.name+' · '+members.get(item.characterId).name}));
+ return [...elixirs,...samples].map((target,index)=>({...target,label:(index+1)+'. '+target.label}));
+}
+const alchemyExaminationSampleField=`<label>Skutečný typ nealchymistické směsi (GM)<select name="classification">
+ <option value="">Vyplňte jen pro nealchymistický vzorek</option><option value="mundane">Běžná směs</option>
+ <option value="exotic">Exotická směs</option></select></label>`;
+const alchemyExaminationRollField=`<label>Skutečný d100<input type="number" name="d100" min="1" max="100" required></label>
+ <button type="button" class="secondary" data-alchemy-examination-die>⚄ Hodit d100</button>`;
+function alchemyExaminationHTML(clock,actor,ml){
+ const cid=campaignKey(clock),targets=alchemyExaminationTargets(clock);
+ const pending=pendingAlchemyExaminations(data.journal,cid,actor.id);
+ const options=targets.map(target=>`<option value="${esc(target.kind+':'+target.id)}">${esc(target.label)}</option>`).join('');
+ const choose=`<label>Vzorek k vyšetření<select name="target" required><option value="">Vybrat vzorek</option>${options}</select></label>`;
+ const procedure=(task,threshold,extra)=>ml>=threshold&&targets.length?
+  `<form data-alchemy-examination="${task}">${choose}${extra}</form>`:
+  `<p class="hc-hint">${ml<threshold?'Vyžaduje Alchemy ML '+threshold+'+.':'Připravte fyzický vzorek v inventáři.'}</p>`;
+ const procedures=[
+  {id:'recognise',label:'Recognise · rozpoznání směsi (HMK str. 266) · ML 10+',
+   html:projectResourcesHTML('Přístup ke skutečnému vzorku a soustředěné zkoumání po dobu jednoho kola.')+
+    procedure('recognise',10,alchemyExaminationSampleField+alchemyExaminationRollField+
+     '<button type="submit">Vyhodnotit rozpoznání</button>')},
+  {id:'identify',label:'Identify · identifikace směsi (HMK str. 267) · ML 20+',
+   html:projectResourcesHTML('Nejprve vyhodnoťte Recognise téhož vzorku. Identify pak vyžaduje jednu hodinu soustředěné práce v alchymistické dílně.')+
+    (pending.length?'<p class="hc-hint">Rozpracovaný krok je v části Průběh a výsledky.</p>':
+     procedure('start',20,'<label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje přístup k alchymistické dílně</label><button type="submit">Zahájit Identify</button>'))}
+ ];
+ const assistants=calendarMemberIds(clock,data.characters).filter(person=>person.id!==actor.id)
+  .map(person=>({person,ml:availableMasteries(person).find(row=>row.name==='Alchemy')?.ml??0}))
+  .filter(entry=>entry.ml>=40&&entry.ml*2>=ml);
+ const assistantOptions=assistants.map(({person,ml})=>`<option value="${esc(person.id)}">${esc(person.name)} · ML ${ml}</option>`).join('');
+ const ongoing=pending.map(row=>{
+  const start=row.calendarAlchemyExaminationStart;
+  const target=targets.find(x=>x.kind===start.target.kind&&x.id===start.target.id);
+  const due=clock.minute>=start.dueMinute;
+  return `<article class="hc-event"><strong>Identify · ${esc(target?.label??'Původní vzorek')}</strong>
+  <p>Dokončení od ${esc(displayCampaignMinute(start.dueMinute))}.</p>
+  ${due&&target?`<form data-alchemy-examination="identify"><input type="hidden" name="startId" value="${esc(row.id)}">
+   ${target.kind==='sample'?alchemyExaminationSampleField:''}
+   ${assistants.length?[1,2].map(n=>`<label>Pomocník ${n}<select name="assistant${n}"><option value="">Bez pomocníka</option>${assistantOptions}</select></label>`).join(''):''}
+   ${alchemyExaminationRollField}<button type="submit">Dokončit Identify a uložit výsledek</button></form>`:''}
+  <form data-alchemy-examination="cancel"><input type="hidden" name="startId" value="${esc(row.id)}">
+   <button type="submit" class="secondary">Ukončit rozpracované Identify</button></form></article>`;
+ });
+ const outcomes=data.journal.filter(row=>row.calendarCampaignId===cid&&row.characterId===actor.id&&row.calendarAlchemyExamination)
+  .slice(-12).reverse().map(row=>`<article class="hc-event"><strong>${esc(row.title)}</strong><p>${esc(row.body)}</p></article>`);
+ const progress=ongoing.length||outcomes.length?`<h4>Rozpoznání a identifikace vzorků</h4>${ongoing.join('')}${outcomes.join('')}`:'';
+ return {procedures,progress};
+}
+function alchemyExaminationDescription(proof){
+ if(proof.task==='cancel')return 'Práce byla ukončena.';
+ const reveal=proof.revealed;
+ const types={mundane:'běžná směs',exotic:'exotická směs',esoteric:'esoterický elixír'};
+ const observations=[];
+ if(reveal.classification)observations.push(types[reveal.classification]);
+ else if(reveal.mundane!==undefined)observations.push(reveal.mundane?'běžná směs':'směs není běžná');
+ if(reveal.convocation)observations.push('konvokace '+reveal.convocation);
+ if(reveal.unique!==undefined)observations.push(reveal.unique?'jedinečný elixír':'kanonický elixír');
+ if(reveal.principle)observations.push('princip '+reveal.principle);
+ if(reveal.effect)observations.push(reveal.unique?reveal.effect:reveal.effect+' · '+(elixirHelp[reveal.effect]??''));
+ if(reveal.as!==undefined)observations.push('AS '+reveal.as);
+ const result=proof.use+' · EML '+proof.eml+' · d100 ('+proof.d100+') · '+proof.sl+(proof.sv===null?'':' · SV '+proof.sv);
+ return result+'. '+(observations.join(' · ')||'Bez zjištění.');
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-alchemy-examination-die]');
+ if(!button)return;
+ const input=button.form.elements.d100;
+ input.value=String(secureAutoDie(100));
+ input.dataset.generated=input.value;
+},true);
+document.addEventListener('input',event=>{
+ if(event.target.matches?.('[data-alchemy-examination] [name="d100"]'))delete event.target.dataset.generated;
+},true);
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(!form.matches?.('[data-alchemy-examination]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ try{
+  const actor=character(selected),clock=data.campaignClock;
+  if(!actor||!clock||view!=='sheet'||activeSheetSection!=='projects'||
+   !calendarMemberIds(clock,[actor]).length)throw Error('Otevřete Alchemy u účastníka aktivní kampaně.');
+  const fields=new FormData(form);
+  const task=form.dataset.alchemyExamination,startId=fields.get('startId');
+  const cid=campaignKey(clock),journal=data.journal,minute=clock.minute;
+  const start=startId&&pendingAlchemyExaminations(journal,cid,actor.id).find(row=>row.id===startId)?.calendarAlchemyExaminationStart;
+  const candidate=alchemyExaminationTargets(clock).find(x=>start?
+   x.kind===start.target.kind&&x.id===start.target.id:x.kind+':'+x.id===fields.get('target'));
+  const target=task==='cancel'?start?.target:candidate&&{kind:candidate.kind,id:candidate.id};
+  if(!target)throw Error('Zvolený vzorek už není přístupný.');
+  const able=person=>{
+   if(!person||combatActorLocked93725(person.id))return false;
+   const state=persistentStateOf(person);
+   return episodeActorCanAct(state)&&state.shock!=='STN'&&!activeHerbalParalysis(state,minute)&&!activeHerbalSoporific(state);
+  };
+  if(task!=='cancel'&&!able(actor))throw Error('Alchymista se v aktuálním stavu nebo v Initiative nemůže soustředit na tento postup.');
+  const mastery=person=>availableMasteries(person).find(row=>row.name==='Alchemy')?.ml??0;
+  const ctx={journal,campaignId:cid,actorId:actor.id,minute,target,alchemyML:mastery(actor)};
+  const title=task==='start'?'Zahájené Identify':task==='cancel'?'Ukončené Identify':
+   task==='recognise'?'Recognise · '+candidate.label:'Identify · '+candidate.label;
+  const assistantIds=[fields.get('assistant1'),fields.get('assistant2')].filter(Boolean);
+  const assistants=assistantIds.map(id=>{
+   const person=calendarMemberIds(clock,data.characters).find(x=>x.id===id);
+   if(!able(person))throw Error('Pomocník musí být způsobilý účastník kampaně.');
+   return {actorId:id,ml:mastery(person)};
+  });
+  const result=task==='start'?startAlchemyIdentification({...ctx,workshopConfirmed:fields.has('workshopConfirmed')}):
+   resolveAlchemyExamination({...ctx,task,startId,assistants,
+    perceptionML:task==='recognise'?Number(actor.hmk?.attributes?.per)*5:null,
+    fatigue:task==='cancel'?0:combatFatigueTotals(persistentStateOf(actor)).total,
+    classification:fields.get('classification'),d100:Number(fields.get('d100')),
+    origin:form.elements.d100?.dataset.generated===fields.get('d100')?'cryptographic-software-die':'manual'});
+  const body=task==='start'?'Výsledek lze zapsat po hodině práce od '+displayCampaignMinute(minute)+'.':alchemyExaminationDescription(result);
+  mutate(()=>{data.journal.push({id:uuid(),createdAt:stamp(),characterId:actor.id,calendarCampaignId:cid,campaignMinute:minute,
+   title,body,[task==='start'?'calendarAlchemyExaminationStart':'calendarAlchemyExamination']:result});});
+ }catch(error){uiAlert(error.message);}
+},true);
+
 function characterCraftProcedures(clock,actor,discipline){
  const [panel]=folioHTMLNodes(characterCraftPanel(clock,actor,discipline));
  const container=panel.firstElementChild;
@@ -8588,7 +8725,8 @@ function characterCraftProcedures(clock,actor,discipline){
   return `${heading.outerHTML}${records.join('')}${rules.length?
    `<details><summary>Pravidla k tomuto kroku</summary>${rules.join('')}</details>`:''}`;
  }).join('');
- return {procedures,progress:progress+arcaneProgress,preparationRules};
+ const examination=alchemy?alchemyExaminationHTML(clock,actor,mastery):{procedures:[],progress:''};
+ return {procedures:[...procedures,...examination.procedures],progress:examination.progress+progress+arcaneProgress,preparationRules};
 }
 function characterProjectsChapter(actor){
  const disciplines=characterProjectDisciplines(actor);
