@@ -6,7 +6,7 @@
 import {writingPageSpread} from './hmk-scribing-work.js?v=94.006';
 import {successLevel} from '../rules/tests.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
-const SELECTOR='form[data-skill-critical-form],form[data-hmk-fishing-catch],form[data-herb-assess],form[data-weather-blood-start],'+
+const SELECTOR='form[data-skill-critical-form],form[data-hmk-fishing-catch],form[data-herb-assess],form[data-herb-complete],form[data-weather-blood-start],'+
  'form[data-skill-cold-shock],form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
  'form[data-faerie-roll],form[data-hmk-engineering-design],form[data-shipwright-roll],form[data-construction-roll],form[data-fletching-finish="roll"],form[data-brew-start],form[data-brew-wine],form[data-jewelcraft-work],form[data-writing-spread],form[data-script-reading]:not([data-script-reading="done"]),form[data-script-copy="test"],form[data-hmk-scribing-work],form[data-parallel-cold-reroll],form[data-parallel-cold-course],.hmk-weather-care form#hmk-frost-amputation-form';
 const SELECTIONS={
@@ -15,7 +15,7 @@ const SELECTIONS={
  shipwright:[],construction:[],
  fletching:['timeStars','armourDiceCount'],skillFollowup:['activity','technique'],
  fishing:['technique','conditionsMode','gmCondition','saturation','saltWater','offshore'],
- herbs:['singlePotencyRoll','actorId'],
+ herbs:['singlePotencyRoll','actorId'],herbShelf:['skillId'],
  blood:['method','healerId','hasWater','hasNeedleThread','hasHeatedTool','tourniquet'],
  shock:[], immersion:['condition'],
  frost:['wound','healerId'],
@@ -23,13 +23,13 @@ const SELECTIONS={
  trauma:['restfulShelter','arcaneBonus','physicianStars'],
  alchemy:[],brewStart:['scope'],brewWine:['workshopTN'],jewelcraft:['jewelTime'],reading:['sourceId','condition','timeStars','exchanged','useCreativity'],copy:[],writing:['timeStars','subjectSkill']
 };
-const title={faerie:'Faeriecraft · potvrzení hodů',design:'Engineering · Design Roll',writingSpread:'Writing · rozptyl dle HMK 132',shipwright:'Shipwright · HMK 84',construction:'Construction Roll · HMK 78, 91',fletching:'Výroba · potvrzení hodů',brewStart:'Brewing · doba zrání',brewWine:'Brewing · cena vína',jewelcraft:'Jewelcraft · doba výroby',reading:'Reading · potvrzení hodů',copy:'Opis · potvrzení d100',writing:'Insight a Scribing · HMK 83, 132',skillFollowup:'Navazující Skill Test',fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',
+const title={faerie:'Faeriecraft · potvrzení hodů',design:'Engineering · Design Roll',writingSpread:'Writing · rozptyl dle HMK 132',shipwright:'Shipwright · HMK 84',construction:'Construction Roll · HMK 78, 91',fletching:'Výroba · potvrzení hodů',brewStart:'Brewing · doba zrání',brewWine:'Brewing · cena vína',jewelcraft:'Jewelcraft · doba výroby',reading:'Reading · potvrzení hodů',copy:'Opis · potvrzení d100',writing:'Insight a Scribing · HMK 83, 132',skillFollowup:'Navazující Skill Test',fishing:'Fishing · Conditions a Catch',herbs:'Byliny · potence a rozpad',herbShelf:'Herblore · trvanlivost',
  frost:'Frost Amputation · hody v pořadí',bloodComplete:'Blood Stoppage a případný Blood Loss',blood:'Blood Stoppage · obvazy',shock:'Shock a případná Coma',immersion:'Cold Water Shock',trauma:'Extended Shock / Coma · Course Rolls',alchemy:'Alchemy · povinné navazující hody'};
 const value=(form,name)=>form.elements.namedItem(name)?.value||'';
 const die=(n,max)=>/^\d+$/.test(String(n).trim())&&Number.isSafeInteger(Number(n))&&Number(n)>=1&&Number(n)<=max;
 const stageKey=(step)=>step.key;
 function kindOf(form){if(form.matches('[data-faerie-roll]'))return 'faerie';if(form.matches('[data-hmk-engineering-design]'))return 'design';if(form.matches('[data-writing-spread]'))return 'writingSpread';if(form.matches('[data-shipwright-roll]'))return 'shipwright';if(form.matches('[data-construction-roll]'))return 'construction';if(form.matches('[data-fletching-finish]'))return 'fletching';if(form.matches('[data-brew-start]'))return 'brewStart';if(form.matches('[data-brew-wine]'))return 'brewWine';if(form.matches('[data-jewelcraft-work]'))return 'jewelcraft';if(form.matches('[data-script-reading]'))return 'reading';if(form.matches('[data-script-copy]'))return 'copy';if(form.matches('[data-hmk-scribing-work]'))return 'writing';return form.matches('[data-skill-critical-form]')?'skillFollowup':form.id==='hmk-frost-amputation-form'?'frost':form.matches('[data-weather-blood-complete]')?'bloodComplete':form.matches('[data-hmk-fishing-catch]')?'fishing':
- form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
+ form.matches('[data-herb-complete]')?'herbShelf':form.matches('[data-herb-assess]')?'herbs':form.matches('[data-weather-blood-start]')?'blood':
  form.matches('[data-skill-cold-shock]')?'immersion':form.matches('[data-weather-shock-followup],[data-parallel-cold-reroll]')?'shock':form.matches('[data-weather-trauma-course],[data-parallel-cold-course]')?'trauma':'alchemy';}
 function fieldsOf(form,kind){
  if(kind==='faerie')return ['spiritRoll','sacredRoll','craftRoll','spiritDie','willRoll'].filter(name=>form.elements.namedItem(name));
@@ -48,6 +48,7 @@ function fieldsOf(form,kind){
  if(kind==='frost')return ['physicianRoll','amputationRoll','shockRoll'];
  if(kind==='bloodComplete')return ['physicianRoll','strengthRoll'].filter(name=>form.elements.namedItem(name));
  if(kind==='fishing')return ['conditionsD100','catchD10'];
+ if(kind==='herbShelf')return ['shelfD6'];
  if(kind==='herbs')return [...form.querySelectorAll('input[name^="dice_"]')].map(n=>n.name);
  if(kind==='blood')return ['bandageD6Rolls'];
  if(kind==='immersion')return ['d6_1','d6_2','d6_3','enduranceD100'];
@@ -194,6 +195,8 @@ function stepsFor(form,kind){
     if(nextHR>0&&nextHR<6)add('periodD10',10,'Coma pokračuje · nový d10 do dalšího Course');
    }
   }
+ }else if(kind==='herbShelf'){
+  add('shelfD6',6,'Trvanlivost d6');
  }else if(kind==='alchemy'){
   if(form.elements.namedItem('cfWillD10')){
    add('cfWillD10',10,'CF · Will Secondary Roll d10');
@@ -239,7 +242,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   }
   const legacy={
    fishing:'[data-hmk-followup-roll-all]',
-   herbs:'[data-herb-auto],[data-herb-shared]',
+   herbs:'[data-herb-auto],[data-herb-shared]',herbShelf:'[data-herb-shelf-roll]',
    blood:'',shock:'[data-weather-coma-d10]',
    alchemy:'[data-alchemy-roll-will],[data-alchemy-roll-dissolution],[data-alchemy-roll-shock],[data-alchemy-roll-augment]'};
   if(legacy[kind])for(const b of form.querySelectorAll(legacy[kind])){b.hidden=true;b.disabled=true;}
@@ -286,7 +289,7 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
     }
     const software=group.length&&group.every(x=>accepted.get(x.key)?.origin==='software');
     for(const property of ['herbGenerated','alchemyGenerated','hmkAutoDice'])delete field.dataset[property];
-    if(software){if(kind==='herbs')field.dataset.herbGenerated=literal;
+    if(software){if(kind==='herbs'||kind==='herbShelf')field.dataset.herbGenerated=literal;
      if(kind==='alchemy')field.dataset.alchemyGenerated=literal;
      field.dataset.hmkAutoDice=literal;}
    }
