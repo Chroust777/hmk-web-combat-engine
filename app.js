@@ -399,7 +399,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.019';
+const APP_VERSION='94.020';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3977,16 +3977,6 @@ const herbProjectNeeds={
 function alchemyWorkshopAccess(mode){
  return projectResourcesHTML([alchemyStartingNeeds[mode],...alchemyWorkshopNeeds]);
 }
-function alchemyProjectRequirements(actor){
- const masteries=availableMasteries(actor);
- const ml=masteries.find(skill=>skill.name==='Alchemy')?.ml??0;
- const known=threshold=>ml>=threshold?'splněno':'chybí '+(threshold-ml)+' ML';
- return `<aside class="notice"><strong>Požadavky Alchemy · aktuální ML ${ml}</strong>
-  <ul><li>Běžný elixír · ML 60 (${known(60)})</li><li>Vynález vlastního elixíru · ML 100 (${known(100)})</li>
-  <li>Asistence u cizí práce · ML 40 (${known(40)})</li></ul>
-  <p>Příprava používá Herblore a Mineralogy jako Secondary Modifiers a Mathematics jako Secondary Roll.</p>
-  <ul>${['Herblore','Mineralogy','Mathematics'].map(name=>`<li>${name} · ${masteries.find(skill=>skill.name===name)?.ml>0?'ML '+masteries.find(skill=>skill.name===name).ml:'neosvojeno'}</li>`).join('')}</ul></aside>`;
-}
 function characterCraftPanel(clock,maker,discipline){
  const participants=calendarMemberIds(clock,registryCharacters93813(data.characters));
  const actorId=maker.id,onlyMaker=participants.filter(person=>person.id===actorId);
@@ -4040,8 +4030,13 @@ function characterCraftPanel(clock,maker,discipline){
   const options=participants.filter(x=>x.id!==actorId).map(x=>({person:x,ml:availableMasteries(x).find(y=>y.name==='Alchemy')?.ml||0})).filter(x=>x.ml>=40);
   return `<fieldset><legend>Alchemy Assistance · nejvýše 2 osoby (HMK 268)</legend><p class="hc-hint">Pomocníky určete před zahájením. ML40+ dovoluje asistovat, Index přispěje do EML jen při ML alespoň polovině výrobce (${alchemyML}); celkový strop +10. Na konci se musí shodovat s původním Skill Workbench SV.</p><div class="hc-fields">${[1,2].map(i=>`<label>Pomocník ${i}<select name="alchemyAssist${i}"><option value="">— nikdo —</option>${options.map(x=>`<option value="${esc(x.person.id)}">${esc(x.person.name)} · Alchemy ML ${x.ml}${x.ml*2>=alchemyML?' · Index +'+Math.floor(x.ml/10):' · bez EML bonusu'}</option>`).join('')}</select></label>`).join('')}</div></fieldset>`;
  };
+ const herbReservationHTML=()=>`<details><summary>Vyhradit bylinnou dávku ze zásob</summary>${availableSupplyLots(data.journal,campaignKey(clock)).filter(x=>x.unit==='herbDoses'&&x.remaining>=1).map(lot=>`<form data-foraging-supply-use>
+  <input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="sourceId" value="${esc(lot.sourceId)}">
+  <input type="hidden" name="resultIndex" value="${esc(lot.resultIndex)}"><input type="hidden" name="unit" value="herbDoses"><input type="hidden" name="quantity" value="1">
+  <label>${esc(lot.herbName)} · dostupné dávky ${lot.remaining} <input name="purpose" maxlength="120" required placeholder="Účel rezervace"></label>
+  <button type="submit">Vyhradit jednu dávku</button></form>`).join('')||'<p>Žádná dostupná bylinná dávka.</p>'}</details>`;
  if(discipline==='special-alchemy')return `<section class="hc-calendar hc-wilderness hmk-workshop-project-94019"><details data-calendar-alchemy-982 open><summary>Alchemy · Create a Invent (${pendingAlchemy.length} rozpracovaných) (HMK str. 265–268)</summary>
- <details><summary>Arcane · Detect / Reveal / Dispel / Negation · alchymistické zdroje (${alchemyArcaneTargets.filter(x=>x.dossier?.targetable).length})</summary>
+ <section data-craft-procedure="arcane" data-label="Magické zdroje a jejich rozpoznání (HMK str. 251, 254, 263, 270)">
  <p class="hc-hint">Pouze pravidlová kontrola aktuálních cílů z originálního inventáře a kalendáře (HMK 251,254,263,270). Nejde o seslání kouzla ani jeho automatický úspěch. Dispel vyžaduje úspěšný Detect i Reveal téhož zdroje, vyřešenou ochranu Ward a skutečný casting; EML má postih −5 za každý aktuální AS. Soulcloak / True Sight / Spirit Sensing nejsou tímto přehledem automaticky aktivovány.</p>
  <p class="hc-hint"><strong>Shèk-Pvâr · skutečně doložená výchozí znalost</strong> (HMK 54,198,251,254): žádný výpis nezakládá spellfire ani dodatečné naučení kouzla.</p>
  ${alchemyArcaneCasters.map(x=>x.error?`<p class="hc-hint">⚠ ${esc(x.name)} · poškozený původ kouzel: ${esc(x.error)}.</p>`:
@@ -4049,8 +4044,8 @@ function characterCraftPanel(clock,maker,discipline){
  ${alchemyArcaneTargets.map(x=>x.error?`<p class="hc-hint">⚠ ${esc(x.finishId)}: ${esc(x.error)} (bez zápisu)</p>`:
   x.dossier.targetable?`<p class="hc-hint"><strong>${esc(x.dossier.elixirName)}</strong> · ${esc(x.dossier.phase==='stored'?'uložený fyzický kus':'aktivní Temporary na postavě')} · AS ${x.dossier.currentAS} · Dispel EML ${x.dossier.dispelEMLPenalty} · původ ${esc(x.dossier.sourceId||'')} · ${esc(x.dossier.targetId||'')}</p>`:
   `<p class="hc-hint">${esc(x.dossier.elixirName)}: ${esc(x.dossier.reason||'nyní bez ověřeného magického cíle')}.</p>`).join('')||'<p class="hc-hint">Žádná dokončená alchymistická dávka v kampani.</p>'}
- </details>
- <div data-character-craft-start><details><summary>Pravidla a vyhodnocení</summary><p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p></details>
+ </section>
+ <section data-craft-procedure="create" data-label="Připravit běžný elixír (HMK str. 267–268)">${alchemyWorkshopAccess('create')}<details open><summary>Pravidla a vyhodnocení</summary><p class="hc-hint">Create ML60+, Invent ML100+; dílna (soukromá podle Wealth 10+, nebo GM doložená chantry 1–5 ★); 10+3d6 nepřerušených dní po cca 10 h. V předepsaném termínu vytvořte nový Alchemy Success Value v původním Skill Workbench: Herblore, Mineralogy, aktivita „Příprava / vynalézání elixíru“ s Mathematics SR a GM Sunsign modifier. Dodatečné Augmentation d10 testují kvalitu dílny. Čas posouvá výhradně GM. Alchemy CF nyní vyžaduje skutečný Will SR d10 (Will Index). Neúspěch vyžaduje d100 Dissolution a zapisuje Aural Shock 1/3/5 a Weakness (HMK 267,190). Crucial Dissolution (d100 končí 5/0) vyžaduje skutečný Shock d100 proti Shock ML po Fatigue; základní SHK 8, následný Shock State a případný Shock Recovery využívají existující Combat State. Žádný čas ani bojové kolo se automaticky neposouvá. Tekuté elixíry lze doloženě uložit do stávající Vial, 4 oz; plná nádoba má 0,5 lb v existujícím ENC. Účinky elixírů dosud nejsou aktivovány.</p></details>
  ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
   if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
@@ -4060,13 +4055,13 @@ function characterCraftPanel(clock,maker,discipline){
   <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label>
   <input type="hidden" name="wealth" value="${esc(c.hmk?.wealth??'')}"></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
-  ${alchemyWorkshopAccess('create')}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   
   <button type="submit">Zahájit přípravu v čase GM (bez posunu)</button>${projectDraftCancelHTML}</form>`}).join('')}
- <h4>Invent · unikátní elixíry (HMK 267–268)</h4>
- <details><summary>Pravidla pro vlastní a převzaté receptury (HMK str. 267–268)</summary><p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p></details>
+ </section>
+ <section data-craft-procedure="invent" data-label="Vynalézt elixír (HMK str. 267–268)">${alchemyWorkshopAccess('invent')}
+ <details open><summary>Pravidla pro vlastní receptury (HMK str. 267–268)</summary><p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p></details>
  ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
   if(ml<100||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
@@ -4080,12 +4075,14 @@ function characterCraftPanel(clock,maker,discipline){
   <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry (zvolit kvalitu)</option></select></label>
   <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
-  ${alchemyWorkshopAccess('invent')}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje parametry unikátního elixíru a jejich znalost výrobcem</label>
   
   <button type="submit">Invent · zahájit výrobu (bez posunu času)</button>${projectDraftCancelHTML}</form>`;}).join('')}
+ </section>
+ <section data-craft-procedure="known" data-label="Připravit převzatou recepturu (HMK str. 267–268)">${alchemyWorkshopAccess('known')}
+ <p>Dokud tuto recepturu postava poprvé úspěšně nepřipraví, uplatní se −1 SV při Preparation Rollu.</p>
  ${knownInventorElixirs.map(source=>{const recipe=source.calendarAlchemyFinish.uniqueElixir;
  return onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
   if(c.id===source.characterId||ml<60||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
@@ -4094,13 +4091,12 @@ function characterCraftPanel(clock,maker,discipline){
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="known"><input type="hidden" name="elixirName" value="${esc(recipe.title)}"><input type="hidden" name="knowledgeFinishId" value="${esc(source.id)}">
   <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry</option></select></label><label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
-  ${alchemyWorkshopAccess('known')}
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
   <label class="hc-check"><input type="checkbox" name="gmInventionConfirmed" required> GM potvrzuje přístup této postavy k doložené receptuře a veškerým parametrům</label>
   
   <button type="submit">Připravit známý unikátní elixír (bez posunu času)</button>${projectDraftCancelHTML}</form>`;}).join('');}).join('')}
- </div>
+ </section>
  ${pendingAlchemy.map(row=>{const a=row.calendarAlchemyStart,actor=character(a.actorId),proofs=projectJournal().filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.characterId===a.actorId&&j.campaignMinute===a.dueMinute&&(!j.calendarCharacterCraftSkill||j.calendarCharacterCraftSkill.startId===row.id)&&j.skillTestProof?.type==='secondary-mastery-value-test'&&j.skillTestProof.skills?.[0]==='Alchemy'&&j.skillTestProof.secondarySkills?.[0]==='Herblore'&&j.skillTestProof.secondarySkills?.[1]==='Mineralogy'&&j.skillTestProof.secondaryRollResult?.routineId==='alchemy-elixir'&&j.skillTestProof.gmModifiers?.[0]===a.sunsignModifier&&!projectJournal().some(x=>x.calendarAlchemyFinish?.skillId===j.id));
   return `<article class="hc-event" data-project-calendar-record="${esc(row.id)}"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.assistantPlan?.length?'Pomocníci: '+a.assistantPlan.map(h=>esc(character(h.actorId)?.name||h.actorId)+' (Alchemy '+h.ml+')').join(', ')+'. ':''}${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
  ${!discipline?projectCancelButton(row):''}
@@ -4112,32 +4108,33 @@ function characterCraftPanel(clock,maker,discipline){
   ${r.level==='CF'?`<div class="hc-fields"><label>Will SR d10 (Will Index ${Math.floor(willML/10)})<input type="number" name="cfWillD10" min="1" max="10" required></label><label>Pokud Will SR neuspěje: Alchemical Dissolution d100<input type="number" name="dissolutionD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-will>⚄ Generovat Will SR d10</button> <button type="button" class="hc-small" data-alchemy-roll-dissolution>⚄ Generovat Dissolution d100 (jen po neúspěšném Will SR)</button><div class="hc-fields"><label>Crucial Dissolution (d100 končí 5/0): skutečný Shock d100<input type="number" name="crucialShockD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-shock>⚄ Generovat Crucial Shock d100 (jen 5/0)</button><p class="hc-hint">Will SR → Dissolution d100 → případný Shock d100 proti ověřenému Shock ML ${shockML} − Fatigue (včetně nové Aural Weakness). SHK 8 upraví původní Shock SL. Při následném STN/INC/UNC zůstává povinný původní Shock Recovery.</p>`:''}
   <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" ${r.level==='CF'?'':'required'}></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje nepřerušenou přípravu, koncentraci a skutečnou účast všech předem zapsaných pomocníků po nezbytnou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||`<button type="button" class="secondary" data-character-craft-sv="Alchemy" data-craft-source="${esc(row.id)}">Provést Preparation Roll</button>`:''}</article>`}).join('')}
  <h4>Elixir Decay · HMK 268 (30 dní)</h4>
- <p class="hc-hint">Každých 30 dní od dokončení: d10 proti aktuální AS; úspěch −1 AS, neúspěch −2 AS. Při AS 0 enchantment zaniká. Hody ukládají neměnný důkaz; GM musí zastavit společné hodiny na splatnosti. Samotná AS neimplikuje fyzickou lahvičku ani účinek. Naplnění vyžaduje zvláštní GM důkaz.</p>
+<p class="hc-hint" data-craft-rule>Každých 30 dní od dokončení: d10 proti aktuální AS; úspěch −1 AS, neúspěch −2 AS. Při AS 0 enchantment zaniká. Hody ukládají neměnný důkaz; GM musí zastavit společné hodiny na splatnosti. Samotná AS neimplikuje fyzickou lahvičku ani účinek. Naplnění vyžaduje zvláštní GM důkaz.</p>
  ${makerElixirs.map(x=>`<p class="hc-hint"><strong>${esc(x.elixirName)}</strong> · ${esc(character(x.actorId)?.name||x.actorId)} · dokončeno ${esc(displayCampaignMinute(x.completedMinute))} · AS ${x.initialAS} → <strong>${x.currentAS}</strong>${x.dispersed?' · obsah vyprázdněn':x.expires?' · ENCHANTMENT LOST':' · další d10 '+esc(displayCampaignMinute(x.nextDueMinute))} · ${x.period} kontrol</p>`).join('')}
  ${alchemyDecayDue.map(x=>`<form data-alchemy-decay><strong>${clock.minute>x.nextDueMinute?'Zmeškaný Decay – konzervativní oprava':'Decay splatný'} · ${esc(x.elixirName)} · AS ${x.currentAS}</strong><input type="hidden" name="finishId" value="${esc(x.finishId)}"><input type="hidden" name="actorId" value="${esc(x.actorId)}"><input type="hidden" name="dueMinute" value="${x.nextDueMinute}"><p class="hc-hint">Splatnost ${esc(displayCampaignMinute(x.nextDueMinute))}; zápis dnes ${esc(displayCampaignMinute(clock.minute))}. ${clock.minute>x.nextDueMinute?'Dnešní hod nelze vydávat za původní historický hod. Zpětné GM vyhodnocení je možné pouze u dosud nepoužitého elixíru bez pozdějších závislých záznamů.':'Řádný hod přesně v termínu.'}</p><label>Decay d10<input name="d10" type="number" min="1" max="10" required></label><button type="button" data-alchemy-roll-decay class="hc-small">⚄ Generovat d10</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečně zadaný hod d10</label>${clock.minute>x.nextDueMinute?'<label class="hc-check"><input type="checkbox" name="gmMissedConfirmed" required> GM schvaluje nynější zpětné vyhodnocení zmeškané splatnosti (nikoli zpětné falšování času zápisu)</label>':''}<button type="submit">${clock.minute>x.nextDueMinute?'Opravit zmeškaný Decay':'Zapsat Decay Roll'} · bez posunu času</button></form>`).join('')}
  <h4>Alchemy · Darkvision / Physic Imbibing (HMK 269–273)</h4>
- <p class="hc-hint">První dokončená větev použití elixíru: Darkvision. Imbibing d100 používá skutečné Aura či Alchemy ML příjemce bez postihů za Fatigue a Impairment. F/CF upravuje AS. Profusion: u další dávky se rozšiřují neúspěšné CF výsledky; skutečné CF vyvolá samostatný Ill Effect každého aktivního Darkvision. Každý má vlastní HP d6 a zotavení. Při CF je doložena i citlivost na světlo (HR5, HP d6 dní); léčení vyžaduje skutečný d6 pro HP a v každém termínu d100 proti HB × HR podle existující Exposure Healing tabulky. Dočasný efekt zůstává po vypití v kalendáři a dále podléhá 30denním Decay Rolls. Žádný společný čas se neposouvá.</p>
+<p class="hc-hint" data-craft-rule>První dokončená větev použití elixíru: Darkvision. Imbibing d100 používá skutečné Aura či Alchemy ML příjemce bez postihů za Fatigue a Impairment. F/CF upravuje AS. Profusion: u další dávky se rozšiřují neúspěšné CF výsledky; skutečné CF vyvolá samostatný Ill Effect každého aktivního Darkvision. Každý má vlastní HP d6 a zotavení. Při CF je doložena i citlivost na světlo (HR5, HP d6 dní); léčení vyžaduje skutečný d6 pro HP a v každém termínu d100 proti HB × HR podle existující Exposure Healing tabulky. Dočasný efekt zůstává po vypití v kalendáři a dále podléhá 30denním Decay Rolls. Žádný společný čas se neposouvá.</p>
  ${onlyMaker.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute),shock=c.hmk?.arcane?.auralShockLevels??0;return effects.map(x=>`<p class="hc-hint">${esc(c.name)} · Darkvision AS ${x.state.currentAS} · ${shock>0?`<strong>Aural Shock ${esc(shock)}: prospěch z vidění ve tmě pozastaven (HMK 270)</strong>; AS a Decay běží dál`:`vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong>`} · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
 <h4>Darkvision · CF citlivost na světlo · HP d6 dní / HR5</h4>
- <p class="hc-hint">HMK 270–271: postih mimo stín/pološero je polovina původní AS × 5. Úplné uzdravení při HR6; další testy po d6 dnech od skutečného CF. Success +1 HR, Critical Success +2 HR; CF znamená přeskočit další periodu. Doba pouze podle kalendáře GM.</p>
+<p class="hc-hint" data-craft-rule>HMK 270–271: postih mimo stín/pološero je polovina původní AS × 5. Úplné uzdravení při HR6; další testy po d6 dnech od skutečného CF. Success +1 HR, Critical Success +2 HR; CF znamená přeskočit další periodu. Doba pouze podle kalendáře GM.</p>
  ${pendingDarkvisionHealing(data.journal,campaignKey(clock),clock.minute).map(h=>{const c=character(h.targetId),attrs=c?.hmk?.attributes;return `<article class="hc-event"><strong>${esc(c?.name||h.targetId)} · citlivost na světlo −${h.penalty} EML (jen zrak při jasném světle)</strong><p>HR ${h.healingRate} · ${h.pendingStart?'Chybí d6 Healing Period – starý CF důkaz':clock.minute>h.nextDueMinute?'ZMEŠKANÁ SPLATNOST '+esc(displayCampaignMinute(h.nextDueMinute)):'Příští hod '+esc(displayCampaignMinute(h.nextDueMinute))}</p>
  ${h.pendingStart&&clock.minute===h.onsetMinute?`<form data-darkvision-healing-start><input type="hidden" name="useId" value="${esc(h.useId)}"><input type="hidden" name="targetId" value="${esc(h.targetId)}"><label>Healing Period d6<input type="number" name="hpD6" min="1" max="6" required></label><button type="button" data-darkvision-roll-hp class="hc-small">⚄ d6</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje hod d6 při původním CF</label><button type="submit">Zapsat Healing Period</button></form>`:''}
  ${!h.pendingStart&&clock.minute===h.nextDueMinute&&attrs?.end&&attrs?.wil?`<form data-darkvision-healing-roll><input type="hidden" name="useId" value="${esc(h.useId)}"><input type="hidden" name="targetId" value="${esc(h.targetId)}"><p>END ${attrs.end}, WIL ${attrs.wil}; Healing Base a EML se vypočítají ze stávajících pravidel.</p><label>Skutečný Healing d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" data-darkvision-roll-heal class="hc-small">⚄ d100</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje skutečný Healing Roll v termínu</label><button type="submit">Zapsat zotavení / HR</button></form>`:''}</article>`}).join('')}
  <h4>Applied Elixirs · Mending / Object Aegis (HMK 269,273)</h4>
-<p class="hc-hint">Mending: plná oprava několika poškozených předmětů do celkové hmotnosti AS ×2 lb, jednu dávku nelze rozdělit. Object Aegis: jeden předmět do AS ×5 lb; GM musí spojit konkrétní pozdější Attunement/Psychometry test s d10 proti aktuální AS. Úspěch sníží původní SL o jeden stupeň a AS o 1. Původní d100 nikdy nepřepisujeme.</p>
+<p class="hc-hint" data-craft-rule>Mending: plná oprava několika poškozených předmětů do celkové hmotnosti AS ×2 lb, jednu dávku nelze rozdělit. Object Aegis: jeden předmět do AS ×5 lb; GM musí spojit konkrétní pozdější Attunement/Psychometry test s d10 proti aktuální AS. Úspěch sníží původní SL o jeden stupeň a AS o 1. Původní d100 nikdy nepřepisujeme.</p>
 ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyFinish?.result==='completed'&&['Mending','Object Aegis'].includes(j.calendarAlchemyFinish.elixirName)&&makerElixirs.some(x=>x.finishId===j.id)).map(j=>{const st=alchemyStates.find(z=>z.finishId===j.id),v=alchemyVialState(data.journal,campaignKey(clock),j.id,clock.minute);if(!st||!v?.full||v.ownerId!==j.characterId||!['none','carried'].includes(v.slot)||st.currentAS<=0||st.nextDueMinute<=clock.minute)return '';const candidates=data.inventory.filter(i=>i.quantity===1&&i.slot!=='chest'&&i.id!==v.vialId&&Number(i.snapshot?.properties?.weightLb)>0);return st.elixirName==='Mending'?`<form data-alchemy-mending><strong>Mending · AS ${st.currentAS} · maximum ${st.currentAS*2} lb</strong><input type="hidden" name="finishId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(v.ownerId)}"><p>Vyberte všechny skutečně poškozené předměty. Ctrl+klik pro více kusů; součet hmotnosti ověří engine. Weapon Quality, Acid AV a doložený stav předmětu se obnoví ve stejném inventáři.</p><select multiple name="targetItemId" size="5" required>${candidates.filter(i=>i.currentWQ!==undefined&&i.snapshot?.properties?.quality>i.currentWQ||Object.values(i.acidAVDamageByLocation||{}).some(x=>x>0)||(i.condition||'').trim()||alchemyAcidObjectDamage(data.journal,campaignKey(clock),i.id,clock.minute)>0).map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot?.name||i.id)} · ${esc(i.snapshot.properties.weightLb)} lb · ${esc(i.id)}</option>`).join('')}</select><label class="hc-check"><input name="accessConfirmed" type="checkbox" required> GM potvrzuje skutečně dostupné předměty a jediné úplné vylití do jednoho kola</label><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplnou opravu a spotřebu skutečné lahvičky bez posunu času</label><button type="submit">Mending: obnovit předměty a vyprázdnit lahvičku</button></form>`:`<form data-alchemy-aegis-apply><strong>Object Aegis · AS ${st.currentAS} · maximum ${st.currentAS*5} lb</strong><input type="hidden" name="finishId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(v.ownerId)}"><label>Jediný skutečný předmět<select name="targetItemId" required>${candidates.filter(i=>Number(i.snapshot.properties.weightLb)<=st.currentAS*5).map(i=>`<option value="${esc(i.id)}">${esc(i.snapshot.name)} · ${i.snapshot.properties.weightLb} lb · ${esc(i.id)}</option>`).join('')}</select></label><label class="hc-check"><input name="accessConfirmed" type="checkbox" required> GM potvrzuje aplikaci na tento fyzický kus v jednom kole</label><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje spotřebu původní lahvičky</label><button type="submit">Object Aegis: vytvořit ochranu</button></form>`;}).join('')}
 ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyObjectAegis).map(j=>{const st=alchemyObjectAegisState(data.journal,campaignKey(clock),j.id,clock.minute);if(!st.active)return `<p class="hc-hint">Object Aegis · ${esc(j.calendarAlchemyObjectAegis.targetName)} · AS vyčerpána</p>`;const attempts=data.journal.filter(k=>k.calendarCampaignId===campaignKey(clock)&&k.skillTestProof&&k.campaignMinute<=clock.minute&&[...(k.skillTestProof.skills||[]),k.skillTestProof.skill,k.skillTestProof.primarySkill,k.skillTestProof.name].some(x=>['Attunement','Psychometry'].includes(x))&&!data.journal.some(a=>a.calendarAlchemyObjectAegisTest?.sourceTestId===k.id));return `<form data-alchemy-aegis-test><strong>Object Aegis · ${esc(j.calendarAlchemyObjectAegis.targetName)} · AS ${st.remainingAS}</strong><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Typ skutečně proběhlého testu<select name="kind"><option value="Attunement">Attunement</option><option value="Psychometry">Psychometry</option></select></label><label>Originální Skill Workbench důkaz<select name="sourceTestId" required>${attempts.map(k=>`<option value="${esc(k.id)}">${esc(k.id)} · ${esc(k.skillTestProof.skills?.[0]||k.skillTestProof.skill||k.skillTestProof.name||'')} · ${esc(k.skillTestProof.a?.level||k.skillTestProof.result?.level||'')}</option>`).join('')}</select></label><label>Skutečný Aegis d10 proti AS ${st.remainingAS}<input name="d10" type="number" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-aegis>⚄ d10</button><label class="hc-check"><input type="checkbox" name="targetConfirmed" required> GM potvrdil tento konkrétní předmět jako cíl doloženého testu</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje d10 a neměnný odvozený SL</label><button type="submit">Vyhodnotit Object Aegis proti originálnímu testu</button></form>`;}).join('')}
  <h4>Acid · přímý kontakt se zbraní · WQ (HMK 271)</h4>
- <p class="hc-hint">Pro skutečnou zbraň se každý doložený úspěch d10 proti AS promítá přímo do její aktuální WQ. AS každým kolem −1. Mimo boj, bez předpokládaného zásahu či splash; WQ musí být doložené. Není to útok proti AV ani zranění živé postavy.</p>
+<p class="hc-hint" data-craft-rule>Pro skutečnou zbraň se každý doložený úspěch d10 proti AS promítá přímo do její aktuální WQ. AS každým kolem −1. Mimo boj, bez předpokládaného zásahu či splash; WQ musí být doložené. Není to útok proti AV ani zranění živé postavy.</p>
  ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyAcidWeaponApply).map(j=>{const a=j.calendarAlchemyAcidWeaponApply,state=acidWeaponState(data.journal,campaignKey(clock),j.id,clock.minute);return `<article class="hc-event"><strong>Acid · WQ ${esc(a.targetName)}</strong><p>WQ ${state.initialWQ} → ${state.wq}, Acid AS ${state.as}, kola ${state.rounds}. ${state.spent?'Působení Acid skončilo.':'Další kontaktní kolo vyžaduje skutečný d10.'}</p>${!state.spent?`<form data-alchemy-acid-weapon-round><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Skutečný d10 proti AS ${state.as}<input type="number" name="d10" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-acid>⚄ d10</button><label class="hc-check"><input type="checkbox" name="contactConfirmed" required> GM potvrzuje další přímý kontakt se stejnou zbraní</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje skutečný hod a změnu původního WQ bez posunu času</label><button type="submit">Zapsat kontaktní kolo a aktualizovat skutečnou WQ</button></form>`:''}</article>`;}).join('')}
  <h4>Acid · poškození zbroje · skutečná AV (HMK 271)</h4>
- <p class="hc-hint">Přímý kontakt mimo Initiative: úspěšné d10 sníží AV původního inventárního kusu o 1; neúspěch AV nemění; AS každým kolem klesá o 1. Originální p118 katalog není přepisován: bojová ochrana používá skutečné poškození konkrétní vrstvy.</p>
+<p class="hc-hint" data-craft-rule>Přímý kontakt mimo Initiative: úspěšné d10 sníží AV původního inventárního kusu o 1; neúspěch AV nemění; AS každým kolem klesá o 1. Originální p118 katalog není přepisován: bojová ochrana používá skutečné poškození konkrétní vrstvy.</p>
  ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyAcidFleshApply).map(j=>{const a=j.calendarAlchemyAcidFleshApply,st=acidFleshState(data.journal,campaignKey(clock),j.id,clock.minute);return `<article class="hc-event"><strong>Acid · Flesh ${esc(character(st.targetId)?.name||st.targetId)}</strong><p>Lokace ${esc(st.targetLocation)} ${esc(st.targetSide||'')}; AS ${st.as}, Acid úspěchy / Burn IL ${st.burnIL}; skutečné IL rány ${st.woundIL}; kontaktní kola ${st.rounds}. ${st.spent?'Acid skončil.':'Další kolo musí mít skutečný d10, při každém novém Injury Level také Shock d100; Compound d10 jen při první popálenině se starší Fire/Frost ranou.'}</p>${!st.spent?`<form data-alchemy-acid-flesh-round><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Kontakt d10 (1–10)<input type="number" name="d10" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-acid>⚄ d10</button><label>Skutečné bojové kolo (v rámci časové osy, bez automatického posunu GM minut)<input type="number" name="combatRound" min="1" max="9999" value="${Math.max(1,persistentStateOf(character(st.targetId)).lastRound,st.rounds+1)}" required></label><label>Shock d100 při úspěchu (jinak prázdné)<input type="number" name="shockD100" min="1" max="100"></label><label>Compound d10 při starší Fire ráně (jinak prázdné)<input type="number" name="compoundD10" min="1" max="10"></label><label class="hc-check"><input type="checkbox" name="contactConfirmed" required> GM potvrzuje pokračující kontakt s touž kůží v jednom dalším kole</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje všechny fyzické hody a zápis do skutečného Combat State</label><button type="submit">Zapsat Acid f Burn / Shock</button></form>`:''}</article>`;}).join('')}
  ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyAcidArmourApply).map(j=>{const a=j.calendarAlchemyAcidArmourApply,state=acidArmourState(data.journal,campaignKey(clock),j.id,clock.minute);return `<article class="hc-event"><strong>Acid · AV ${esc(a.targetName)}</strong><p>Lokace ${esc(state.targetLocation)} · poškození AV ${state.initialDamage} → ${state.damage} (max ${state.maximumAV}), AS ${state.as}, kola ${state.rounds}. ${state.spent?'Acid přestal působit.':'Doložte další kontaktní kolo d10.'}</p>${!state.spent?`<form data-alchemy-acid-armour-round><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Skutečný d10 proti AS ${state.as}<input type="number" name="d10" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-acid>⚄ d10</button><label class="hc-check"><input type="checkbox" name="contactConfirmed" required> GM potvrzuje kontakt Acid se stejnou zbrojí</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje doložený hod, úpravu původního inventáře a historii</label><button type="submit">Zapsat Acid AV kolo</button></form>`:''}</article>`;}).join('')}
  <h4>Acid · kontaktní kola na neživém objektu (HMK 271)</h4>
+ <p data-craft-rule>Zahájený kontakt s předmětem sledujte u uložené dávky. Kola kontaktu potvrzujte u příslušného záznamu vpravo.</p>
  ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyAcidApply).map(j=>{const a=j.calendarAlchemyAcidApply,state=alchemyAcidContactState(data.journal,campaignKey(clock),j.id,clock.minute);return `<article class="hc-event"><strong>Acid · ${esc(a.targetName)} · ${esc(a.material)}</strong><p>AS ${state.as}; ${state.successes}/${state.destroyAtSuccesses} úspěchů; doložená kola ${state.rounds}. ${state.guideReached?'Dosažena HMK orientační hranice poškození; případné vyřazení původního kusu provede GM v inventáři.':state.as===0?'Acid vyčerpán.':'Každé další kolo: skutečný d10, úspěch 1 poškození, AS vždy −1.'}</p>${!state.spent?`<form data-alchemy-acid-round><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Další skutečné d10 proti AS ${state.as}<input type="number" name="d10" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-acid>⚄ d10</button><label class="hc-check"><input type="checkbox" name="contactConfirmed" required> GM potvrzuje pokračování přímého kontaktu s týmž objektem právě po jedno další kolo</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje původ d10 a výsledek bez posunu GM času</label><button type="submit">Zapsat další Acid round</button></form>`:''}</article>`;}).join('')}
  <h4>Fyzické alchymistické nádoby · HMK 268</h4>
- <p class="hc-hint">Tekuté i plynné elixíry: skleněná/keramická nádoba s korkem, plná 0,5 lb (prázdná Vial, 4 oz: 0,25 lb). Používá se jediný již vlastněný inventární kus. Hmotnost plné nádoby se promítá do stávajících přehledů, ENC a Combat Load; přesuny používají existující Truhlici a předání. Pozdní doložení vyžaduje potvrdit uložení již při dokončení. Plynný Fumebomb se ukládá do stejného typu fyzické nádoby, ale jako plyn (HMK 268). Applied Acid na neživý 6palcový objekt lze nyní přímo doložit; jiné aplikované účinky čekají na samostatnou implementaci.</p>
+<p class="hc-hint" data-craft-rule>Tekuté i plynné elixíry: skleněná/keramická nádoba s korkem, plná 0,5 lb (prázdná Vial, 4 oz: 0,25 lb). Používá se jediný již vlastněný inventární kus. Hmotnost plné nádoby se promítá do stávajících přehledů, ENC a Combat Load; přesuny používají existující Truhlici a předání. Pozdní doložení vyžaduje potvrdit uložení již při dokončení. Plynný Fumebomb se ukládá do stejného typu fyzické nádoby, ale jako plyn (HMK 268). Applied Acid na neživý 6palcový objekt lze nyní přímo doložit; jiné aplikované účinky čekají na samostatnou implementaci.</p>
  ${data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&x.calendarAlchemyFinish?.result==='completed'&&makerElixirs.some(elixir=>elixir.finishId===x.id)).map(x=>{
   const a=x.calendarAlchemyFinish,bind=alchemyVialBinding(data.journal,campaignKey(clock),x.id),state=bind?alchemyVialState(data.journal,campaignKey(clock),x.id,clock.minute):null;
   if(bind){const target=data.inventory.find(v=>v.id===state?.vialId);
@@ -4178,11 +4175,11 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
    ${vials.length?`<label>Existující samostatná Vial, 4 oz<select name="vialId" required>${vials.map(v=>`<option value="${esc(v.id)}">${esc(v.snapshot?.name||'Vial')} · ${esc(v.id)}</option>`).join('')}</select></label><label>Materiál nádoby<select name="material" required><option value="glass">Sklo</option><option value="ceramic">Keramika</option></select></label>${a.elixirName==='Fumebomb'?`<label class="hc-check"><input type="checkbox" name="gasConfirmed" value="yes" required> GM potvrzuje plyn Fumebomb v původní uzavřené nádobě</label>`:`<label class="hc-check"><input type="checkbox" name="liquidConfirmed" value="yes" required> GM potvrzuje, že jde o tekutou podobu tohoto elixíru</label>`}<label class="hc-check"><input type="checkbox" name="corkConfirmed" value="yes" required> GM potvrzuje fyzickou korkovou zátku</label><label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje skutečné uložení elixíru do této nádoby při dokončení přípravy, i když je důkaz zapsán později</label><button type="submit">Doložit fyzickou nádobu bez posunu času</button>`:'<p class="hc-hint">Chybí samostatná skutečně nesená a prázdná Vial, 4 oz (1 ks).</p>'}</form>`;
  }).join('')}
  <h4>Egosight · dotyk a rozpoznání artefaktu (HMK 271)</h4>
- <p class="hc-hint">Rozliší minor artefakt, major artefakt s Ego a Ego Subversion nebo major artefakt s vlastní vůlí Will. Neposkytuje neznámé schopnosti minor artefaktu ani přesný Will. GM musí artefakt skutečně předložit a potvrdit jeho stav. Během Aural Shock není prospěch z Egosight dostupný.</p>
+<p class="hc-hint" data-craft-rule>Rozliší minor artefakt, major artefakt s Ego a Ego Subversion nebo major artefakt s vlastní vůlí Will. Neposkytuje neznámé schopnosti minor artefaktu ani přesný Will. GM musí artefakt skutečně předložit a potvrdit jeho stav. Během Aural Shock není prospěch z Egosight dostupný.</p>
  ${onlyMaker.map(c=>{const shock=c.hmk?.arcane?.auralShockLevels??0,ctx=egosightTouchContext({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,actorId:c.id,auralShockLevels:shock});if(!ctx.sourceUseIds.length)return '';
  return `<form data-alchemy-egosight-touch><strong>${esc(c.name)} · Egosight ${ctx.active?'aktivní':ctx.suspended?'pozastaven Aural Shock':'splatný Decay'}</strong><input type="hidden" name="actorId" value="${esc(c.id)}"><label>Označení skutečně dotčeného artefaktu<input name="artefactReference" minlength="3" maxlength="160" required></label><label>Pravidlový druh artefaktu<select name="gmClassification"><option value="minor">Minor artefact (bez znalosti jeho schopností)</option><option value="major-ego">Major artefact — Ego a Ego Subversion</option><option value="major-will">Major artefact — má Will volition (bez hodnoty Will)</option></select></label><label>Ego (vyplnit pouze u Major Ego)<input name="ego" type="number" min="0" max="1000"></label><label>Ego Subversion (pouze u Major Ego)<select name="egoSubversion"><option value="">— netýká se —</option><option value="yes">Ano</option><option value="no">Ne</option></select></label><label class="hc-check"><input name="touchedConfirmed" type="checkbox" required> GM potvrzuje skutečný dotyk artefaktu</label><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje fakta a identitu předmětu (bez nové položky inventáře)</label><button type="submit" ${!ctx.active?'disabled':''}>Doložit poznatek v původní historii</button></form>`;}).join('')}
  <h4>Footpad · řeč, křik a zvuk držených předmětů (HMK 272)</h4>
- <p class="hc-hint">Běžná řeč zní jako šepot, křik jako běžná řeč. Zvuk držených předmětů se tlumí při jejich celkové hmotnosti nejvýše polovina Spirit ML. HMK neurčuje číselný postih pro posluchače. Držení a výběr předmětů potvrzuje GM; záznam neposouvá čas.</p>
+<p class="hc-hint" data-craft-rule>Běžná řeč zní jako šepot, křik jako běžná řeč. Zvuk držených předmětů se tlumí při jejich celkové hmotnosti nejvýše polovina Spirit ML. HMK neurčuje číselný postih pro posluchače. Držení a výběr předmětů potvrzuje GM; záznam neposouvá čas.</p>
  ${onlyMaker.map(c=>{const shock=c.hmk?.arcane?.auralShockLevels??0,foot=footpadAcousticState({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,actorId:c.id,auralShockLevels:shock});if(!foot.present)return '';
   const spirit=availableMasteries(c).find(m=>m.name==='Spirit')?.ml;
   const choices=projectAlchemyVialInventory(data.inventory,data.journal,campaignKey(clock),clock.minute).filter(item=>item.characterId===c.id&&['carried','none','main_hand','off_hand'].includes(item.slot)&&item.quantity===1&&typeof item.snapshot?.properties?.weightLb==='number'&&item.snapshot.properties.weightLb>=0);
@@ -4195,19 +4192,25 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   <button type="submit" ${foot.suspended||foot.overdue?'disabled':''}>Doložit zvuk bez hodu a posunu času</button></form>`;}).join('')}
  </details></section>`;
  return `<section class="hc-calendar hc-wilderness hmk-workshop-project-94019"><details data-calendar-character-herblore open><summary>Byliny, potence, konzervace a lektvary · ${herbCandidates.length} nálezů (HMK str. 74–75)</summary>
- <div data-character-craft-start><details><summary>Pravidla a vyhodnocení</summary><p class="hc-hint">Každá nalezená dávka má skutečně doložený d10: Mild (1–6), Strong (7–9), Great (10); HMK dovoluje i jediný d10 pro všechny dávky téhož nálezu. Každý stupeň klesá po 2d6 dnech. Suchá tmavá dílna a skutečný Herblore SV umožňují konzervaci (30 + 10×SV dní na stupeň). Příprava lektvaru trvá 10 minut potvrzeného času GM. Podání, zdravotní účinky a alchymistické elixíry nejsou totožné s přípravou.</p></details>
+ <section data-craft-procedure="assess" data-label="Určit potenci bylin (HMK str. 74)">${projectResourcesHTML(herbProjectNeeds.assess)}<details open><summary>Pravidla a vyhodnocení</summary><p class="hc-hint">Každá nalezená dávka má skutečně doložený d10: Mild (1–6), Strong (7–9), Great (10); HMK dovoluje i jediný d10 pro všechny dávky téhož nálezu. Každý stupeň klesá po 2d6 dnech. Suchá tmavá dílna a skutečný Herblore SV umožňují konzervaci (30 + 10×SV dní na stupeň). Příprava lektvaru trvá 10 minut potvrzeného času GM. Podání, zdravotní účinky a alchymistické elixíry nejsou totožné s přípravou.</p></details>
  ${herbCandidates.map(l=>`<form data-herb-assess><h4>${esc(l.herbName)} · ${l.quantity} dávek · Foraging ${esc(displayCampaignMinute(l.minute))}</h4><input type="hidden" name="sourceId" value="${esc(l.sourceId)}"><input type="hidden" name="resultIndex" value="${l.resultIndex}">
  <input type="hidden" name="actorId" value="${esc(actorId)}">
- ${projectResourcesHTML(herbProjectNeeds.assess)}
  ${Array.from({length:l.quantity},(_,i)=>`<fieldset><legend>Dávka ${i+1}</legend><div class="hc-fields">${Array.from({length:7},(_,k)=>`<label>${k===0?'d10 potence':'Rozpad '+Math.ceil(k/2)+' · d6 '+(k%2?'A':'B')}<input type="number" name="dice_${i}_${k}" min="1" max="${k===0?10:6}" step="1" required></label>`).join('')}</div></fieldset>`).join('')}
  <label class="hc-check"><input type="checkbox" name="singlePotencyRoll"> Jeden d10 potence pro všechny dávky (HMK 74)</label>
  <button type="button" class="hc-small" data-herb-auto>⚄ Vygenerovat d10 a d6</button>
  <button type="button" class="hc-small" data-herb-shared>⚄ Jeden společný d10, ostatní 2d6</button>
  <button type="submit">Doložit potenci bez posunu času</button></form>`).join('')||'<p class="hc-hint">Všechny nálezy již mají doloženou potenci.</p>'}
+ </section>
+ <section data-craft-procedure="preserve" data-label="Konzervovat byliny (HMK str. 74)">${projectResourcesHTML(herbProjectNeeds.preserve)}
+ <p>Konzervujte dosud účinnou dávku. K dokončení použijte Herblore Success Value v aktuální minutě kampaně.</p>
+ <button type="button" class="secondary" data-character-craft-sv="Herblore" ${herbalProofs.length?'':'disabled'}>Otevřít Herblore Success Value</button>
  ${herbalProofs.flatMap(a=>a.calendarHerbPotency.doses.map((dose,i)=>{let q;try{q=herbDoseStatus(data.journal,campaignKey(clock),a.calendarHerbPotency.sourceId,a.calendarHerbPotency.resultIndex,i,clock.minute)}catch{return ''}
  return `<div class="hc-event"><strong>${esc(a.calendarHerbPotency.herbName)} · dávka ${i+1} · ${esc(q.potency)}</strong> ${q.preserved?'· konzervováno':''}
  ${q.quality>0&&!q.preserved&&usableHerblore(actorId).length?`<form data-herb-preserve><input type="hidden" name="assessmentId" value="${esc(a.id)}"><input type="hidden" name="doseIndex" value="${i}"><label>Herblore SV z původního Skill Workbench<select name="skillId">${usableHerblore(actorId).map(j=>`<option value="${esc(j.id)}">${esc(character(j.characterId)?.name||j.characterId)} · SV ${(j.skillTestProof.a||j.skillTestProof.result).sv}</option>`).join('')}</select></label>${projectResourcesHTML(['Suchá a tmavá dílna.', 'Účinná dávka byliny a zaznamenaný Herblore Success Value.'])}<button type="submit">Konzervovat bez posunu času</button></form>`:''}</div>`})).join('')}
- <details><summary>Mundánní Concoctions · HMK str. 74 · Brewing / Cookery / Embalming / Perfumery</summary>
+ </section>
+ <section data-craft-procedure="mundane" data-label="Připravit běžný bylinný výrobek (HMK str. 74)">${projectResourcesHTML(herbProjectNeeds.mundane)}
+ ${herbReservationHTML()}
+ <button type="button" class="secondary" data-character-craft-sv="Herblore">Otevřít Herblore Success Value</button>
  <p class="hc-hint">Použijte jednu skutečně rezervovanou dávku odpovídající byliny a doložené SV obou dovedností. Výrobní test musí mít <strong>Herblore jako Secondary Modifier</strong> (p.62). Potence Strong přidá +1 SV, Great +2 SV. HMK neuvádí jednotnou recepturu ani jednotný výrobní čas, a proto musí GM potvrdit konkrétní recept a již vykonanou práci. Záznam automaticky nevytváří fyzické zboží, inventář ani jeho hmotnost.</p>
  ${mundaneReservations.map(({row,skill,status})=>{const actorId=row.characterId;
  const proofs=mundaneSkills.filter(j=>j.characterId===actorId);
@@ -4224,16 +4227,12 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <label class="hc-check"><input type="checkbox" name="gmLaborConfirmed" required> GM potvrzuje konkrétní recept a skutečně odpracovanou přípravu v kalendáři</label>
  <button type="submit" ${!hl.length||!crafts.length?'disabled':''}>Zapsat výsledek Concoction bez posunu času</button>
  ${!hl.length||!crafts.length?'<p class="hc-hint">Nejprve proveďte skutečný Herblore a výrobní SV test ve Skill Workbench; u výrobního SV vyberte Herblore jako Secondary Modifier.</p>':''}</form>`;}).join('')||'<p>Dosud žádná platná rezervace Brewing/Cookery/Embalming/Perfumery herbs.</p>'}
- </details>
- <h4>Lektvary · 12 kategorií HMK str. 75</h4>
- <details><summary>Vyhradit bylinnou dávku ze zásob</summary>${availableSupplyLots(data.journal,campaignKey(clock)).filter(x=>x.unit==='herbDoses'&&x.remaining>=1).map(lot=>`<form data-foraging-supply-use>
-  <input type="hidden" name="actorId" value="${esc(actorId)}"><input type="hidden" name="sourceId" value="${esc(lot.sourceId)}">
-  <input type="hidden" name="resultIndex" value="${esc(lot.resultIndex)}"><input type="hidden" name="unit" value="herbDoses"><input type="hidden" name="quantity" value="1">
-  <label>${esc(lot.herbName)} · dostupné dávky ${lot.remaining} <input name="purpose" maxlength="120" required placeholder="Účel rezervace"></label>
-  <button type="submit">Vyhradit jednu dávku</button></form>`).join('')||'<p>Žádná dostupná bylinná dávka.</p>'}</details>
- <button type="button" class="secondary" data-character-craft-sv="Herblore">Otevřít Herblore Success Value</button><p class="hc-hint">Nejdřív vyhraďte přesně jednu dávku ve stávajícím formuláři zásob. Lektvar lze dokončit až po deseti minutách GM času a novém skutečném Herblore SV. Výroba nic nepodává ani neléčí.</p>
+ </section>
+ <section data-craft-procedure="potion" data-label="Připravit bylinný lektvar (HMK str. 74–75)">${projectResourcesHTML(herbProjectNeeds.potion)}
+ ${herbReservationHTML()}
+ <p class="hc-hint">Nejdřív vyhraďte přesně jednu dávku ve stávajícím formuláři zásob. Lektvar lze dokončit až po deseti minutách GM času a novém skutečném Herblore SV. Výroba nic nepodává ani neléčí.</p>
  ${herbalReservations.filter(x=>EXOTIC_POTIONS.includes(x.row.calendarForagingSupplyUse.herbName?.toLowerCase().trim())).map(({row,status})=>`<form data-herb-start><input type="hidden" name="reserveId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(row.characterId)}"><input type="hidden" name="herbType" value="${esc(row.calendarForagingSupplyUse.herbName.toLowerCase().trim())}"><strong>${esc(character(row.characterId)?.name||row.characterId)} · ${esc(row.calendarForagingSupplyUse.herbName)} · ${esc(status.potency)}</strong>${projectResourcesHTML('Jedna rezervovaná účinná dávka. Podle lektvaru použijte pomůcky k vaření nebo drcení; příprava trvá 10 minut.')}<button type="submit">Zahájit výrobu na 10 minut</button>${projectDraftCancelHTML}</form>`).join('')||'<p class="hc-hint">Žádná dostupná, účinná a rezervovaná bylina odpovídající tištěným kategoriím.</p>'}
- </div>
+ </section>
  ${pendingHerbalPotions.map(j=>{const p=j.calendarHerbPotionStart,skills=usableHerblore(p.actorId,j.id);return `<div class="hc-event" data-project-calendar-record="${esc(j.id)}"><strong>${esc(character(p.actorId)?.name||p.actorId)} · ${esc(p.herbType)} · ${esc(potencyLabel(p.quality))}</strong> · Herblore splatný ${esc(displayCampaignMinute(p.dueMinute))}
  ${clock.minute>=p.dueMinute&&skills.length?`<form data-herb-complete><input type="hidden" name="startId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(p.actorId)}"><label>Skutečný Herblore SV<select name="skillId">${skills.map(x=>`<option value="${esc(x.id)}">SV ${(x.skillTestProof.a||x.skillTestProof.result).sv} · ${esc(x.id)}</option>`).join('')}</select></label><label>Trvanlivost · d6<input name="shelfD6" type="number" min="1" max="6" required></label><button type="button" class="hc-small" data-herb-shelf-roll>⚄ Generovat d6</button><button type="submit">Dokončit výrobu bez podání</button></form>`:clock.minute<p.dueMinute?'<p>Čeká na skutečný posun GM.</p>':`<button type="button" class="secondary" data-character-craft-sv="Herblore" data-craft-source="${esc(j.id)}">Provést Herblore Success Value</button>`}</div>`}).join('')}
  ${availablePotions.filter(j=>!vialBinding(data.journal,campaignKey(clock),j.id)).map(j=>{const p=j.calendarHerbPotionComplete;
@@ -4270,7 +4269,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  ${p.herbType==='antivenin'&&p.potency===3?'<label class="hc-check"><input type="checkbox" name="combatAnchorConfirmed"> GM potvrzuje bojovou časovou osu pro Great Antivenin – nástup již po jednom kole (bez tohoto důkazu se v minutě podání bonus neuplatní)</label>':''}
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečné podání této dávky</label>
  <button type="submit" ${targets.length&&canApply?'':'disabled'}>${canApply?'Podat jednu dávku (bez posunu času)':'Nejdříve vyzvedněte lahvičku z Truhlice'}</button></form>`;
- }).join('')||'<p class="hc-hint">Žádný účinný, dosud nepodaný lektvar.</p>'}
+ }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný účinný, dosud nepodaný lektvar.</p>'}
  ${availablePotions.filter(j=>vialBinding(data.journal,campaignKey(clock),j.id)).map(j=>{const p=j.calendarHerbPotionComplete,pos=vialState(data.journal,campaignKey(clock),j.id,clock.minute);
  const own=data.inventory.find(x=>x.id===pos.vialId&&x.characterId===pos.ownerId);
  return own&&['carried','none'].includes(own.slot)?`<form data-herb-vial-discard><strong>Odpis obsahu · ${esc(p.herbType)} (${esc(own.snapshot?.name||'Vial')})</strong>
@@ -4279,6 +4278,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje ztrátu obsahu; prázdná lahvička zůstává postavě</label><button type="submit">Odepsat pouze obsah</button></form>`:'';
  }).join('')}
  <h4>Paralytic · povinné Endurance d100 (HMK 75, 184)</h4>
+ <p data-craft-rule>Po podání dávky aplikace zobrazí termín povinného Endurance d100 u dané postavy. Hod se provádí z tohoto záznamu.</p>
  ${paralyzedNow.length?`<p class="hc-hint">Aktuální úplná paralýza: ${paralyzedNow.map(c=>esc(c.name||c.id)+' · do '+esc(displayCampaignMinute(c.hmk.healthState.herbalParalysis.endMinute))).join('; ')}. Postava zůstává prone; po uplynutí času musí případné vstání řešit běžnou bojovou akcí.</p>`:''}
  ${legacyParalytics.length?`<p class="hc-hint">${legacyParalytics.length} starší podání Paralytic bez časového důkazu v93.400: není automaticky vyhodnoceno ani zpětně přiřazeno. GM je musí vyřešit jednotlivě; staré hodiny se tím nezablokují.</p>`:''}
  ${unresolvedParalytics.map(t=>{const patient=character(t.targetId),end=patient?.hmk?.attributes?.end;
@@ -4286,22 +4286,22 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   const due=t.potency===3?'bojové kolo '+t.dueRound+' / '+t.timelineId:displayCampaignMinute(t.dueMinute);
   return `<div class="hc-event"><strong>${esc(patient?.name||t.targetId)} · ${esc(potencyLabel(t.potency))}</strong> · END test splatný ${esc(due)}. Potence −${t.source.calendarHerbPotionAdminister.bonus}; neúspěch = úplná paralýza 1 hodinu.
    ${ready&&Number.isSafeInteger(end)&&end>0?`<form data-herb-paralytic-endurance><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Skutečný END d100 (END ${end})<input type="number" name="d100" min="1" max="100" required></label><button type="button" class="hc-small" data-paralytic-roll-d100>⚄ Generovat d100</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje předepsaný END test přesně v termínu</label><button type="submit">Vyhodnotit Paralytic a zapsat stav</button></form>`:'<p class="hc-hint">Čeká na přesný čas/kolo a ověřený Endurance postavy. Termín nelze bez vyhodnocení přeskočit.</p>'}</div>`;
- }).join('')||'<p class="hc-hint">Žádný nevyhodnocený Paralytic.</p>'}
+ }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný nevyhodnocený Paralytic.</p>'}
  <h4>Soporific · Endurance Success Value → Weariness / INC / UNC (HMK 75)</h4>
- <p class="hc-hint">END SV = ⌊END ML/10⌋ + modifikátor skutečného SL (CF −2, F −1, S 0, CS +1). Mild: po SV minutách +2×Herblore SV únavy; Strong navíc INC; Great navíc UNC po SV bojových kolech. Účinky lektvaru se evidují odděleně od traumatického Shock; není doložen automatický konec. SV ≤0 nemá podle HMK 61 použitelný čas a vyžaduje GM rozhodnutí.</p>
+<p class="hc-hint" data-craft-rule>END SV = ⌊END ML/10⌋ + modifikátor skutečného SL (CF −2, F −1, S 0, CS +1). Mild: po SV minutách +2×Herblore SV únavy; Strong navíc INC; Great navíc UNC po SV bojových kolech. Účinky lektvaru se evidují odděleně od traumatického Shock; není doložen automatický konec. SV ≤0 nemá podle HMK 61 použitelný čas a vyžaduje GM rozhodnutí.</p>
  ${pendingSoporificEND.map(t=>{const patient=character(t.targetId),end=patient?.hmk?.attributes?.end;
  const app=t.source.calendarHerbPotionAdminister,ready=clock.minute===t.minute&&
  (t.potency<3||combatInitiativeSequence?.round===app.combatAnchor?.round&&combatInitiativeSequence?.timelineId===app.combatAnchor?.timelineId);
  return `<div class="hc-event"><strong>${esc(patient?.name||t.targetId)} · ${esc(potencyLabel(t.potency))}</strong> · potvrdit END SV v minutě podání ${esc(displayCampaignMinute(t.minute))}.
  ${ready&&Number.isSafeInteger(end)&&end>0?`<form data-herb-soporific-end><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Skutečný END d100 (END ${end})<input type="number" name="d100" min="1" max="100" required></label><button type="button" class="hc-small" data-soporific-d100>⚄ Generovat d100</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje END SV bez posunu času</label><button type="submit">Zapsat END SV a založit přesné termíny</button></form>`:'<p class="hc-hint">Čeká na čas podání a ověřené Endurance postavy.</p>'}</div>`;
- }).join('')||'<p class="hc-hint">Žádný čekající Soporific END SV.</p>'}
+ }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný čekající Soporific END SV.</p>'}
  ${pendingSoporificOnsets.map(t=>{const ready=t.phase==='weariness'?clock.minute===t.dueMinute:
  combatInitiativeSequence?.round===t.dueRound&&combatInitiativeSequence?.timelineId===t.timelineId;
  return `<div class="hc-event"><strong>${esc(character(t.targetId)?.name||t.targetId)} · ${esc(t.phase)}</strong> · termín ${esc(t.phase==='weariness'?displayCampaignMinute(t.dueMinute):'bojové kolo '+t.dueRound)}.
  ${ready?`<form data-herb-soporific-effect><input type="hidden" name="testId" value="${esc(t.testId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><input type="hidden" name="phase" value="${esc(t.phase)}"><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje splatný účinek v původní časové ose</label><button type="submit">Zapsat ${esc(t.phase)} do původního bojového stavu</button></form>`:'<p class="hc-hint">Čeká na splatnou minutu nebo bojové kolo.</p>'}</div>`;
- }).join('')||'<p class="hc-hint">Žádný splatný následný účinek Soporific.</p>'}
+ }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný splatný následný účinek Soporific.</p>'}
  <h4>Poison paste · nanesení na skutečnou zbraň (HMK 75)</h4>
- <p class="hc-hint">Zbraň musí být skutečně vybavená a dávka fyzicky dostupná. Pasta je účetně spotřebována při nanesení, ale <strong>otrava se nevyvolává bez konkrétního potvrzeného Edge/Point ne-Glancing zraňujícího zásahu</strong>. Stávající událost zásahu neobsahuje jednoznačný záznam útočníkovy zbraně; GM tedy musí použití přesné natřené zbraně samostatně doložit. Zásah založí povinnost Resistance Roll s bonusem +20 pro cíl, nikoli automaticky vyřešený Poison Course. Bez doloženého odporu zdravotní následky zůstávají otevřené.</p>
+<p class="hc-hint" data-craft-rule>Zbraň musí být skutečně vybavená a dávka fyzicky dostupná. Pasta je účetně spotřebována při nanesení, ale <strong>otrava se nevyvolává bez konkrétního potvrzeného Edge/Point ne-Glancing zraňujícího zásahu</strong>. Stávající událost zásahu neobsahuje jednoznačný záznam útočníkovy zbraně; GM tedy musí použití přesné natřené zbraně samostatně doložit. Zásah založí povinnost Resistance Roll s bonusem +20 pro cíl, nikoli automaticky vyřešený Poison Course. Bez doloženého odporu zdravotní následky zůstávají otevřené.</p>
  ${availablePotions.filter(j=>j.calendarHerbPotionComplete.herbType==='poison'&&combatInitiativeSequence?.round).map(j=>{const p=j.calendarHerbPotionComplete,pos=vialState(data.journal,campaignKey(clock),j.id,clock.minute),owner=pos?.ownerId??p.actorId;
  const weapons=data.inventory.filter(x=>x.characterId===owner&&x.snapshot?.category==='weapon'&&x.quantity===1&&['main_hand','off_hand'].includes(x.slot)&&!armedWeaponPoisons.some(a=>a.weaponItemId===x.id));
  return `<form data-herb-weapon-paste><strong>${esc(character(owner)?.name||owner)} · Poison ${esc(potencyLabel(p.potency))}, SV ${p.sv}</strong><input type="hidden" name="completeId" value="${esc(j.id)}"><input type="hidden" name="actorId" value="${esc(owner)}"><label>Skutečná vybavená čepel nebo hrot<select name="weaponItemId">${weapons.map(x=>`<option value="${esc(x.id)}">${esc(x.snapshot.name)}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje nanesení dávky na tuto konkrétní zbraň v aktuálním bojovém kole</label><button type="submit" ${weapons.length?'':'disabled'}>Nanést pastu · spotřebovat dávku</button></form>`;
@@ -4310,23 +4310,24 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  return `<div class="hc-event"><strong>Aktivní Poison paste · ${esc(character(p.actorId)?.name||p.actorId)} · ${esc(p.weaponName)}</strong> · původní kolo ${p.round}, ${esc(p.timelineId)}.
  ${data.inventory.some(x=>x.id===p.weaponItemId&&x.characterId===p.actorId&&['main_hand','off_hand'].includes(x.slot))?`<form data-herb-weapon-hit><input type="hidden" name="pasteId" value="${esc(p.pasteId)}"><label>Ověřený ne-Glancing injuring hit<select name="hitRef">${wounds.map(({c,e})=>`<option value="${esc(c.id+'::'+e.id)}">${esc(c.name)} · ${esc(e.id)} · kolo ${e.round}, ${esc(e.details.aspect)}, ${esc(e.details.injury)}</option>`).join('')}</select></label><label class="hc-check"><input type="checkbox" name="weaponConfirmed" required> GM potvrzuje, že právě tato natřená zbraň skutečně způsobila vybraný zásah, nikoli jiná zbraň</label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje ne-Glancing zranění a navazující, dosud nevyřešený Resistance Roll (+20 oběti)</label><button type="submit" ${wounds.length?'':'disabled'}>Doložit přenos jedu ze zásahu · nevyhodnocuje Resistance</button></form>`:'<p class="hc-hint">Zbraň není dostupná v inventáři. Nejdříve vyřešte historickou nesrovnalost.</p>'}
  <form data-herb-weapon-discard><input type="hidden" name="pasteId" value="${esc(p.pasteId)}"><label>Důvod odstranění pasty<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje vyřazení nepoužité pasty</label><button type="submit">Odepsat pastu bez otravy</button></form></div>`;
- }).join('')||'<p class="hc-hint">Žádná nevyhodnocená natřená zbraň.</p>'}
+ }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádná nevyhodnocená natřená zbraň.</p>'}
  ${pendingWeaponPoisonResistance(data.journal,campaignKey(clock)).map(j=>`<form data-weapon-poison-resistance class="hc-event"><strong>Resistance Roll (+20) · ${esc(character(j.targetId)?.name||j.targetId)}</strong> · doložený zásah ${esc(j.hitEventId)} · rána ${esc(j.woundId)}.
  <input type="hidden" name="hitProofId" value="${esc(j.hitProofId)}"><input type="hidden" name="targetId" value="${esc(j.targetId)}">
- <p class="hc-hint">GM musí vyhodnotit Resistance ve stejném bojovém kole a minutě zásahu. HMK 75 určuje bonus +20 oběti, ale v obecném Poison Course HMK 186 není uveden základní EML tohoto odporu. GM musí uvést skutečný základ a zdroj pravidla; aplikace jej nesmí odhadnout. Ani neúspěch sám nezaloží Poison Course.</p>
+<p class="hc-hint" data-craft-rule>GM musí vyhodnotit Resistance ve stejném bojovém kole a minutě zásahu. HMK 75 určuje bonus +20 oběti, ale v obecném Poison Course HMK 186 není uveden základní EML tohoto odporu. GM musí uvést skutečný základ a zdroj pravidla; aplikace jej nesmí odhadnout. Ani neúspěch sám nezaloží Poison Course.</p>
  <label>GM doložený základní Resistance EML (před +20)<input name="baseEML" type="number" min="-200" max="300" required></label>
  <label>Pravidlový podklad výpočtu EML<input name="basis" minlength="8" maxlength="400" required placeholder="Konkrétní pravidlo / rozhodnutí GM"></label>
  <label>Skutečný Resistance d100<input name="d100" type="number" min="1" max="100" required></label>
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje EML, skutečný hod a původ tohoto zranění</label>
  <button type="submit" ${combatInitiativeSequence?.timelineId===j.timelineId&&combatInitiativeSequence?.round===j.round&&clock.minute===j.minute?'':'disabled'}>Vyhodnotit Resistance · bez automatické otravy</button></form>`).join('')}
  ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbWeaponResistance).map(j=>{const r=j.calendarHerbWeaponResistance;return `<p class="hc-hint"><strong>Resistance ${esc(r.sl)} · ${esc(character(r.targetId)?.name||r.targetId)}</strong> · d100 ${r.d100}, EML ${r.baseEML} + 20 → ${r.eml}; ${r.resisted?'odpor úspěšný, bez zdravotního Course':'odpor neúspěšný, GM musí zvlášť určit následný Poison Course'} · důkaz ${esc(j.id)}</p>`}).join('')}
- <h4>Great Poison · nástup po skutečných bojových kolech (HMK 75/186)</h4>
+ <h4>Great Poison · nástup po skutečných bojových kolech (HMK 75, 186)</h4>
+ <p data-craft-rule>Nástup se řídí potvrzenou bojovou osou. V termínu pokračujte z konkrétního podání vpravo.</p>
  ${unresolvedGreatPoison.map(t=>{const target=character(t.targetId),ready=!!combatInitiativeSequence&&combatInitiativeSequence.timelineId===t.timelineId&&combatInitiativeSequence.round===t.dueRound&&clock.minute>=t.originMinute&&clock.minute<=t.originMinute+1;
  return `<div class="hc-event"><strong>${esc(target?.name||t.targetId)} · HR4 · splatné kolo ${t.dueRound}</strong> · skutečné požití ${esc(t.applicationId)} · (15 − SV) = ${t.dueRound-t.originRound} kol. ${ready?`<form data-herb-great-poison-onset><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Poison Course interval (GM 10–60 minut)<input name="periodMinutes" type="number" min="10" max="60" required></label><div class="field-grid">${[1,2,3,4].map(i=>`<label>Skutečný symptom d10 #${i}<input type="number" name="symptom${i}" min="1" max="10" required></label>`).join('')}</div><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje splatné kolo, požití a standardní smrtelný HR0 průběh</label><button type="submit">Založit Poison Course a vyhodnotit nástup (bez dalšího hodu)</button></form>`:'<p class="hc-hint">Čeká na přesné kolo původní osy. Nelze přeskočit, převést na minuty ani ukončit Initiative před vyřešením.</p>'}</div>`;
- }).join('')||'<p class="hc-hint">Žádné nové, bojově doložené požití Great Poison nečeká.</p>'}
+ }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádné nové, bojově doložené požití Great Poison nečeká.</p>'}
 
  <h4>Hallucinogenic · Lucid Dream, Sâvirìs a Transcendence (HMK 75, 291–292)</h4>
- <p class="hc-hint">Hallucinogenic po 10 minutách vyžaduje d20 proti tištěné Aura tabulce. U nově doloženého lucidního snu následuje samostatný Sâvirìs d20 před prvním kolem. Během nepřerušené Trance nastává termín 15 − SV minut; po něm se doloží skutečný Transcendence d100 se současnou Fatigue. CS vyžaduje samostatný d3. CF vyžaduje následný Will test a reembodiment zůstává oddělen. Starší doklady se zpětně nepřepočítávají.</p>
+<p class="hc-hint" data-craft-rule>Hallucinogenic po 10 minutách vyžaduje d20 proti tištěné Aura tabulce. U nově doloženého lucidního snu následuje samostatný Sâvirìs d20 před prvním kolem. Během nepřerušené Trance nastává termín 15 − SV minut; po něm se doloží skutečný Transcendence d100 se současnou Fatigue. CS vyžaduje samostatný d3. CF vyžaduje následný Will test a reembodiment zůstává oddělen. Starší doklady se zpětně nepřepočítávají.</p>
  ${appliedPotions.filter(j=>j.calendarHerbPotionAdminister.herbType==='hallucinogenic'&&j.calendarHerbPotionAdminister.hallucinogenicTracked===true&&j.campaignMinute===clock.minute&&
   !data.journal.some(x=>x.calendarHerbHallucinogenicTranceStart?.applicationId===j.id)&&!data.journal.some(x=>x.calendarHerbLucidDream?.applicationId===j.id)).map(j=>{const a=j.calendarHerbPotionAdminister,who=character(a.targetId),ml=who?skillValueForJournal(who,['Trance']):null;return `<form data-hallucinogenic-trance-start class="hc-event"><strong>Trance při podání · ${esc(who?.name||a.targetId)} · ${esc(j.id)}</strong><input type="hidden" name="applicationId" value="${esc(j.id)}"><input type="hidden" name="targetId" value="${esc(a.targetId)}"><p class="hc-hint">Termín 15 − SV = ${15-a.sv} minut; přidaný bonus Transcendence +${a.bonus}. ${15-a.sv<=0?'Nekladný interval – vyžaduje rozhodnutí GM, automatická větev nedostupná.':''}</p><label class="hc-check"><input type="checkbox" name="conscious" required> GM potvrzuje vědomí a skutečnou Trance již při podání</label><label class="hc-check"><input type="checkbox" name="uninterrupted" required> GM potvrzuje zahájení nepřerušené koncentrace</label><button type="submit" ${Number.isInteger(ml)&&ml>0&&15-a.sv>0?'':'disabled'}>Doložit zahájení Trance bez posunu času</button></form>`;}).join('')}
  ${pendingHallDreams.map(t=>{const who=character(t.targetId),aura=who?.hmk?.attributes?.aur;return `<div class="hc-event"><strong>Lucid Dream d20 · ${esc(who?.name||t.targetId)}</strong> · termín ${esc(displayCampaignMinute(t.dueMinute))}, podání ${esc(t.applicationId)}.${clock.minute===t.dueMinute?`<form data-hallucinogenic-dream><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Aura (ověřená atributová hodnota)<input name="aura" type="number" min="1" max="100" required value="${Number.isInteger(aura)?aura:''}"></label><label>Will Index (ověřený GM)<input name="willIndex" type="number" min="0" max="100" required></label><label>Skutečný d20<input name="d20" type="number" min="1" max="20" required></label><button type="button" data-hallucinogenic-d20>⚄ Generovat d20</button><label class="hc-check"><input name="gmConfirmed" type="checkbox" required> GM potvrzuje atributy a skutečný d20, nevyhodnocuje následnou Saviris/Reembodiment</label><button type="submit">Zapsat Lucid Dream check</button></form>`:'<p class="hc-hint">GM musí nejdříve dosáhnout přesně splatné minuty. Nelze ji přeskočit.</p>'}</div>`;}).join('')}
@@ -4342,10 +4343,10 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   return `<div class="hc-event"><strong>${esc(patient?.name||t.targetId)} · d6 ${t.dueRound-t.originRound} · splatné kolo ${t.dueRound}</strong> · podání ${esc(t.applicationId)}<p class="hc-hint">SHK 7; Shock ML − skutečná Fatigue − lektvarový postih; žádné druhé kostky ani posun času.</p>
   ${ready&&Number.isSafeInteger(skill)?`<form data-herb-emetic-shock><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Skutečný Shock d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-emetic-roll-d100>⚄ Generovat d100</button><p class="hc-hint">Ověřený Shock ML ${skill}, bonus podaného Emetic −${t.source.calendarHerbPotionAdminister.bonus}.</p><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečný hod v splatném bojovém kole</label><button type="submit">Vyhodnotit původní Shock a zapsat trvalý stav</button></form>`:
   `<p class="hc-hint">${ready?'Nelze vyhodnotit bez existujícího Shock ML postavy.': 'Čeká na přesné bojové kolo původní osy ('+t.timelineId+'). GM nesmí termín přeskočit.'}</p>`}</div>`;
- }).join('')||'<p class="hc-hint">Žádný nový doložený Emetic Shock nyní nečeká v této bojové ose.</p>'}
+ }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný nový doložený Emetic Shock nyní nečeká v této bojové ose.</p>'}
  ${appliedPotions.slice(-15).map(j=>{const p=j.calendarHerbPotionAdminister,e=herbPotionEffectAt(p,clock.minute);return `<p class="hc-hint">${esc(p.herbType)} → ${esc(character(p.targetId)?.name||p.targetId)}${p.woundId?' · rána '+esc(p.woundId):''} · původní bonus ${p.bonus} · ${esc(e.status)}${e.status==='active'?' · nyní '+e.bonus:''} · ${p.herbType==='curative'?'bonus se automaticky načte při příštím Healing/Infection hodu dané rány':p.herbType==='coagulant'?'bonus se ověří při Blood Loss Strength d100, pouze při souhlasu bojových kol s minutou GM':p.herbType==='antivenin'?'bonus se ověří u Poison Course '+esc(p.poisonSourceId||'(staré nepřiřazené podání)')+' až po nástupu účinku':p.herbType==='soporific'?'END SV a následné Weariness/INC/UNC se vyhodnocují výše':p.herbType==='narcotic'?'aktuální Shock bonus +'+e.bonus+', Move/AGL/AGL dovednosti postih −'+(e.bonus/2)+' (časové stupně po 4 h); aplikováno ve vedeném Shock Recovery a prostorovém Move/Stumble':'další hod zůstává v příslušném původním modulu'}; důkaz ${esc(j.id)}</p>`}).join('')}
 
- <p class="hc-hint">Podání všech 12 druhů je doložitelné. Curative ovlivňuje Healing/Infection, Coagulant Blood Loss a doložený Antivenin navazující Poison Course. Great Antivenin v minutě podání vyžaduje ověření bojového kola. Soporific vyžaduje END SV a GM potvrzené termíny Weariness/INC/UNC; léčebné zotavení z účinku zatím není automatizováno. Ostatní dosud nepřipojené účinky nejsou automaticky vyhodnoceny. Hmotnost bylinného obsahu není HMK doložena. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
+<p class="hc-hint" data-craft-rule>Podání všech 12 druhů je doložitelné. Curative ovlivňuje Healing/Infection, Coagulant Blood Loss a doložený Antivenin navazující Poison Course. Great Antivenin v minutě podání vyžaduje ověření bojového kola. Soporific vyžaduje END SV a GM potvrzené termíny Weariness/INC/UNC; léčebné zotavení z účinku zatím není automatizováno. Ostatní dosud nepřipojené účinky nejsou automaticky vyhodnoceny. Hmotnost bylinného obsahu není HMK doložena. Nedokončeno: mundánní receptury a Alchemy 267–268.</p>
  </details></section>`;
 }
 function campaignCalendarView(){
@@ -8352,6 +8353,66 @@ document.addEventListener('click',event=>{
    createdAt:stamp(),title:'Zrušeno · '+start.title,body:'Činnost zrušena. Naplánované kroky byly odebrány z kalendáře.',calendarProjectCancellation:{startId:start.id}});
  });
 });
+const characterProcedureSelections=new Map();
+function projectProcedurePicker(actor,discipline,procedures){
+ if(!procedures.length)return '';
+ const key=actor.id+'::'+discipline;
+ const procedure=procedures.find(item=>item.id===characterProcedureSelections.get(key))||procedures[0];
+ return `${procedures.length>1?`<label>Postup<select data-character-project-procedure data-discipline="${esc(discipline)}">
+  ${procedures.map(item=>`<option value="${esc(item.id)}" ${item===procedure?'selected':''}>${esc(item.label)}</option>`).join('')}
+ </select></label>`:''}
+ <section class="hmk-project-procedure"><h4>${esc(procedure.label)}</h4>${procedure.html}</section>`;
+}
+function characterCraftProcedures(clock,actor,discipline){
+ const [panel]=folioHTMLNodes(characterCraftPanel(clock,actor,discipline));
+ const container=panel.firstElementChild;
+ const mastery=availableMasteries(actor).find(row=>row.name==='Alchemy')?.ml??0;
+ const procedures=[];
+ const actions={
+  create:'Zahájit přípravu',invent:'Zahájit vynález elixíru',known:'Připravit převzatou recepturu',
+  assess:'Doložit potenci',preserve:'Konzervovat dávku',mundane:'Zapsat výrobek',potion:'Zahájit výrobu lektvaru'
+ };
+ const missing={
+  create:mastery<60?'Vyžaduje Alchemy ML 60+.':'Přípravu nyní blokuje stav postavy nebo jiná rozpracovaná příprava.',
+  invent:mastery<100?'Vyžaduje Alchemy ML 100+.':'Vynález nyní blokuje stav postavy nebo jiná rozpracovaná příprava.',
+  known:mastery<60?'Vyžaduje Alchemy ML 60+.':'Chybí dostupná převzatá receptura, případně postava právě nemůže připravovat.',
+  assess:'Vyžaduje dosud nevyhodnocený nález bylin.',preserve:'Vyžaduje účinnou dávku a uložený Herblore Success Value.',
+  mundane:'Vyžaduje vyhrazenou dávku a výrobní test.',potion:'Nejprve vyhraďte účinnou dávku vhodné byliny.'
+ };
+ const forms={
+  create:'form[data-alchemy-start]',invent:'form[data-alchemy-start]',known:'form[data-alchemy-start]',
+  assess:'form[data-herb-assess]',preserve:'form[data-herb-preserve]',mundane:'form[data-mundane-herbal-craft]',potion:'form[data-herb-start]'
+ };
+ for(const node of container.querySelectorAll(':scope > [data-craft-procedure]')){
+  const id=node.dataset.craftProcedure;
+  const actionMissing=actions[id]&&!node.querySelector(forms[id]);
+  procedures.push({id,label:node.dataset.label,html:node.innerHTML+(actionMissing?
+   `<p>${esc(missing[id])}</p><button type="button" disabled>${esc(actions[id])}</button>`:'')});
+  node.remove();
+ }
+ container.firstElementChild.remove();
+ const outcomes=[];
+ let group;
+ for(const node of container.children){
+  if(node.matches('[data-craft-empty]'))continue;
+  if(node.matches('h4')){
+   group={heading:node,rules:[],records:[]};
+   outcomes.push(group);
+   continue;
+  }
+  if(node.matches('[data-craft-rule]')){
+   if(group)group.rules.push(node.outerHTML);
+  }else if(group)group.records.push(node.outerHTML);
+  else outcomes.push({rules:[],records:[node.outerHTML]});
+ }
+ const progress=outcomes.map(({heading,rules,records},index)=>{
+  if(rules.length)procedures.push({id:'rules-'+index,label:heading.textContent,html:rules.join('')});
+  return records.length?(heading?.outerHTML||'')+records.join(''):'';
+ }).join('');
+ const arcane=procedures.findIndex(item=>item.id==='arcane');
+ if(arcane>=0)procedures.push(...procedures.splice(arcane,1));
+ return {procedures,progress};
+}
 function characterProjectsChapter(actor){
  const disciplines=characterProjectDisciplines(actor);
  const section=disciplines.find(item=>item.enabled&&item.id===characterProjectSelections.get(actor.id))||disciplines.find(item=>item.enabled);
@@ -8360,7 +8421,7 @@ function characterProjectsChapter(actor){
  const options=(section?'':'<option value="" selected disabled>Postava zatím nemá dostupný obor</option>')+
   disciplines.map(item=>`<option value="${esc(item.id)}"${item.enabled?'':' disabled'}${item===section?' selected':''}>${esc(item.label)}</option>`).join('');
  const jump=(kind,label)=>`<button type="button" class="secondary" data-character-project-open="${kind}">${label}</button>`;
- const available=[],progress=[];
+ const available=[],progress=[],procedures=[];
  const agenda=active?campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory):{all:[]};
  if(section?.specialty){
   const sp=section.specialty;
@@ -8369,9 +8430,7 @@ function characterProjectsChapter(actor){
    <details><summary>O oboru a způsobilosti postavy</summary><p>${esc(sp.reason)}</p>
    ${sp.details.map(fact=>`<div class="list-row"><strong>${esc(fact.name)}</strong><span>${esc(fact.value)}</span></div>`).join('')}
    <p>${esc(sp.note)}</p></details>`);
-  if(sp.id==='special-alchemy')available.push(projectResourcesHTML([...Object.values(alchemyStartingNeeds),...alchemyWorkshopNeeds]),alchemyProjectRequirements(actor));
-  else if(sp.id==='special-herblore')available.push(projectResourcesHTML(Object.values(herbProjectNeeds)));
-  else {
+  if(!['special-alchemy','special-herblore'].includes(sp.id)){
    const requirements={
     'special-spellbook':'Znalost konkrétního kouzla a splněné podmínky jeho seslání.',
     'special-talents':'Doložený vhodný Talent. Vědomá invokace vyžaduje ML 20+.',
@@ -8381,12 +8440,12 @@ function characterProjectsChapter(actor){
    };
    available.push(projectResourcesHTML(requirements[sp.id]));
   }
-  if(active&&['special-alchemy','special-herblore'].includes(sp.id)){
-   const [panel]=folioHTMLNodes(characterCraftPanel(clock,actor,sp.id));
-   const start=panel.querySelector('[data-character-craft-start]');
-   available.push(`<details class="hmk-project-create"><summary>${sp.id==='special-alchemy'?'Připravit elixír':'Příprava a konzervace bylin'}</summary>${start.innerHTML}</details>`);
-   start.remove();
-   progress.push(characterProjectRows(actor,[sp.id],agenda),panel.outerHTML);
+  if(['special-alchemy','special-herblore'].includes(sp.id)){
+   if(active){
+    const craft=characterCraftProcedures(clock,actor,sp.id);
+    procedures.push(...craft.procedures);
+    progress.push(characterProjectRows(actor,[sp.id],agenda),craft.progress?'<section class="hmk-workshop-project-94019">'+craft.progress+'</section>':'');
+   }else available.push(projectResourcesHTML(sp.id==='special-alchemy'?alchemyWorkshopNeeds:Object.values(herbProjectNeeds)));
   }
  }
  if(active)for(const {kind,label,known} of section?.projects||[]){
@@ -8395,8 +8454,10 @@ function characterProjectsChapter(actor){
   if(panel){
    const content=folioHTMLNodes(panel)[0];
    const forms=[...content.querySelectorAll('form[data-hmk-project-start-591],form[data-construction-project="start"],form[data-shipwright-project="start"],form[data-faerie-step="start"]')];
-   if(known&&forms.length)available.push(`<details class="hmk-project-create"><summary>${esc(label)}</summary>${forms.map(form=>form.outerHTML).join('')}</details>`);
-   if(known&&kind==='faeriecraft'&&!forms.length)available.push(projectResourcesHTML('Způsobilá postava Ælrhin, osvojený Spirit a odpovídající řemeslo, klidné místo pro reverie a vybavení pro vybranou zakázku.'));
+   const requirements=forms[0]?.querySelector('.hmk-project-resources')?.outerHTML||'';
+   procedures.push({id:kind,label:kind==='writing'?'Napsat text (HMK str. 132)':label,html:known&&forms.length?forms.map(form=>form.outerHTML).join(''):
+    `${requirements}<p>${known?'Příprava nyní není dostupná.':'Postava nemá potřebnou dovednost.'}</p><button type="button" disabled>Zahájit činnost</button>`});
+   if(kind==='faeriecraft'&&!forms.length)procedures.at(-1).html=projectResourcesHTML('Způsobilá postava Ælrhin, osvojený Spirit a odpovídající řemeslo, klidné místo pro reverie a vybavení pro vybranou zakázku.')+procedures.at(-1).html;
    for(const form of forms)form.remove();
    let quickActions='';
    if(content.querySelector('.hsk-project-pending-list')){
@@ -8409,32 +8470,37 @@ function characterProjectsChapter(actor){
    let actions='';
    if(kind==='writing'){
     actions=pendingWritingWorkHTML591(actor)+completedWritingHTML992(actor);
-    available.push(projectResourcesHTML([
-     'Opis: přístup k doložené předloze a materiál a pomůcky pro opis.',
-     'Čtení: dostupná a čitelná předloha a znalost jejího jazyka a písma.'
-    ]));
-    for(const html of [scriptCopyHTML993(actor),readingHTML994(actor)]){
+    for(const [id,name,html,requirements] of [
+     ['copy','Zahájit opis (HMK str. 83, 132)',scriptCopyHTML993(actor),'Přístup k doložené předloze a materiál a pomůcky pro opis.'],
+     ['reading','Zahájit čtení (HMK str. 83, 132)',readingHTML994(actor),'Dostupná a čitelná předloha a znalost jejího jazyka a písma.']
+    ]){
      for(const panel of folioHTMLNodes(html)){
-      const startForms=panel.querySelectorAll('form[data-script-copy="start"],form[data-script-reading="start"]');
-      for(const form of startForms){
-       const name=form.matches('[data-script-copy]')?'Zahájit opis':'Zahájit čtení';
-       available.push(`<details class="hmk-project-create"><summary>${name}</summary>${form.outerHTML}</details>`);
-       form.remove();
+      const startForms=[...panel.querySelectorAll('form[data-script-copy="start"],form[data-script-reading="start"]')];
+      const register=panel.querySelector('form[data-script-reading="register"]')?.closest('details');
+      if(register){
+       procedures.push({id:'reading-register',label:'Zapsat předlohu',html:register.querySelector('form').outerHTML});
+       register.remove();
       }
-      actions+=panel.outerHTML;
+      procedures.push({id,label:name,html:startForms.length?startForms.map(form=>form.outerHTML).join(''):
+       projectResourcesHTML(requirements)+'<p>Chybí způsobilá předloha.</p><button type="button" disabled>Zahájit činnost</button>'});
+      for(const form of startForms)form.remove();
+      for(const info of panel.querySelectorAll(':scope > p'))info.remove();
+      if(panel.querySelector('form,article'))actions+=panel.outerHTML;
      }
     }
    }
-   progress.push(`<section class="hmk-project-kind">${rows?'<h4>'+esc(label)+'</h4>'+rows:''}${content.outerHTML}${quickActions}${actions}</section>`);
+   const continuation=content.querySelector('form,article,.hsk-project-pending')?content.outerHTML:'';
+   if(rows||continuation||quickActions||actions)progress.push(`<section class="hmk-project-kind">${rows?'<h4>'+esc(label)+'</h4>'+rows:''}${continuation}${quickActions}${actions}</section>`);
   }else{
-   if(known&&projectFieldRequirements[kind])available.push(projectResourcesHTML(projectFieldRequirements[kind]));
-   if(known)available.push(jump(kind,kind==='animal'?'Otevřít výcvik ve Stáji':kind==='fishing'?'Otevřít Fishing':'Otevřít kladení pastí'));
+   procedures.push({id:kind,label,html:projectResourcesHTML(projectFieldRequirements[kind])+
+    (known?jump(kind,kind==='animal'?'Otevřít výcvik ve Stáji':kind==='fishing'?'Otevřít Fishing':'Otevřít kladení pastí'):
+     '<p>Postava nemá potřebnou dovednost.</p><button type="button" disabled>Zahájit činnost</button>')});
    progress.push(characterProjectRows(actor,kind==='writing'?[kind,'script-copy','script-reading']:[kind],agenda));
   }
  }
  const left=`<section class="panel panel--chapter hmk-project-page"><label>Obor<select data-character-project-discipline ${options?'':'disabled'}>${options||'<option>Žádný dostupný obor</option>'}</select></label>
   <h3>Co může postava dělat</h3>${section?.mastery?`<p><strong>${esc(section.mastery.name)} · ML ${section.mastery.ml}</strong></p>`:''}
-  ${available.join('')||'<p>V tomto oboru není dostupné zahájení projektu.</p>'}
+  ${available.join('')}${projectProcedurePicker(actor,section?.id,procedures)}${!available.length&&!procedures.length?'<p>V tomto oboru není dostupné zahájení projektu.</p>':''}
   ${active?'':clock?'<p>Postava musí být účastníkem otevřené kampaně.</p>':'<p>Časované projekty vyžadují otevřenou kampaň.</p>'}</section>`;
  const right=`<section class="panel panel--chapter hmk-project-page"><h3>Průběh a výsledky</h3>${progress.filter(Boolean).join('')||'<p>Zatím tu nejsou žádné projekty.</p>'}</section>`;
  return journalShell(folioChapterSpread('Dovednosti a projekty',actor.name,left+right,'journal-book--character-projects'),'journal-book--chapter journal-book--character-projects');
@@ -8442,6 +8508,12 @@ function characterProjectsChapter(actor){
 
 document.addEventListener('change',event=>{
  const field=event.target;
+ if(field.matches?.('[data-character-project-procedure]')&&view==='sheet'&&activeSheetSection==='projects'){
+  characterProcedureSelections.set(selected+'::'+field.dataset.discipline,field.value);
+  render();
+  document.querySelector('[data-character-project-procedure]')?.focus({preventScroll:true});
+  return;
+ }
  if(!field.matches?.('[data-character-project-discipline]')||view!=='sheet'||activeSheetSection!=='projects')return;
  if(!characterProjectDisciplines(character(selected)).some(item=>item.enabled&&item.id===field.value))return;
  characterProjectSelections.set(selected,field.value);
