@@ -49,7 +49,7 @@ import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/h
 import {FAERIE_ARMOUR_ARTICLES,faerieArmourItem,FAERIE_CRAFTS,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.012';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=94.014';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
-import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.014';
+import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.046';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=94.043';
 import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=94.043';
@@ -65,7 +65,7 @@ import {trappingStart93908,trappingStart93909,trappingProgress93909,trappingWork
 import {catchSource93908,createCatchCarry93908,createFreshCatchCarry93912,discardWildCatch93908,validateCatchCarry93908} from './src/integration/hmk-wild-catch-93908.js?v=93.914';
 import {WILD_FRESH_CARRY_93912,wildFreshState93912,wildSpoilage93912,wildSaltStart93912,wildSaltFinish93912,validateWildFreshness93912,assertWildDueBeforeAdvance93912} from './src/integration/hmk-wild-freshness-93912.js?v=93.914';
 import {animalTrainingCandidate,resolveAnimalTraining} from './src/integration/hmk-animal-training-548.js';
-import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign,engineeringDesignWorkMinutes} from './src/integration/hmk-engineering-design-548.js?v=94.007';
+import {ENGINEERING_DESIGN_DAYS,engineeringDesignCandidate,resolveEngineeringDesign,engineeringDesignWorkMinutes,engineeringSecondarySkill} from './src/integration/hmk-engineering-design-548.js?v=94.046';
 import {CERAMICS_BATCH_LIMIT,MINERALOGY_BATCH_LIMIT,batchCraftQuantity,ceramicsQuality,brewingPrice995,brewingWorkshopDice995,cookeryEffect994,CRAFT_WORK_600,craftDurationText600,CRAFT_LABELS_600,CRAFT_SKILL_600,projectTiming600,confirmCraftStart600,calendarDayStart600} from './src/integration/hmk-skill-crafts-600.js?v=94.044';
 import {MILLING_PROJECTS,millingBaseline,WRITING_WORK_MINUTES_591,writingProjectState,writingCompletionMinute,SKILL_TIMED_WORK_FORMAT_591,timedSkillBaseMinutes591,printedCraftMaterialCost,skillTimedEarliest591,validateSkillTimedWork591,assertSkillTimedAppendOnly591,TIMED_CRAFT_ITEMS_599,TIMED_CRAFT_LABELS_599} from './src/integration/hmk-skill-timed-work-591.js?v=94.044';
 import {prepareClimbingFallingSequence,prepareShortClimbingFall,inspectClimbingFallingStep,passiveRepeatFallAvailable} from './src/integration/hmk-climbing-fall-sequence.js?v=93.983';
@@ -407,7 +407,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.045';
+const APP_VERSION='94.046';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6241,7 +6241,7 @@ function decorateTimedSkillProject591(root){
  const picker=label?.querySelector('select');if(!picker)return;
  const isTimed=view==='skills'&&activeSkillTab==='value'&&skillSVChoice595?.actorId===selected&&skillSVChoice595.kind==='timed'&&['engineering','writing',...CRAFT_TIMED_LIST_600].includes(skillSVChoice595.value);
  label.hidden=!isTimed;
- if(!isTimed){picker.value='';delete primary.dataset.hmkWritingWaiting;return;}
+ if(!isTimed){picker.value='';delete primary.dataset.hmkWritingWaiting;refreshEngineeringSecondary(primary);return;}
  const current=picker.value,skill=primary.elements.namedItem('primary')?.value||'';
  const matches=pendingSkillProjects591(selected).filter(j=>j.calendarSkillProjectStart591.kind===skillSVChoice595.value&&timedProjectTestMinute591(j)!==null&&
  (j.calendarSkillProjectStart591.kind==='writing'?(j.calendarSkillProjectStart591.writingPlan?
@@ -6269,7 +6269,12 @@ function decorateTimedSkillProject591(root){
   refreshSkillAutoPreview(primary);
  }
  note.textContent=due!==null?(data.campaignClock.minute<due?'Do dalšího hodu zbývá '+chronicleRemainingTime(due-data.campaignClock.minute)+'.':'Časové podmínky pro tento Success Value jsou splněny.'):'Projekt se neváže na běžný Skill Test. Pro časovanou práci vyber skutečný projekt.';
- const blocked=due===null||data.campaignClock.minute<due;
+ const engineeringSecondary=project?.calendarSkillProjectStart591.kind==='engineering'?
+  engineeringSecondarySkill(project.calendarSkillProjectStart591.scope):null;
+ const missing=engineeringSecondary&&skillActorMastery(character(selected),engineeringSecondary).ml<=0;
+ if(engineeringSecondary)note.textContent+=' Povinný Secondary Modifier: '+engineeringSecondary+(missing?' (postava jej nemá osvojený).':'.');
+ refreshEngineeringSecondary(primary);
+ const blocked=due===null||data.campaignClock.minute<due||missing;
  if((skillSVChoice595.value==='writing'||isWorkshopCraft(skillSVChoice595.value))&&blocked)primary.dataset.hmkWritingWaiting='yes';
  else delete primary.dataset.hmkWritingWaiting;
  const submit=primary.querySelector('button[type="submit"]');
@@ -16693,6 +16698,8 @@ document.addEventListener('submit',event=>{
     proxyMetalcraftId:fletching.providerId});
   }
   const engineeringRandomTime=kind==='engineering'&&form.elements.namedItem('engineeringRandomTime').checked;
+  const engineeringSecondary=kind==='engineering'?engineeringSecondarySkill(scope):null;
+  if(engineeringSecondary)hskValidatedSecondaries(actor,{primary:'Engineering',secondary1:engineeringSecondary});
   const plannedBase=writingPlannedMinutes(fletching?.workMinutes??base,writingPlan);
   const p={format:SKILL_TIMED_WORK_FORMAT_591,kind,scope,projectName,actorId:actor.id,startMinute:start,baseMinutes:base,
    ...(writingPlan?{writingPlan}:{}),
@@ -16825,6 +16832,9 @@ function recordSkillEvidence(title,body,proof,slotId=null,extra=null){
  if(timedId){
   const p=timedStart?.calendarSkillProjectStart591,skill=proof?.skills?.[0]||proof?.skill;
   const test=writingRollSkills(p?.writingPlan);
+  const designSecondary=p?.kind==='engineering'?engineeringSecondarySkill(p.scope):null;
+  if(designSecondary&&!proof.secondarySkills?.includes(designSecondary))
+   throw Error('Tento Engineering SV musí zahrnout Secondary Modifier '+designSecondary+'.');
   if(!p||p.actorId!==selected||timedStart.calendarCampaignId!==campaignKey(data.campaignClock)||
    (p.kind==='writing'?writing.readyMinute==null||data.campaignClock.minute<writing.readyMinute:
     data.campaignClock.minute<p.earliestMinute||projectJournal().some(j=>j.calendarSkillProjectSV591?.startId===timedId))||
@@ -19229,6 +19239,26 @@ function selectedFletchingProject996(form){
  const project=id&&data.journal.find(row=>row.id===id)?.calendarSkillProjectStart591;
  return isWorkshopCraft(project?.kind)?project:null;
 }
+function timedEngineeringSecondary(form){
+ if(form.id!=='skill-value-form')return null;
+ const id=form.elements.namedItem('timedProjectId')?.value;
+ const project=id&&projectJournal().find(row=>row.id===id)?.calendarSkillProjectStart591;
+ return project?.kind==='engineering'?engineeringSecondarySkill(project.scope):null;
+}
+function refreshEngineeringSecondary(form){
+ const field=form.elements.namedItem('secondary1');
+ if(!field)return;
+ const required=timedEngineeringSecondary(form);
+ if(required){
+  field.value=required;
+  field.disabled=true;
+  field.dataset.engineeringRequired=required;
+ }else if(field.dataset.engineeringRequired){
+  if(field.value===field.dataset.engineeringRequired)field.value='';
+  delete field.dataset.engineeringRequired;
+  field.disabled=false;
+ }
+}
 function hskFields(form,side){
  const project=side==='A'&&selectedFletchingProject996(form);
  if(project){
@@ -19240,7 +19270,7 @@ function hskFields(form,side){
   proxyMetalcraftId:form.elements.namedItem('metalcraftProvider').value
  };
  return {
-  secondary1:form.elements.namedItem(side==='A'?'secondary1':'defSecondary1')?.value||'',
+  secondary1:(side==='A'?timedEngineeringSecondary(form):null)||form.elements.namedItem(side==='A'?'secondary1':'defSecondary1')?.value||'',
   secondary2:form.elements.namedItem(side==='A'?'secondary2':'defSecondary2')?.value||'',
   secondaryRoll:form.elements.namedItem(side==='A'?'secondaryRoll':'defSecondaryRoll')?.value||'',
   primary:form.elements.namedItem(side==='A'?'primary':'opponentSkill')?.value||''};}
@@ -19480,6 +19510,7 @@ function hskRefreshSRTarget(form,person,side){
 }
 function refreshSkillAutoPreview(form){
  hskRefreshFletchingSecondary(form);
+ if(form?.id==='skill-value-form')refreshEngineeringSecondary(form);
  if(!['skill-secondary-form','skill-value-form','skill-assistance-form'].includes(form?.id))return;
  const actor=character(selected);if(!actor)return;
  hskPreviewFor(form,actor,'primary','A');
