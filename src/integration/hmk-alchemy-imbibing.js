@@ -442,7 +442,7 @@ export function assertAlchemyImbibingAppendOnly(before=[],after=[]){
 export function createDarkvisionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Physic','Erudition','Footpad'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
+ ok(['Darkvision','Physic','Erudition','Footpad','Egosight'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
   'Profusion: chybí skutečný účinný Critical Failure Imbibing');
  const known=p.profusionIllEffects?.find(x=>x.sourceUseId===sourceUseId);
  ok(!!known&&sourceUseId!==triggerUseId,'Profusion: předchozí aktivní elixír nebyl v CF důkazu');
