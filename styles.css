@@ -1108,19 +1108,18 @@ form[data-hmk-animal-training] [data-animal-training-d3-status] {
 .hmk-project-page .hc-fields > * { min-width: 0; }
 
 
-/* Shared requirements for timed work, with a monochrome table boundary. */
+/* Requirements use the same parchment borders as the episode tables. */
 table.hmk-project-resources {
   grid-column: 1 / -1;
   width: 100%;
   margin: .55rem 0;
   border-collapse: collapse;
-  border: 1px solid #000;
+  border: 1px solid rgba(113,86,48,.33);
   color: inherit;
 }
 table.hmk-project-resources :is(th, td) {
   padding: .38rem .55rem;
-  border: 1px solid #000;
-  background: transparent;
+  border-bottom: 1px solid rgba(113,86,48,.33);
   text-align: left;
 }
 
