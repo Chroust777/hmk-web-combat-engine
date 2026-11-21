@@ -5,7 +5,7 @@ import {isWorkshopCraft,workshopCraftItem,WORKSHOP_CRAFT_PROJECTS,fletchingPlan,
  * Existing unscheduled historical skill tests are unchanged.
  */
 import {ENGINEERING_DESIGN_DAYS,recomputeEngineeringDesign,engineeringDesignWorkMinutes} from './hmk-engineering-design-548.js?v=94.007';
-import {CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=94.011';
+import {batchCraftQuantity,ceramicsQuality,CRAFT_WORK_600,projectTiming600,confirmCraftStart600,brewingPrice995} from './hmk-skill-crafts-600.js?v=94.044';
 import {validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,writingPlannedMinutes,writingIsText,resolveAuthoredScribing} from './hmk-scribing-work.js?v=94.006';
 import {jewelcraftWork994} from './hmk-jewelcraft-work.js?v=93.994';
 const assert=(condition,message)=>{if(!condition)throw Error(message)};
@@ -159,8 +159,11 @@ export function validateSkillTimedWork591(data){
     const options={exactCalendar,spiritMonths:p.brewing995===true?p.spiritMonths995:0};
     const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls,...options});
     const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls,options);
+    const quantity=p.mineralogyQuantity===undefined?1:batchCraftQuantity('mineralogy',p.mineralogyQuantity);
     return t&&p.earliestMinute===t.dueMinute&&p.baseDueMinute===t.dueMinute&&
-     p.craftItemName===reference.craftItemName&&p.craftItemCostD===reference.craftItemCostD&&
+     p.craftItemName===reference.craftItemName&&p.craftItemCostD===reference.craftItemCostD*quantity&&
+     (p.mineralogyQuantity===undefined||p.kind==='mineralogy')&&
+     (p.ceramicsPiece===undefined||p.kind==='ceramics'&&p.ceramicsPiece===true)&&
      p.craftSourcePage===reference.craftSourcePage&&p.craftDayResolution===reference.craftDayResolution&&
      JSON.stringify(p.craftAgingRolls)===JSON.stringify(reference.craftAgingRolls)&&
      p.craftAgingDays===reference.craftAgingDays&&p.craftReadyMinute===reference.craftReadyMinute&&
@@ -206,6 +209,10 @@ export function validateSkillTimedWork591(data){
    (!TIMED_CRAFT_ITEMS_599[s.p.kind]||row.campaignMinute>=s.p.baseDueMinute)&&
    (!CRAFT_WORK_600[s.p.kind]||row.campaignMinute>=s.p.earliestMinute),
    'Časovaný Skill Test: původní SV nesouhlasí s časem, postavou ani projektem.');
+  if(s.p.ceramicsPiece){
+   const {usable}=ceramicsQuality((proof.a??proof.result).sv);
+   assert(link.inventoryId===(usable?'ceramics:'+link.startId:null),'Ceramics: doklad výrobku neodpovídá výsledku.');
+  }
   linked.add(link.startId);
  }
  const scheduledDesigns=new Map();

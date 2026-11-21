@@ -63,6 +63,17 @@ export const CRAFT_WORK_600=Object.freeze({
   quicklimePot:item('Quicklime Pot · 2 qt',24,24,{mineralMix:'quicklime'})
  })
 });
+export const CERAMICS_BATCH_LIMIT=100;
+export const MINERALOGY_BATCH_LIMIT=10000;
+export function ceramicsQuality(sv){
+ if(!Number.isSafeInteger(sv))throw Error('Ceramics: chybí doložený Success Value.');
+ return {usable:sv>0,quality:sv<=0?'nepoužitelný kus':sv<=2?'omezená kvalita / vada':sv<=4?'běžná kvalita':`nadstandardní kvalita · ${Math.min(5,sv-4)} ★`};
+}
+export function batchCraftQuantity(kind,value){
+ const limit=kind==='ceramics'?CERAMICS_BATCH_LIMIT:kind==='mineralogy'?MINERALOGY_BATCH_LIMIT:1;
+ if(!Number.isSafeInteger(value)||value<1||value>limit)throw Error('Množství musí být celé číslo od 1 do '+limit+'.');
+ return value;
+}
 export const CRAFT_LABELS_600=Object.freeze({brewing:'Brewing · HMK 66',ceramics:'Ceramics · HMK 66',hideworking:'Hideworking · HMK 76',textilecraft:'Textilecraft · HMK 86',metalcraft:'Metalcraft · HMK 80',mineralogy:'Mineralogy · HMK 81'});
 export const CRAFT_SKILL_600=Object.freeze(Object.fromEntries(Object.keys(CRAFT_WORK_600).map(x=>[x,x.charAt(0).toUpperCase()+x.slice(1)])));
 export const craftDurationText600=entry=>entry.durationDays?entry.durationDays+' dní':entry.hours+' h';
