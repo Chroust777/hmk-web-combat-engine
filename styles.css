@@ -1131,3 +1131,15 @@ table.hmk-project-resources :is(th, td) {
   font-weight: normal;
   color: inherit;
 }
+
+.hmk-project-page .hmk-specialty-facts > p {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .15em .7em;
+  margin: 0;
+  padding-block: .2em;
+}
+.hmk-project-page .hmk-specialty-facts > p > * {
+  font-size: inherit;
+}

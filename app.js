@@ -399,7 +399,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.020';
+const APP_VERSION='94.021';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -8427,8 +8427,8 @@ function characterProjectsChapter(actor){
   const sp=section.specialty;
   const specialtyPage=sp.id==='special-herblore'?'HMK str. 74–75':sp.page;
   available.push(`<h4>${esc(sp.title)} (${esc(specialtyPage)})</h4>
-   <details><summary>O oboru a způsobilosti postavy</summary><p>${esc(sp.reason)}</p>
-   ${sp.details.map(fact=>`<div class="list-row"><strong>${esc(fact.name)}</strong><span>${esc(fact.value)}</span></div>`).join('')}
+   <details open><summary>O oboru a způsobilosti postavy</summary><p>${esc(sp.reason)}</p>
+   <div class="hmk-specialty-facts">${sp.details.map(fact=>`<p><strong>${esc(fact.name)}</strong><span>${esc(fact.value)}</span></p>`).join('')}</div>
    <p>${esc(sp.note)}</p></details>`);
   if(!['special-alchemy','special-herblore'].includes(sp.id)){
    const requirements={
