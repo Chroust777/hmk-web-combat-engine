@@ -275,7 +275,7 @@ import {createForagingCarry,createForagingCarryEat,foragedCarriedFood,projectFor
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
 import {elixirHelp,herbalPotionHelp} from './src/integration/hmk-craft-item-help.js?v=94.032';
 import {CANONICAL_ALCHEMY_ELIXIRS,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js?v=93.988';
-import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.034';
+import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.038';
 import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js?v=94.036';
@@ -401,7 +401,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.037';
+const APP_VERSION='94.038';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4799,6 +4799,13 @@ function campaignCalendarView(){
    starts.push({id:row.id,name:'Alchemy · '+prep.elixirName,actor:character(prep.actorId)?.name||'Postava',
     start:prep.minute,due:prep.dueMinute,details:'Preparation Roll v termínu. Pokračujte v deníku postavy.'});
   }
+  for(const member of calendarMemberIds(clock,data.characters)){
+   for(const row of pendingAlchemyExaminations(data.journal,cid,member.id)){
+    const check=row.calendarAlchemyExaminationStart;
+    starts.push({id:row.id,name:'Alchemy · Identify',actor:member.name,start:check.minute,due:check.dueMinute,
+     details:'Po hodině v dílně zadejte d100 u rozpracovaného Identify.'});
+   }
+  }
   starts.sort((a,b)=>a.due-b.due);
   return starts.length?`<section class="panel hc-calendar hsk-calendar-timed-skills"><h3>Časované Skill Tests · ${starts.length}</h3><p class="hc-hint">Skutečně zahájené činnosti; zobrazované termíny jsou odvozené z neměnných zápisů. Hod lze provést až po splnění pravidlové doby.</p>${starts.map(a=>`<p class="hsk-calendar-timed-row"><strong>${esc(a.name)}</strong> · ${esc(a.actor)} · ${esc(displayCampaignMinute(a.start))} → <strong>${esc(displayCampaignMinute(a.due))}</strong> · ${a.due>clock.minute?'zbývá '+esc(chronicleRemainingTime(a.due-clock.minute)):'základní termín dosažen'}<small>${esc(a.details)}</small><button type="button" class="secondary hc-small" data-calendar-character-project="${esc(a.id)}">Otevřít projekt postavy</button></p>`).join('')}</section>`:'';
  })();
@@ -8591,11 +8598,22 @@ const alchemyExaminationRollField=`<label>Skutečný d100<input type="number" na
 function alchemyExaminationHTML(clock,actor,ml){
  const cid=campaignKey(clock),targets=alchemyExaminationTargets(clock);
  const pending=pendingAlchemyExaminations(data.journal,cid,actor.id);
- const options=targets.map(target=>`<option value="${esc(target.kind+':'+target.id)}">${esc(target.label)}</option>`).join('');
- const choose=`<label>Vzorek k vyšetření<select name="target" required><option value="">Vybrat vzorek</option>${options}</select></label>`;
- const procedure=(task,threshold,extra)=>ml>=threshold&&targets.length?
-  `<form data-alchemy-examination="${task}">${choose}${extra}</form>`:
-  `<p class="hc-hint">${ml<threshold?'Vyžaduje Alchemy ML '+threshold+'+.':'Připravte fyzický vzorek v inventáři.'}</p>`;
+ const examinations=data.journal.filter(row=>row.calendarCampaignId===cid&&row.characterId===actor.id&&row.calendarAlchemyExamination)
+  .map(row=>row.calendarAlchemyExamination);
+ const matchesTarget=(proof,target)=>proof.target.kind===target.kind&&proof.target.id===target.id;
+ const procedure=(task,threshold,extra)=>{
+  if(ml<threshold)return '<p class="hc-hint">Vyžaduje Alchemy ML '+threshold+'+.</p>';
+  if(!targets.length)return '<p class="hc-hint">Připravte fyzický vzorek v inventáři.</p>';
+  const eligible=targets.filter(target=>!examinations.some(proof=>
+   proof.task===(task==='start'?'identify':task)&&matchesTarget(proof,target)&&ml<=proof.alchemyML)&&
+   (task!=='start'||examinations.some(proof=>proof.task==='recognise'&&matchesTarget(proof,target))));
+  if(!eligible.length)return '<p class="hc-hint">'+(task==='start'?
+   'Nejprve rozpoznejte dostupný vzorek. Dokončené Identify lze zopakovat po zvýšení ML.':
+   'Všechny dostupné vzorky už postava zkoumala. Opakování vyžaduje vyšší Alchemy ML.')+'</p>';
+  const options=eligible.map(target=>'<option value="'+esc(target.kind+':'+target.id)+'">'+esc(target.label)+'</option>').join('');
+  return '<form data-alchemy-examination="'+task+'"><label>Vzorek k vyšetření<select name="target" required>'+
+   '<option value="">Vybrat vzorek</option>'+options+'</select></label>'+extra+'</form>';
+ };
  const procedures=[
   {id:'recognise',label:'Recognise · rozpoznání směsi (HMK str. 266) · ML 10+',
    html:projectResourcesHTML('Přístup ke skutečnému vzorku a soustředěné zkoumání po dobu jednoho kola.')+
@@ -8604,7 +8622,7 @@ function alchemyExaminationHTML(clock,actor,ml){
   {id:'identify',label:'Identify · identifikace směsi (HMK str. 267) · ML 20+',
    html:projectResourcesHTML('Nejprve vyhodnoťte Recognise téhož vzorku. Identify pak vyžaduje jednu hodinu soustředěné práce v alchymistické dílně.')+
     (pending.length?'<p class="hc-hint">Rozpracovaný krok je v části Průběh a výsledky.</p>':
-     procedure('start',20,'<label class="hc-check"><input type="checkbox" name="workshopConfirmed" required> GM potvrzuje přístup k alchymistické dílně</label><button type="submit">Zahájit Identify</button>'))}
+     procedure('start',20,'<button type="submit">Zahájit Identify</button>'))}
  ];
  const assistants=calendarMemberIds(clock,data.characters).filter(person=>person.id!==actor.id)
   .map(person=>({person,ml:availableMasteries(person).find(row=>row.name==='Alchemy')?.ml??0}))
@@ -8614,8 +8632,9 @@ function alchemyExaminationHTML(clock,actor,ml){
   const start=row.calendarAlchemyExaminationStart;
   const target=targets.find(x=>x.kind===start.target.kind&&x.id===start.target.id);
   const due=clock.minute>=start.dueMinute;
-  return `<article class="hc-event"><strong>Identify · ${esc(target?.label??'Původní vzorek')}</strong>
-  <p>Dokončení od ${esc(displayCampaignMinute(start.dueMinute))}.</p>
+  return `<article class="hc-event" data-project-calendar-record="${esc(row.id)}"><strong>Identify · ${esc(target?.label??'Původní vzorek')}</strong>
+  ${projectRemainingHTML('Výsledek od',start.dueMinute,clock.minute)}
+  ${!target?'<p>Původní vzorek teď není dostupný. Zpřístupněte jej nebo ukončete zkoumání.</p>':''}
   ${due&&target?`<form data-alchemy-examination="identify"><input type="hidden" name="startId" value="${esc(row.id)}">
    ${target.kind==='sample'?alchemyExaminationSampleField:''}
    ${assistants.length?[1,2].map(n=>`<label>Pomocník ${n}<select name="assistant${n}"><option value="">Bez pomocníka</option>${assistantOptions}</select></label>`).join(''):''}
@@ -8685,7 +8704,7 @@ document.addEventListener('submit',event=>{
    if(!able(person))throw Error('Pomocník musí být způsobilý účastník kampaně.');
    return {actorId:id,ml:mastery(person)};
   });
-  const result=task==='start'?startAlchemyIdentification({...ctx,workshopConfirmed:fields.has('workshopConfirmed')}):
+  const result=task==='start'?startAlchemyIdentification({...ctx,workshopConfirmed:true}):
    resolveAlchemyExamination({...ctx,task,startId,assistants,
     perceptionML:task==='recognise'?Number(actor.hmk?.attributes?.per)*5:null,
     fatigue:task==='cancel'?0:combatFatigueTotals(persistentStateOf(actor)).total,
@@ -8942,7 +8961,7 @@ document.addEventListener('click',event=>{
   const row=data.journal.find(x=>x.id===button.dataset.calendarCharacterProject&&x.calendarCampaignId===campaignKey(data.campaignClock));
   const actor=row&&character(row.characterId);
   if(!actor||!characterJournalReadiness(actor).ready)return;
-  if(row.calendarAlchemyStart){openCharacterCraft(actor,'special-alchemy',row.id);return;}
+  if(row.calendarAlchemyStart||row.calendarAlchemyExaminationStart){openCharacterCraft(actor,'special-alchemy',row.id);return;}
   const kind=row.calendarSkillProjectStart591?.kind||(row.calendarFishingStart590?'fishing':row.calendarAnimalTrainingStart590?'animal':null);
   const section=characterProjectDisciplines(actor).find(item=>item.enabled&&item.projects?.some(p=>p.kind===kind));
   if(!section)return;
@@ -8989,7 +9008,8 @@ function focusCharacterCraftRecord(source){
  const target=source&&document.querySelector(`[data-project-calendar-record="${CSS.escape(source)}"]`);
  if(!target)return false;
  target.scrollIntoView({block:'center'});
- const activeDie=target.querySelector('[data-hmk-chain-value-93918]:enabled');
+ const activeDie=target.querySelector('[data-hmk-chain-value-93918]:enabled,[data-alchemy-examination="identify"] [name="d100"]:enabled');
+ if(activeDie?.form?.dataset.alchemyExamination==='identify')activeDie.classList.add('hmk-medical-required-target');
  (activeDie??[...target.querySelectorAll('input:not([type="hidden"]):enabled,button:enabled')].find(field=>!field.closest('[hidden]')))?.focus({preventScroll:true});
  return true;
 }
