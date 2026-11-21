@@ -407,7 +407,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.044';
+const APP_VERSION='94.045';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -6160,7 +6160,7 @@ function decorateTimedSkillProject591(root){
   const update=()=>{
    const rewriteScope=refreshWritingPlan992(create);
    const isText=create.elements.namedItem('writingIntent')?.value==='text';
-   const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD} d · ${craftDurationText600(item)}${item.agingDice?' + '+item.agingDice+'d'+item.agingFaces+' zrání':''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name}${item.decorative?' [d]':''} · ${item.priceD} d · ${timedSkillBaseMinutes591(kind.value,key)/60} h`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
+   const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD} d · ${craftDurationText600(item)}${item.agingDice?` práce · zrání ${item.agingBaseDays?item.agingBaseDays+' + ':''}${item.agingDice}d${item.agingFaces} dní`:''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name}${item.decorative?' [d]':''} · ${item.priceD} d · ${timedSkillBaseMinutes591(kind.value,key)/60} h`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
    const last=scope.value;
    if(scope.tagName==='SELECT'){
     scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${isWorkshopCraft(kind.value)||['ceramics','mineralogy'].includes(kind.value)?'':esc(key)+' · '}${esc(description)}</option>`).join('');
