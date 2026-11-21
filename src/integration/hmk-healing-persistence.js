@@ -11,7 +11,7 @@ import {validateCombatState,initialCombatState} from './persistent-combat-state.
 import {hmkHumanLocationSymbols,hmkAmputationAssessment,hmkInjuryMishaps} from './injury-special-hmk.js';
 import {calculateShockState,applyShockState,SHOCK_STATE} from '../rules/shock.js';
 import {treatmentDurationMinutes} from '../rules/healing.js';
-import {curativeHealingEvidence} from './hmk-herbal-healing-bridge.js';
+import {curativeHealingEvidence} from './hmk-herbal-healing-bridge.js?v=94.031';
 import {medicalOriginOfWound,isNoncombatMedicalOrigin,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const requireRule=(ok,message)=>{if(!ok)throw Error(message);};

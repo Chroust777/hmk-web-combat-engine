@@ -7,6 +7,8 @@ import {EXOTIC_POTIONS} from './hmk-herbal-concoctions.js';
 import {vialState} from './hmk-herbal-vial-ledger.js';
 const need=(x,m)=>{if(!x)throw Error(m);};
 const safeMinute=n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000000;
+export const CURATIVE_AREA_DOSES=5;
+export const curativeAreaBonus=doses=>Math.min(...doses.map(dose=>dose.bonus));
 export const HERB_ADMIN_FORMAT='hmk-herb-potion-application-v1';
 const METHODS=Object.freeze({
  antivenin:['ingested'],aphrodisiac:['ingested'],aromatic:['perfume'],
@@ -47,7 +49,7 @@ export function herbPotionRuleConsequence({type,potency,sv,minute}={}){
  }[type];
  return {bonus,schedule,rule:nextCheck,sourcePage:75,externalRollResolved:false};
 }
-export function createHerbPotionAdministration({journal=[],campaignId,minute,actorId,completeId,targetId,method,woundId='',gmConfirmed=false,memberIds=[],combatAnchor=null,poisonSourceId='',emeticOnsetD6=null,emeticOnsetOrigin='',legacyValidation=false}={}){
+export function createHerbPotionAdministration({journal=[],campaignId,minute,actorId,completeId,targetId,method,woundId='',gmConfirmed=false,memberIds=[],combatAnchor=null,poisonSourceId='',emeticOnsetD6=null,emeticOnsetOrigin='',curativeAreaGroup=null,legacyValidation=false}={}){
  need(gmConfirmed===true,'Podání musí potvrdit GM');
  need(typeof campaignId==='string'&&campaignId&&safeMinute(minute)&&typeof actorId==='string'&&actorId&&typeof targetId==='string'&&targetId,'Chybí kampaň, čas či postava');
  need(Array.isArray(memberIds)&&memberIds.includes(actorId)&&memberIds.includes(targetId),'Podávající i příjemce musí být členem stejné kampaně');
@@ -62,6 +64,9 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
  need(!journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarHerbVialDiscard?.completeId===completeId),'Obsah tohoto lektvaru byl doloženě odepsán');
  need(!journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarHerbWeaponPaste?.completeId===completeId),'Tato dávka již byla skutečně nanesena na zbraň');
  need(EXOTIC_POTIONS.includes(potion.herbType)&&METHODS[potion.herbType]?.includes(method),'Nepovolená metoda podání pro tištěný druh lektvaru');
+ if(curativeAreaGroup!==null){
+  need(potion.herbType==='curative'&&typeof curativeAreaGroup==='string'&&curativeAreaGroup,'Pět dávek se používá pouze u plošného zranění s Curative');
+ }
  const antivenin=potion.herbType==='antivenin',emetic=potion.herbType==='emetic';
  if(emetic&&(!legacyValidation||emeticOnsetD6!==null)){
   need(Number.isSafeInteger(emeticOnsetD6)&&emeticOnsetD6>=1&&emeticOnsetD6<=6&&
@@ -89,13 +94,23 @@ export function createHerbPotionAdministration({journal=[],campaignId,minute,act
   ...(potion.herbType==='paralytic'&&!legacyValidation?{paralyticTracked:true}:{}),
   ...(potion.herbType==='soporific'&&!legacyValidation?{soporificTracked:true}:{}),
   ...(potion.herbType==='poison'&&potion.potency===3&&!legacyValidation?{poisonGreatTracked:true}:{}),
+  ...(curativeAreaGroup?{curativeAreaGroup}:{}),
   ...(physical?{vialId:physical.vialId,vialBindingId:physical.bindingId}:{}),
   ...(antivenin&&poisonSourceId?{poisonSourceId:poisonSourceId.trim()}:{}),
   ...(emetic&&emeticOnsetD6!==null?{emeticOnsetD6,emeticOnsetOrigin}:{}),
   ...(combatAnchor?{combatAnchor:{confirmedByGM:true,round:combatAnchor.round,campaignMinute:minute,timelineId:combatAnchor.timelineId}}:{})};
 }
+export function createCurativeAreaAdministration({journal=[],completeIds,campaignId,minute,actorId,targetId,woundId,memberIds,gmConfirmed}={}){
+ need(Array.isArray(completeIds)&&completeIds.length===CURATIVE_AREA_DOSES&&new Set(completeIds).size===CURATIVE_AREA_DOSES,
+  'Plošné zranění potřebuje přesně pět různých účinných dávek Curative');
+ need(!journal.some(x=>x.calendarCampaignId===campaignId&&x.calendarHerbPotionAdminister?.herbType==='curative'&&
+  x.calendarHerbPotionAdminister.targetId===targetId&&x.calendarHerbPotionAdminister.woundId===woundId),
+  'Tato rána už má doložené podání Curative');
+ return completeIds.map(completeId=>createHerbPotionAdministration({journal,campaignId,minute,actorId,completeId,
+  targetId,method:'poultice',woundId,memberIds,gmConfirmed,curativeAreaGroup:completeIds[0]}));
+}
 export function validateHerbAdministrationJournal(journal=[]){
- const prior=[];
+ const prior=[],groups=new Map();
  for(const row of journal){
   if(row.calendarHerbPotionAdminister){
    const p=row.calendarHerbPotionAdminister;
@@ -107,11 +122,21 @@ export function validateHerbAdministrationJournal(journal=[]){
    const x=createHerbPotionAdministration({journal:prior,campaignId:p.campaignId,minute:p.minute,
     actorId:p.actorId,completeId:p.completeId,targetId:p.targetId,method:p.method,woundId:p.woundId,
     gmConfirmed:p.gmConfirmed,memberIds:[p.actorId,p.targetId],combatAnchor:p.combatAnchor??null,
-    poisonSourceId:p.poisonSourceId??'',emeticOnsetD6:p.emeticOnsetD6??null,
+    poisonSourceId:p.poisonSourceId??'',curativeAreaGroup:p.curativeAreaGroup??null,emeticOnsetD6:p.emeticOnsetD6??null,
     emeticOnsetOrigin:p.emeticOnsetOrigin??'',legacyValidation:p.paralyticTracked!==true&&p.soporificTracked!==true&&p.poisonGreatTracked!==true&&p.hallucinogenicTracked!==true});
    need(JSON.stringify(x)===JSON.stringify(p),'Podání neodpovídá původnímu doloženému lektvaru');
+   if(p.curativeAreaGroup){
+    const key=JSON.stringify([p.campaignId,p.curativeAreaGroup]);
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(p);
+   }
   }
   prior.push(row);
+ }
+ for(const doses of groups.values()){
+  const first=doses[0];
+  need(doses.length===CURATIVE_AREA_DOSES&&first.completeId===first.curativeAreaGroup&&doses.every(p=>
+   p.actorId===first.actorId&&p.targetId===first.targetId&&p.woundId===first.woundId&&p.minute===first.minute),'Zápis plošného Curative musí obsahovat všech pět dávek na stejnou ránu');
  }
  return true;
 }

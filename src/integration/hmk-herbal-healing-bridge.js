@@ -3,7 +3,7 @@
  * No new health state, dice, clock update, or inferred injury assignment.
  * If multiple applications to one wound exist, do not invent stacking rules.
  */
-import {herbPotionStageBonus,validateHerbAdministrationJournal} from './hmk-herbal-administration.js';
+import {CURATIVE_AREA_DOSES,curativeAreaBonus,validateHerbAdministrationJournal} from './hmk-herbal-administration.js?v=94.031';
 const ensure=(ok,message)=>{if(!ok)throw Error(message)};
 const safeMinute=x=>Number.isSafeInteger(x)&&x>=0&&x<=1e9;
 export function curativeHealingEvidence({journal=[],campaignId,minute,targetId,woundId,woundOnsetMinute}={}){
@@ -16,16 +16,12 @@ export function curativeHealingEvidence({journal=[],campaignId,minute,targetId,w
  if(!rows.length)return {bonus:0,sourceIds:[],sourcePage:75};
  // Revalidate the persisted source chain, not merely the stored numeric bonus.
  validateHerbAdministrationJournal(journal);
- ensure(rows.length===1,'Curative: pro jednu ránu existuje více podání; HMK neurčuje automatické sčítání bonusů. Rozhodne GM.');
- const row=rows[0],p=row.calendarHerbPotionAdminister;
- ensure(row.campaignMinute===p.minute&&p.campaignId===campaignId&&p.minute>=woundOnsetMinute&&
-  row.characterId===p.actorId&&p.method==='poultice',
-  'Curative: nesoulad časové osy nebo původu aplikace k dané ráně');
- const complete=journal.find(x=>x.id===p.completeId&&x.calendarCampaignId===campaignId&&x.calendarHerbPotionComplete);
- ensure(complete&&complete.calendarHerbPotionComplete.usable&&complete.campaignMinute<=p.minute&&
-  Number.isSafeInteger(complete.calendarHerbPotionComplete.expiryMinute)&&p.minute<complete.calendarHerbPotionComplete.expiryMinute,
-  'Curative: chybí včas dokončený účinný lektvar');
- const value=herbPotionStageBonus(complete.calendarHerbPotionComplete.sv,complete.calendarHerbPotionComplete.potency);
- ensure(Number.isSafeInteger(value)&&value>0&&p.bonus===value,'Curative: uložený bonus neodpovídá výrobnímu Herblore SV');
- return {bonus:value,sourceIds:[row.id],completeIds:[complete.id],sourcePage:75};
+ const first=rows[0].calendarHerbPotionAdminister;
+ ensure(first.curativeAreaGroup
+   ?rows.length===CURATIVE_AREA_DOSES&&rows.every(row=>row.calendarHerbPotionAdminister.curativeAreaGroup===first.curativeAreaGroup)
+   :rows.length===1,
+  'Curative: pro jednu ránu existuje více podání; HMK neurčuje automatické sčítání bonusů. Rozhodne GM.');
+ ensure(rows.every(row=>row.calendarHerbPotionAdminister.minute>=woundOnsetMinute&&row.calendarHerbPotionAdminister.method==='poultice'),
+  'Curative: podání musí patřit k této již vzniklé ráně');
+ return {bonus:first.curativeAreaGroup?curativeAreaBonus(rows.map(row=>row.calendarHerbPotionAdminister)):first.bonus,sourceIds:rows.map(row=>row.id),completeIds:rows.map(row=>row.calendarHerbPotionAdminister.completeId),sourcePage:75};
 }
