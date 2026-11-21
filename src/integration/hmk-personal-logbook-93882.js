@@ -1,4 +1,4 @@
-import {knownChronicleCase} from './hmk-chronicle-novel-93961.js?v=93.964';
+import {knownChronicleCase} from './hmk-chronicle-novel-93961.js?v=94.043';
 import {chronicleTravelParty,ledAnimalDescription} from './hmk-chronicle-travel-93951.js?v=93.964';
 import {literaryChronicleIntro,literaryChronicleTest} from './hmk-chronicle-literary-93892.js?v=93.961';
 /** Character Notes & Logbook: read-only, concise projections of already committed
@@ -322,7 +322,7 @@ const daylightPeriod=p=>{
  }
  return txt(p?.settings?.lightPeriod||'');
 };
-export function personalEpisodeWeather(p){
+export function personalEpisodeWeather(p,{includePrecipitation=true}={}){
  const w=p?.weather||{}, season=namesSeason[w.season||p?.settings?.season];
  const type=p?.precipitation?.precipitation||w.precipitation;
  const rain={rain:'déšť',snow:'sněžení',sleet:'déšť se sněhem',none:'bez srážek'}[type]||
@@ -331,7 +331,7 @@ export function personalEpisodeWeather(p){
  const light={day:'den',night:'noc',twilight:'šero'}[period];
  const temperature=p?.precipitation?.hazard??(period==='night'?w.nightHazard:period?w.daylightHazard:null);
  const extreme={cold:'silný chlad',heat:'velké horko'}[temperature];
- return [season?`Roční období: ${season[0].toUpperCase()+season.slice(1)}`:'',rain,extreme,light].filter(Boolean).join(' · ');
+ return [season?`Roční období: ${season[0].toUpperCase()+season.slice(1)}`:'',includePrecipitation?rain:'',extreme,light].filter(Boolean).join(' · ');
 }
 export function personalEpisodeFlavor(entry,p){
  const season=txt(p?.weather?.season||p?.settings?.season).toLowerCase();

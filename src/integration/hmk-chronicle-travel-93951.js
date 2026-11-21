@@ -1,4 +1,4 @@
-import {knownChronicleCase,novelActor,novelDistance,novelScene} from './hmk-chronicle-novel-93961.js?v=93.964';
+import {knownChronicleCase,novelActor,novelDistance,novelScene} from './hmk-chronicle-novel-93961.js?v=94.043';
 import {literaryChronicleIntro} from './hmk-chronicle-literary-93892.js?v=93.961';
 /** Czech travel prose built from the committed episode, with stable variation. */
 const list = values => new Intl.ListFormat('cs').format(values);

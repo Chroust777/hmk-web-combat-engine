@@ -97,7 +97,7 @@ export function novelScene(entry,p,ordinal) {
  const scenery=dark?(nightTerrain[group]||nightTerrain.general):pick('krajina',ground);
  const time=times[light];
  const rollTime=lines=>Number.isSafeInteger(ordinal)&&ordinal>=0?lines[ordinal%lines.length]:pick('světlo',lines);
- const rain=fall==='rain'&&group==='needles'?forestRain:weatherLines[fall];
+ const rain=p.hourlyWeatherNarrated?null:fall==='rain'&&group==='needles'?forestRain:weatherLines[fall];
  const rainPhrase=rain?pick('srážky',rain):'';
  const condition=p.precipitation?.hazard||
   (stored==='night'?p.weather?.nightHazard:stored==='day'?p.weather?.daylightHazard:null);
