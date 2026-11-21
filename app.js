@@ -399,7 +399,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.021';
+const APP_VERSION='94.022';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4098,7 +4098,7 @@ function characterCraftPanel(clock,maker,discipline){
   <button type="submit">Připravit známý unikátní elixír (bez posunu času)</button>${projectDraftCancelHTML}</form>`;}).join('');}).join('')}
  </section>
  ${pendingAlchemy.map(row=>{const a=row.calendarAlchemyStart,actor=character(a.actorId),proofs=projectJournal().filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.characterId===a.actorId&&j.campaignMinute===a.dueMinute&&(!j.calendarCharacterCraftSkill||j.calendarCharacterCraftSkill.startId===row.id)&&j.skillTestProof?.type==='secondary-mastery-value-test'&&j.skillTestProof.skills?.[0]==='Alchemy'&&j.skillTestProof.secondarySkills?.[0]==='Herblore'&&j.skillTestProof.secondarySkills?.[1]==='Mineralogy'&&j.skillTestProof.secondaryRollResult?.routineId==='alchemy-elixir'&&j.skillTestProof.gmModifiers?.[0]===a.sunsignModifier&&!projectJournal().some(x=>x.calendarAlchemyFinish?.skillId===j.id));
-  return `<article class="hc-event" data-project-calendar-record="${esc(row.id)}"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.assistantPlan?.length?'Pomocníci: '+a.assistantPlan.map(h=>esc(character(h.actorId)?.name||h.actorId)+' (Alchemy '+h.ml+')').join(', ')+'. ':''}${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
+  return `<article class="hc-event" data-project-calendar-record="${esc(row.id)}" data-elixir-preparing="${esc(a.elixirName)}"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.assistantPlan?.length?'Pomocníci: '+a.assistantPlan.map(h=>esc(character(h.actorId)?.name||h.actorId)+' (Alchemy '+h.ml+')').join(', ')+'. ':''}${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
  ${!discipline?projectCancelButton(row):''}
  ${clock.minute<a.dueMinute?`<form data-alchemy-abort><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="startId" value="${esc(row.id)}"><label>Důvod přerušení / narušení koncentrace<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení a zničení rozpracovaného elixíru</label><button type="submit">Ukončit a znehodnotit přípravu (bez posunu času)</button></form>`:''}
  ${clock.minute===a.dueMinute?proofs.map(proof=>{const t=proof.skillTestProof,r=t.a||t.result,sv=r.sv+(a.uniqueElixir?inventionSVPenalty({journal:projectJournal(),campaignId:campaignKey(clock),actorId:a.actorId,startId:row.id}):0),count=sv>=5?Math.min(5,sv-4):0;
@@ -4107,16 +4107,16 @@ function characterCraftPanel(clock,maker,discipline){
   return `<form data-alchemy-finish data-alchemy-will-index="${Math.floor(willML/10)}" data-alchemy-shock-ml="${shockML}"><input type="hidden" name="startId" value="${esc(row.id)}"><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="skillId" value="${esc(proof.id)}"><strong>Doložený Preparation Roll · SV ${sv} · d100 ${r.roll} · ${esc(r.level)} · až ${count} × d10</strong>
   ${r.level==='CF'?`<div class="hc-fields"><label>Will SR d10 (Will Index ${Math.floor(willML/10)})<input type="number" name="cfWillD10" min="1" max="10" required></label><label>Pokud Will SR neuspěje: Alchemical Dissolution d100<input type="number" name="dissolutionD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-will>⚄ Generovat Will SR d10</button> <button type="button" class="hc-small" data-alchemy-roll-dissolution>⚄ Generovat Dissolution d100 (jen po neúspěšném Will SR)</button><div class="hc-fields"><label>Crucial Dissolution (d100 končí 5/0): skutečný Shock d100<input type="number" name="crucialShockD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-shock>⚄ Generovat Crucial Shock d100 (jen 5/0)</button><p class="hc-hint">Will SR → Dissolution d100 → případný Shock d100 proti ověřenému Shock ML ${shockML} − Fatigue (včetně nové Aural Weakness). SHK 8 upraví původní Shock SL. Při následném STN/INC/UNC zůstává povinný původní Shock Recovery.</p>`:''}
   <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" ${r.level==='CF'?'':'required'}></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje nepřerušenou přípravu, koncentraci a skutečnou účast všech předem zapsaných pomocníků po nezbytnou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||`<button type="button" class="secondary" data-character-craft-sv="Alchemy" data-craft-source="${esc(row.id)}">Provést Preparation Roll</button>`:''}</article>`}).join('')}
- <h4>Elixir Decay · HMK 268 (30 dní)</h4>
+ <h4 data-craft-guide="decay">Elixir Decay · HMK 268 (30 dní)</h4>
 <p class="hc-hint" data-craft-rule>Každých 30 dní od dokončení: d10 proti aktuální AS; úspěch −1 AS, neúspěch −2 AS. Při AS 0 enchantment zaniká. Hody ukládají neměnný důkaz; GM musí zastavit společné hodiny na splatnosti. Samotná AS neimplikuje fyzickou lahvičku ani účinek. Naplnění vyžaduje zvláštní GM důkaz.</p>
- ${makerElixirs.map(x=>`<p class="hc-hint"><strong>${esc(x.elixirName)}</strong> · ${esc(character(x.actorId)?.name||x.actorId)} · dokončeno ${esc(displayCampaignMinute(x.completedMinute))} · AS ${x.initialAS} → <strong>${x.currentAS}</strong>${x.dispersed?' · obsah vyprázdněn':x.expires?' · ENCHANTMENT LOST':' · další d10 '+esc(displayCampaignMinute(x.nextDueMinute))} · ${x.period} kontrol</p>`).join('')}
+ ${makerElixirs.map(x=>`<p class="hc-hint" ${!x.expires&&!x.dispersed?'data-elixir-decay-schedule':''}><strong>${esc(x.elixirName)}</strong> · ${esc(character(x.actorId)?.name||x.actorId)} · dokončeno ${esc(displayCampaignMinute(x.completedMinute))} · AS ${x.initialAS} → <strong>${x.currentAS}</strong>${x.dispersed?' · obsah vyprázdněn':x.expires?' · ENCHANTMENT LOST':' · další d10 '+esc(displayCampaignMinute(x.nextDueMinute))} · ${x.period} kontrol</p>`).join('')}
  ${alchemyDecayDue.map(x=>`<form data-alchemy-decay><strong>${clock.minute>x.nextDueMinute?'Zmeškaný Decay – konzervativní oprava':'Decay splatný'} · ${esc(x.elixirName)} · AS ${x.currentAS}</strong><input type="hidden" name="finishId" value="${esc(x.finishId)}"><input type="hidden" name="actorId" value="${esc(x.actorId)}"><input type="hidden" name="dueMinute" value="${x.nextDueMinute}"><p class="hc-hint">Splatnost ${esc(displayCampaignMinute(x.nextDueMinute))}; zápis dnes ${esc(displayCampaignMinute(clock.minute))}. ${clock.minute>x.nextDueMinute?'Dnešní hod nelze vydávat za původní historický hod. Zpětné GM vyhodnocení je možné pouze u dosud nepoužitého elixíru bez pozdějších závislých záznamů.':'Řádný hod přesně v termínu.'}</p><label>Decay d10<input name="d10" type="number" min="1" max="10" required></label><button type="button" data-alchemy-roll-decay class="hc-small">⚄ Generovat d10</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečně zadaný hod d10</label>${clock.minute>x.nextDueMinute?'<label class="hc-check"><input type="checkbox" name="gmMissedConfirmed" required> GM schvaluje nynější zpětné vyhodnocení zmeškané splatnosti (nikoli zpětné falšování času zápisu)</label>':''}<button type="submit">${clock.minute>x.nextDueMinute?'Opravit zmeškaný Decay':'Zapsat Decay Roll'} · bez posunu času</button></form>`).join('')}
- <h4>Alchemy · Darkvision / Physic Imbibing (HMK 269–273)</h4>
+ <h4 data-craft-guide="darkvision">Darkvision · vypití a podání (HMK 269–270)</h4>
 <p class="hc-hint" data-craft-rule>První dokončená větev použití elixíru: Darkvision. Imbibing d100 používá skutečné Aura či Alchemy ML příjemce bez postihů za Fatigue a Impairment. F/CF upravuje AS. Profusion: u další dávky se rozšiřují neúspěšné CF výsledky; skutečné CF vyvolá samostatný Ill Effect každého aktivního Darkvision. Každý má vlastní HP d6 a zotavení. Při CF je doložena i citlivost na světlo (HR5, HP d6 dní); léčení vyžaduje skutečný d6 pro HP a v každém termínu d100 proti HB × HR podle existující Exposure Healing tabulky. Dočasný efekt zůstává po vypití v kalendáři a dále podléhá 30denním Decay Rolls. Žádný společný čas se neposouvá.</p>
- ${onlyMaker.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute),shock=c.hmk?.arcane?.auralShockLevels??0;return effects.map(x=>`<p class="hc-hint">${esc(c.name)} · Darkvision AS ${x.state.currentAS} · ${shock>0?`<strong>Aural Shock ${esc(shock)}: prospěch z vidění ve tmě pozastaven (HMK 270)</strong>; AS a Decay běží dál`:`vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong>`} · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
-<h4>Darkvision · CF citlivost na světlo · HP d6 dní / HR5</h4>
+ ${onlyMaker.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute),shock=c.hmk?.arcane?.auralShockLevels??0;return effects.map(x=>`<p class="hc-hint" data-darkvision-active>${esc(c.name)} · Darkvision AS ${x.state.currentAS} · ${shock>0?`<strong>Aural Shock ${esc(shock)}: prospěch z vidění ve tmě pozastaven (HMK 270)</strong>; AS a Decay běží dál`:`vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong>`} · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
+<h4 data-craft-guide="darkvision-healing">Darkvision · CF citlivost na světlo · HP d6 dní / HR5</h4>
 <p class="hc-hint" data-craft-rule>HMK 270–271: postih mimo stín/pološero je polovina původní AS × 5. Úplné uzdravení při HR6; další testy po d6 dnech od skutečného CF. Success +1 HR, Critical Success +2 HR; CF znamená přeskočit další periodu. Doba pouze podle kalendáře GM.</p>
- ${pendingDarkvisionHealing(data.journal,campaignKey(clock),clock.minute).map(h=>{const c=character(h.targetId),attrs=c?.hmk?.attributes;return `<article class="hc-event"><strong>${esc(c?.name||h.targetId)} · citlivost na světlo −${h.penalty} EML (jen zrak při jasném světle)</strong><p>HR ${h.healingRate} · ${h.pendingStart?'Chybí d6 Healing Period – starý CF důkaz':clock.minute>h.nextDueMinute?'ZMEŠKANÁ SPLATNOST '+esc(displayCampaignMinute(h.nextDueMinute)):'Příští hod '+esc(displayCampaignMinute(h.nextDueMinute))}</p>
+ ${pendingDarkvisionHealing(data.journal,campaignKey(clock),clock.minute).map(h=>{const c=character(h.targetId),attrs=c?.hmk?.attributes;return `<article class="hc-event" data-darkvision-healing-record><strong>${esc(c?.name||h.targetId)} · citlivost na světlo −${h.penalty} EML (jen zrak při jasném světle)</strong><p>HR ${h.healingRate} · ${h.pendingStart?'Chybí d6 Healing Period – starý CF důkaz':clock.minute>h.nextDueMinute?'ZMEŠKANÁ SPLATNOST '+esc(displayCampaignMinute(h.nextDueMinute)):'Příští hod '+esc(displayCampaignMinute(h.nextDueMinute))}</p>
  ${h.pendingStart&&clock.minute===h.onsetMinute?`<form data-darkvision-healing-start><input type="hidden" name="useId" value="${esc(h.useId)}"><input type="hidden" name="targetId" value="${esc(h.targetId)}"><label>Healing Period d6<input type="number" name="hpD6" min="1" max="6" required></label><button type="button" data-darkvision-roll-hp class="hc-small">⚄ d6</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje hod d6 při původním CF</label><button type="submit">Zapsat Healing Period</button></form>`:''}
  ${!h.pendingStart&&clock.minute===h.nextDueMinute&&attrs?.end&&attrs?.wil?`<form data-darkvision-healing-roll><input type="hidden" name="useId" value="${esc(h.useId)}"><input type="hidden" name="targetId" value="${esc(h.targetId)}"><p>END ${attrs.end}, WIL ${attrs.wil}; Healing Base a EML se vypočítají ze stávajících pravidel.</p><label>Skutečný Healing d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" data-darkvision-roll-heal class="hc-small">⚄ d100</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje skutečný Healing Roll v termínu</label><button type="submit">Zapsat zotavení / HR</button></form>`:''}</article>`}).join('')}
  <h4>Applied Elixirs · Mending / Object Aegis (HMK 269,273)</h4>
@@ -4133,12 +4133,12 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  <h4>Acid · kontaktní kola na neživém objektu (HMK 271)</h4>
  <p data-craft-rule>Zahájený kontakt s předmětem sledujte u uložené dávky. Kola kontaktu potvrzujte u příslušného záznamu vpravo.</p>
  ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyAcidApply).map(j=>{const a=j.calendarAlchemyAcidApply,state=alchemyAcidContactState(data.journal,campaignKey(clock),j.id,clock.minute);return `<article class="hc-event"><strong>Acid · ${esc(a.targetName)} · ${esc(a.material)}</strong><p>AS ${state.as}; ${state.successes}/${state.destroyAtSuccesses} úspěchů; doložená kola ${state.rounds}. ${state.guideReached?'Dosažena HMK orientační hranice poškození; případné vyřazení původního kusu provede GM v inventáři.':state.as===0?'Acid vyčerpán.':'Každé další kolo: skutečný d10, úspěch 1 poškození, AS vždy −1.'}</p>${!state.spent?`<form data-alchemy-acid-round><input type="hidden" name="applicationId" value="${esc(j.id)}"><label>Další skutečné d10 proti AS ${state.as}<input type="number" name="d10" min="1" max="10" required></label><button type="button" class="hc-small" data-alchemy-roll-acid>⚄ d10</button><label class="hc-check"><input type="checkbox" name="contactConfirmed" required> GM potvrzuje pokračování přímého kontaktu s týmž objektem právě po jedno další kolo</label><label class="hc-check"><input type="checkbox" name="confirmed" required> GM potvrzuje původ d10 a výsledek bez posunu GM času</label><button type="submit">Zapsat další Acid round</button></form>`:''}</article>`;}).join('')}
- <h4>Fyzické alchymistické nádoby · HMK 268</h4>
+ <h4 data-craft-guide="vials">Fyzické alchymistické nádoby · HMK 268</h4>
 <p class="hc-hint" data-craft-rule>Tekuté i plynné elixíry: skleněná/keramická nádoba s korkem, plná 0,5 lb (prázdná Vial, 4 oz: 0,25 lb). Používá se jediný již vlastněný inventární kus. Hmotnost plné nádoby se promítá do stávajících přehledů, ENC a Combat Load; přesuny používají existující Truhlici a předání. Pozdní doložení vyžaduje potvrdit uložení již při dokončení. Plynný Fumebomb se ukládá do stejného typu fyzické nádoby, ale jako plyn (HMK 268). Applied Acid na neživý 6palcový objekt lze nyní přímo doložit; jiné aplikované účinky čekají na samostatnou implementaci.</p>
  ${data.journal.filter(x=>x.calendarCampaignId===campaignKey(clock)&&x.calendarAlchemyFinish?.result==='completed'&&makerElixirs.some(elixir=>elixir.finishId===x.id)).map(x=>{
   const a=x.calendarAlchemyFinish,bind=alchemyVialBinding(data.journal,campaignKey(clock),x.id),state=bind?alchemyVialState(data.journal,campaignKey(clock),x.id,clock.minute):null;
   if(bind){const target=data.inventory.find(v=>v.id===state?.vialId);
-   return `<article class="hc-event"><strong>${esc(a.elixirName)} · AS ${alchemyStates.find(z=>z.finishId===x.id)?.currentAS??a.baseAS}</strong> · nádoba ${esc(state?.vialId)} · ${esc(character(state?.ownerId)?.name||state?.ownerId)} · ${esc(state?.slot)} · ${state?.full?'plná 0,5 lb':'vyprázdněná 0,25 lb'}
+   return `<article class="hc-event" ${state?.full&&a.elixirName==='Darkvision'&&(alchemyStates.find(z=>z.finishId===x.id)?.currentAS??0)>0?'data-darkvision-bound':''}><strong>${esc(a.elixirName)} · AS ${alchemyStates.find(z=>z.finishId===x.id)?.currentAS??a.baseAS}</strong> · nádoba ${esc(state?.vialId)} · ${esc(character(state?.ownerId)?.name||state?.ownerId)} · ${esc(state?.slot)} · ${state?.full?'plná 0,5 lb':'vyprázdněná 0,25 lb'}
     ${state?.full&&['Eruption','Fumebomb','Weakness'].includes(a.elixirName)&&
     alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&
     target?.characterId===state.ownerId&&['carried','none'].includes(state.slot)&&
@@ -4171,7 +4171,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   const vials=data.inventory.filter(v=>v.characterId===x.characterId&&v.sourceItemId===PRINTED_VIAL&&v.quantity===1&&v.snapshot?.properties?.weightLb===0.25&&['carried','none'].includes(v.slot)&&
    !data.journal.some(y=>y.calendarCampaignId===campaignKey(clock)&&y.calendarAlchemyVialBinding?.vialId===v.id&&alchemyVialState(data.journal,campaignKey(clock),y.calendarAlchemyVialBinding.finishId,clock.minute)?.full)&&
    !data.journal.some(y=>y.calendarCampaignId===campaignKey(clock)&&y.calendarHerbVialBinding?.vialId===v.id&&clock.minute<(data.journal.find(z=>z.id===y.calendarHerbVialBinding.completeId)?.calendarHerbPotionComplete?.expiryMinute??0)&&!data.journal.some(z=>z.calendarCampaignId===campaignKey(clock)&&(z.calendarHerbPotionAdminister?.completeId===y.calendarHerbVialBinding.completeId||z.calendarHerbVialDiscard?.completeId===y.calendarHerbVialBinding.completeId||z.calendarHerbWeaponPaste?.completeId===y.calendarHerbVialBinding.completeId))));
-  return `<form data-alchemy-vial-bind><strong>${esc(a.elixirName)} · dokončeno ${esc(displayCampaignMinute(a.minute))}</strong><input name="finishId" type="hidden" value="${esc(x.id)}"><input name="actorId" type="hidden" value="${esc(x.characterId)}">
+  return `<form data-alchemy-vial-bind data-elixir-name="${esc(a.elixirName)}"><strong>${esc(a.elixirName)} · dokončeno ${esc(displayCampaignMinute(a.minute))}</strong><input name="finishId" type="hidden" value="${esc(x.id)}"><input name="actorId" type="hidden" value="${esc(x.characterId)}">
    ${vials.length?`<label>Existující samostatná Vial, 4 oz<select name="vialId" required>${vials.map(v=>`<option value="${esc(v.id)}">${esc(v.snapshot?.name||'Vial')} · ${esc(v.id)}</option>`).join('')}</select></label><label>Materiál nádoby<select name="material" required><option value="glass">Sklo</option><option value="ceramic">Keramika</option></select></label>${a.elixirName==='Fumebomb'?`<label class="hc-check"><input type="checkbox" name="gasConfirmed" value="yes" required> GM potvrzuje plyn Fumebomb v původní uzavřené nádobě</label>`:`<label class="hc-check"><input type="checkbox" name="liquidConfirmed" value="yes" required> GM potvrzuje, že jde o tekutou podobu tohoto elixíru</label>`}<label class="hc-check"><input type="checkbox" name="corkConfirmed" value="yes" required> GM potvrzuje fyzickou korkovou zátku</label><label class="hc-check"><input type="checkbox" name="confirmed" value="yes" required> GM potvrzuje skutečné uložení elixíru do této nádoby při dokončení přípravy, i když je důkaz zapsán později</label><button type="submit">Doložit fyzickou nádobu bez posunu času</button>`:'<p class="hc-hint">Chybí samostatná skutečně nesená a prázdná Vial, 4 oz (1 ks).</p>'}</form>`;
  }).join('')}
  <h4>Egosight · dotyk a rozpoznání artefaktu (HMK 271)</h4>
@@ -8363,6 +8363,64 @@ function projectProcedurePicker(actor,discipline,procedures){
  </select></label>`:''}
  <section class="hmk-project-procedure"><h4>${esc(procedure.label)}</h4>${procedure.html}</section>`;
 }
+function alchemyProcedureGuidance(container,canPrepare){
+ const find=selector=>container.querySelector(selector);
+ const link=(target,key,label)=>{
+  if(!target)return '';
+  target.dataset.craftJumpTarget=(target.dataset.craftJumpTarget||'')+' '+key;
+  target.tabIndex=-1;
+  return `<button type="button" class="secondary" data-craft-jump="${key}">${label}</button>`;
+ };
+ const prepare=canPrepare?
+  '<button type="button" class="secondary" data-craft-prepare-darkvision>Připravit Darkvision</button>':
+  '<button type="button" class="secondary" disabled>Připravit Darkvision</button><p>Příprava vyžaduje Alchemy ML 60+, dostupnou dílnu a volného alchymistu. Případnou rozpracovanou přípravu najdete vpravo.</p>';
+ const drink=find('form[data-alchemy-darkvision]');
+ const unbottled=find('form[data-alchemy-vial-bind][data-elixir-name="Darkvision"]');
+ const brewing=find('[data-elixir-preparing="Darkvision"]');
+ const bound=find('[data-darkvision-bound]');
+ const active=find('[data-darkvision-active]');
+ const next=drink?'<p>Účinná dávka v lahvičce je připravená k použití.</p>'+link(drink,'darkvision','Otevřít vypití nebo podání'):
+  unbottled?'<p>Hotovou dávku nejprve přiřaďte k volné lahvičce Vial, 4 oz. Pokud chybí, přidejte ji do inventáře výrobce.</p>'+link(unbottled,'darkvision','Otevřít uložení do lahvičky'):
+  brewing?'<p>Darkvision se připravuje. Termín a další krok jsou u rozpracované dávky.</p>'+link(brewing,'darkvision','Přejít k rozpracovanému Darkvision'):
+  bound?'<p>Dávka je v lahvičce. Zkontrolujte, že ji má postava u sebe a že je vyhodnocený případný splatný Decay.</p>'+link(bound,'darkvision','Zobrazit lahvičku Darkvision'):
+  active?'<p>Darkvision už působí. Hotovou dávku k dalšímu použití můžete připravit znovu.</p>'+link(active,'darkvision','Zobrazit působící Darkvision')+prepare:
+  '<p>Nejprve připravte dávku Darkvision. Po dokončení ji uložte do lahvičky a u dávky se objeví Imbibing Roll.</p>'+prepare;
+ const healing=find('[data-darkvision-healing-record]');
+ const decay=find('form[data-alchemy-decay]');
+ const schedule=find('[data-elixir-decay-schedule]');
+ const vial=find('form[data-alchemy-vial-bind]');
+ const allBrewing=find('[data-elixir-preparing]');
+ const startOther=canPrepare?
+  '<button type="button" class="secondary" data-craft-open-preparation>Přejít k přípravě elixíru</button>':
+  '<button type="button" class="secondary" disabled>Přejít k přípravě elixíru</button>';
+ return {
+  darkvision:next,
+  'darkvision-healing':healing?
+   '<p>Citlivost na světlo je už zaznamenaná. Termín dalšího hodu je u zdravotního následku.</p>'+link(healing,'darkvision-healing','Přejít k léčení citlivosti na světlo'):
+   '<p>Citlivost na světlo se řeší až po kritickém neúspěchu při vypití Darkvision. Aktuálně tu žádný takový záznam není.</p>'+next,
+  decay:decay?link(decay,'decay','Otevřít splatný Decay Roll'):
+   schedule?'<p>Hod se zpřístupní v uvedeném termínu.</p>'+link(schedule,'decay','Zobrazit termín dalšího Decay'):
+   '<p>Decay se počítá až od dokončení elixíru.</p>'+(link(allBrewing,'decay','Přejít k rozpracovanému elixíru')||startOther),
+  vials:vial?link(vial,'vials','Otevřít přiřazení lahvičky'):
+   '<p>Tento krok se zobrazí u hotové dávky, která ještě nemá lahvičku.</p>'+(link(allBrewing,'vials','Přejít k rozpracovanému elixíru')||startOther)
+ };
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-craft-jump],[data-craft-prepare-darkvision],[data-craft-open-preparation]');
+ if(!button||view!=='sheet'||activeSheetSection!=='projects')return;
+ if(button.dataset.craftJump){
+  const target=document.querySelector(`[data-craft-jump-target~="${CSS.escape(button.dataset.craftJump)}"]`);
+  if(!target)return;
+  target.scrollIntoView({block:'center'});
+  target.focus({preventScroll:true});
+  return;
+ }
+ characterProcedureSelections.set(selected+'::special-alchemy','create');
+ render();
+ const choice=document.querySelector('form[data-alchemy-start]:not([data-alchemy-invent],[data-alchemy-known]) select[name="elixirName"]');
+ if(choice&&button.hasAttribute('data-craft-prepare-darkvision'))choice.value='Darkvision';
+ (choice||document.querySelector('[data-character-project-procedure]'))?.focus();
+});
 function characterCraftProcedures(clock,actor,discipline){
  const [panel]=folioHTMLNodes(characterCraftPanel(clock,actor,discipline));
  const container=panel.firstElementChild;
@@ -8386,11 +8444,12 @@ function characterCraftProcedures(clock,actor,discipline){
  for(const node of container.querySelectorAll(':scope > [data-craft-procedure]')){
   const id=node.dataset.craftProcedure;
   const actionMissing=actions[id]&&!node.querySelector(forms[id]);
-  procedures.push({id,label:node.dataset.label,html:node.innerHTML+(actionMissing?
+  procedures.push({id,label:node.dataset.label,canStart:!actionMissing,html:node.innerHTML+(actionMissing?
    `<p>${esc(missing[id])}</p><button type="button" disabled>${esc(actions[id])}</button>`:'')});
   node.remove();
  }
  container.firstElementChild.remove();
+ const guidance=discipline==='special-alchemy'?alchemyProcedureGuidance(container,!!procedures.find(item=>item.id==='create')?.canStart):{};
  const outcomes=[];
  let group;
  for(const node of container.children){
@@ -8406,7 +8465,8 @@ function characterCraftProcedures(clock,actor,discipline){
   else outcomes.push({rules:[],records:[node.outerHTML]});
  }
  const progress=outcomes.map(({heading,rules,records},index)=>{
-  if(rules.length)procedures.push({id:'rules-'+index,label:heading.textContent,html:rules.join('')});
+  if(rules.length)procedures.push({id:heading.dataset.craftGuide||'rules-'+index,label:heading.textContent,
+   html:(guidance[heading.dataset.craftGuide]||'')+rules.join('')});
   return records.length?(heading?.outerHTML||'')+records.join(''):'';
  }).join('');
  const arcane=procedures.findIndex(item=>item.id==='arcane');
