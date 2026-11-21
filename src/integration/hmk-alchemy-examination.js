@@ -6,6 +6,7 @@ import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 
 const FORMAT='hmk-alchemy-examination-v1';
+const IDENTIFY_FORMAT='hmk-alchemy-examination-v2';
 const fields=['calendarAlchemyExaminationStart','calendarAlchemyExamination'];
 const check=(condition,message)=>{if(!condition)throw Error(message);};
 const whole=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
@@ -62,9 +63,11 @@ function alchemyExaminationTruth({journal,campaignId,minute,target,classificatio
 }
 
 export function resolveAlchemyExamination({journal=[],campaignId,actorId,minute,target,startId=null,
- task,alchemyML,perceptionML=null,fatigue,assistants=[],d100,origin:rollOrigin,classification}){
+ task,format=task==='identify'?IDENTIFY_FORMAT:FORMAT,alchemyML,perceptionML=null,fatigue,assistants=[],d100,
+ origin:rollOrigin,classification}){
  const rows=origin({journal,campaignId,actorId,minute,target});
  check(['recognise','identify','cancel'].includes(task),'Neznámý alchymistický postup.');
+ check(format===FORMAT||(task==='identify'&&format===IDENTIFY_FORMAT),'Neznámý formát alchymistického průzkumu.');
  if(task!=='recognise'){
   const start=pendingAlchemyExaminations(rows,campaignId,actorId).find(row=>row.id===startId)?.calendarAlchemyExaminationStart;
   check(start&&sameTarget(start.target,target)&&minute>=start.minute,'Chybí původní rozpracované Identify stejného vzorku.');
@@ -93,6 +96,7 @@ export function resolveAlchemyExamination({journal=[],campaignId,actorId,minute,
    assistants.every(x=>text(x.actorId)&&x.actorId!==actorId&&whole(x.ml,40,1000)&&x.ml*2>=alchemyML),
    'Identify dovoluje nejvýše dva pomocníky, každý s ML 40+ a alespoň polovinou ML alchymisty.');
   assisted=assistants.reduce((total,x)=>total+Math.floor(x.ml/10),0);
+  if(format===IDENTIFY_FORMAT)assisted=Math.min(10,assisted);
   rawEML+=assisted;
  }
  const level=successLevel(d100,rawEML);
@@ -111,7 +115,7 @@ export function resolveAlchemyExamination({journal=[],campaignId,actorId,minute,
    if(sv>=(truth.unique?6:4))revealed.as=truth.as;
   }
  }
- return {format:FORMAT,campaignId,actorId,minute,target,task,startId,alchemyML,perceptionML,fatigue,assistants,
+ return {format,campaignId,actorId,minute,target,task,startId,alchemyML,perceptionML,fatigue,assistants,
   assisted,d100,origin:rollOrigin,use,eml:effectiveMasteryLevel(rawEML),sl,sv,
   classification:target.kind==='sample'?classInfo:null,revealed};
 }
