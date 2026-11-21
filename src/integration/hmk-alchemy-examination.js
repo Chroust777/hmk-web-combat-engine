@@ -4,6 +4,7 @@ import {effectiveMasteryLevel,secondaryModifier,SL,successLevel,successValue} fr
 import {CANONICAL_ALCHEMY_ELIXIRS} from './hmk-alchemy-preparation.js';
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
+import {alchemyDoseProof} from './hmk-alchemy-starting-doses.js';
 
 const FORMAT='hmk-alchemy-examination-v1';
 const IDENTIFY_FORMAT='hmk-alchemy-examination-v2';
@@ -50,7 +51,7 @@ function alchemyExaminationTruth({journal,campaignId,minute,target,classificatio
   check(['mundane','exotic'].includes(classification),'GM určí skutečný typ směsi, běžná nebo exotická.');
   return {classification};
  }
- const finish=getRows(journal,campaignId).find(row=>row.id===target.id)?.calendarAlchemyFinish;
+ const finish=alchemyDoseProof(getRows(journal,campaignId).find(row=>row.id===target.id));
  check(finish?.result==='completed','Chybí původní vyrobený elixír.');
  const vial=alchemyVialState(journal,campaignId,target.id,minute);
  const strength=alchemyElixirStrength(journal,campaignId,target.id,minute);

@@ -6,6 +6,7 @@
  */
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
+import {alchemyDoseProof} from './hmk-alchemy-starting-doses.js';
 import {canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
 import {CANONICAL_ALCHEMY_ELIXIRS} from './hmk-alchemy-preparation.js';
 
@@ -78,7 +79,7 @@ export function alchemyArcaneTargetRegister({journal=[],inventory=[],campaignId,
  assert(Array.isArray(journal)&&Array.isArray(inventory)&&typeof campaignId==='string'&&campaignId&&minuteOK(minute),
   'neplatný kontext přehledu');
  return journal.filter(r=>r.calendarCampaignId===campaignId&&r.campaignMinute<=minute&&
-  r.calendarAlchemyFinish?.result==='completed').map(row=>{
+  alchemyDoseProof(r)?.result==='completed').map(row=>{
   try{return {finishId:row.id,dossier:alchemyArcaneTargetDossier({journal,inventory,campaignId,minute,finishId:row.id}),error:null};}
   catch(error){return {finishId:row.id,dossier:null,error:String(error.message||error)};}
  });

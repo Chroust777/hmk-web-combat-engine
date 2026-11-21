@@ -1,3 +1,5 @@
+import {alchemyDoseProof} from './hmk-alchemy-starting-doses.js';
+
 /** HMK v1.2 p.268 — canonical elixir decay on the existing GM campaign clock.
  * Every 30 days after completion, d10 against current base AS; success -1,
  * failure -2. These are journal proofs, NOT inventory or autonomous clocks.
@@ -29,10 +31,11 @@ function requireSafeRetrospectiveDecay(journal,campaignId,finishId,dueMinute,rec
 }
 
 function initialElixir(journal,campaignId,finishId){
- const finish=journal.find(r=>r.id===finishId&&relevant(r,campaignId)&&r.calendarAlchemyFinish);
- const p=finish?.calendarAlchemyFinish;
- requireTrue(p&&p.result==='completed'&&integer(p.baseAS,6,11)&&p.campaignId===campaignId&&
-  p.minute===finish.campaignMinute,'Alchemy Decay: chybí skutečně dokončený elixír s base AS6–11');
+ const finish=journal.find(r=>r.id===finishId&&relevant(r,campaignId)&&alchemyDoseProof(r));
+ const p=alchemyDoseProof(finish);
+ const validAS=finish?.calendarAlchemyStartingDose?integer(p.baseAS,1,p.selection?.index):integer(p?.baseAS,6,11);
+ requireTrue(p&&p.result==='completed'&&validAS&&p.campaignId===campaignId&&
+  p.minute===finish.campaignMinute,'Alchemy Decay: chybí doložený dokončený nebo počáteční elixír s platnou AS');
  return {finish,proof:p};
 }
 /** Authoritative strength as established by immutable completed + decay proofs.
@@ -121,12 +124,12 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
  * unbound elixir cannot silently suspend its mandatory natural decay.
  */
 export function pendingAlchemyDecay(journal=[],campaignId,minute=1e9){
- return journal.filter(r=>relevant(r,campaignId)&&r.calendarAlchemyFinish?.result==='completed')
+ return journal.filter(r=>relevant(r,campaignId)&&alchemyDoseProof(r)?.result==='completed')
   .map(r=>alchemyElixirStrength(journal,campaignId,r.id,Math.max(minute,r.campaignMinute)))
   .filter(s=>!s.expires&&s.nextDueMinute<=minute);
 }
 export function alchemyElixirStates(journal=[],campaignId){
- return journal.filter(r=>relevant(r,campaignId)&&r.calendarAlchemyFinish?.result==='completed')
+ return journal.filter(r=>relevant(r,campaignId)&&alchemyDoseProof(r)?.result==='completed')
   .map(r=>alchemyElixirStrength(journal,campaignId,r.id));
 }
 export function createAlchemyDecay({journal=[],campaignId,minute,recordedMinute=minute,actorId,finishId,d10,origin,gmConfirmed=false,gmMissedConfirmed=false}={}){
