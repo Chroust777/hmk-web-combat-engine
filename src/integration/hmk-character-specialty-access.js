@@ -36,8 +36,7 @@ export function characterSpecialtyChapters(character){
   const known=h.startingElixirs?.elixirs;
   add('special-alchemy','Osvojená Alchemy; nestačí samo povolání ani teoretické SB.',
    [detail('Alchemy ML',alchemy.ml),detail('Vývoj dovednosti',alchemy.totalDP+' DP'),
-    ...(Array.isArray(known)?[detail('Doložené počáteční elixíry',known.length)]:[])],
-   'V tomto oboru spravujete výrobu, AS, dávky a Decay. Čas a termíny určuje kalendář kampaně.');
+    ...(Array.isArray(known)?[detail('Doložené počáteční elixíry',known.length)]:[])]);
  }
  const pvar=rowFor(skills,'Pvârism'),spells=proofs.startingPvarSpellsProof;
  // The starting spell proof identifies known spells. Occupation/Pvârism alone do not.
