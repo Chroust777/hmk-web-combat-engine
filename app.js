@@ -51,9 +51,9 @@ import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOppose
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.014';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
-import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=93.964';
-import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=93.972';
-import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integration/hmk-chronicle-novel-93961.js?v=93.964';
+import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=94.043';
+import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=94.043';
+import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integration/hmk-chronicle-novel-93961.js?v=94.043';
 import {CHRONICLE_NOVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.962';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
@@ -244,6 +244,7 @@ import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority
 import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekWeatherReference,trekAvailableTerrain,trekMovementTableRow,trekBearingRequirement,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence,assertTrekDailyWeatherAppendOnly} from './src/integration/hmk-trekking-routine.js';
 import {createPCShelteredStay,pcShelteredStayAt,validatePCShelteredStayJournal,assertPCShelteredStayAppendOnly} from './src/integration/hmk-pc-sheltered-stay-93730.js';
 import {weather24HourTimeline,trekkingDaylightSeason} from './src/integration/hmk-episode-weather-timeline.js';
+import {weatherDisplayDay,travelWeatherDisplay,hourlyWeatherLabels,travelHourlyWeatherProse} from './src/integration/hmk-hourly-weather.js?v=94.043';
 import {calendarTravelWeatherSegments,firstCalendarTravelBoundary} from './src/integration/hmk-weather-calendar-timeline-93730.js';
 import {visibleWeather} from './src/integration/hmk-weather-phrases-93730.js';
 import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-scope.js';
@@ -406,7 +407,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.042';
+const APP_VERSION='94.043';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2231,23 +2232,54 @@ function trekWeatherDetailsHTML(w){
  const day=trekWeatherWords(w,false),night=trekWeatherWords(w,true);
  return `<span data-hmk-help="HMK 144: jde o pravidlové riziko, nikoliv konkrétní stupně Celsia. Jeden pár d10 určuje 24 hodin. Při nočním chladu se déšť může změnit ve sníh nebo plískanici." tabindex="0">☀️ Den: ${esc(day.temperature)} · ${esc(day.kind)}. 🌙 Noc: ${esc(night.temperature)} · ${esc(night.kind)}.</span>`;
 }
-function weatherDayTimelineHTML(day,{latitudeBand='mid',daylightSeason=null,sunriseMinute=null,twilightMinutes=60,highlightMinute=null}={}){
- if(!day)return '';
- const lightSeason=daylightSeason||day.season;
- const duration=EPISODE_DAYLIGHT_HOURS[latitudeBand]?.[lightSeason];
- if(!duration)return '<p class="hc-hint">Pro časový přehled vyberte šířkové pásmo a datum.</p>';
- const sunrise=Number.isSafeInteger(sunriseMinute)?sunriseMinute:Math.round(720-duration*30);
- const t=weather24HourTimeline({weather:day,latitudeBand,daylightSeason:lightSeason,sunriseMinute:sunrise,twilightMinutes});
- const fmt=n=>`${String(Math.floor(n/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;
- const periodLabel={day:'Den',twilight:'Soumrak',night:'Noc'};
- const hazardHelp='Riziko podle HMK 144–149: v tomto úseku může počasí vyvolat Cold Hazard nebo Heat Hazard. Samotné označení není zranění ani automatický hod. Potřebný Weather Hazard Roll se řeší až pro konkrétní doloženou expozici a podle skutečné ochrany postavy; bez rizika se teplotní Hazard Roll neprovádí.';
- return `<div class="hc-weather-timeline"><div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline"><caption class="hc-weather-table-caption">Potvrzený průběh počasí pro celý den</caption><thead><tr><th>Čas</th><th>Část dne</th><th>Světlo</th><th>Jaké je počasí</th><th>Srážky</th><th><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(hazardHelp)}" aria-label="Riziko HMK – zobrazit vysvětlení">Riziko HMK</span></th></tr></thead>
- <tbody>${t.rows.map(r=>{const d=visibleWeather({hazard:r.hazard,precipitation:r.precipitation});return `<tr class="${[r.hazard?'hc-weather-timeline-hazard':'',Number.isInteger(highlightMinute)&&r.start<=highlightMinute&&highlightMinute<r.end?'hc-weather-timeline-current':''].filter(Boolean).join(' ')}"><td>${fmt(r.start)}–${fmt(r.end)}</td><td>${r.daypart}</td><td>${periodLabel[r.period]}</td><td><strong>${d.icon} ${esc(d.heading)}</strong></td><td>${esc(d.precipitation)}</td><td>${esc(d.badge)}</td></tr>`;}).join('')}</tbody></table></div></div>`;
+function weatherClockMinute(minute){
+ return String(Math.floor(minute/60)%24).padStart(2,'0')+':'+String(minute%60).padStart(2,'0');
 }
-/** v93.871: show only the requested confirmed area's 24-hour table on
- * its name hover/focus (tap focuses the button). No rolls or saves here. */
+function weatherClockRange(start,end){
+ return weatherClockMinute(start)+'–'+(end%1440===0?'24:00':weatherClockMinute(end));
+}
+function currentAreaWeatherTimeline(area,weather,{latitudeBand='mid',daylightSeason=null,sunriseMinute=null,twilightMinutes=60}={}){
+ const clock=data.campaignClock;
+ const lightSeason=daylightSeason||weather.season;
+ const duration=EPISODE_DAYLIGHT_HOURS[latitudeBand]?.[lightSeason];
+ if(!clock||!duration)return [];
+ const dayStart=Math.floor(clock.minute/1440)*1440;
+ const sunrise=Number.isSafeInteger(sunriseMinute)?sunriseMinute:Math.round(720-duration*30);
+ const {light}=weather24HourTimeline({weather,latitudeBand,daylightSeason:lightSeason,sunriseMinute:sunrise,twilightMinutes});
+ return weatherDisplayDay(data.journal,campaignKey(clock),area,dayStart,light.segments.map(segment=>({
+  ...segment,start:segment.start+dayStart,end:segment.end+dayStart
+ })));
+}
+function weatherDayTimelineHTML(timeline,highlightMinute){
+ if(!timeline.length)return '<p class="hc-hint">Pro časový přehled vyberte šířkové pásmo a datum.</p>';
+ const dayStart=timeline[0].start,periodLabel={day:'Den',twilight:'Šero',night:'Noc'};
+ const hazardLabel={cold:'Cold Hazard',heat:'Heat Hazard'};
+ const rows=Array.from({length:24},(_,hour)=>{
+  const start=dayStart+hour*60,end=start+60;
+  const segments=timeline.filter(row=>row.start>=start&&row.start<end);
+  const cell=render=>{
+   const runs=[];
+   for(const row of segments){
+    const text=render(row),last=runs.at(-1);
+    if(last?.text===text)last.end=row.end;
+    else runs.push({start:row.start,end:row.end,text});
+   }
+   return runs.length===1?runs[0].text:runs.map(row=>
+    `<div><small>${weatherClockRange(row.start,row.end)}</small> ${row.text}</div>`).join('');
+  };
+  const current=Number.isInteger(highlightMinute)&&highlightMinute>=hour*60&&highlightMinute<(hour+1)*60;
+  return `<tr class="${current?'hc-weather-timeline-current':''}" data-weather-hour="${hour}">
+   <td>${weatherClockRange(start,end)}</td><td>${cell(r=>periodLabel[r.period]??'—')}</td>
+   <td>${cell(r=>{const [sky,,icon]=hourlyWeatherLabels(r);return '<strong>'+esc(icon+' '+sky)+'</strong>';})}</td>
+   <td>${cell(r=>esc(hourlyWeatherLabels(r)[1]))}</td><td>${cell(r=>hazardLabel[r.hazard]??'—')}</td></tr>`;
+ }).join('');
+ return `<div class="hc-weather-timeline"><div class="hc-episode-table-scroll"><table class="hc-episode-weather-timeline">
+  <caption class="hc-weather-table-caption">Počasí po hodinách</caption><thead><tr><th>Čas</th><th>Světlo</th><th>Obloha</th><th>Srážky</th><th>Riziko HMK</th></tr></thead>
+  <tbody>${rows}</tbody></table></div><p class="hc-hint">Průběh vychází ze dvou denních hodů. Potvrzené souvislé srážky mají v odehraném úseku přednost.</p></div>`;
+}
 function weatherAreaHoverHTML(area,weather,opts={}){
- return `<span class="hc-weather-hover-shell hc-weather-area-hover"><button type="button" class="hc-weather-area-trigger" title="Najetím nebo kliknutím zobrazit průběh dne" aria-label="${esc(area)} · zobrazit průběh počasí za den">${esc(area)}</button><div class="hc-weather-hover-popover">${weatherDayTimelineHTML(weather,opts)}</div></span>`;
+ const timeline=opts.timeline??currentAreaWeatherTimeline(area,weather,opts);
+ return `<span class="hc-weather-hover-shell hc-weather-area-hover"><button type="button" class="hc-weather-area-trigger" title="Najetím nebo kliknutím zobrazit průběh dne" aria-label="${esc(area)} · zobrazit průběh počasí za den">${esc(area)}</button><div class="hc-weather-hover-popover">${weatherDayTimelineHTML(timeline,opts.highlightMinute)}</div></span>`;
 }
 /** Draft inputs and generated dice are NOT a resolved weather outcome. Only the
  * submit handler, after explicit GM confirmation and a journal write, renders
@@ -3693,11 +3725,14 @@ function chronicleParagraphs951(clock,entry,presentation,source,{gm=false}={}){
   narratedTracking:rolls.some(beat=>/tracking/i.test(beat.test?.skill||'')&&beat.after),
   narratedEndurance:rolls.some(beat=>beat.kind==='endurance')
  };
+ const hourly=travelWeatherDisplay(data.journal,entry.calendarCampaignId,p);
+ const storyEpisode=hourly.length?{...p,hourlyWeatherNarrated:true}:p;
  const beats=legacy?personalChronicleBeats(entry,p,tests,{hazard,encounter:!presentation.shared?encounter:null,name,calendar}):
-  composeTravelChronicle(entry,p,{hazard,name,calendar,priorInjuries,flow,animalKind:source.animalKind,language,ordinal:source.sequence.get(entry.id)});
+  composeTravelChronicle(entry,storyEpisode,{hazard,name,calendar,priorInjuries,flow,animalKind:source.animalKind,language,ordinal:source.sequence.get(entry.id)});
  const intro=!legacy&&beats.find(beat=>beat.kind==='intro'&&beat.text);
  const wind=travelWindProse(p);
- if(intro&&wind)intro.text+=' '+wind;
+ const weatherProse=travelHourlyWeatherProse(hourly);
+ if(intro)intro.text=[intro.text,weatherProse,wind].filter(Boolean).join(' ');
  if(!legacy&&presentation.paragraphs?.length>beats.length){
   const ending=composeTravelChronicle(entry,p,{hazard,name,calendar,priorInjuries,animalKind:source.animalKind,language,ordinal:source.sequence.get(entry.id)}).at(-1);
   if(ending?.kind==='aftermath')beats.push(ending);
@@ -3785,7 +3820,7 @@ function personalTimeEpisodeChronicleHTML(clock,personalId,{gm=false}={}){
   const timeRange=`${historyTRMoment950(clock,p.startMinute)} · ${start}–${endShort}`;
   const routePart=locality?`Typ krajiny / cesta: ${locality}${distance}`:(distance?distance.slice(3):'');
   const roles=personalEpisodeRoles(p,name,source.animalKind,displayCampaignMinute,source.language);
-  const weather=chronicleWeather954(p);
+  const weather=chronicleWeather954(p,entry.calendarCampaignId);
   const chronicle=chronicleParagraphs951(clock,entry,presentation,source,{gm});
   const {tests,hazard,encounter}=chronicle;
   const context=[weather,p.area&&p.area.toLowerCase()!==locality.toLowerCase()?`Oblast: ${p.area}`:'',Number.isInteger(p.minutes)?`${p.minutes} ${p.minutes===1?'minuta':p.minutes>=2&&p.minutes<=4?'minuty':'minut'}`:''].filter(Boolean);
@@ -3805,14 +3840,20 @@ function personalTimeEpisodeChronicleHTML(clock,personalId,{gm=false}={}){
  return gm?`<section class="${klass} hc-episode-chronicle--gm" data-personal-chronicle><h3>${caption}</h3>${body}</section>`:
   `<details class="${klass}" data-personal-chronicle><summary><strong>${caption}</strong></summary>${body}</details>`;
 }
-function chronicleWeather954(episode){
- const weather=episode?.weather||episode?.precipitation?.precipitation?personalEpisodeWeather(episode):'';
+function chronicleWeather954(episode,cid){
+ const hourly=episode?travelWeatherDisplay(data.journal,cid,episode):[];
+ const weather=episode?.weather||episode?.precipitation?.precipitation?
+  personalEpisodeWeather(episode,{includePrecipitation:!hourly.length}):'';
+ const hourlyText=hourly.map(row=>{
+  const [sky,rain]=hourlyWeatherLabels(row);
+  return (hourly.length>1?weatherClockRange(row.start,row.end)+' ':'')+(rain==='bez srážek'?sky:rain);
+ }).join(' / ');
  const wind=(episode?.windSegments??[]).map(segment=>{
   const label=windDescription(segment);
   return segment.from===episode.startMinute&&segment.until===episode.endMinute?label:
    label+' · '+displayCampaignMinute(segment.from)+' až '+displayCampaignMinute(segment.until);
  });
- return [weather,wind.join(' / ')].filter(Boolean).join(' · ');
+ return [weather,hourlyText,wind.join(' / ')].filter(Boolean).join(' · ');
 }
 const chronicleDayByCampaign=new Map();
 function activeCampaignChronicle(){
@@ -3846,7 +3887,7 @@ function timeEpisodeChronicleHTML(clock){
   const day=dayLabel(minute);
   const weather=[...new Set(items.flatMap(item=>{
    const p=item.row?.calendarTimeEpisode||item.row?.calendarTrekProof;
-   const label=chronicleWeather954(p);
+   const label=chronicleWeather954(p,cid);
    return label?[p.area?`${p.area} — ${label}`:label]:[];
   }))];
   const body=items.map(item=>{
@@ -3875,8 +3916,9 @@ function timeEpisodeChronicleHTML(clock){
    const presentation=campaignChronicleEpisodeEdit(data,cid,entry.id);
    const story=chronicleParagraphs951(clock,entry,presentation,source);
    const title=[personalEpisodeActivities(p),p.area].filter(Boolean).join(' · ');
+   const weather=chronicleWeather954(p,cid);
    return `<article class="hc-book-scene"><header><time>${esc(clockLabel(p.startMinute))}–${esc(clockLabel(p.endMinute))}</time><h4>${esc(title)}</h4></header>
-    ${chronicleWeather954(p)?`<p class="hc-episode-weather">${esc(chronicleWeather954(p))}</p>`:''}
+    ${weather?`<p class="hc-episode-weather">${esc(weather)}</p>`:''}
     ${roleList(p)}
     <div class="hc-personal-episode__story hc-personal-episode__story--integrated">${chronicleNarrativeHTML953(entry,story,name,presentation.paragraphs)}</div>
     ${paragraphs(p.narrative)}
@@ -4885,15 +4927,15 @@ function campaignCalendarView(){
  const windOnly=activeWind.filter(wind=>!recordedAreas.has(weatherAreaKey(wind.area))).map(wind=>
   '<div class="hc-clock-weather-row">'+esc(wind.area)+': '+esc(windLine(wind))+'</div>').join('');
  const weatherHeading=confirmedWeather.length?confirmedWeather.map(w=>{
-  const day=trekWeatherWords(w.weather,false),night=trekWeatherWords(w.weather,true);
-  const active=w.period==='night'?night:w.period==='day'?day:null;
-  // "Deštivé počasí" already conveys rain; do not repeat "déšť" and
-  // do not append another day/night explanation to a current-period label.
-  const compact=x=>x.temperature+((x.kind==='déšť'&&/deštiv/i.test(x.temperature))?'':x.kind&&x.kind!=='bez srážek'?` · ${x.kind}`:'');
-  const detail=active?`${active.icon} ${compact(active)}`:
-   compact(day)===compact(night)?`${day.icon} ${compact(day)}`:
-   `☀️ ${compact(day)}; 🌙 ${compact(night)}`;
-  return `<div class="hc-clock-weather-row">${weatherAreaHoverHTML(w.area,w.weather,{highlightMinute:clock.minute%1440})}: ${esc(detail)}${w.changed?' <small>· změna GM</small>':''}${windByArea.has(weatherAreaKey(w.area))?' · '+esc(windLine(windByArea.get(weatherAreaKey(w.area)))):''}</div>`;
+  const base=activeAreaWeather(data.journal,campaignKey(clock),Math.floor(clock.minute/1440),w.area)?.calendarTrekDayWeather;
+  const opts={latitudeBand:base?.latitudeBand||'mid',daylightSeason:date?trekkingDaylightSeason(date.month,date.day):base?.season};
+  const timeline=currentAreaWeatherTimeline(w.area,w.weather,opts);
+  const now=timeline.find(row=>row.start<=clock.minute&&clock.minute<row.end);
+  const fallback=trekWeatherWords(w.weather,w.period==='night');
+  const [sky,rain,icon]=now?hourlyWeatherLabels(now):[fallback.temperature,fallback.kind,fallback.icon];
+  const extreme=now?.hazard==='cold'?'nebezpečný chlad':now?.hazard==='heat'?'nebezpečné vedro':'';
+  const detail=[icon+' '+sky,rain,extreme].filter(Boolean).join(' · ');
+  return `<div class="hc-clock-weather-row">${weatherAreaHoverHTML(w.area,w.weather,{timeline,highlightMinute:clock.minute%1440})}: ${esc(detail)}${w.changed?' <small>· změna GM</small>':''}${windByArea.has(weatherAreaKey(w.area))?' · '+esc(windLine(windByArea.get(weatherAreaKey(w.area)))):''}</div>`;
  }).join(''):'<span class="hc-clock-weather-row">Denní počasí dosud nebylo GM potvrzeno.</span>';
  const withClock=folio.replace('</header><div class="folio-chapter-content">',
   `<div class="hc-clock-heading" role="status" aria-label="Aktuální herní datum, čas a počasí"><span>AKTUÁLNÍ ČAS KAMPANĚ</span><strong>${esc(clockLabel)} · ${esc(timeLabel)}</strong><div class="hc-clock-weather"><span class="hc-clock-weather-label">POČASÍ · AKTUÁLNÍ DEN</span>${weatherHeading}${windOnly}</div>${date?'':'<small>Datum TR nebylo v tomto kalendáři ještě přiřazeno.</small>'}</div></header><div class="folio-chapter-content">`);
