@@ -219,9 +219,9 @@ import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,travelBloodStoppageEML,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
-import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.018';
+import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.033';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
-import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js';
+import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.033';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
 import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.018';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
@@ -323,7 +323,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.018';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.033';
 import {operationalProjectJournal,projectKind,projectEnded,validateProjectCancellations,assertProjectCancellationsAppendOnly} from './src/integration/hmk-project-cancellation-94017.js';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
@@ -400,7 +400,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.032';
+const APP_VERSION='94.033';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4414,7 +4414,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  ${unresolvedParalytics.map(t=>{const patient=character(t.targetId),end=patient?.hmk?.attributes?.end;
   const ready=t.potency===3?!!combatInitiativeSequence&&combatInitiativeSequence.timelineId===t.timelineId&&combatInitiativeSequence.round===t.dueRound:clock.minute===t.dueMinute;
   const due=t.potency===3?'bojové kolo '+t.dueRound+' / '+t.timelineId:displayCampaignMinute(t.dueMinute);
-  return `<div class="hc-event"><strong>${esc(patient?.name||t.targetId)} · ${esc(potencyLabel(t.potency))}</strong> · END test splatný ${esc(due)}. Potence −${t.source.calendarHerbPotionAdminister.bonus}; neúspěch = úplná paralýza 1 hodinu.
+  return `<div class="hc-event" data-project-calendar-record="${esc(t.applicationId)}"><strong>${esc(patient?.name||t.targetId)} · ${esc(potencyLabel(t.potency))}</strong> · END test splatný ${esc(due)}. Potence −${t.source.calendarHerbPotionAdminister.bonus}; neúspěch = úplná paralýza 1 hodinu.
    ${ready&&Number.isSafeInteger(end)&&end>0?`<form data-herb-paralytic-endurance><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Skutečný END d100 (END ${end})<input type="number" name="d100" min="1" max="100" required></label><button type="button" class="hc-small" data-paralytic-roll-d100>⚄ Generovat d100</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje předepsaný END test přesně v termínu</label><button type="submit">Vyhodnotit Paralytic a zapsat stav</button></form>`:'<p class="hc-hint">Čeká na přesný čas/kolo a ověřený Endurance postavy. Termín nelze bez vyhodnocení přeskočit.</p>'}</div>`;
  }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný nevyhodnocený Paralytic.</p>'}
  <h4>Soporific · Endurance Success Value → Weariness / INC / UNC (HMK 75)</h4>
@@ -4422,12 +4422,12 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
  ${pendingSoporificEND.map(t=>{const patient=character(t.targetId),end=patient?.hmk?.attributes?.end;
  const app=t.source.calendarHerbPotionAdminister,ready=clock.minute===t.minute&&
  (t.potency<3||combatInitiativeSequence?.round===app.combatAnchor?.round&&combatInitiativeSequence?.timelineId===app.combatAnchor?.timelineId);
- return `<div class="hc-event"><strong>${esc(patient?.name||t.targetId)} · ${esc(potencyLabel(t.potency))}</strong> · potvrdit END SV v minutě podání ${esc(displayCampaignMinute(t.minute))}.
+ return `<div class="hc-event" data-project-calendar-record="${esc(t.applicationId)}"><strong>${esc(patient?.name||t.targetId)} · ${esc(potencyLabel(t.potency))}</strong> · potvrdit END SV v minutě podání ${esc(displayCampaignMinute(t.minute))}.
  ${ready&&Number.isSafeInteger(end)&&end>0?`<form data-herb-soporific-end><input type="hidden" name="applicationId" value="${esc(t.applicationId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><label>Skutečný END d100 (END ${end})<input type="number" name="d100" min="1" max="100" required></label><button type="button" class="hc-small" data-soporific-d100>⚄ Generovat d100</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje END SV bez posunu času</label><button type="submit">Zapsat END SV a založit přesné termíny</button></form>`:'<p class="hc-hint">Čeká na čas podání a ověřené Endurance postavy.</p>'}</div>`;
  }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný čekající Soporific END SV.</p>'}
  ${pendingSoporificOnsets.map(t=>{const ready=t.phase==='weariness'?clock.minute===t.dueMinute:
  combatInitiativeSequence?.round===t.dueRound&&combatInitiativeSequence?.timelineId===t.timelineId;
- return `<div class="hc-event"><strong>${esc(character(t.targetId)?.name||t.targetId)} · ${esc(t.phase)}</strong> · termín ${esc(t.phase==='weariness'?displayCampaignMinute(t.dueMinute):'bojové kolo '+t.dueRound)}.
+ return `<div class="hc-event" ${t.phase==='weariness'?`data-project-calendar-record="${esc(t.testId)}"`:''}><strong>${esc(character(t.targetId)?.name||t.targetId)} · ${esc(t.phase)}</strong> · termín ${esc(t.phase==='weariness'?displayCampaignMinute(t.dueMinute):'bojové kolo '+t.dueRound)}.
  ${ready?`<form data-herb-soporific-effect><input type="hidden" name="testId" value="${esc(t.testId)}"><input type="hidden" name="targetId" value="${esc(t.targetId)}"><input type="hidden" name="phase" value="${esc(t.phase)}"><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje splatný účinek v původní časové ose</label><button type="submit">Zapsat ${esc(t.phase)} do původního bojového stavu</button></form>`:'<p class="hc-hint">Čeká na splatnou minutu nebo bojové kolo.</p>'}</div>`;
  }).join('')||'<p class=\"hc-hint\" data-craft-empty>Žádný splatný následný účinek Soporific.</p>'}
  <h4>Poison paste · nanesení na skutečnou zbraň (HMK 75)</h4>
@@ -4550,7 +4550,7 @@ function campaignCalendarView(){
    arr.push({kind:'aural',name:'Aural Shock',unit:'hodiny',episodeId:'aural-legacy'});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
- const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))} · ${esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button><button type="button" class="hc-small danger" data-cal-gm-cancel-due="${esc(x.id)}" data-cal-gm-cancel-actor="${esc(x.characterId)}" title="GM: zrušit povinnost a navázané termíny">×</button></div></div>`;};
+ const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))}${isHerbalCalendarCheck(x.kind)?'':' · '+esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button>${x.cancellable===false?'':`<button type="button" class="hc-small danger" data-cal-gm-cancel-due="${esc(x.id)}" data-cal-gm-cancel-actor="${esc(x.characterId)}" title="GM: zrušit povinnost a navázané termíny">×</button>`}</div></div>`;};
  const moraleChecks=agenda.due.filter(x=>x.kind==='morale-reaction');
  const moraleUnknown=agenda.unknown.filter(x=>x.kind==='morale-reaction');
  const moraleWarnings=agenda.moraleWarnings||[];
@@ -8815,6 +8815,24 @@ function focusCharacterCraftRecord(source){
  const activeDie=target.querySelector('[data-hmk-chain-value-93918]:enabled');
  (activeDie??[...target.querySelectorAll('input:not([type="hidden"]):enabled,button:enabled')].find(field=>!field.closest('[hidden]')))?.focus({preventScroll:true});
  return true;
+}
+function isHerbalCalendarCheck(kind){
+ return ['herbal-paralytic','herbal-soporific-end','herbal-soporific-onset'].includes(kind);
+}
+function openHerbalCalendarCheck(sourceId){
+ const source=projectJournal().find(row=>row.id===sourceId&&row.calendarCampaignId===campaignKey(data.campaignClock));
+ const application=source?.calendarHerbSoporificEnd
+  ?projectJournal().find(row=>row.id===source.calendarHerbSoporificEnd.applicationId&&row.calendarCampaignId===source.calendarCampaignId):source;
+ const actor=character(application?.calendarHerbPotionAdminister?.actorId??application?.characterId);
+ if(!actor||!openCharacterCraft(actor,'special-herblore')){
+  if(!actor)uiAlert('Původní podání v Herblore už není dostupné.');
+  return;
+ }
+ const record=document.querySelector(`[data-project-calendar-record="${CSS.escape(sourceId)}"]`);
+ if(record){
+  record.classList.add('hmk-project-item-focus');
+  focusCharacterCraftRecord(sourceId);
+ }
 }
 function openCharacterCraft(actor,discipline,source){
  if(!characterProjectDisciplines(actor).some(item=>item.enabled&&item.id===discipline)){
@@ -21317,6 +21335,7 @@ function explainAndOpenBlockedCalendarTerm(err,targetMinute){
  if(!due)return false;
  const actor=character(due.characterId);
  uiAlert('Čas nebyl změněn. Povinná kontrola: '+(actor?.name||due.name)+' · '+due.description+' · '+displayCampaignMinute(due.minute)+'. Po zavření tohoto okna se otevře správný formulář.');
+ if(isHerbalCalendarCheck(due.kind)){openHerbalCalendarCheck(due.sourceId);return true;}
  if(actor&&due.kind==='concurrent-treatment'&&due.startId){
   try{openCalendarConcurrentTreatment(actor,due.startId);}catch(failure){uiAlert(failure.message);}
   return true;
@@ -22110,7 +22129,7 @@ document.addEventListener('click',e=>{
   const liveAgenda=campaignCalendarAgenda(data.campaignClock,data.characters,data.journal,data.inventory);
   const x=b.dataset.calGmCancelUnknown?liveAgenda.unknown.find(x=>gmCalendarUnknownId(x)===b.dataset.calGmCancelUnknown):
    liveAgenda.all.find(x=>x.id===b.dataset.calGmCancelDue&&x.characterId===b.dataset.calGmCancelActor);
-  if(!x)throw Error('Povinnost již neexistuje nebo byla zrušena.');
+  if(!x||x.cancellable===false)throw Error('Tuto povinnost nelze zrušit v kalendáři.');
   const reason=window.prompt('GM · zrušení povinného termínu a navázaných kontrol. Důvod:', 'Rozhodnutí GM');
   if(reason===null)return;
   const next=cancelGMCalendarObligation(data.campaignClock,{event:x,eventId:uuid(),reason,gmConfirmed:true,journal:data.journal});
@@ -22133,6 +22152,7 @@ document.addEventListener('click',e=>{
  try{
   if(control==='rules'){
    if(isRemove){
+    if(chosen.cancellable===false)return;
     const reason=window.prompt('GM · zrušit povinný test a z něj odvozené kalendářové povinnosti. Potvrzené hody zůstanou v historickém deníku. Důvod zrušení:', 'Rozhodnutí GM');
     if(reason===null)return;
     const next=cancelGMCalendarObligation(data.campaignClock,{event:chosen,eventId:uuid(),reason,gmConfirmed:true,journal:data.journal});
@@ -22353,7 +22373,7 @@ document.addEventListener('click',e=>{
   const ev=[...currentAgenda.all,...(currentAgenda.prepared||[])].find(x=>x.id===t.dataset.calAgenda);
   if(!ev||ev.characterId!==t.dataset.calLink||ev.kind!==t.dataset.calKind||
     String(ev.sourceId||ev.woundId||'')!==String(t.dataset.calSource||''))return;
-  if(ev.kind!=='herbal-potion'&&ev.status!=='due'&&ev.status!=='preparation'){
+  if(ev.kind!=='herbal-potion'&&!isHerbalCalendarCheck(ev.kind)&&ev.status!=='due'&&ev.status!=='preparation'){
    const target=character(ev.characterId);if(!target)return;
    selected=target.id;activeSheetSection='status';view='sheet';
    const message='Událost '+ev.description+' pro '+target.name+' je naplánovaná až na '+displayCampaignMinute(ev.minute)+'. Nelze ji vyhodnotit před splatností.';
@@ -22366,6 +22386,9 @@ document.addEventListener('click',e=>{
   try{openCalendarConcurrentTreatment(character(t.dataset.calLink),t.dataset.calConcurrentId);}
   catch(failure){uiAlert('Kontrola Treatment: '+failure.message);}
   return;
+ }
+ if(t.dataset.calLink&&isHerbalCalendarCheck(t.dataset.calKind)){
+  openHerbalCalendarCheck(t.dataset.calSource);return;
  }
  if(t.dataset.calLink&&t.dataset.calKind==='herbal-potion'){
   const target=character(t.dataset.calLink);if(!target)return;
@@ -22585,7 +22608,13 @@ document.addEventListener('submit',e=>{
    gmConfirmed:true,eventId:uuid()});
   if(!uiConfirm('Trvale potvrdit počátek '+kind+' před '+elapsedMinutes+' minutami?'))return;
   mutate(()=>{data.campaignClock=next;});
- }catch(err){alert('Kalendář nebyl změněn: '+err.message);}
+ }catch(err){
+  if(f.id==='campaign-advance-form'&&data.campaignClock&&/povinný termín (Paralytic|Soporific)/.test(err.message)){
+   const target=data.campaignClock.minute+parse(v.days)*DAY_MINUTES+parse(v.hours)*60+parse(v.minutes);
+   if(explainAndOpenBlockedCalendarTerm(err,target))return;
+  }
+  alert('Kalendář nebyl změněn: '+err.message);
+ }
 },true);
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-ui-history]');if(!button)return;
