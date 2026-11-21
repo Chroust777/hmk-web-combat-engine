@@ -70,6 +70,23 @@ const secondaryResult=I.applyEgosightProfusionAural({journal:pending,state:initi
 yes(I.validateEgosightProfusionJournal([...pending,row('secondary-egosight',other.minute,'B','calendarAlchemyEgosightProfusionIll',secondary)]));
 no(()=>I.validateEgosightProfusionJournal(pending),/chybí důkaz/);
 no(()=>I.createEgosightProfusionIll({journal:pending,campaignId:'WRONG',minute:other.minute,triggerUseId:trigger,sourceUseId:'usee',targetId:'B'}),/spouštěcí/);
+// A critical Egosight imbibing also triggers an existing Darkvision's illness.
+const darkvision=prepared('Darkvision','prior-dv');
+const darkvisionArgs={journal:darkvision.journal,inventory:darkvision.inventory,campaignId:'C',
+ minute:darkvision.minute,actorId:'A',targetId:'B',finishId:darkvision.finishId,
+ testSkill:'Aura',ml:80,d100:41,origin:'manual',emptyId:'prior-dv-empty',gmConfirmed:true};
+const darkvisionProof=I.createAlchemyDarkvisionImbibing(darkvisionArgs);
+const darkvisionEmpty=V.createAlchemyVialEmpty({...darkvisionArgs,reason:'Darkvision imbibed',confirmedByGM:true});
+const egosightDose=prepared('Egosight','trigger-ego');
+const combination=imbibe(egosightDose,95,'B',[
+ ...darkvision.journal,row('prior-dv-empty',darkvision.minute,'A','calendarAlchemyVialEmpty',darkvisionEmpty),
+ row('prior-dv-use',darkvision.minute,'A','calendarAlchemyImbibing',darkvisionProof),...egosightDose.journal
+]);
+const darkvisionIll=I.createDarkvisionProfusionIll({journal:combination.journal,campaignId:'C',
+ minute:egosightDose.minute,triggerUseId:combination.useId,sourceUseId:'prior-dv-use',targetId:'B'});
+eq(darkvisionIll.illEffect.penalty,Math.round(darkvisionProof.asBefore*2.5));
+yes(I.validateDarkvisionProfusionJournal([...combination.journal,
+ row('dv-ill',egosightDose.minute,'B','calendarAlchemyDarkvisionProfusionIll',darkvisionIll)]));
 // Physic references an existing dose and cannot silently lose its Egosight effects.
 const physic=prepared('Physic','ph');const p=I.createAlchemyPhysicImbibing({journal:[...used.journal,...physic.journal],inventory:physic.inventory,campaignId:'C',minute:physic.minute,actorId:'A',targetId:'B',finishId:physic.finishId,testSkill:'Aura',ml:80,d100:42,origin:'manual',emptyId:'emptyph',gmConfirmed:true});
 eq(p.physicEffects.some(x=>x.sourceUseId==='usee'),true);
