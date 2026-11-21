@@ -19,6 +19,7 @@ export function calendarEventDestination(event){
  if(['weather-course','weather-skin','weather-onset','weather-shock'].includes(event?.kind))return 'hazards';
  if(event?.route&&['combat','healing','hazards','skills','inventory','calendar'].includes(event.route))return event.route;
  switch(event?.kind){
+  case 'herbal-paralytic':case 'herbal-soporific-end':case 'herbal-soporific-onset':
   case 'herbal-potion':case 'malnutrition-course':return 'calendar';
   case 'poison':case 'disease':case 'asphyxia':case 'sleep-deprivation':
   case 'weather-course':case 'weather-skin':case 'weather-onset':case 'weather-shock':return 'hazards';

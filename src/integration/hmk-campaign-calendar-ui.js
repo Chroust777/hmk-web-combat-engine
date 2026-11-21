@@ -2,8 +2,8 @@ import {calendarPCShelteredControlsHTML} from './hmk-pc-sheltered-stay-93730.js'
 import {isTravelEpisodeReceipt,travelEpisodeCalendarSegments} from './hmk-episode-calendar-scope.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js';
 import {isCompletedSkillTest,skillTestEvidenceHTML} from './hmk-skill-result-evidence-529.js';
-import {calendarEventDestination} from './hmk-calendar-event-routing.js';
-import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js';
+import {calendarEventDestination} from './hmk-calendar-event-routing.js?v=94.033';
+import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js?v=94.033';
 import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
 import {historicalHMKCalendarEntries} from './hmk-calendar-history.js?v=94.017';
 import {calendarActorActivities} from './hmk-calendar-activities.js';
@@ -48,12 +48,12 @@ function shortEventName(p){
 }
 function issueAction(p,esc){
  const id=esc(p.id),control=calendarEventControlKind(p);
- const marks=p.origin==='gm'&&!p.resolution?
+ const marks=p.cancellable===false?'':p.origin==='gm'&&!p.resolution?
   `<button type="button" class="hc-small hc-event-mark" title="Potvrdit událost GM" aria-label="Potvrdit událost GM" data-cal-resolve="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="Zrušit událost GM" aria-label="Zrušit událost GM" data-cal-cancel="${id}">×</button>`:
   `<button type="button" class="hc-small hc-event-mark" title="${control==='rules'?'Přejít k povinnému pravidlovému vyhodnocení':'Označit událost jako zkontrolovanou – bez změny herních následků'}" aria-label="${control==='rules'?'Otevřít povinné vyhodnocení':'Zkontrolovat událost'}" data-cal-event-check="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="${control==='activity'||control==='nutrition'?'Přerušit probíhající interval':'GM: zrušit událost a navázané aktivní povinnosti'}" aria-label="Zrušit událost rozhodnutím GM" data-cal-event-remove="${id}">×</button>`;
- const text=p.origin==='history'?'Deník ↗':p.origin==='activity'?'Činnost ↗':
+ const text=p.cancellable===false?(p.status==='due'?'Otevřít Herblore ↗':'Zobrazit termín v Herblore ↗'):p.origin==='history'?'Deník ↗':p.origin==='activity'?'Činnost ↗':
   p.origin==='gm'?'Otevřít ↗':p.origin==='hml'?'Kontrola ↗':'Detail ↗';
- const route=p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-concurrent-id="${esc(p.startId||'')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='gm'&&p.skill?`data-cal-skill="${esc(p.skill)}" data-cal-plan="${esc(p.id)}"`: ''} ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:'';
+ const route=p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(p.cancellable===false?'Dovednosti a projekty · Herblore':eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-concurrent-id="${esc(p.startId||'')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='gm'&&p.skill?`data-cal-skill="${esc(p.skill)}" data-cal-plan="${esc(p.id)}"`: ''} ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:'';
  return `${route}${marks}`;
 }
 

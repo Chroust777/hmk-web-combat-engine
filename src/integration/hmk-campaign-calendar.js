@@ -13,6 +13,8 @@ import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
 import {automaticAilmentOnset} from './hmk-calendar-automatic-onsets.js';
 import {operationalProjectJournal} from './hmk-project-cancellation-94017.js';
 import {gmCalendarCancellationMatches} from './hmk-calendar-gm-cancellation.js';
+import {pendingParalyticChecks} from './hmk-herbal-paralytic.js';
+import {pendingSoporificTests,pendingSoporificEffects} from './hmk-herbal-soporific.js';
 export const DAY_MINUTES=1440;
 const validInt=(v,min,max)=>Number.isSafeInteger(v)&&v>=min&&v<=max;
 const ensure=(ok,msg)=>{if(!ok)throw Error(msg);};
@@ -193,7 +195,8 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  if(!clock)return {due:[],future:[],unknown:[],all:[],suspended:[]};
  validateCampaignCalendar(clock);
  characters=Array.isArray(clock.characterIds)?characters.filter(c=>clock.characterIds.includes(c.id)):characters;
- journal=projectedCalendarJournal(clock,operationalProjectJournal(journal));
+ const herbalJournal=operationalProjectJournal(journal);
+ journal=projectedCalendarJournal(clock,herbalJournal);
  characters=characters.map(c=>{
   const state=c.hmk?.healthState,projected=projectLegacyAlchemyShock(projectLegacyGrimShock(state,clock,c.id),clock,c.id);
   return projected===state?c:{...c,hmk:{...c.hmk,healthState:projected}};
@@ -389,6 +392,26 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
   all.push({id:'herbal-potion:'+j.id,characterId:actor.id,name:actor.name,kind:'herbal-potion',
    sourceId:j.id,description:'Herblore SV – dokončení '+h.herbType+' (HMK 74)',
    minute:h.dueMinute,anchorMinute:h.minute,status:h.dueMinute<=clock.minute?'due':'future'});
+ }
+ // The same pending records drive the Herblore forms and the calendar.
+ // Round-based Great checks stay on their original initiative timeline.
+ const addHerbalCheck=(check,kind,sourceId,minute,description)=>{
+  const patient=herbMembers.get(check.targetId);
+  if(!patient)return;
+  all.push({id:kind+':'+sourceId,characterId:patient.id,name:patient.name,kind,sourceId,
+   description,minute,anchorMinute:check.source.campaignMinute,status:minute<=clock.minute?'due':'future',cancellable:false});
+ };
+ for(const check of pendingParalyticChecks(herbalJournal,clock.campaignId)){
+  if(check.potency===3)continue;
+  const potency=check.potency===2?'Strong':'Mild';
+  addHerbalCheck(check,'herbal-paralytic',check.applicationId,check.dueMinute,'Paralytic '+potency+' · Endurance d100');
+ }
+ for(const check of pendingSoporificTests(herbalJournal,clock.campaignId)){
+  if(check.potency<3)addHerbalCheck(check,'herbal-soporific-end',check.applicationId,check.minute,'Soporific · Endurance Success Value');
+ }
+ for(const check of pendingSoporificEffects(herbalJournal,clock.campaignId)){
+  if(check.potency<3&&check.phase==='weariness')
+   addHerbalCheck(check,'herbal-soporific-onset',check.testId,check.dueMinute,check.addIncapacitation?'Soporific · nástup únavy a INC':'Soporific · nástup únavy');
  }
  // Independently begun procedures are scheduled, not already treated.
  // The original Treatment obligation is represented by the authenticated
