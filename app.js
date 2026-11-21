@@ -401,7 +401,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.036';
+const APP_VERSION='94.037';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3990,8 +3990,13 @@ function projectRulesFor(kind){
 }
 document.addEventListener('change',event=>{
  const field=event.target;
- if(field.name==='workshopSource'&&field.form?.elements.namedItem('workshopStars'))
-  field.form.elements.namedItem('workshopStars').required=field.value==='chantry';
+ if(field.name==='workshopSource'){
+  const quality=field.form?.elements.namedItem('workshopStars');
+  if(quality){
+   quality.required=field.value==='chantry';
+   quality.disabled=!quality.required;
+  }
+ }
 });
 const projectDraftCancelHTML='<button type="button" class="secondary" data-project-draft-cancel>Zrušit přípravu</button>';
 const projectFieldRequirements={
@@ -4130,7 +4135,13 @@ function characterCraftPanel(clock,maker,discipline){
  const paralyzedNow=data.characters.filter(c=>activeHerbalParalysis(c.hmk?.healthState,clock.minute));
  const pendingHerbalPotions=projectJournal().filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotionStart?.actorId===actorId&&
   !projectJournal().some(r=>r.calendarHerbPotionComplete?.startId===j.id));
- const pendingAlchemy=pendingAlchemyPreparations(projectJournal(),campaignKey(clock)).filter(forMaker);
+ const ongoingAlchemy=pendingAlchemyPreparations(projectJournal(),campaignKey(clock));
+ const pendingAlchemy=ongoingAlchemy.filter(forMaker);
+ const occupiedAlchemists=new Set(ongoingAlchemy.flatMap(row=>[
+  row.characterId,...(row.calendarAlchemyStart.assistantPlan??[]).map(helper=>helper.actorId)
+ ]));
+ const availableAlchemist=person=>!occupiedAlchemists.has(person.id)&&
+  !(person.hmk?.arcane?.auralShockLevels>0)&&person.hmk?.healthState?.shock!=='KIA';
  const alchemyStates=alchemyElixirStates(projectJournal(),campaignKey(clock));
  const makerElixirs=alchemyStates.filter(x=>x.actorId===actorId||alchemyVialState(projectJournal(),campaignKey(clock),x.finishId,clock.minute)?.ownerId===actorId);
  const alchemyArcaneTargets=alchemyArcaneTargetRegister({journal:data.journal,inventory:data.inventory,campaignId:campaignKey(clock),minute:clock.minute});
@@ -4142,8 +4153,19 @@ function characterCraftPanel(clock,maker,discipline){
  const knownInventorElixirs=data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAlchemyFinish?.result==='completed'&&
   j.calendarAlchemyFinish?.uniqueElixir?.mode==='invent').filter((row,i,all)=>all.findIndex(other=>
   other.calendarAlchemyFinish.uniqueElixir.title.toLocaleLowerCase()===row.calendarAlchemyFinish.uniqueElixir.title.toLocaleLowerCase())===i);
+ const alchemyWorkshopFields=(actor)=>{
+  const wealth=actor.hmk?.wealth;
+  const privateAvailable=Number.isInteger(wealth)&&wealth>=10;
+  return `<label>Dílna<select name="workshopSource">
+   <option value="private" ${privateAvailable?'selected':'disabled'}>Soukromá (Wealth ${esc(wealth??'—')}${privateAvailable?'':' · vyžaduje 10+'})</option>
+   <option value="chantry" ${privateAvailable?'':'selected'}>Cech / chantry</option>
+  </select></label>
+  <label>Kvalita cechovní dílny<select name="workshopStars" ${privateAvailable?'disabled':'required'}>
+   <option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}
+  </select></label>`;
+ };
  const alchemyAssistantFields=(actorId,alchemyML)=>{
-  const options=participants.filter(x=>x.id!==actorId).map(x=>({person:x,ml:availableMasteries(x).find(y=>y.name==='Alchemy')?.ml||0})).filter(x=>x.ml>=40);
+  const options=participants.filter(person=>person.id!==actorId&&availableAlchemist(person)).map(person=>({person,ml:availableMasteries(person).find(skill=>skill.name==='Alchemy')?.ml||0})).filter(row=>row.ml>=40);
   return `<fieldset><legend>Alchemy Assistance · nejvýše 2 osoby (HMK 268)</legend><p class="hc-hint">Pomocníky určete před zahájením. ML40+ dovoluje asistovat, Index přispěje do EML jen při ML alespoň polovině výrobce (${alchemyML}); celkový strop +10. Na konci se musí shodovat s původním Skill Workbench SV.</p><div class="hc-fields">${[1,2].map(i=>`<label>Pomocník ${i}<select name="alchemyAssist${i}"><option value="">— nikdo —</option>${options.map(x=>`<option value="${esc(x.person.id)}">${esc(x.person.name)} · Alchemy ML ${x.ml}${x.ml*2>=alchemyML?' · Index +'+Math.floor(x.ml/10):' · bez EML bonusu'}</option>`).join('')}</select></label>`).join('')}</div></fieldset>`;
  };
  const herbReservationHTML=()=>`<details><summary>Vyhradit bylinnou dávku ze zásob</summary>${availableSupplyLots(data.journal,campaignKey(clock)).filter(x=>x.unit==='herbDoses'&&x.remaining>=1).map(lot=>`<form data-foraging-supply-use>
@@ -4172,14 +4194,12 @@ function characterCraftPanel(clock,maker,discipline){
    <p>Při kritickém neúspěchu proveďte Will SR d10. Pokud neuspěje, následuje Dissolution d100, které určí Aural Shock a Weakness. Při Crucial Dissolution (poslední číslice 5 nebo 0) pokračujte hodem na Shock se základním SHK 8. Případné zotavení se řeší v Combat.</p>
   </details>
  </details>
- ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0,pend=pendingAlchemy.find(x=>x.characterId===c.id);
-  if(ml<60||pend||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
+ ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
+  if(ml<60||!availableAlchemist(c))return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start><strong>${esc(c.name)} · Alchemy ML ${ml} · Sunsign ${esc(sunsign||'NEVYPLNĚN')}</strong><input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}">
   <div class="hc-fields">${alchemyElixirField(c.id)}
-  <label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Cech / chantry · zvolit kvalitu</option></select></label>
-  <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label>
-  <input type="hidden" name="wealth" value="${esc(c.hmk?.wealth??'')}"></div>
+  ${alchemyWorkshopFields(c)}</div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
@@ -4189,7 +4209,7 @@ function characterCraftPanel(clock,maker,discipline){
  <section data-craft-procedure="invent" data-label="Vynalézt elixír (HMK str. 267–268)">${alchemyWorkshopAccess('invent')}
  <details open><summary>Pravidla pro vlastní receptury (HMK str. 267–268)</summary><p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p></details>
  ${onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
-  if(ml<100||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
+  if(ml<100||!availableAlchemist(c))return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start data-alchemy-invent><strong>${esc(c.name)} · Invent ML ${ml} · nová receptura</strong>
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="invent">
@@ -4198,8 +4218,7 @@ function characterCraftPanel(clock,maker,discipline){
   <label>Použití<select name="use"><option value="imbibed">Imbibed</option><option value="applied">Applied</option></select></label>
   <label>Trvání<select name="duration"><option value="instantaneous">Instantaneous</option><option value="temporary">Temporary</option></select></label></div>
   <label>Definovaný efekt (GM; zatím bez automatické mechaniky)<textarea name="effect" required minlength="3" maxlength="1000" rows="2"></textarea></label>
-  <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry (zvolit kvalitu)</option></select></label>
-  <label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
+  <div class="hc-fields">${alchemyWorkshopFields(c)}</div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
@@ -4211,11 +4230,11 @@ function characterCraftPanel(clock,maker,discipline){
  <p>Dokud tuto recepturu postava poprvé úspěšně nepřipraví, uplatní se −1 SV při Preparation Rollu.</p>
  ${knownInventorElixirs.map(source=>{const recipe=source.calendarAlchemyFinish.uniqueElixir;
  return onlyMaker.map(c=>{const ml=availableMasteries(c).find(m=>m.name==='Alchemy')?.ml||0;
-  if(c.id===source.characterId||ml<60||pendingAlchemy.some(j=>j.characterId===c.id)||c.hmk?.arcane?.auralShockLevels>0||c.hmk?.healthState?.shock==='KIA')return '';
+  if(c.id===source.characterId||ml<60||!availableAlchemist(c))return '';
   const sunsign=c.hmk?.sunsign||c.hmk?.creation?.computed?.sunsign||'';
   return `<form data-alchemy-start data-alchemy-known><strong>${esc(c.name)} · znalost unikátní receptury „${esc(recipe.title)}“ · ML ${ml}</strong>
   <input type="hidden" name="actorId" value="${esc(c.id)}"><input type="hidden" name="alchemyML" value="${ml}"><input type="hidden" name="sunsign" value="${esc(sunsign)}"><input type="hidden" name="mode" value="known"><input type="hidden" name="elixirName" value="${esc(recipe.title)}"><input type="hidden" name="knowledgeFinishId" value="${esc(source.id)}">
-  <div class="hc-fields"><label>Dílna<select name="workshopSource"><option value="private">Soukromá (Wealth ${esc(c.hmk?.wealth??'—')})</option><option value="chantry">Chantry</option></select></label><label>Chantry stars<select name="workshopStars"><option value="">Vyberte kvalitu</option>${[1,2,3,4,5].map(n=>`<option value="${n}">${n} ★</option>`).join('')}</select></label></div>
+  <div class="hc-fields">${alchemyWorkshopFields(c)}</div>
   <div class="hc-fields">${[0,1,2].map(i=>`<label>Čas d6 #${i+1}<input name="timeD6${i}" type="number" min="1" max="6" required></label>`).join('')}</div>
   ${alchemyAssistantFields(c.id,ml)}
   <button type="button" class="hc-small" data-alchemy-roll-time>⚄ Generovat 3d6</button>
