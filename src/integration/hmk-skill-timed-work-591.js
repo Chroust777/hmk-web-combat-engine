@@ -155,7 +155,7 @@ export function validateSkillTimedWork591(data){
     return f.providerId!==p.actorId&&(!f.helperIds||f.helperIds.every(id=>id!==p.actorId&&data.characters.some(person=>person.id===id)))&&JSON.stringify(f)===JSON.stringify(plan)&&
      p.earliestMinute===fletchingDue(p.scope,p.startMinute,f,0.7)&&p.baseDueMinute===fletchingDue(p.scope,p.startMinute,f);
    })():CRAFT_WORK_600[p.kind]?(()=>{
-    const exactCalendar=p.kind==='ceramics'&&p.craftExact994===true||p.kind==='brewing'&&p.brewing995===true;
+    const exactCalendar=['ceramics','mineralogy'].includes(p.kind)&&p.craftExact994===true||p.kind==='brewing'&&p.brewing995===true;
     const options={exactCalendar,spiritMonths:p.brewing995===true?p.spiritMonths995:0};
     const t=projectTiming600(p.kind,p.scope,p.startMinute,{agingRolls:p.craftAgingRolls,...options});
     const reference=confirmCraftStart600(p.kind,p.scope,p.startMinute,p.craftAgingRolls,options);
