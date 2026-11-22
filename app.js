@@ -1,3 +1,4 @@
+import {atlasView,mountAtlasView} from './src/ui/atlas-viewer.js';
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.007';
 import {armourWorkItem} from './src/integration/hmk-making-armour.js?v=94.012';
@@ -407,7 +408,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.049';
+const APP_VERSION='94.050';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1241,6 +1242,7 @@ function activeVisualScene(){
   return 'study';
  }
  if(view==='calendar')return 'valley';
+ if(view==='atlas')return 'study';
  if(view==='skills')return 'warroom';
  if(view==='encounter')return 'armory';
  return 'study';
@@ -1258,10 +1260,11 @@ function main(){
  if(view==='gmhistory')body=gmHistoryView();
  if(view==='backup')body=backupView();
  if(view==='calendar')body=campaignCalendarView();
+ if(view==='atlas')body=atlasView();
  if(view==='skills')body=skillWorkbenchView();
  if(view==='encounter')body=encounterView();
  const scene=activeVisualScene();
- const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
+ const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['atlas','▧','Atlas'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
  const registryPeople=registryCharacters93813(data.characters);
  const characterButtons=registryPeople.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
@@ -14660,6 +14663,7 @@ function render(){
  if(!uiNavigationRestoring)uiNavigation.visit(nextRoute,{scrollY:window.scrollY});
  writeGuidedDraft();
  app.innerHTML=main()+(overlay||'');
+ if(view==='atlas')mountAtlasView(app);
  const returnRoute=characterProjectReturn;
  if(returnRoute&&(view===returnRoute.view||(returnRoute.view==='stable'&&view==='sheet'&&activeSheetSection==='stable'))&&returnRoute.actorId===selected&&returnRoute.campaignId===campaignKey(data.campaignClock)){
   app.querySelector('main.content')?.insertAdjacentHTML('afterbegin','<div class="hmk-project-return"><button type="button" class="secondary" data-character-project-return>‹ Zpět k projektu postavy</button></div>');
