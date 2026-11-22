@@ -257,3 +257,10 @@ body #app main.content-atlas .atlas-tools .atlas-marker-list-select{
 
 /* The party position is the first quick-add action and the first marker type. */
 .atlas-marker-placement-controls{display:flex;flex-direction:column;gap:7px}
+
+/* v94.060 — a map-sized marker symbol and a visible (unsaved) draft. */
+body #app main.content-atlas .atlas-custom-marker--draft{
+ pointer-events:none!important;cursor:default!important;opacity:0.88!important;
+}
+.atlas-marker-editor label[hidden]{display:none!important}
+.atlas-custom-marker.is-party .atlas-marker-tooltip{display:none!important}
