@@ -1,8 +1,8 @@
 /**
- * Hârn Atlas v94.054 — vector PDF K5 / zoom-preserving stand-alone viewer.
+ * Hârn Atlas v94.055 — PDF vector zoom and independent two-point distance ruler.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
- * No storage, campaign, calendar, travel, inventory, cloud or combat access.
+ * Only in-memory map measurement; no storage, campaign, calendar, travel, inventory, cloud or combat access.
  */
 const OVERVIEW=Object.freeze({
  id:'overview', width:2449,height:2363,margin:48,
@@ -44,6 +44,17 @@ export const ATLAS_SECTORS=Object.freeze(ROWS.flatMap(row=>LETTERS.map(column=>O
 let currentMapId='overview';
 let selectedSector=null;
 const rememberedByMap={overview:{initialized:false},K5:{initialized:false}};
+// Measurement is intentionally ephemeral and independent of campaign/game data.
+// Coordinates are in original map pixels, never viewport/screen pixels.
+const measurementsByMap={overview:{active:false,points:[]},K5:{active:false,points:[]}};
+const LEAGUE_KM=4; // 1 Hârnic league = 4 km, confirmed by both source map scales.
+const formatDistance=(km)=>new Intl.NumberFormat('cs-CZ',{maximumFractionDigits:km<1?3:2}).format(km);
+// Reusable physical-distance calculator in unscaled source-map coordinates.
+export function atlasDistanceKm(mapId,a,b){
+ const map=MAPS[mapId];if(!map||!a||!b)throw new Error('Atlas: invalid map or points');
+ return Math.hypot(b.x-a.x,b.y-a.y)/map.pixelsPerKm;
+}
+
 
 const sectorButtons=()=>ATLAS_SECTORS.map(sector=>{
  const ready=!!sector.detailMap;
@@ -83,10 +94,35 @@ export function atlasView(){
        ${grid}
       </div>
      </div>
+     <svg class="atlas-measure-overlay" data-atlas-measure-overlay aria-hidden="true">
+      <line data-atlas-measure-outline class="atlas-measure-line-outline" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>
+      <line data-atlas-measure-line class="atlas-measure-line" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>
+      <g data-atlas-measure-marker="A" visibility="hidden"><circle class="atlas-measure-marker-halo" r="13"/><circle class="atlas-measure-marker-a" r="10"/><text text-anchor="middle" dy="4.4">A</text></g>
+      <g data-atlas-measure-marker="B" visibility="hidden"><circle class="atlas-measure-marker-halo" r="13"/><circle class="atlas-measure-marker-b" r="10"/><text text-anchor="middle" dy="4.4">B</text></g>
+     </svg>
      <div class="atlas-scale" aria-label="Grafické měřítko mapy"><div data-atlas-scale-line class="atlas-scale-line"></div><span data-atlas-scale-label>≈ 20 km</span></div>
     </div>
     <div class="atlas-status" role="status" aria-live="polite" data-atlas-status>${hint}</div>
    </div>
+   <aside class="atlas-tools" aria-label="Nástroje mapy">
+    <h2>Nástroje mapy</h2><p class="atlas-tools-subtitle">Práce přímo nad mapou · ${overview?'I4–L7':'K5'}</p>
+    <section class="atlas-tool-card" aria-label="Měření vzdálenosti">
+     <h3><span aria-hidden="true">↔</span> Měření vzdálenosti</h3>
+     <p class="atlas-tool-help">Přímá vzdálenost mezi dvěma místy podle měřítka právě otevřené mapy.</p>
+     <button type="button" class="atlas-tool-action" data-atlas-measure-toggle aria-pressed="false">Zapnout měření</button>
+     <div class="atlas-measure-instructions" data-atlas-measure-help role="status" aria-live="polite">Zapněte měření. Potom na mapě označte bod A a bod B.</div>
+     <div class="atlas-measure-results" data-atlas-measure-result aria-live="polite" hidden>
+      <div class="atlas-measure-distance" data-atlas-measure-km>—</div>
+      <div class="atlas-measure-units"><span data-atlas-measure-m>—</span><span data-atlas-measure-leagues>—</span></div>
+     </div>
+     <div class="atlas-measure-actions">
+      <button type="button" data-atlas-measure-reset disabled>Nové měření</button>
+      <button type="button" data-atlas-measure-clear disabled>Odstranit body</button>
+     </div>
+     <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km. Měří se vzdušnou čarou, ne skutečná délka cesty.</p>
+    </section>
+    <div class="atlas-tools-future"><strong>Další nástroje</strong><p>Poznámky, vlastní značky a měření tras doplníme později.</p></div>
+   </aside>
   </div>
  </section>`;
 }
@@ -104,6 +140,16 @@ export function mountAtlasView(root){
  const scaleLine=workspace.querySelector('[data-atlas-scale-line]');
  const scaleLabel=workspace.querySelector('[data-atlas-scale-label]');
  const status=workspace.querySelector('[data-atlas-status]');
+ const overlay=workspace.querySelector('[data-atlas-measure-overlay]');
+ const measureToggle=workspace.querySelector('[data-atlas-measure-toggle]');
+ const measureReset=workspace.querySelector('[data-atlas-measure-reset]');
+ const measureClear=workspace.querySelector('[data-atlas-measure-clear]');
+ const measureHelp=workspace.querySelector('[data-atlas-measure-help]');
+ const measureResult=workspace.querySelector('[data-atlas-measure-result]');
+ const measureKm=workspace.querySelector('[data-atlas-measure-km]');
+ const measureMeters=workspace.querySelector('[data-atlas-measure-m]');
+ const measureLeagues=workspace.querySelector('[data-atlas-measure-leagues]');
+ const measurement=measurementsByMap[map.id];
  const frameW=map.width+map.margin,frameH=map.height+map.margin;
  const pdfLayer=workspace.querySelector('[data-atlas-pdf-layer]');
  let pdfLoading=null, pdfRenderTask=null, pdfRenderTimer=null, pdfEpoch=0, pdfDisposed=false;
@@ -121,6 +167,76 @@ export function mountAtlasView(root){
   state.y=clamp(state.y,...limitY);
  };
  const remember=()=>{rememberedByMap[map.id]={zoom:state.zoom,x:state.x,y:state.y,initialized:true};};
+ const screenPoint=p=>({x:state.x+(map.margin+p.x)*state.zoom,y:state.y+(map.margin+p.y)*state.zoom});
+ const inMap=(clientX,clientY)=>{
+  const rect=viewport.getBoundingClientRect();
+  const x=(clientX-rect.left-state.x)/state.zoom-map.margin;
+  const y=(clientY-rect.top-state.y)/state.zoom-map.margin;
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||x>=map.width||y<0||y>=map.height)return null;
+  return {x,y};
+ };
+ const paintMeasurement=()=>{
+  const pts=measurement.points;
+  viewport.classList.toggle('is-measuring',measurement.active);
+  measureToggle.setAttribute('aria-pressed',String(measurement.active));
+  measureToggle.textContent=measurement.active?'Ukončit měření':'Zapnout měření';
+  measureReset.disabled=pts.length===0;
+  measureClear.disabled=pts.length===0;
+  const messages=[
+   'Zapněte měření. Potom na mapě označte bod A a bod B.',
+   'Klikněte na mapu a označte bod A. Tažením myší lze dál posouvat.',
+   'Bod A je označen. Kliknutím na mapu zvolte bod B.',
+   'Vzdálenost A–B je změřena. „Nové měření“ umožní označit jiné body.'
+  ];
+  measureHelp.textContent=measurement.active?messages[pts.length+1]:pts.length===2?'Měření je dokončené. Opětovným zapnutím můžete začít nové.':messages[0];
+  for(const [i,label] of ['A','B'].entries()){
+   const marker=overlay.querySelector(`[data-atlas-measure-marker="${label}"]`);
+   if(pts[i]){const p=screenPoint(pts[i]);marker.setAttribute('transform',`translate(${p.x},${p.y})`);marker.setAttribute('visibility','visible');}
+   else marker.setAttribute('visibility','hidden');
+  }
+  const ln=overlay.querySelector('[data-atlas-measure-line]');
+  const outline=overlay.querySelector('[data-atlas-measure-outline]');
+  if(pts.length===2){
+   const a=screenPoint(pts[0]),b=screenPoint(pts[1]);
+   for(const el of [ln,outline]){
+    el.setAttribute('x1',a.x);el.setAttribute('y1',a.y);
+    el.setAttribute('x2',b.x);el.setAttribute('y2',b.y);
+    el.setAttribute('visibility','visible');
+   }
+   const km=atlasDistanceKm(map.id,pts[0],pts[1]);
+   measureKm.textContent=`${formatDistance(km)} km`;
+   measureMeters.textContent=`${Math.round(km*1000).toLocaleString('cs-CZ')} m`;
+   measureLeagues.textContent=`${formatDistance(km/LEAGUE_KM)} hârnických lig`;
+   measureResult.hidden=false;
+  }else{
+   ln.setAttribute('visibility','hidden');outline.setAttribute('visibility','hidden');measureResult.hidden=true;
+  }
+ };
+ const recordPoint=(clientX,clientY)=>{
+  if(!measurement.active)return false;
+  const pt=inMap(clientX,clientY);
+  if(!pt){status.textContent='Bod musí být umístěný uvnitř mapy.';return true;}
+  // After the second point, starting a new measurement replaces both old points.
+  if(measurement.points.length===2)measurement.points=[];
+  measurement.points.push(pt);
+  paintMeasurement();
+  if(measurement.points.length===2)status.textContent=`Naměřeno ${measureKm.textContent} (přímá vzdálenost).`;
+  else status.textContent='Bod A je označen. Klikněte na druhé místo B.';
+  return true;
+ };
+ measureToggle.addEventListener('click',()=>{
+  measurement.active=!measurement.active;
+  if(measurement.active&&measurement.points.length===2)measurement.points=[];
+  paintMeasurement();
+  status.textContent=measurement.active?'Měření vzdálenosti: klikněte na bod A a potom na bod B.':'Měření vypnuto; mapou můžete procházet jako obvykle.';
+ });
+ measureReset.addEventListener('click',()=>{
+  measurement.points=[];measurement.active=true;paintMeasurement();
+  status.textContent='Nové měření: označte na mapě bod A.';
+ });
+ measureClear.addEventListener('click',()=>{
+  measurement.points=[];paintMeasurement();status.textContent='Body A a B byly odstraněny.';
+ });
 
  // K5: draw only the visible PDF rectangle (+overscan), not a giant canvas.
  // PDF.js keeps the original vector paths and font glyphs, so new zoom levels
@@ -211,10 +327,14 @@ export function mountAtlasView(root){
   stage.style.transform=`translate3d(${state.x}px,${state.y}px,0) scale(${state.zoom})`;
   zoomLabel.textContent=`${Math.round(state.zoom*100)} %`;
   const pixelPerKm=map.pixelsPerKm*state.zoom;
-  const scales=[1,2,5,10,20,40,60,100,200,400,600,1000];
-  const labelKm=scales.reduce((best,km)=>Math.abs(km*pixelPerKm-140)<Math.abs(best*pixelPerKm-140)?km:best,20);
-  scaleLine.style.width=`${Math.round(labelKm*pixelPerKm)}px`;
-  scaleLabel.textContent=`≈ ${labelKm} km`;
+  // Choose a real source-scaled length; never let CSS clamp the bar to a misleading length.
+  const scales=[.005,.01,.02,.05,.1,.2,.5,1,2,5,10,20,50,100,200,500,1000,2000,5000];
+  const maxWidth=Math.max(32,Math.min(165,viewport.clientWidth*.43));
+  const candidates=scales.filter(km=>km*pixelPerKm<=maxWidth);
+  const labelKm=(candidates.length?candidates:scales).reduce((best,km)=>Math.abs(km*pixelPerKm-Math.min(120,maxWidth))<Math.abs(best*pixelPerKm-Math.min(120,maxWidth))?km:best);
+  scaleLine.style.width=`${labelKm*pixelPerKm}px`;
+  scaleLabel.textContent=labelKm<1?`≈ ${Math.round(labelKm*1000)} m`:`≈ ${labelKm} km`;
+  paintMeasurement();
   remember();
   if(pdfLayer)schedulePdf();
  };
@@ -283,6 +403,7 @@ export function mountAtlasView(root){
   viewport.classList.remove('is-dragging');
   if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
   if(didMove){ignoreClick=true;if(pdfLayer)schedulePdf(25);return;}
+  if(measurement.active){recordPoint(e.clientX,e.clientY);return;}
   if(!overview)return;
   // Native click may be retargeted to viewport by pointer capture.
   const rect=viewport.getBoundingClientRect();
@@ -303,6 +424,9 @@ export function mountAtlasView(root){
   if(button)clickSector(button.dataset.atlasSector);
  });
  viewport.addEventListener('keydown',e=>{
+  if(measurement.active&&(e.key==='Enter'||e.key===' ')&&e.target===viewport){
+   e.preventDefault();const [x,y]=center();recordPoint(x,y);return;
+  }
   const arrows={ArrowLeft:[75,0],ArrowRight:[-75,0],ArrowUp:[0,75],ArrowDown:[0,-75]};
   if(arrows[e.key]){e.preventDefault();state.x+=arrows[e.key][0];state.y+=arrows[e.key][1];repaint();return;}
   if(['+','=','-'].includes(e.key)){

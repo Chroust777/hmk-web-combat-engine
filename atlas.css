@@ -68,7 +68,7 @@ body #app main.content-atlas .atlas-sector.is-selected{
 #app .atlas-sector:focus-visible{outline:8px solid #a4502b;z-index:2}
 .atlas-scale{position:absolute;left:14px;bottom:14px;z-index:3;pointer-events:none;display:flex;align-items:flex-end;gap:8px;
  background:#f6e7cdda;padding:8px 10px;border:1px solid #65482c;color:#2d2218;box-shadow:0 1px 7px #4b291c66}
-.atlas-scale-line{height:12px;border:2px solid #322a23;border-top:0;max-width:52vw;min-width:18px}
+.atlas-scale-line{height:12px;border:2px solid #322a23;border-top:0;min-width:0}
 .atlas-scale span{font:700 13px/1.1 Georgia,serif;white-space:nowrap}
 .atlas-status{min-height:36px;margin-top:9px;padding:8px 10px;border-top:1px solid #b99b6c;font:12px/1.35 Georgia,serif;color:#604020}
 @media(max-width:1280px){.atlas-body{grid-template-columns:minmax(175px,195px) minmax(0,1fr)}.atlas-toolbar-help{width:100%;margin-left:0}.atlas-legend-scroll{height:min(65vh,630px)}}
@@ -114,3 +114,72 @@ body #app main.content-atlas .atlas-toolbar button:hover{
 .atlas-pdf-loading{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);
  display:block;min-width:280px;padding:18px 20px;text-align:center;
  background:#f4e2bce0;border:1px solid #a2865b;color:#4d3421;font:14px/1.5 Georgia,serif}
+
+
+/* v94.055 — Atlas tools on the RIGHT; scoped to the Atlas only. */
+.atlas-body{grid-template-columns:minmax(166px,214px) minmax(0,1fr) minmax(206px,245px);gap:12px}
+.atlas-workspace--detail .atlas-body{grid-template-columns:minmax(185px,245px) minmax(0,1fr) minmax(206px,245px)}
+.atlas-tools{min-width:0;align-self:stretch;border:1px solid #aa875ac4;padding:12px 10px;
+ background:linear-gradient(150deg,#eedcbd55,#d7b78433),url('./assets/ui/book/clean_vellum.png') repeat;
+ background-size:auto,440px 440px;box-shadow:inset 0 0 14px #7a51262f}
+.atlas-tools h2{font:700 18px/1.2 Georgia,serif!important;margin:0 0 4px!important;color:#493222!important}
+.atlas-tools-subtitle{font-size:11px;color:#7a5535;margin:0 0 12px!important}
+.atlas-tool-card{border-top:1px solid #a9845588;padding-top:11px}
+.atlas-tool-card h3{font:700 15px/1.3 Georgia,serif!important;margin:0 0 7px!important;color:#432a19!important}
+.atlas-tool-card h3 span{font-size:19px;vertical-align:-1px;margin-right:3px}
+.atlas-tool-help,.atlas-tool-footnote{font:12px/1.45 Georgia,serif;color:#654b30;margin:0 0 11px!important}
+.atlas-tool-footnote{margin-top:13px!important;font-style:italic;font-size:11px}
+body #app main.content-atlas .atlas-tools button{display:inline-flex!important;align-items:center;justify-content:center;
+ width:auto!important;min-width:0!important;min-height:34px!important;max-width:100%;
+ font:700 12px/1.3 Georgia,serif!important;padding:7px 9px!important;
+ border:1px solid #957044!important;border-radius:5px!important;
+ color:#3a2618!important;background:#efd9b1!important;background-image:none!important;
+ box-shadow:none!important;text-shadow:none!important;cursor:pointer}
+body #app main.content-atlas .atlas-tools button:hover:not(:disabled){background:#fae7c7!important}
+body #app main.content-atlas .atlas-tools .atlas-tool-action{width:100%!important;background:#74502a!important;
+ color:#fff4dc!important;border-color:#53391e!important;font-size:13px!important}
+body #app main.content-atlas .atlas-tools .atlas-tool-action[aria-pressed="true"]{background:#4d682f!important;border-color:#344722!important}
+body #app main.content-atlas .atlas-tools button:disabled{opacity:.46;cursor:not-allowed}
+.atlas-measure-instructions{min-height:56px;margin-top:12px!important;padding:9px 10px;border:1px dashed #ab8a5c;
+ font:12px/1.45 Georgia,serif;color:#5a412b;background:#f8ebd075}
+.atlas-measure-results{padding:12px 8px;margin-top:10px;border:1px solid #a17b48;background:#f8ead3b8;text-align:center}
+.atlas-measure-results[hidden]{display:none!important}
+.atlas-measure-distance{font:700 clamp(19px,2vw,26px)/1.15 Georgia,serif;color:#432819}
+.atlas-measure-units{display:flex;flex-direction:column;gap:3px;margin-top:8px;font:12px/1.3 Georgia,serif;color:#664b2b}
+.atlas-measure-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.atlas-tools-future{border-top:1px solid #b3976f;margin-top:14px;padding-top:11px;color:#715235;font:12px/1.45 Georgia,serif}
+.atlas-tools-future p{margin:5px 0 0!important;font-size:11px}
+.atlas-viewport.is-measuring{cursor:crosshair}
+.atlas-viewport.is-measuring.is-dragging{cursor:grabbing}
+.atlas-measure-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:5;
+ pointer-events:none;overflow:hidden;user-select:none}
+.atlas-measure-line-outline{stroke:#fef6e5;stroke-width:6;stroke-linecap:round}
+.atlas-measure-line{stroke:#a33320;stroke-width:3;stroke-linecap:round;stroke-dasharray:8 4}
+.atlas-measure-marker-halo{fill:#fdf0d8;stroke:#34261c;stroke-width:2}
+.atlas-measure-marker-a{fill:#a33320}
+.atlas-measure-marker-b{fill:#2d5f8a}
+.atlas-measure-overlay text{fill:white;font:bold 13px system-ui,sans-serif;paint-order:stroke;stroke:none}
+/* At narrower widths the map retains the entire row, and tools move under it rather than squeeze the map. */
+@media(max-width:1050px){
+ .atlas-body,.atlas-workspace--detail .atlas-body{grid-template-columns:minmax(170px,215px) minmax(0,1fr)}
+ .atlas-tools{grid-column:2;align-self:start}
+ .atlas-tool-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px}
+ .atlas-tool-card h3,.atlas-tool-help,.atlas-tool-footnote{grid-column:1/-1}
+ .atlas-measure-instructions{grid-column:1;align-self:start}
+ .atlas-measure-results{grid-column:2;grid-row:3/5}
+ .atlas-measure-actions{grid-column:1/-1}
+}
+@media(max-width:960px){
+ .atlas-body,.atlas-workspace--detail .atlas-body{grid-template-columns:1fr}
+ .atlas-tools{grid-column:1}
+}
+@media(max-width:550px){
+ .atlas-tool-card{display:block}
+ .atlas-tools{padding:9px}
+}
+
+/* The older Atlas 1280px rule was two-column; keep the tools on the right until the 1050px breakpoint. */
+@media(min-width:1051px) and (max-width:1280px){
+ .atlas-body{grid-template-columns:minmax(166px,205px) minmax(0,1fr) minmax(200px,225px)}
+ .atlas-workspace--detail .atlas-body{grid-template-columns:minmax(180px,220px) minmax(0,1fr) minmax(200px,225px)}
+}

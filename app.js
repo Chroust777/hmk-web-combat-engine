@@ -1,4 +1,4 @@
-import {atlasView,mountAtlasView} from './src/ui/atlas-viewer.js?v=94.054';
+import {atlasView,mountAtlasView} from './src/ui/atlas-viewer.js?v=94.055';
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.007';
 import {armourWorkItem} from './src/integration/hmk-making-armour.js?v=94.012';
