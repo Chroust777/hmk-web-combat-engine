@@ -13,9 +13,6 @@
 .atlas-eyebrow{margin:0 0 5px!important;font-size:11px;font-weight:700;letter-spacing:.18em;color:#785633}
 .atlas-header h1{font:500 clamp(29px,2.6vw,43px)/1.1 Georgia,serif!important;margin:0 0 5px!important;color:#30211b!important}
 .atlas-header p:not(.atlas-eyebrow){margin:0!important;font-size:13px;color:#72502d}
-#app .atlas-pdf-link{display:inline-block;white-space:nowrap;padding:9px 13px;border:1px solid #936a3b;border-radius:5px;
- color:#322217!important;text-decoration:none;background:#ebd4a5aa;box-shadow:inset 0 1px #ffeed4}
-#app .atlas-pdf-link:focus-visible,#app .atlas-pdf-link:hover{background:#f6d99a;outline:2px solid #9e7338}
 .atlas-body{display:grid;grid-template-columns:minmax(190px,232px) minmax(0,1fr);gap:15px;min-width:0;align-items:start}
 .atlas-legend,.atlas-map-pane{min-width:0;border:1px solid #aa875ac4;background:linear-gradient(140deg,#ecd5ae3d,#d4b07b2b),url('./assets/ui/book/clean_vellum.png') repeat;
  background-size:auto,440px 440px;box-shadow:inset 0 0 14px #7a51262f}

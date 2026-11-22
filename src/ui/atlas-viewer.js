@@ -3,7 +3,7 @@
  * Does NOT access combat, travel, calendar, inventory, localStorage or cloud.
  * Source: 5001A-HarnWorld-Map_Chroust.pdf; cropped without changing PDF art.
  * HTML shows one lossless WebP rendered at the source PDF's native 300 DPI;
- * the original losslessly cropped PDF remains available as a link.
+ * the cropped map is shown directly inside every sector on the Atlas page.
  *
  * Future sector detail pages: change a sector's `detailUrl` from null to a
  * real path. No placeholder/missing links are followed today.
@@ -11,7 +11,6 @@
 const MAP = Object.freeze({
   width:2449, height:2363,
   image:'./assets/atlas/harn-I4-L7.webp',
-  pdf:'./assets/atlas/Harn_Atlas_I4-L7.pdf',
   key:'./assets/atlas/harn-map-key.webp',
   // Original legend: One hex (1 cm on the print) = 5 Hârnic leagues ≈ 20 km.
   // Raster was rendered from the cropped PDF at 300 DPI, without rescaling.
@@ -30,8 +29,7 @@ const sectorButtons=ATLAS_SECTORS.map(s=>
 
 export function atlasView(){
  return `<section class="atlas-workspace" aria-label="Atlas Hârnu, sektory I4 až L7">
-   <header class="atlas-header"><div><p class="atlas-eyebrow">HÂRNWORLD · KARTOGRAFICKÁ KNIHOVNA</p><h1>Atlas Hârnu</h1><p>Sektory I–L / 4–7 · samostatný mapový list · bez napojení na herní systémy</p></div>
-     <a class="atlas-pdf-link" href="${MAP.pdf}" target="_blank" rel="noopener">Otevřít původní PDF ↗</a>
+   <header class="atlas-header"><div><p class="atlas-eyebrow">HÂRNWORLD · KARTOGRAFICKÁ KNIHOVNA</p><h1>Atlas Hârnu</h1><p>Mapový podklad I4–L7 přímo v 16 sektorech · kliknutím vyberete sektor pro budoucí detailní mapu</p></div>
    </header>
    <div class="atlas-body">
     <aside class="atlas-legend" aria-label="Legenda původní mapy"><h2>Legenda mapy</h2><p class="atlas-legend-note">Původní značky HârnWorld</p>
