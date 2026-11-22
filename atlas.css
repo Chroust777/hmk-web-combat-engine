@@ -183,3 +183,15 @@ body #app main.content-atlas .atlas-tools button:disabled{opacity:.46;cursor:not
  .atlas-body{grid-template-columns:minmax(166px,205px) minmax(0,1fr) minmax(200px,225px)}
  .atlas-workspace--detail .atlas-body{grid-template-columns:minmax(180px,220px) minmax(0,1fr) minmax(200px,225px)}
 }
+
+/* v94.056 — map-calibrated route: arbitrary number of points and segment labels. */
+.atlas-measure-total-caption{font:700 11px/1.3 Georgia,serif;color:#644b31;margin-bottom:5px}
+.atlas-measure-segments-title{font:700 12px/1.4 Georgia,serif;color:#493222;margin-top:12px;border-top:1px solid #ae8d5b77;padding-top:10px}
+.atlas-measure-segments-list{display:flex;flex-direction:column;gap:3px;list-style:none;padding:0!important;margin:7px 0 0!important;max-height:245px;overflow:auto;font:12px/1.35 Georgia,serif;color:#574128}
+.atlas-measure-segments-list li{display:flex;gap:8px;justify-content:space-between;border-bottom:1px dotted #ab916a77;padding:4px 2px;align-items:baseline}
+.atlas-measure-segments-list strong{font-variant-numeric:tabular-nums;white-space:nowrap;color:#452c1c}
+.atlas-measure-segment-label rect{fill:#fff4df;stroke:#683d25;stroke-width:1.15;opacity:.94}
+.atlas-measure-segment-label text{fill:#472719;font:700 12px Georgia,serif;stroke:none;paint-order:normal}
+.atlas-measure-point circle{stroke-linejoin:round}
+/* SVG <path> defaults to solid black fill: the route must be a thin line only. */
+.atlas-measure-line,.atlas-measure-line-outline{fill:none}

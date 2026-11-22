@@ -1,5 +1,5 @@
 /**
- * Hârn Atlas v94.055 — PDF vector zoom and independent two-point distance ruler.
+ * Hârn Atlas v94.056 — PDF vector zoom, calibrated multi-point route measurement.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Only in-memory map measurement; no storage, campaign, calendar, travel, inventory, cloud or combat access.
@@ -49,10 +49,18 @@ const rememberedByMap={overview:{initialized:false},K5:{initialized:false}};
 const measurementsByMap={overview:{active:false,points:[]},K5:{active:false,points:[]}};
 const LEAGUE_KM=4; // 1 Hârnic league = 4 km, confirmed by both source map scales.
 const formatDistance=(km)=>new Intl.NumberFormat('cs-CZ',{maximumFractionDigits:km<1?3:2}).format(km);
+const formatSegment=(km)=>km<1?`${new Intl.NumberFormat('cs-CZ',{maximumFractionDigits:km<.1?1:0}).format(km*1000)} m`:`${formatDistance(km)} km`;
+const pointLabel=index=>{let i=index+1,out='';while(i){i--;out=String.fromCharCode(65+i%26)+out;i=Math.floor(i/26);}return out;};
 // Reusable physical-distance calculator in unscaled source-map coordinates.
 export function atlasDistanceKm(mapId,a,b){
  const map=MAPS[mapId];if(!map||!a||!b)throw new Error('Atlas: invalid map or points');
  return Math.hypot(b.x-a.x,b.y-a.y)/map.pixelsPerKm;
+}
+// Returns each consecutive segment and their sum, INDEPENDENT of the viewport zoom.
+export function atlasRouteDistancesKm(mapId,points){
+ if(!Array.isArray(points))throw new Error('Atlas: points must be an array');
+ const segments=points.slice(1).map((p,i)=>atlasDistanceKm(mapId,points[i],p));
+ return {segments,totalKm:segments.reduce((total,segment)=>total+segment,0)};
 }
 
 
@@ -95,10 +103,10 @@ export function atlasView(){
       </div>
      </div>
      <svg class="atlas-measure-overlay" data-atlas-measure-overlay aria-hidden="true">
-      <line data-atlas-measure-outline class="atlas-measure-line-outline" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>
-      <line data-atlas-measure-line class="atlas-measure-line" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>
-      <g data-atlas-measure-marker="A" visibility="hidden"><circle class="atlas-measure-marker-halo" r="13"/><circle class="atlas-measure-marker-a" r="10"/><text text-anchor="middle" dy="4.4">A</text></g>
-      <g data-atlas-measure-marker="B" visibility="hidden"><circle class="atlas-measure-marker-halo" r="13"/><circle class="atlas-measure-marker-b" r="10"/><text text-anchor="middle" dy="4.4">B</text></g>
+      <path data-atlas-measure-outline class="atlas-measure-line-outline" visibility="hidden"/>
+      <path data-atlas-measure-line class="atlas-measure-line" visibility="hidden"/>
+      <g data-atlas-measure-segments></g>
+      <g data-atlas-measure-markers></g>
      </svg>
      <div class="atlas-scale" aria-label="Grafické měřítko mapy"><div data-atlas-scale-line class="atlas-scale-line"></div><span data-atlas-scale-label>≈ 20 km</span></div>
     </div>
@@ -107,21 +115,25 @@ export function atlasView(){
    <aside class="atlas-tools" aria-label="Nástroje mapy">
     <h2>Nástroje mapy</h2><p class="atlas-tools-subtitle">Práce přímo nad mapou · ${overview?'I4–L7':'K5'}</p>
     <section class="atlas-tool-card" aria-label="Měření vzdálenosti">
-     <h3><span aria-hidden="true">↔</span> Měření vzdálenosti</h3>
-     <p class="atlas-tool-help">Přímá vzdálenost mezi dvěma místy podle měřítka právě otevřené mapy.</p>
+     <h3><span aria-hidden="true">↝</span> Měření trasy</h3>
+     <p class="atlas-tool-help">Postupně označte A → B → C → … Mapa ukáže délku každého úseku přímo u spojnice; vpravo se sčítá celá trasa.</p>
      <button type="button" class="atlas-tool-action" data-atlas-measure-toggle aria-pressed="false">Zapnout měření</button>
-     <div class="atlas-measure-instructions" data-atlas-measure-help role="status" aria-live="polite">Zapněte měření. Potom na mapě označte bod A a bod B.</div>
+     <div class="atlas-measure-instructions" data-atlas-measure-help role="status" aria-live="polite">Zapněte měření a postupně klikejte na místa své trasy.</div>
      <div class="atlas-measure-results" data-atlas-measure-result aria-live="polite" hidden>
+      <div class="atlas-measure-total-caption">Celková délka trasy</div>
       <div class="atlas-measure-distance" data-atlas-measure-km>—</div>
       <div class="atlas-measure-units"><span data-atlas-measure-m>—</span><span data-atlas-measure-leagues>—</span></div>
+      <div class="atlas-measure-segments-title" data-atlas-measure-count>Úseky trasy</div>
+      <ol class="atlas-measure-segments-list" data-atlas-measure-segment-list></ol>
      </div>
      <div class="atlas-measure-actions">
+      <button type="button" data-atlas-measure-undo disabled>Odebrat poslední bod</button>
       <button type="button" data-atlas-measure-reset disabled>Nové měření</button>
       <button type="button" data-atlas-measure-clear disabled>Odstranit body</button>
      </div>
-     <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km. Měří se vzdušnou čarou, ne skutečná délka cesty.</p>
+     <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km. Součet přímých úseků mezi po sobě označenými body; nikoliv automatické sledování silnice. Zoom výsledek nemění.</p>
     </section>
-    <div class="atlas-tools-future"><strong>Další nástroje</strong><p>Poznámky, vlastní značky a měření tras doplníme později.</p></div>
+    <div class="atlas-tools-future"><strong>Další nástroje</strong><p>Poznámky a vlastní značky doplníme později.</p></div>
    </aside>
   </div>
  </section>`;
@@ -143,12 +155,15 @@ export function mountAtlasView(root){
  const overlay=workspace.querySelector('[data-atlas-measure-overlay]');
  const measureToggle=workspace.querySelector('[data-atlas-measure-toggle]');
  const measureReset=workspace.querySelector('[data-atlas-measure-reset]');
+ const measureUndo=workspace.querySelector('[data-atlas-measure-undo]');
  const measureClear=workspace.querySelector('[data-atlas-measure-clear]');
  const measureHelp=workspace.querySelector('[data-atlas-measure-help]');
  const measureResult=workspace.querySelector('[data-atlas-measure-result]');
  const measureKm=workspace.querySelector('[data-atlas-measure-km]');
  const measureMeters=workspace.querySelector('[data-atlas-measure-m]');
  const measureLeagues=workspace.querySelector('[data-atlas-measure-leagues]');
+ const measureCount=workspace.querySelector('[data-atlas-measure-count]');
+ const measureSegmentList=workspace.querySelector('[data-atlas-measure-segment-list]');
  const measurement=measurementsByMap[map.id];
  const frameW=map.width+map.margin,frameH=map.height+map.margin;
  const pdfLayer=workspace.querySelector('[data-atlas-pdf-layer]');
@@ -175,67 +190,99 @@ export function mountAtlasView(root){
   if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||x>=map.width||y<0||y>=map.height)return null;
   return {x,y};
  };
+ const svgNS='http://www.w3.org/2000/svg';
+ const svgAdd=(parent,name,attrs,caption)=>{
+  const el=document.createElementNS(svgNS,name);
+  for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));
+  if(caption!==undefined)el.textContent=caption;
+  parent.appendChild(el);return el;
+ };
+ const linePath=overlay.querySelector('[data-atlas-measure-line]');
+ const outlinePath=overlay.querySelector('[data-atlas-measure-outline]');
+ const segmentLayer=overlay.querySelector('[data-atlas-measure-segments]');
+ const markerLayer=overlay.querySelector('[data-atlas-measure-markers]');
  const paintMeasurement=()=>{
   const pts=measurement.points;
+  const positions=pts.map(screenPoint);
+  const {segments,totalKm}=atlasRouteDistancesKm(map.id,pts);
   viewport.classList.toggle('is-measuring',measurement.active);
   measureToggle.setAttribute('aria-pressed',String(measurement.active));
-  measureToggle.textContent=measurement.active?'Ukončit měření':'Zapnout měření';
+  measureToggle.textContent=measurement.active?'Pozastavit měření':pts.length?'Pokračovat v měření':'Zapnout měření';
   measureReset.disabled=pts.length===0;
+  measureUndo.disabled=pts.length===0;
   measureClear.disabled=pts.length===0;
-  const messages=[
-   'Zapněte měření. Potom na mapě označte bod A a bod B.',
-   'Klikněte na mapu a označte bod A. Tažením myší lze dál posouvat.',
-   'Bod A je označen. Kliknutím na mapu zvolte bod B.',
-   'Vzdálenost A–B je změřena. „Nové měření“ umožní označit jiné body.'
-  ];
-  measureHelp.textContent=measurement.active?messages[pts.length+1]:pts.length===2?'Měření je dokončené. Opětovným zapnutím můžete začít nové.':messages[0];
-  for(const [i,label] of ['A','B'].entries()){
-   const marker=overlay.querySelector(`[data-atlas-measure-marker="${label}"]`);
-   if(pts[i]){const p=screenPoint(pts[i]);marker.setAttribute('transform',`translate(${p.x},${p.y})`);marker.setAttribute('visibility','visible');}
-   else marker.setAttribute('visibility','hidden');
-  }
-  const ln=overlay.querySelector('[data-atlas-measure-line]');
-  const outline=overlay.querySelector('[data-atlas-measure-outline]');
-  if(pts.length===2){
-   const a=screenPoint(pts[0]),b=screenPoint(pts[1]);
-   for(const el of [ln,outline]){
-    el.setAttribute('x1',a.x);el.setAttribute('y1',a.y);
-    el.setAttribute('x2',b.x);el.setAttribute('y2',b.y);
-    el.setAttribute('visibility','visible');
-   }
-   const km=atlasDistanceKm(map.id,pts[0],pts[1]);
-   measureKm.textContent=`${formatDistance(km)} km`;
-   measureMeters.textContent=`${Math.round(km*1000).toLocaleString('cs-CZ')} m`;
-   measureLeagues.textContent=`${formatDistance(km/LEAGUE_KM)} hârnických lig`;
+  measureHelp.textContent=measurement.active
+   ?(pts.length===0?'Kliknutím na mapu označte bod A. Tažením můžete mapu posouvat.':`Bod ${pointLabel(pts.length-1)} je označen. Klikněte na další místo (${pointLabel(pts.length)}). Libovolný počet bodů, ukončení tlačítkem nahoře.`)
+   :(pts.length===0?'Zapněte měření a označte první bod A.':`Trasa má ${pts.length} bodů. Můžete pokračovat, začít znovu nebo body odstranit.`);
+  markerLayer.replaceChildren();segmentLayer.replaceChildren();
+  if(pts.length>=2){
+   const path=positions.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+   for(const el of [linePath,outlinePath]){el.setAttribute('d',path);el.setAttribute('visibility','visible');}
+   segments.forEach((km,i)=>{
+    const a=positions[i],b=positions[i+1];
+    const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy);
+    if(len<.001)return;
+    // Labels remain readable in SCREEN pixels; the actual distances stay in MAP coordinates.
+    const offset=16*(i%2===0?-1:1);
+    const midX=(a.x+b.x)/2-(dy/len)*offset;
+    const midY=(a.y+b.y)/2+(dx/len)*offset;
+    const label=formatSegment(km),w=Math.max(47,label.length*7.1+16);
+    const group=svgAdd(segmentLayer,'g',{'class':'atlas-measure-segment-label',transform:`translate(${midX.toFixed(2)},${midY.toFixed(2)})`});
+    svgAdd(group,'rect',{x:-w/2,y:-12,width:w,height:24,rx:5,ry:5});
+    svgAdd(group,'text',{'text-anchor':'middle',dy:'4.5'},label);
+   });
+   measureKm.textContent=`${formatDistance(totalKm)} km`;
+   measureMeters.textContent=`${Math.round(totalKm*1000).toLocaleString('cs-CZ')} m`;
+   measureLeagues.textContent=`${formatDistance(totalKm/LEAGUE_KM)} hârnických lig`;
+   measureCount.textContent=`Úseky trasy (${segments.length})`;
+   measureSegmentList.replaceChildren();
+   segments.forEach((km,i)=>{
+    const item=document.createElement('li');
+    const labels=document.createElement('span');labels.textContent=`${pointLabel(i)} → ${pointLabel(i+1)}`;
+    const distance=document.createElement('strong');distance.textContent=formatSegment(km);
+    item.append(labels,distance);measureSegmentList.appendChild(item);
+   });
    measureResult.hidden=false;
   }else{
-   ln.setAttribute('visibility','hidden');outline.setAttribute('visibility','hidden');measureResult.hidden=true;
+   linePath.setAttribute('visibility','hidden');outlinePath.setAttribute('visibility','hidden');
+   measureResult.hidden=true;measureSegmentList.replaceChildren();
   }
+  positions.forEach((pos,i)=>{
+   const label=pointLabel(i),r=Math.max(10,label.length*4+7);
+   const group=svgAdd(markerLayer,'g',{'class':'atlas-measure-point',transform:`translate(${pos.x.toFixed(2)},${pos.y.toFixed(2)})`});
+   svgAdd(group,'circle',{'class':'atlas-measure-marker-halo',r:r+3});
+   svgAdd(group,'circle',{'class':i===0?'atlas-measure-marker-a':'atlas-measure-marker-b',r});
+   svgAdd(group,'text',{'text-anchor':'middle',dy:'4.4'},label);
+  });
  };
  const recordPoint=(clientX,clientY)=>{
   if(!measurement.active)return false;
   const pt=inMap(clientX,clientY);
   if(!pt){status.textContent='Bod musí být umístěný uvnitř mapy.';return true;}
-  // After the second point, starting a new measurement replaces both old points.
-  if(measurement.points.length===2)measurement.points=[];
   measurement.points.push(pt);
   paintMeasurement();
-  if(measurement.points.length===2)status.textContent=`Naměřeno ${measureKm.textContent} (přímá vzdálenost).`;
-  else status.textContent='Bod A je označen. Klikněte na druhé místo B.';
+  if(measurement.points.length>=2){
+   const {totalKm}=atlasRouteDistancesKm(map.id,measurement.points);
+   status.textContent=`Trasa má ${measurement.points.length} bodů a ${measurement.points.length-1} úseků: celkem ${formatDistance(totalKm)} km. Kliknutím přidáte další bod.`;
+  }else status.textContent='Bod A je označen. Klikněte na další místo B.';
   return true;
  };
  measureToggle.addEventListener('click',()=>{
-  measurement.active=!measurement.active;
-  if(measurement.active&&measurement.points.length===2)measurement.points=[];
-  paintMeasurement();
-  status.textContent=measurement.active?'Měření vzdálenosti: klikněte na bod A a potom na bod B.':'Měření vypnuto; mapou můžete procházet jako obvykle.';
+  measurement.active=!measurement.active;paintMeasurement();
+  status.textContent=measurement.active
+   ?`Měření trasy: klikněte na ${pointLabel(measurement.points.length)} a poté pokračujte podle potřeby.`
+   :'Měření je pozastavené. Vyznačená trasa zůstává na mapě.';
  });
  measureReset.addEventListener('click',()=>{
   measurement.points=[];measurement.active=true;paintMeasurement();
   status.textContent='Nové měření: označte na mapě bod A.';
  });
+ measureUndo.addEventListener('click',()=>{
+  const removed=measurement.points.pop();if(!removed)return;
+  paintMeasurement();status.textContent=`Poslední bod byl odebrán. Nyní je na mapě ${measurement.points.length} bodů.`;
+ });
  measureClear.addEventListener('click',()=>{
-  measurement.points=[];paintMeasurement();status.textContent='Body A a B byly odstraněny.';
+  measurement.points=[];paintMeasurement();status.textContent='Všechny body trasy byly odstraněny.';
  });
 
  // K5: draw only the visible PDF rectangle (+overscan), not a giant canvas.
