@@ -48,11 +48,23 @@
 .atlas-image-layer{position:absolute;overflow:hidden;border:2px solid #4c3827}
 .atlas-image-layer>img{display:block;width:100%;height:100%;object-fit:fill;max-width:none!important;pointer-events:none;-webkit-user-drag:none}
 .atlas-sector-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr))}
-#app .atlas-sector{position:relative;min-width:0;min-height:0;width:100%;height:100%;margin:0;padding:0;
- border:0;border-right:2px solid #4c332052;border-bottom:2px solid #4c332052;border-radius:0;
- background:transparent;box-shadow:none;cursor:inherit;outline-offset:-9px}
-#app .atlas-sector:hover{background:rgba(250,224,151,.12);box-shadow:inset 0 0 0 6px rgba(77,49,27,.14)}
-#app .atlas-sector.is-selected{background:rgba(250,226,159,.12);box-shadow:inset 0 0 0 9px rgba(148,69,25,.40)}
+/* CRITICAL v94.052: the global book theme gives EVERY non-book <button>
+   an opaque navy gradient with !important. These 16 buttons are invisible
+   click-targets ON TOP OF the map, never tiles with their own paint. */
+body #app main.content-atlas .atlas-sector{
+ position:relative;min-width:0;min-height:0;width:100%;height:100%;margin:0!important;padding:0!important;
+ border:0!important;border-right:2px solid #4c332052!important;border-bottom:2px solid #4c332052!important;
+ border-radius:0!important;background:transparent!important;background-image:none!important;
+ box-shadow:none!important;opacity:1!important;cursor:inherit;outline-offset:-9px;
+}
+body #app main.content-atlas .atlas-sector:hover{
+ background:rgba(250,224,151,.12)!important;background-image:none!important;
+ box-shadow:inset 0 0 0 6px rgba(77,49,27,.14)!important;
+}
+body #app main.content-atlas .atlas-sector.is-selected{
+ background:rgba(250,226,159,.12)!important;background-image:none!important;
+ box-shadow:inset 0 0 0 9px rgba(148,69,25,.40)!important;
+}
 #app .atlas-sector:focus-visible{outline:8px solid #a4502b;z-index:2}
 .atlas-scale{position:absolute;left:14px;bottom:14px;z-index:3;pointer-events:none;display:flex;align-items:flex-end;gap:8px;
  background:#f6e7cdda;padding:8px 10px;border:1px solid #65482c;color:#2d2218;box-shadow:0 1px 7px #4b291c66}
