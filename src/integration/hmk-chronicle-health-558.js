@@ -4,6 +4,7 @@
  * sources for deadlines. This file never writes health, rolls or time.
  */
 import {ailmentOutcome} from '../rules/ailments.js';
+import {isNoncombatMedicalOrigin} from './hmk-medical-origin.js';
 export const HR_HELP_558 = 'Healing Rate (HR), HMK str. 184–186: sedm stupňů 0 až 6. HR6 = zotavení; HR5 = +5 Weakness Fatigue; HR4 = +10 Weakness Fatigue; HR3 = Stunned (STN); HR2 = Incapacitated (INC); HR1 = Unconscious (UNC); HR0 = smrt u smrtelných průběhů. Stupně se nesčítají, účinek současného HR nahrazuje předchozí. Hlad začíná HR5 a žízeň HR4. Advance hlad: 3 dny, při polovičních dávkách 6 dní; žízeň: 1 / 2 dny. Úplný klid prodlužuje Advance interval na dvojnásobek. Plná denní dávka umožní Healing Roll po jednom dni. Každý hod může další průběh změnit, předem nelze určit datum smrti ani zotavení.';
 export const HR_LEVELS_558=Object.freeze([
  'HR0 · smrt (při smrtelném průběhu)','HR1 · bezvědomí (UNC)',
@@ -106,13 +107,17 @@ export function projectChronicleHealth_558({actorId,state,now=null,campaignId=nu
  if(s.shockFollowup){
   const q=s.shockFollowup;
   const manual=q.domain==='gm-health';
+  const outsideCombat=isNoncombatMedicalOrigin(q.domain);
+  const agendaKind=outsideCombat?'weather-shock':'shock-followup';
+  const calendarCheck=outsideCombat&&q.sourceId?dueFor(agenda,agendaKind,actorId,q.sourceId):null;
   const manualDue=manual&&integer(q.originMinute)?nextTime(q.originMinute+(q.kind==='UNC'?10:0),gmTime,displayMinute):
     'Původní herní minuta není doložena; nejdříve potvrdit v Kalendáři';
-  rows.push(item('shock-followup','Shock Reroll','Povinný',
-   'čeká na skutečný Shock test',manual?manualDue:dueDescriptor(agenda,q.domain==='travel-weather'?'weather-shock':'shock-followup',actorId,gmTime,displayMinute),
+  rows.push({...item('shock-followup','Shock Reroll','Povinný',
+   'čeká na skutečný Shock test',manual?manualDue:dueDescriptor(agenda,agendaKind,actorId,gmTime,displayMinute,q.sourceId),
    manual?'GM doložený Shock bez anatomické rány; u STN/INC je navíc nutná skutečně dokončená následující akce.':
-    q.domain==='travel-weather'?'Weather Shock: původní minuta je doložena Kalendářem; bez bojové časové osy.':
-    'Termín může záviset na bojovém kole; nepřevádět automaticky na minuty kampaně.',false));
+    outsideCombat?(q.phase==='after-all-bleeding-stopped'?'Kontrola následuje ihned po zastavení všech krvácení.':
+     q.kind==='UNC'?'Kontrola následuje 10 minut od počátečního Shocku.':'Kontrola následuje po další skutečné akci postavy.'):
+    'Termín může záviset na bojovém kole; nepřevádět automaticky na minuty kampaně.',false),calendarCheck});
  }
  if(s.bloodShockPending)rows.push(item('blood-shock-pending','Blood Shock','Povinný',
   'vyřešit v Combat',dueDescriptor(agenda,'blood-shock',actorId,gmTime,displayMinute),
