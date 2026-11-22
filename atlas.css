@@ -195,3 +195,63 @@ body #app main.content-atlas .atlas-tools button:disabled{opacity:.46;cursor:not
 .atlas-measure-point circle{stroke-linejoin:round}
 /* SVG <path> defaults to solid black fill: the route must be a thin line only. */
 .atlas-measure-line,.atlas-measure-line-outline{fill:none}
+
+/* v94.058 — custom, browser-persisted per-map markers. Screen-size icons,
+   map-space coordinates; tooltips are independent of PDF and sector overlay. */
+.atlas-custom-section{margin-top:14px}
+.atlas-custom-section .atlas-tool-help{margin-bottom:10px!important}
+.atlas-custom-marker-overlay{position:absolute;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+body #app main.content-atlas .atlas-custom-marker{
+ position:absolute!important;transform:translate(-50%,-50%);width:30px!important;height:35px!important;
+ min-height:0!important;min-width:0!important;padding:0!important;margin:0!important;
+ border:0!important;border-radius:0!important;background:transparent!important;
+ background-image:none!important;box-shadow:none!important;opacity:1!important;
+ pointer-events:auto;cursor:pointer;overflow:visible!important;display:flex!important;align-items:center;justify-content:center;
+}
+body #app main.content-atlas .atlas-custom-marker:hover,
+body #app main.content-atlas .atlas-custom-marker:focus-visible{
+ background:transparent!important;background-image:none!important;box-shadow:none!important;outline:none!important;
+}
+.atlas-custom-pin{width:27px;height:27px;border-radius:50% 50% 50% 2px;transform:rotate(-45deg);
+ background:#794a28;border:2px solid #ffebc8;box-shadow:0 1px 5px #26180dcc;
+ display:flex;align-items:center;justify-content:center;color:#fff7de;font:bold 17px/1 Georgia,serif;
+ font-variant-numeric:tabular-nums;text-shadow:0 1px #2d1b14}
+.atlas-custom-symbol{display:flex;align-items:center;justify-content:center;transform:rotate(45deg);width:20px;height:20px}
+body #app main.content-atlas .atlas-custom-marker .atlas-custom-pin{font-size:18px}
+.atlas-custom-marker.is-selected .atlas-custom-pin{background:#bd371e;box-shadow:0 0 0 5px #ffdd68b5,0 0 18px #f5c642;transform:rotate(-45deg) scale(1.16)}
+.atlas-viewport.is-measuring .atlas-custom-marker{pointer-events:none}
+.atlas-marker-tooltip{position:absolute;left:calc(50% + var(--atlas-tip-shift,0px));bottom:36px;
+ transform:translateX(-50%);display:none;min-width:145px;max-width:245px;width:max-content;
+ padding:9px 11px;background:#f8e8c8f7;border:1px solid #644525;border-radius:6px;
+ box-shadow:0 5px 15px #21120980;text-align:left;white-space:normal;color:#312117;
+ font:12px/1.4 Georgia,serif;word-break:break-word;pointer-events:none}
+.atlas-marker-tooltip-title{display:block;font-weight:700;font-size:13px}
+.atlas-marker-tooltip-description{display:block;white-space:pre-wrap;margin-top:4px;font-weight:400}
+.atlas-marker-tooltip-description[hidden]{display:none!important}
+.atlas-custom-marker:hover .atlas-marker-tooltip,
+.atlas-custom-marker:focus-visible .atlas-marker-tooltip,
+.atlas-custom-marker.is-selected .atlas-marker-tooltip{display:block}
+.atlas-viewport.is-marking{cursor:crosshair}
+.atlas-viewport.is-marking.is-dragging{cursor:grabbing}
+.atlas-marker-editor{margin:10px 0;padding:10px;border:1px solid #a48255;background:#f8e8ca9c;border-radius:6px}
+.atlas-marker-editor[hidden]{display:none!important}
+.atlas-marker-editor h4{font:700 14px Georgia,serif;margin:0 0 10px!important;color:#452c1d}
+.atlas-marker-editor label{display:block;margin:7px 0!important;font:700 12px/1.35 Georgia,serif;color:#503723}
+#app .atlas-marker-editor input,#app .atlas-marker-editor select,#app .atlas-marker-editor textarea{
+ display:block;width:100%;max-width:none;min-width:0;box-sizing:border-box;margin-top:4px;
+ padding:7px 8px;border:1px solid #9e8056;border-radius:4px;background:#fff8e9;
+ color:#35231a;font:13px/1.35 Georgia,serif;resize:vertical;
+}
+.atlas-marker-form-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.atlas-marker-list-heading{margin:14px 0 8px;font:700 12px/1.35 Georgia,serif;color:#503723}
+.atlas-marker-list{display:flex;flex-direction:column;gap:6px;max-height:350px;overflow-y:auto;overflow-x:hidden;min-width:0}
+.atlas-marker-row{display:flex;flex-direction:column;gap:6px;border:1px solid #b69c75aa;border-radius:5px;padding:6px;background:#ffefce70}
+.atlas-marker-row.is-selected{border-color:#ac572f;background:#fbe5ba;box-shadow:inset 3px 0 #b84b29}
+body #app main.content-atlas .atlas-tools .atlas-marker-list-select{
+ width:100%!important;justify-content:flex-start!important;text-align:left!important;
+ white-space:normal;overflow-wrap:anywhere;font-size:12px!important;
+}
+.atlas-marker-row-actions{display:flex;gap:6px}
+.atlas-marker-empty{font:12px/1.4 Georgia,serif;color:#705437;margin:0!important}
+.atlas-marker-save-note{font:11px/1.4 Georgia,serif;color:#795b38;margin-top:10px!important}
+@media(max-width:1050px){.atlas-custom-section{display:block}.atlas-custom-section .atlas-tool-help{display:block}}
