@@ -365,7 +365,7 @@ import {liveSpatialEvade} from './src/integration/hmk-spatial-evasion.js';
 import {baseMove} from './src/rules/movement.js';
 import {projectChronicleMovement} from './src/integration/hmk-chronicle-movement-556.js';
 import {projectChronicleConditions,CHRONICLE_FATIGUE_HELP} from './src/integration/hmk-chronicle-conditions-557.js';
-import {projectChronicleHealth_558,HR_HELP_558} from './src/integration/hmk-chronicle-health-558.js?v=93.971';
+import {projectChronicleHealth_558,HR_HELP_558} from './src/integration/hmk-chronicle-health-558.js?v=94.049';
 import {SL,successLevel} from './src/rules/tests.js';
 import {createLiveGuidedMelee,createLiveGuidedMissile,createLiveGuidedDeadlyMelee} from './src/integration/hmk-guided-live-attack-inputs.js';
 import {verifiedDeadlyHelplessReason} from './src/integration/hmk-deadly-attack.js';
@@ -407,7 +407,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.048';
+const APP_VERSION='94.049';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7637,6 +7637,9 @@ function journalChronicleStatusHTML(c,state){
    <div class="journal-health-course__due">${esc(row.time||'Termín není doložen')}</div>
    ${row.detail?`<div class="journal-health-course__detail">${esc(row.detail)}</div>`:''}
    ${row.woundId&&woundsById.has(row.woundId)?journalWoundCareButton(c,woundsById.get(row.woundId),row.label):''}
+   ${row.calendarCheck?'<button type="button" class="hc-small" data-cal-link="'+esc(c.id)+
+    '" data-cal-kind="weather-shock" data-cal-source="'+esc(row.calendarCheck.sourceId)+'">'+
+    (row.calendarCheck.status==='due'?'Přejít k Shock Reroll ↗':'Zobrazit Shock Reroll ↗')+'</button>':''}
   </div>`).join('')}
   ${health.issues.length?`<div class="journal-health-course__warning">Neověřené zdravotní termíny: ${esc(health.issues.slice(0,3).join('; '))}</div>`:''}
  </details>`:'';
@@ -17789,7 +17792,7 @@ document.addEventListener('submit',async event=>{
     ...(originalTrek?.calendarTimeEpisode?.settings?.animalIds||[]),
     ...(originalTrek?.calendarTimeEpisode?.settings?.stableAnimalIds||[])].includes(target.id)||
    data.campaignClock.minute!==originalTrek.calendarTimeEpisode.endMinute))
-   throw Error('Accident: oběť musí patřit do původní družiny a test nastat v potvrzené minutě nehody.');
+   throw Error('Accident: oběť musí patřit do původní družiny a zdravotní vyhodnocení začíná na konci potvrzeného intervalu.');
   if(linkedTrek){
    if(!data.campaignClock||campaignKey(data.campaignClock)!==linkedTrek.campaignId||
      !(data.campaignClock.characterIds??data.characters.map(c=>c.id)).includes(target.id))
@@ -29836,7 +29839,9 @@ function episodeHazardSelectionUI93840(form,required){
 function episodeLockInactiveHazardFields93863(form){
  const panel=form?.querySelector('[data-episode-hazard-details]');if(!panel)return;
  for(const field of panel.querySelectorAll('input,select,textarea,button')){
-  if(field.type==='hidden'||field.name==='hazardChoices93840')continue;
+  // The confirmation controls own their disabled state in
+  // episodeHazardSelectionUI93840. A cached lock can overwrite that decision.
+  if(field.type==='hidden'||field.name==='hazardChoices93840'||field.hasAttribute('data-hazard-choices-confirm'))continue;
   const inactive=!!field.closest('[hidden]');
   // A confirmed/historical roll keeps its original independent read-only lock.
   if(inactive){
@@ -29862,13 +29867,18 @@ function episodeHazardInputIsDraft93840(node){
   (episodeHazardSelectable93840.has(node.name)||node.name?.startsWith('hazardCompProof_'));
 }
 function episodeHazardChoicesRequired93840(form){
- if(!form||!episodeEvaluationRequested)return false;
- const hz=form.querySelector('[data-episode-hazard-details]');
+ const hz=form?.querySelector('[data-episode-hazard-details]');
  if(!hz)return false;
  // The preview owns which hazard types require a GM decision. Lost Time
  // (Direction d10 1-4) produces an automatic Slow, not a second choice.
  // A generic combined-hazard heading must never create a fictitious pending
  // confirmation after all real dice have been accepted.
+ const survivalRoll=String(form.elements.namedItem('survivalD10')?.value||'');
+ const accident=['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&/^[456]$/.test(survivalRoll);
+ // A missing minute can make the preview stop before the new accident is
+ // complete. Once its field is offered, the confirmed d10 is the gate.
+ if(accident)return episodeEvaluationRequested&&episodeDiceAccepted93849.get('survivalD10')===survivalRoll;
+ if(!episodeEvaluationRequested)return false;
  if(hz.dataset.episodeHazardActionRequired==='false')return false;
  const legend=hz.querySelector('[data-episode-hazard-legend]')?.textContent||'';
  // v93.847: after a Complication Skill Test the result can momentarily
@@ -29877,10 +29887,8 @@ function episodeHazardChoicesRequired93840(form){
  // Do not hide the only confirmation button merely because the derived
  // hazard section was hidden while rebuilding the next task.
  const complication=/^Complication ·/.test(legend)&&Number(form.elements.namedItem('survivalD10')?.value)>=7;
- const accident=['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
-  /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
- if(hz.hidden&&!complication&&!accident)return false;
- return accident||!!legend;
+ if(hz.hidden&&!complication)return false;
+ return !!legend;
 }
 function episodeHazardRequireConfirmed93840(form){
  if(episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form))
@@ -34648,17 +34656,8 @@ document.addEventListener('click',e=>{
  const btn=e.target.closest?.('[data-episode-evaluate]');if(!btn)return;
  e.preventDefault();const form=btn.closest('form');if(!form)return;
  ensureFixedAccidentMinute93773(form);
- try{
-  const raw=String(form.elements.namedItem('survivalD10')?.value||'').trim();
-  const hazard=Number(raw),atText=String(form.elements.namedItem('hazardAtMinute')?.value||'').trim();
-  if(['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&raw&&hazard>=4&&hazard<=6){
-   if(!/^\d+$/.test(atText))throw Error('Accident: GM musí zadat celou minutu nehody.');
-   const at=Number(atText),elapsed=Number(form.elements.namedItem('minutes')?.value);
-   incidentMinutes93863({minutes:elapsed,atMinute:at,kind:form.elements.namedItem('kind')?.value});
-   // No write to minutes: the fixed window remains precisely the GM plan.
-  }
- }catch(err){episodeEvaluationRequested=false;timeEpisodeDraft=episodeFormSnapshot(form);
-  episodeShowSetupError(form,{field:'hazardAtMinute',message:err.message});return;}
+ // Preview requests the missing accident minute without leaving evaluation
+ // mode. The explicit hazard confirmation validates and commits that minute.
  const setup=episodeSetupIssue(form);
  if(setup){episodeEvaluationRequested=false;timeEpisodeDraft=episodeFormSnapshot(form);
   updateEpisodePreview(form);episodeShowSetupError(form,setup);return;}
