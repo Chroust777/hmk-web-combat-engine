@@ -1,5 +1,5 @@
 /**
- * Hârn Atlas v94.056 — PDF vector zoom, calibrated multi-point route measurement.
+ * Hârn Atlas v94.057 — PDF vector zoom, calibrated multi-point route measurement and explicit measure on/off.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Only in-memory map measurement; no storage, campaign, calendar, travel, inventory, cloud or combat access.
@@ -118,7 +118,7 @@ export function atlasView(){
      <h3><span aria-hidden="true">↝</span> Měření trasy</h3>
      <p class="atlas-tool-help">Postupně označte A → B → C → … Mapa ukáže délku každého úseku přímo u spojnice; vpravo se sčítá celá trasa.</p>
      <button type="button" class="atlas-tool-action" data-atlas-measure-toggle aria-pressed="false">Zapnout měření</button>
-     <div class="atlas-measure-instructions" data-atlas-measure-help role="status" aria-live="polite">Zapněte měření a postupně klikejte na místa své trasy.</div>
+     <div class="atlas-measure-instructions" data-atlas-measure-help role="status" aria-live="polite" hidden></div>
      <div class="atlas-measure-results" data-atlas-measure-result aria-live="polite" hidden>
       <div class="atlas-measure-total-caption">Celková délka trasy</div>
       <div class="atlas-measure-distance" data-atlas-measure-km>—</div>
@@ -131,7 +131,7 @@ export function atlasView(){
       <button type="button" data-atlas-measure-reset disabled>Nové měření</button>
       <button type="button" data-atlas-measure-clear disabled>Odstranit body</button>
      </div>
-     <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km. Součet přímých úseků mezi po sobě označenými body; nikoliv automatické sledování silnice. Zoom výsledek nemění.</p>
+     <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km.</p>
     </section>
     <div class="atlas-tools-future"><strong>Další nástroje</strong><p>Poznámky a vlastní značky doplníme později.</p></div>
    </aside>
@@ -207,13 +207,14 @@ export function mountAtlasView(root){
   const {segments,totalKm}=atlasRouteDistancesKm(map.id,pts);
   viewport.classList.toggle('is-measuring',measurement.active);
   measureToggle.setAttribute('aria-pressed',String(measurement.active));
-  measureToggle.textContent=measurement.active?'Pozastavit měření':pts.length?'Pokračovat v měření':'Zapnout měření';
+  measureToggle.textContent=measurement.active?'Ukončit měření':'Zapnout měření';
   measureReset.disabled=pts.length===0;
   measureUndo.disabled=pts.length===0;
   measureClear.disabled=pts.length===0;
   measureHelp.textContent=measurement.active
    ?(pts.length===0?'Kliknutím na mapu označte bod A. Tažením můžete mapu posouvat.':`Bod ${pointLabel(pts.length-1)} je označen. Klikněte na další místo (${pointLabel(pts.length)}). Libovolný počet bodů, ukončení tlačítkem nahoře.`)
-   :(pts.length===0?'Zapněte měření a označte první bod A.':`Trasa má ${pts.length} bodů. Můžete pokračovat, začít znovu nebo body odstranit.`);
+   :(pts.length===0?'':`Měření ukončeno. Trasa má ${pts.length} bodů; můžete znovu zapnout měření, začít novou trasu nebo body odstranit.`);
+  measureHelp.hidden=!measureHelp.textContent;
   markerLayer.replaceChildren();segmentLayer.replaceChildren();
   if(pts.length>=2){
    const path=positions.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
@@ -271,7 +272,7 @@ export function mountAtlasView(root){
   measurement.active=!measurement.active;paintMeasurement();
   status.textContent=measurement.active
    ?`Měření trasy: klikněte na ${pointLabel(measurement.points.length)} a poté pokračujte podle potřeby.`
-   :'Měření je pozastavené. Vyznačená trasa zůstává na mapě.';
+   :'Měření ukončeno. Vyznačená trasa zůstává na mapě.';
  });
  measureReset.addEventListener('click',()=>{
   measurement.points=[];measurement.active=true;paintMeasurement();
@@ -405,6 +406,9 @@ export function mountAtlasView(root){
  const center=()=>{const r=viewport.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2];};
  const switchTo=(nextMap)=>{
   if(!MAPS[nextMap]||nextMap===currentMapId)return;
+  // Map changes always turn off the measuring tool on BOTH maps. Keep their
+  // independently recorded routes visible so users can review or clear them.
+  for(const entry of Object.values(measurementsByMap))entry.active=false;
   remember();
   if(pdfLayer)releasePdf();
   currentMapId=nextMap;
