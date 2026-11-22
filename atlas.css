@@ -74,3 +74,33 @@ body #app main.content-atlas .atlas-sector.is-selected{
 @media(max-width:1280px){.atlas-body{grid-template-columns:minmax(175px,195px) minmax(0,1fr)}.atlas-toolbar-help{width:100%;margin-left:0}.atlas-legend-scroll{height:min(65vh,630px)}}
 @media(max-width:960px){.atlas-body{grid-template-columns:1fr}.atlas-legend{display:grid;grid-template-columns:minmax(155px,1fr) minmax(0,245px);column-gap:12px;align-items:start}.atlas-legend h2,.atlas-legend-note,.atlas-legend-scale{grid-column:1}.atlas-legend-scroll{grid-column:2;grid-row:1/4;max-height:260px;min-height:150px}.atlas-viewport{height:clamp(400px,62vh,680px)}}
 @media(max-width:550px){.atlas-workspace{padding:9px!important}.atlas-legend{display:block}.atlas-legend-scroll{max-height:230px;min-height:140px}.atlas-legend-scroll img{max-width:215px;margin:0 auto}.atlas-viewport{height:430px}.atlas-map-pane{padding:5px}.atlas-header{gap:8px}.atlas-scale{left:5px;bottom:5px;padding:5px;font-size:11px}.atlas-scale span{font-size:11px}.atlas-toolbar-help{font-size:10px}}
+
+/* v94.053 · K5 detail: back-navigation and an independent PDF-derived key. */
+#app .atlas-back{font:700 14px/1.35 Georgia,serif!important;min-height:39px!important;
+ padding:8px 13px!important;border:1px solid #886638!important;color:#322217!important;
+ background:#f1dcb8!important;background-image:none!important;border-radius:5px!important;
+ cursor:pointer;white-space:normal;text-align:center}
+#app .atlas-back:hover{background:#fbe8c6!important;background-image:none!important}
+#app .atlas-back:focus-visible{outline:3px solid #87532b}
+.atlas-workspace--detail .atlas-body{grid-template-columns:minmax(230px,272px) minmax(0,1fr)}
+.atlas-workspace--detail .atlas-legend-scroll{height:min(76vh,760px);max-height:760px}
+.atlas-workspace--detail .atlas-legend-scroll img{max-width:none;mix-blend-mode:multiply}
+.atlas-workspace--detail .atlas-image-layer{border-width:1px}
+@media(max-width:960px){
+ .atlas-workspace--detail .atlas-body{grid-template-columns:1fr}
+ .atlas-workspace--detail .atlas-legend-scroll{max-height:265px;height:265px}
+}
+@media(max-width:550px){
+ .atlas-workspace--detail .atlas-legend-scroll{height:245px;max-height:245px}
+ .atlas-workspace--detail .atlas-legend-scroll img{max-width:215px}
+ #app .atlas-back{width:100%!important}
+}
+/* Prevent the global book button theme from turning Atlas map controls navy. */
+body #app main.content-atlas .atlas-toolbar button{
+ background:#eed7aa!important;background-image:none!important;
+ color:#38291e!important;border-color:#9d7644!important;
+ box-shadow:none!important;
+}
+body #app main.content-atlas .atlas-toolbar button:hover{
+ background:#f7dfb1!important;background-image:none!important;
+}

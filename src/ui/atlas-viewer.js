@@ -1,105 +1,132 @@
 /**
- * Atlas I4–L7 — independent, read-only cartographic view.
- * Does NOT access combat, travel, calendar, inventory, localStorage or cloud.
- * Source: 5001A-HarnWorld-Map_Chroust.pdf; cropped without changing PDF art.
- * HTML shows one lossless WebP rendered at the source PDF's native 300 DPI;
- * the cropped map is shown directly inside every sector on the Atlas page.
- *
- * Future sector detail pages: change a sector's `detailUrl` from null to a
- * real path. No placeholder/missing links are followed today.
+ * Hârn Atlas v94.053 — two-level stand-alone viewer.
+ * Overview: I4–L7 and 16 selectable sectors.
+ * Detail: K5 from the user's K5.pdf, shown as a single lossless WebP.
+ * No storage, campaign, calendar, travel, inventory, cloud or combat access.
  */
-const MAP = Object.freeze({
-  width:2449, height:2363,
-  image:'./assets/atlas/harn-I4-L7.webp',
-  key:'./assets/atlas/harn-map-key.webp',
-  // Original legend: One hex (1 cm on the print) = 5 Hârnic leagues ≈ 20 km.
-  // Raster was rendered from the cropped PDF at 300 DPI, without rescaling.
-  sourceDpi:300,
-  kmPerHex:20
+const OVERVIEW=Object.freeze({
+ id:'overview', width:2449,height:2363,margin:48,
+ image:'./assets/atlas/harn-I4-L7.webp',
+ key:'./assets/atlas/harn-map-key.webp',
+ title:'Atlas Hârnu',
+ subtitle:'Přehledová mapa I4–L7 · vyberte sektor, pro který je připravena detailní mapa',
+ legendTitle:'Legenda hlavní mapy',legendNote:'Originální vysvětlivky HârnWorld',
+ legendWidth:647,legendHeight:3254,
+ legendAlt:'Vysvětlivky původní mapy HârnWorld: krajiny, lesy, vody, hory, cesty a sídla',
+ scaleNote:'1 hex = 5 hârnických lig ≈ 20 km',
+ pixelsPerKm:300/2.54/20
 });
-const MARGIN=48;
+const DETAIL_K5=Object.freeze({
+ id:'K5', width:4172,height:4031,margin:0,
+ image:'./assets/atlas/k5-detail-map.webp',
+ key:'./assets/atlas/k5-detail-legend.webp',
+ title:'Atlas Hârnica · K5',
+ subtitle:'Detailní mapa sektoru K5 · originální kresba a všechny místní názvy',
+ legendTitle:'Legenda sektoru K5',legendNote:'Značky, vrstevnice, sídla, cesty a hranice z K5.pdf',
+ legendWidth:814,legendHeight:2981,
+ legendAlt:'Legenda mapy K5: vegetace, sněhové oblasti, reliéf, brody, cesty, sídla, oblasti a grafické měřítko v ligách',
+ scaleNote:'0–5 lig na původní mapě ≈ 0–20 km',
+ // PDF's printed distance rule: 5 leagues span approximately 140 points;
+ // image rendered at 400 dpi (400/72 px per PDF point).
+ pixelsPerKm:140*(400/72)/20
+});
+const MAPS=Object.freeze({overview:OVERVIEW,K5:DETAIL_K5});
 const LETTERS=Object.freeze(['I','J','K','L']);
 const ROWS=Object.freeze([4,5,6,7]);
-export const ATLAS_SECTORS=Object.freeze(ROWS.flatMap(row=>LETTERS.map(column=>Object.freeze({id:`${column}${row}`,column,row,detailUrl:null}))));
-let remembered={zoom:0,x:0,y:0,initialized:false};
+export const ATLAS_SECTORS=Object.freeze(ROWS.flatMap(row=>LETTERS.map(column=>Object.freeze({
+ id:`${column}${row}`,column,row,detailMap:column==='K'&&row===5?'K5':null
+}))));
+let currentMapId='overview';
+let selectedSector=null;
+const rememberedByMap={overview:{initialized:false},K5:{initialized:false}};
 
-const sectorButtons=ATLAS_SECTORS.map(s=>
- `<button type="button" class="atlas-sector" data-atlas-sector="${s.id}" aria-label="Sektor ${s.id}. Detailní mapa zatím není připojena." title="Sektor ${s.id} · detailní mapa bude přidána později" tabindex="0"></button>`
-).join('');
+const sectorButtons=()=>ATLAS_SECTORS.map(sector=>{
+ const ready=!!sector.detailMap;
+ return `<button type="button" class="atlas-sector${ready?' atlas-sector--has-detail':''}${selectedSector===sector.id?' is-selected':''}" data-atlas-sector="${sector.id}" aria-label="Sektor ${sector.id}${ready?', otevřít detailní mapu':' – detailní mapa zatím nepřipojena'}" title="${ready?'Otevřít detailní mapu K5':'Sektor '+sector.id+' · detailní mapa bude přidána později'}" tabindex="0"></button>`;
+}).join('');
 
 export function atlasView(){
- return `<section class="atlas-workspace" aria-label="Atlas Hârnu, sektory I4 až L7">
-   <header class="atlas-header"><div><p class="atlas-eyebrow">HÂRNWORLD · KARTOGRAFICKÁ KNIHOVNA</p><h1>Atlas Hârnu</h1><p>Mapový podklad I4–L7 přímo v 16 sektorech · kliknutím vyberete sektor pro budoucí detailní mapu</p></div>
-   </header>
-   <div class="atlas-body">
-    <aside class="atlas-legend" aria-label="Legenda původní mapy"><h2>Legenda mapy</h2><p class="atlas-legend-note">Původní značky HârnWorld</p>
-      <div class="atlas-legend-scroll"><img src="${MAP.key}" alt="Původní legenda: krajina, lesy, voda, hory, řeky, brody, peřeje, cesty a značení sídel" width="647" height="3254" draggable="false"></div>
-      <div class="atlas-legend-scale"><strong>Originální měřítko</strong><span>1 hex (1 cm) = 5 hârnických lig</span><span>≈ 20 km / 12,5 míle</span></div>
-    </aside>
-    <div class="atlas-map-pane">
-     <div class="atlas-toolbar" role="toolbar" aria-label="Ovládání mapy">
-      <button type="button" data-atlas-control="minus" aria-label="Oddálit mapu" title="Oddálit">−</button>
-      <output class="atlas-zoom-label" data-atlas-zoom aria-live="off">100 %</output>
-      <button type="button" data-atlas-control="plus" aria-label="Přiblížit mapu" title="Přiblížit">+</button>
-      <button type="button" data-atlas-control="fit" class="atlas-fit" title="Zobrazit celý výřez">Celá mapa</button>
-      <div class="atlas-toolbar-help">Kolečko myši: přiblížení · držet levé tlačítko: posun</div>
-     </div>
-     <div class="atlas-viewport" data-atlas-viewport tabindex="0" role="region" aria-label="Interaktivní mapa sektorů I4 až L7, kolečko myši přibližuje, tažení posouvá, klávesy se šipkami posouvají">
-      <div class="atlas-stage" data-atlas-stage style="width:${MAP.width+MARGIN}px;height:${MAP.height+MARGIN}px">
-       <div class="atlas-letters" aria-hidden="true" style="left:${MARGIN}px;width:${MAP.width}px">${LETTERS.map(l=>`<span>${l}</span>`).join('')}</div>
-       <div class="atlas-numbers" aria-hidden="true" style="top:${MARGIN}px;height:${MAP.height}px">${ROWS.map(n=>`<span>${n}</span>`).join('')}</div>
-       <div class="atlas-image-layer" style="left:${MARGIN}px;top:${MARGIN}px;width:${MAP.width}px;height:${MAP.height}px">
-        <img src="${MAP.image}" alt="Bezeztrátová mapová kresba regionu Kaldor, Shava Forest, Tashal, Azadmere a okolí ze sektorů I4 až L7" width="${MAP.width}" height="${MAP.height}" draggable="false" decoding="async">
-        <div class="atlas-sector-grid" aria-label="Mřížka 16 sektorů připravených pro detailní mapy">${sectorButtons}</div>
-       </div>
-      </div>
-      <div class="atlas-scale" aria-label="Grafické měřítko mapy"><div data-atlas-scale-line class="atlas-scale-line"></div><span data-atlas-scale-label>≈ 20 km</span></div>
-     </div>
-     <div class="atlas-status" role="status" aria-live="polite" data-atlas-status>Výřez I4–L7. Kliknutí na sektor nyní pouze označí jeho pozici; detailní mapy přidáme později.</div>
+ const map=MAPS[currentMapId]||OVERVIEW;
+ const overview=map.id==='overview';
+ const margin=map.margin;
+ const stageW=map.width+margin,stageH=map.height+margin;
+ const axes=overview?`<div class="atlas-letters" aria-hidden="true" style="left:${margin}px;width:${map.width}px">${LETTERS.map(letter=>`<span>${letter}</span>`).join('')}</div><div class="atlas-numbers" aria-hidden="true" style="top:${margin}px;height:${map.height}px">${ROWS.map(num=>`<span>${num}</span>`).join('')}</div>`:'';
+ const grid=overview?`<div class="atlas-sector-grid" aria-label="Mřížka 16 sektorů; K5 otevírá detailní mapu">${sectorButtons()}</div>`:'';
+ const hint=overview?'Kliknutím na K5 otevřete podrobnou mapu. Ostatní sektory zatím pouze označíte.':'Detailní mapa K5 · tlačítkem Zpět na hlavní mapu se vrátíte do stejného výřezu I4–L7.';
+ return `<section class="atlas-workspace${overview?' atlas-workspace--overview':' atlas-workspace--detail'}" data-atlas-map="${map.id}" aria-label="Atlas Hârnu: ${overview?'přehled sektorů I4–L7':'detail K5'}">
+  <header class="atlas-header"><div><p class="atlas-eyebrow">HÂRNWORLD · KARTOGRAFICKÁ KNIHOVNA</p><h1>${map.title}</h1><p>${map.subtitle}</p></div>
+  ${overview?'':'<button type="button" class="atlas-back" data-atlas-back>← Zpět na hlavní mapu</button>'}
+  </header>
+  <div class="atlas-body">
+   <aside class="atlas-legend" aria-label="${map.legendTitle}"><h2>${map.legendTitle}</h2><p class="atlas-legend-note">${map.legendNote}</p>
+    <div class="atlas-legend-scroll"><img src="${map.key}" alt="${map.legendAlt}" width="${map.legendWidth}" height="${map.legendHeight}" draggable="false"></div>
+    <div class="atlas-legend-scale"><strong>Originální měřítko</strong><span>${map.scaleNote}</span></div>
+   </aside>
+   <div class="atlas-map-pane">
+    <div class="atlas-toolbar" role="toolbar" aria-label="Ovládání mapy">
+     <button type="button" data-atlas-control="minus" aria-label="Oddálit mapu" title="Oddálit">−</button>
+     <output class="atlas-zoom-label" data-atlas-zoom aria-live="off">100 %</output>
+     <button type="button" data-atlas-control="plus" aria-label="Přiblížit mapu" title="Přiblížit">+</button>
+     <button type="button" data-atlas-control="fit" class="atlas-fit" title="Zobrazit celou mapu">Celá mapa</button>
+     <div class="atlas-toolbar-help">Kolečko myši: přiblížení · podržet levé tlačítko: posun</div>
     </div>
+    <div class="atlas-viewport" data-atlas-viewport tabindex="0" role="region" aria-label="${overview?'Mapa I4–L7, K5 je klikací sektor':'Mapa K5'}, kolečko myši přibližuje, tažení posouvá, klávesy se šipkami posouvají">
+     <div class="atlas-stage" data-atlas-stage style="width:${stageW}px;height:${stageH}px">
+      ${axes}
+      <div class="atlas-image-layer" style="left:${margin}px;top:${margin}px;width:${map.width}px;height:${map.height}px">
+       <img src="${map.image}" data-atlas-image alt="${overview?'Přehledová mapa Hârnu, sektory I4 až L7':'Podrobná barevná mapa K5 včetně místních jmen, sídel, cest a terénních vrstevnic'}" width="${map.width}" height="${map.height}" draggable="false" decoding="async">
+       ${grid}
+      </div>
+     </div>
+     <div class="atlas-scale" aria-label="Grafické měřítko mapy"><div data-atlas-scale-line class="atlas-scale-line"></div><span data-atlas-scale-label>≈ 20 km</span></div>
+    </div>
+    <div class="atlas-status" role="status" aria-live="polite" data-atlas-status>${hint}</div>
    </div>
-  </section>`;
+  </div>
+ </section>`;
 }
 
-/** Bind ephemeral viewer controls; no state writes outside this module. */
+/** Bind per-view ephemeral controls; only Atlas DOM is replaced when K5 opens. */
 export function mountAtlasView(root){
- const viewport=root.querySelector('[data-atlas-viewport]');
- if(!viewport)return;
- const stage=root.querySelector('[data-atlas-stage]');
- const zoomLabel=root.querySelector('[data-atlas-zoom]');
- const scaleLine=root.querySelector('[data-atlas-scale-line]');
- const scaleLabel=root.querySelector('[data-atlas-scale-label]');
- const status=root.querySelector('[data-atlas-status]');
- const frameW=MAP.width+MARGIN,frameH=MAP.height+MARGIN;
- const state={...remembered};
+ const workspace=root.querySelector('.atlas-workspace');
+ const viewport=workspace?.querySelector('[data-atlas-viewport]');
+ if(!workspace||!viewport)return;
+ const mapId=workspace.dataset.atlasMap;
+ const map=MAPS[mapId]||OVERVIEW;
+ const overview=map.id==='overview';
+ const stage=workspace.querySelector('[data-atlas-stage]');
+ const zoomLabel=workspace.querySelector('[data-atlas-zoom]');
+ const scaleLine=workspace.querySelector('[data-atlas-scale-line]');
+ const scaleLabel=workspace.querySelector('[data-atlas-scale-label]');
+ const status=workspace.querySelector('[data-atlas-status]');
+ const frameW=map.width+map.margin,frameH=map.height+map.margin;
+ const state={...rememberedByMap[map.id]};
  let fitZoom=1;
  let drag=null;
+ let ignoreClick=false;
  const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
  const size=()=>({w:viewport.clientWidth,h:viewport.clientHeight});
  const bounds=()=>{
   const {w,h}=size(),ww=frameW*state.zoom,hh=frameH*state.zoom;
-  // Center when fully visible; otherwise allow panning all the way to edges.
   const limitX=ww<=w?[(w-ww)/2,(w-ww)/2]:[w-ww,0];
   const limitY=hh<=h?[(h-hh)/2,(h-hh)/2]:[h-hh,0];
   state.x=clamp(state.x,...limitX);
   state.y=clamp(state.y,...limitY);
  };
- const remember=()=>{remembered={zoom:state.zoom,x:state.x,y:state.y,initialized:true};};
+ const remember=()=>{rememberedByMap[map.id]={zoom:state.zoom,x:state.x,y:state.y,initialized:true};};
  const repaint=()=>{
   bounds();
   stage.style.transform=`translate3d(${state.x}px,${state.y}px,0) scale(${state.zoom})`;
   zoomLabel.textContent=`${Math.round(state.zoom*100)} %`;
-  // Scale is anchored to PDF's printed 1cm/hex at native 300dpi.
-  const pixelPerKm=(MAP.sourceDpi/2.54/MAP.kmPerHex)*state.zoom;
-  const scales=[5,10,20,40,60,100,200,400,600,1000];
+  const pixelPerKm=map.pixelsPerKm*state.zoom;
+  const scales=[1,2,5,10,20,40,60,100,200,400,600,1000];
   const labelKm=scales.reduce((best,km)=>Math.abs(km*pixelPerKm-140)<Math.abs(best*pixelPerKm-140)?km:best,20);
   scaleLine.style.width=`${Math.round(labelKm*pixelPerKm)}px`;
   scaleLabel.textContent=`≈ ${labelKm} km`;
   remember();
  };
  const fullFit=()=>{
-  const {w,h}=size();
-  if(!w||!h)return;
+  const {w,h}=size();if(!w||!h)return;
   fitZoom=Math.min(w/frameW,h/frameH);
   state.zoom=fitZoom;
   state.x=(w-frameW*fitZoom)/2;
@@ -107,33 +134,39 @@ export function mountAtlasView(root){
   repaint();
  };
  const zoomAt=(next,cx,cy)=>{
-  const rect=viewport.getBoundingClientRect();
-  const px=cx-rect.left,py=cy-rect.top;
+  const rect=viewport.getBoundingClientRect(),px=cx-rect.left,py=cy-rect.top;
   const old=state.zoom;
-  const max=Math.max(4,fitZoom*8);
-  state.zoom=clamp(next,Math.max(.12,fitZoom*.7),max);
+  state.zoom=clamp(next,Math.max(.06,fitZoom*.7),Math.max(4,fitZoom*8));
   const ratio=state.zoom/old;
   state.x=px-(px-state.x)*ratio;
   state.y=py-(py-state.y)*ratio;
   repaint();
  };
  const center=()=>{const r=viewport.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2];};
- const clickSector=(id)=>{
-  const def=ATLAS_SECTORS.find(s=>s.id===id);if(!def)return;
+ const switchTo=(nextMap)=>{
+  if(!MAPS[nextMap]||nextMap===currentMapId)return;
+  remember();
+  currentMapId=nextMap;
+  workspace.outerHTML=atlasView();
+  mountAtlasView(root);
+  root.querySelector('[data-atlas-viewport]')?.focus({preventScroll:true});
+ };
+ const clickSector=id=>{
+  const def=ATLAS_SECTORS.find(s=>s.id===id);if(!def||!overview)return;
+  selectedSector=id;
   viewport.querySelectorAll('.atlas-sector.is-selected').forEach(el=>el.classList.remove('is-selected'));
   viewport.querySelector(`[data-atlas-sector="${id}"]`)?.classList.add('is-selected');
-  status.textContent=`Sektor ${id} je připraven pro budoucí samostatnou detailní mapu. Zatím není přiřazen žádný odkaz.`;
-  if(def.detailUrl)window.location.assign(def.detailUrl);
+  if(def.detailMap){switchTo(def.detailMap);return;}
+  status.textContent=`Sektor ${id} zatím nemá připojenou detailní mapu. K dispozici je nyní K5.`;
  };
- root.querySelectorAll('[data-atlas-control]').forEach(button=>button.addEventListener('click',()=>{
-  const action=button.dataset.atlasControl;
-  if(action==='fit')return fullFit();
-  const [x,y]=center();zoomAt(state.zoom*(action==='plus'?1.25:1/1.25),x,y);
+ workspace.querySelector('[data-atlas-back]')?.addEventListener('click',()=>switchTo('overview'));
+ workspace.querySelectorAll('[data-atlas-control]').forEach(button=>button.addEventListener('click',()=>{
+  if(button.dataset.atlasControl==='fit')return fullFit();
+  const [x,y]=center();zoomAt(state.zoom*(button.dataset.atlasControl==='plus'?1.25:.8),x,y);
  }));
  viewport.addEventListener('wheel',e=>{
   e.preventDefault();
-  const factor=Math.exp(-clamp(e.deltaY,-350,350)*.00165);
-  zoomAt(state.zoom*factor,e.clientX,e.clientY);
+  zoomAt(state.zoom*Math.exp(-clamp(e.deltaY,-350,350)*.00165),e.clientX,e.clientY);
  },{passive:false});
  viewport.addEventListener('dblclick',e=>{e.preventDefault();zoomAt(state.zoom*1.6,e.clientX,e.clientY);});
  viewport.addEventListener('pointerdown',e=>{
@@ -155,40 +188,42 @@ export function mountAtlasView(root){
   drag=null;
   viewport.classList.remove('is-dragging');
   if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
-  if(didMove)return;
-  // Pointer capture can retarget a click to the viewport; pick sector by
-  // untransformed image coordinates. Axis labels never select a sector.
+  if(didMove){ignoreClick=true;return;}
+  if(!overview)return;
+  // Native click may be retargeted to viewport by pointer capture.
   const rect=viewport.getBoundingClientRect();
-  const localX=(e.clientX-rect.left-state.x)/state.zoom-MARGIN;
-  const localY=(e.clientY-rect.top-state.y)/state.zoom-MARGIN;
-  if(localX<0||localX>=MAP.width||localY<0||localY>=MAP.height)return;
-  const col=LETTERS[Math.floor(localX/MAP.width*4)];
-  const row=ROWS[Math.floor(localY/MAP.height*4)];
+  const localX=(e.clientX-rect.left-state.x)/state.zoom-map.margin;
+  const localY=(e.clientY-rect.top-state.y)/state.zoom-map.margin;
+  if(localX<0||localX>=map.width||localY<0||localY>=map.height)return;
+  const col=LETTERS[Math.floor(localX/map.width*4)];
+  const row=ROWS[Math.floor(localY/map.height*4)];
   clickSector(col+row);
  };
  viewport.addEventListener('pointerup',endDrag);
  viewport.addEventListener('pointercancel',e=>{if(drag&&drag.id===e.pointerId){drag=null;viewport.classList.remove('is-dragging');}});
  viewport.addEventListener('click',e=>{
-  // Keyboard accessibility; pointer click is handled by the position above.
+  // Keyboard-triggered button click. Pointer clicks are handled above.
+  if(ignoreClick){ignoreClick=false;return;}
   if(e.detail!==0)return;
-  const cell=e.target.closest?.('[data-atlas-sector]');if(cell)clickSector(cell.dataset.atlasSector);
+  const button=e.target.closest?.('[data-atlas-sector]');
+  if(button)clickSector(button.dataset.atlasSector);
  });
  viewport.addEventListener('keydown',e=>{
   const arrows={ArrowLeft:[75,0],ArrowRight:[-75,0],ArrowUp:[0,75],ArrowDown:[0,-75]};
   if(arrows[e.key]){e.preventDefault();state.x+=arrows[e.key][0];state.y+=arrows[e.key][1];repaint();return;}
-  if(e.key==='+'||e.key==='='||e.key==='-'){
+  if(['+','=','-'].includes(e.key)){
    e.preventDefault();const [x,y]=center();zoomAt(state.zoom*(e.key==='-'?.8:1.25),x,y);
   }
  });
- const image=viewport.querySelector('.atlas-image-layer img');
- image?.addEventListener('error',()=>{status.textContent='Nepodařilo se načíst mapový obraz. Zkontrolujte soubor assets/atlas/harn-I4-L7.webp.';});
+ viewport.querySelector('[data-atlas-image]')?.addEventListener('error',()=>{
+  status.textContent=`Nepodařilo se načíst mapu ${map.id}. Zkontrolujte, zda je na GitHubu soubor ${map.image.replace('./','')}.`;
+ });
  const initialize=()=>{
   const {w,h}=size();if(!w||!h)return;
   fitZoom=Math.min(w/frameW,h/frameH);
   if(!state.initialized)fullFit();else repaint();
  };
  initialize();
- // Late sizing on narrow screens. Avoid attaching an observer to the entire app.
  if(typeof ResizeObserver==='function'){
   const observer=new ResizeObserver(()=>{
    const {w,h}=size();if(!w||!h)return;
@@ -196,8 +231,9 @@ export function mountAtlasView(root){
    if(!state.initialized)fullFit();else repaint();
   });
   observer.observe(viewport);
-  // Auto-disconnect when navigating; the old viewer is detached on render.
-  const disconnect=new MutationObserver(()=>{if(!viewport.isConnected){observer.disconnect();disconnect.disconnect();}});
-  disconnect.observe(root,{childList:true});
+  const disconnect=new MutationObserver(()=>{
+   if(!viewport.isConnected){observer.disconnect();disconnect.disconnect();}
+  });
+  disconnect.observe(root,{childList:true,subtree:true});
  }
 }
