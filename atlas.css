@@ -104,3 +104,13 @@ body #app main.content-atlas .atlas-toolbar button{
 body #app main.content-atlas .atlas-toolbar button:hover{
  background:#f7dfb1!important;background-image:none!important;
 }
+
+/* v94.054 K5 PDF: vector redraws use a movable viewport-sized buffer.
+   No page raster image or thousands of tile files. */
+.atlas-pdf-layer{position:absolute;inset:0;overflow:hidden;pointer-events:none;
+ background:linear-gradient(115deg,#eee4ce,#e0cfac)}
+.atlas-pdf-canvas{position:absolute;display:block;max-width:none!important;max-height:none!important;
+ pointer-events:none;user-select:none}
+.atlas-pdf-loading{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);
+ display:block;min-width:280px;padding:18px 20px;text-align:center;
+ background:#f4e2bce0;border:1px solid #a2865b;color:#4d3421;font:14px/1.5 Georgia,serif}

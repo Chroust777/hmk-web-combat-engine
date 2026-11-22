@@ -1,7 +1,7 @@
 /**
- * Hârn Atlas v94.053 — two-level stand-alone viewer.
+ * Hârn Atlas v94.054 — vector PDF K5 / zoom-preserving stand-alone viewer.
  * Overview: I4–L7 and 16 selectable sectors.
- * Detail: K5 from the user's K5.pdf, shown as a single lossless WebP.
+ * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * No storage, campaign, calendar, travel, inventory, cloud or combat access.
  */
 const OVERVIEW=Object.freeze({
@@ -18,7 +18,7 @@ const OVERVIEW=Object.freeze({
 });
 const DETAIL_K5=Object.freeze({
  id:'K5', width:4172,height:4031,margin:0,
- image:'./assets/atlas/k5-detail-map.webp',
+ pdf:'./assets/atlas/k5-detail-map.pdf',
  key:'./assets/atlas/k5-detail-legend.webp',
  title:'Atlas Hârnica · K5',
  subtitle:'Detailní mapa sektoru K5 · originální kresba a všechny místní názvy',
@@ -26,10 +26,15 @@ const DETAIL_K5=Object.freeze({
  legendWidth:814,legendHeight:2981,
  legendAlt:'Legenda mapy K5: vegetace, sněhové oblasti, reliéf, brody, cesty, sídla, oblasti a grafické měřítko v ligách',
  scaleNote:'0–5 lig na původní mapě ≈ 0–20 km',
- // PDF's printed distance rule: 5 leagues span approximately 140 points;
- // image rendered at 400 dpi (400/72 px per PDF point).
- pixelsPerKm:140*(400/72)/20
+ // The five-league bar measured from PDF vector text positions spans 141.28 pt.
+ // The K5 stage reproduces the same source PDF crop at 400/72 screen px per pt.
+ pixelsPerKm:141.28*(400/72)/20,
+ // Rect in the original PDF's ROTATED, landscape page coordinates (points).
+ pdfCrop:Object.freeze({x:340.3,y:31.1,w:750.8,h:725.4})
 });
+// PDF.js loads only when K5 is opened; no external JS is loaded on the overview.
+const PDFJS_URL='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
 const MAPS=Object.freeze({overview:OVERVIEW,K5:DETAIL_K5});
 const LETTERS=Object.freeze(['I','J','K','L']);
 const ROWS=Object.freeze([4,5,6,7]);
@@ -52,7 +57,7 @@ export function atlasView(){
  const stageW=map.width+margin,stageH=map.height+margin;
  const axes=overview?`<div class="atlas-letters" aria-hidden="true" style="left:${margin}px;width:${map.width}px">${LETTERS.map(letter=>`<span>${letter}</span>`).join('')}</div><div class="atlas-numbers" aria-hidden="true" style="top:${margin}px;height:${map.height}px">${ROWS.map(num=>`<span>${num}</span>`).join('')}</div>`:'';
  const grid=overview?`<div class="atlas-sector-grid" aria-label="Mřížka 16 sektorů; K5 otevírá detailní mapu">${sectorButtons()}</div>`:'';
- const hint=overview?'Kliknutím na K5 otevřete podrobnou mapu. Ostatní sektory zatím pouze označíte.':'Detailní mapa K5 · tlačítkem Zpět na hlavní mapu se vrátíte do stejného výřezu I4–L7.';
+ const hint=overview?'Kliknutím na K5 otevřete podrobnou mapu. Ostatní sektory zatím pouze označíte.':'Vektorové PDF K5 · při změně přiblížení se znovu ostře vykreslí viditelná oblast. Zpět vrací hlavní mapu.';
  return `<section class="atlas-workspace${overview?' atlas-workspace--overview':' atlas-workspace--detail'}" data-atlas-map="${map.id}" aria-label="Atlas Hârnu: ${overview?'přehled sektorů I4–L7':'detail K5'}">
   <header class="atlas-header"><div><p class="atlas-eyebrow">HÂRNWORLD · KARTOGRAFICKÁ KNIHOVNA</p><h1>${map.title}</h1><p>${map.subtitle}</p></div>
   ${overview?'':'<button type="button" class="atlas-back" data-atlas-back>← Zpět na hlavní mapu</button>'}
@@ -74,7 +79,7 @@ export function atlasView(){
      <div class="atlas-stage" data-atlas-stage style="width:${stageW}px;height:${stageH}px">
       ${axes}
       <div class="atlas-image-layer" style="left:${margin}px;top:${margin}px;width:${map.width}px;height:${map.height}px">
-       <img src="${map.image}" data-atlas-image alt="${overview?'Přehledová mapa Hârnu, sektory I4 až L7':'Podrobná barevná mapa K5 včetně místních jmen, sídel, cest a terénních vrstevnic'}" width="${map.width}" height="${map.height}" draggable="false" decoding="async">
+       ${overview?`<img src="${map.image}" data-atlas-image alt="Přehledová mapa Hârnu, sektory I4 až L7" width="${map.width}" height="${map.height}" draggable="false" decoding="async">`:`<div class="atlas-pdf-layer" data-atlas-pdf-layer aria-label="Vektorová detailní mapa K5 z PDF"><span class="atlas-pdf-loading" data-atlas-pdf-loading>Načítám vektorovou mapu K5…</span></div>`}
        ${grid}
       </div>
      </div>
@@ -100,6 +105,8 @@ export function mountAtlasView(root){
  const scaleLabel=workspace.querySelector('[data-atlas-scale-label]');
  const status=workspace.querySelector('[data-atlas-status]');
  const frameW=map.width+map.margin,frameH=map.height+map.margin;
+ const pdfLayer=workspace.querySelector('[data-atlas-pdf-layer]');
+ let pdfLoading=null, pdfRenderTask=null, pdfRenderTimer=null, pdfEpoch=0, pdfDisposed=false;
  const state={...rememberedByMap[map.id]};
  let fitZoom=1;
  let drag=null;
@@ -114,6 +121,91 @@ export function mountAtlasView(root){
   state.y=clamp(state.y,...limitY);
  };
  const remember=()=>{rememberedByMap[map.id]={zoom:state.zoom,x:state.x,y:state.y,initialized:true};};
+
+ // K5: draw only the visible PDF rectangle (+overscan), not a giant canvas.
+ // PDF.js keeps the original vector paths and font glyphs, so new zoom levels
+ // are independently rasterized at the actual screen pixel density.
+ const loadPdf=()=>{
+  if(!pdfLoading){
+   pdfLoading=(async()=>{
+    const pdfjs=await import(PDFJS_URL);
+    pdfjs.GlobalWorkerOptions.workerSrc=PDFJS_WORKER;
+    const task=pdfjs.getDocument({url:new URL(map.pdf,document.baseURI).href, isEvalSupported:false, useSystemFonts:true});
+    const doc=await task.promise;
+    const page=await doc.getPage(1);
+    return {task,doc,page};
+   })();
+  }
+  return pdfLoading;
+ };
+ const releasePdf=()=>{
+  pdfDisposed=true;
+  ++pdfEpoch;
+  if(pdfRenderTimer!==null){clearTimeout(pdfRenderTimer);pdfRenderTimer=null;}
+  try{pdfRenderTask?.cancel();}catch(_){}
+  if(pdfLoading)pdfLoading.then(({doc})=>doc.destroy()).catch(()=>{});
+ };
+ const drawPdf=async epoch=>{
+  if(!pdfLayer||pdfDisposed||!pdfLayer.isConnected)return;
+  let loaded;
+  try{loaded=await loadPdf();}
+  catch(error){
+   if(epoch===pdfEpoch&&!pdfDisposed){
+    const failure=`K5 PDF nelze načíst: ${error?.message||error}. Zkontrolujte soubor assets/atlas/k5-detail-map.pdf a přístup k PDF.js.`;
+    status.textContent=failure;
+    pdfLayer.querySelector('[data-atlas-pdf-loading]')?.replaceChildren(document.createTextNode('Nelze načíst PDF mapu K5.'));
+   }
+   return;
+  }
+  if(epoch!==pdfEpoch||pdfDisposed||!pdfLayer.isConnected)return;
+  const {page}=loaded, pixelRatio=Math.min(window.devicePixelRatio||1,2);
+  // Rectangle of the original map which is currently on screen.
+  const overscan=100;
+  const x0=clamp((-state.x-overscan)/state.zoom,0,map.width);
+  const y0=clamp((-state.y-overscan)/state.zoom,0,map.height);
+  const x1=clamp((viewport.clientWidth-state.x+overscan)/state.zoom,0,map.width);
+  const y1=clamp((viewport.clientHeight-state.y+overscan)/state.zoom,0,map.height);
+  if(x1<=x0||y1<=y0)return;
+  const surfaceW=Math.ceil((x1-x0)*state.zoom*pixelRatio);
+  const surfaceH=Math.ceil((y1-y0)*state.zoom*pixelRatio);
+  const canvas=document.createElement('canvas');
+  canvas.width=surfaceW;canvas.height=surfaceH;
+  canvas.className='atlas-pdf-canvas';
+  canvas.style.left=`${x0}px`;canvas.style.top=`${y0}px`;
+  canvas.style.width=`${x1-x0}px`;canvas.style.height=`${y1-y0}px`;
+  const ctx=canvas.getContext('2d',{alpha:false});
+  if(!ctx)return;
+  // Source PDF is already rotated to landscape in page.getViewport().
+  const pxPerPdfPt=map.width/map.pdfCrop.w;
+  const pdfScale=pxPerPdfPt*state.zoom*pixelRatio;
+  const pdfViewport=page.getViewport({scale:pdfScale});
+  const xOffset=map.pdfCrop.x*pdfScale+x0*state.zoom*pixelRatio;
+  const yOffset=map.pdfCrop.y*pdfScale+y0*state.zoom*pixelRatio;
+  try{
+   pdfRenderTask?.cancel();
+  }catch(_){}
+  try{
+   // Rendering into a NEW canvas avoids conflicts with a cancelled task.
+   const task=page.render({canvasContext:ctx,viewport:pdfViewport,
+    transform:[1,0,0,1,-xOffset,-yOffset],background:'#f2e7ca'});
+   pdfRenderTask=task;
+   await task.promise;
+   if(epoch!==pdfEpoch||pdfDisposed||!pdfLayer.isConnected)return;
+   pdfLayer.querySelectorAll('.atlas-pdf-canvas').forEach(old=>old.remove());
+   pdfLayer.appendChild(canvas);
+   pdfLayer.querySelector('[data-atlas-pdf-loading]')?.remove();
+  }catch(error){
+   if(error?.name!=='RenderingCancelledException'&&epoch===pdfEpoch&&!pdfDisposed){
+    status.textContent=`PDF K5 nelze vykreslit: ${error?.message||error}`;
+   }
+  }
+ };
+ const schedulePdf=(delay=170)=>{
+  if(!pdfLayer||pdfDisposed)return;
+  const epoch=++pdfEpoch;
+  if(pdfRenderTimer!==null)clearTimeout(pdfRenderTimer);
+  pdfRenderTimer=setTimeout(()=>{pdfRenderTimer=null;void drawPdf(epoch);},delay);
+ };
  const repaint=()=>{
   bounds();
   stage.style.transform=`translate3d(${state.x}px,${state.y}px,0) scale(${state.zoom})`;
@@ -124,6 +216,7 @@ export function mountAtlasView(root){
   scaleLine.style.width=`${Math.round(labelKm*pixelPerKm)}px`;
   scaleLabel.textContent=`≈ ${labelKm} km`;
   remember();
+  if(pdfLayer)schedulePdf();
  };
  const fullFit=()=>{
   const {w,h}=size();if(!w||!h)return;
@@ -146,6 +239,7 @@ export function mountAtlasView(root){
  const switchTo=(nextMap)=>{
   if(!MAPS[nextMap]||nextMap===currentMapId)return;
   remember();
+  if(pdfLayer)releasePdf();
   currentMapId=nextMap;
   workspace.outerHTML=atlasView();
   mountAtlasView(root);
@@ -188,7 +282,7 @@ export function mountAtlasView(root){
   drag=null;
   viewport.classList.remove('is-dragging');
   if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
-  if(didMove){ignoreClick=true;return;}
+  if(didMove){ignoreClick=true;if(pdfLayer)schedulePdf(25);return;}
   if(!overview)return;
   // Native click may be retargeted to viewport by pointer capture.
   const rect=viewport.getBoundingClientRect();
@@ -232,7 +326,7 @@ export function mountAtlasView(root){
   });
   observer.observe(viewport);
   const disconnect=new MutationObserver(()=>{
-   if(!viewport.isConnected){observer.disconnect();disconnect.disconnect();}
+   if(!viewport.isConnected){observer.disconnect();disconnect.disconnect();if(pdfLayer&&!pdfDisposed)releasePdf();}
   });
   disconnect.observe(root,{childList:true,subtree:true});
  }
