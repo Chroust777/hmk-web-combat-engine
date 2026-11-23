@@ -451,7 +451,7 @@ body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fol
  cursor:pointer; font:700 15px/1.4 Georgia,serif; color:#4d3322; user-select:none;
 }
 
-/* v94.071 — The Atlas folds match the 12px label of "Pozice družiny". */
+/* v94.072 — The Atlas folds match the 12px label of "Pozice družiny". */
 body #app main.content-atlas .atlas-tools > .atlas-tool-fold > summary,
 body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fold > summary{
  font-size:12px!important;line-height:1.5!important;
