@@ -434,3 +434,19 @@ body #app main.content-atlas .atlas-tools-head .atlas-carto-top button{min-heigh
 .atlas-fog-gate-box input[type=password]{width:100%;margin-top:6px;min-height:38px;box-sizing:border-box;font:16px Georgia,serif;padding:6px 10px;background:#fff8e9;border:1px solid #977850;border-radius:5px}
 .atlas-fog-gate-error{min-height:1.25em;color:#8a241c;font:700 12px/1.35 Georgia,serif;margin:5px 0!important}
 body #app main.content-atlas .atlas-toolbar .atlas-party-position:disabled{opacity:.46!important;cursor:not-allowed!important;background:#ece3d3!important;color:#7d7165!important}
+
+/* v94.070 — All four tool folds use identical boxes, summary typography and spacing.
+   No horizontal divider separates Measurement, Markers, Cartography or Fog. */
+body #app main.content-atlas .atlas-tools > .atlas-cartography {
+ border-top:0!important; margin-top:0!important; padding-top:0!important;
+}
+body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fold {
+ display:block; margin:9px 0; border:1px solid #ab8c61; border-radius:6px;
+ background:#f7e8c9a3; min-width:0; padding:8px 9px;
+}
+body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fold[open] {
+ background:#f9eddaa6;
+}
+body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fold > summary {
+ cursor:pointer; font:700 15px/1.4 Georgia,serif; color:#4d3322; user-select:none;
+}

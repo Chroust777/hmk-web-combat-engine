@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.069. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.070. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -51,7 +51,7 @@ const polygonArea=(pts,map)=>Math.abs(pts.reduce((sum,p,i)=>{const q=pts[(i+1)%p
 const names={route:'Trasa',area:'Oblast',radius:'Dosah',draw:'Kresba',arrow:'Šipka',text:'Text'};
 export function atlasCartographyPanel(){
  return `<section class="atlas-tool-card atlas-cartography" aria-label="Kartografické nástroje" data-atlas-carto>
- <details open><summary>Trasy, oblasti a kreslení</summary>
+ <details class="atlas-tool-fold"><summary>Trasy, oblasti a kreslení</summary>
   <label>Nástroj<select data-carto-mode><option value="">— Vyberte nástroj —</option><option value="route">Zakreslit trasu</option><option value="area">Zakreslit oblast / změřit plochu</option><option value="radius">Kružnice dosahu (tažením)</option><option value="draw">Kreslení od ruky</option><option value="arrow">Šipka</option><option value="text">Text na mapě</option></select></label>
   <div class="atlas-carto-fields" data-carto-fields hidden>
    <label data-carto-for="route area radius draw arrow text">Název / text<input data-carto-title maxlength="120" placeholder="Volitelný název objektu"></label>
@@ -62,8 +62,8 @@ export function atlasCartographyPanel(){
   <p class="atlas-carto-hint" data-carto-hint>Vyberte nástroj. Kružnici vytvoříte přímo tažením od středu k okraji; její dosah se při kreslení zobrazuje na mapě.</p>
   <div class="atlas-carto-actions"><button type="button" data-carto-save-meta hidden>Uložit změny</button><button data-carto-finish type="button" hidden disabled>Dokončit objekt</button><button data-carto-point-undo type="button" hidden disabled>Odebrat bod</button></div>
  </details>
- <details data-carto-fog-section><summary>Mlha války</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
-  <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.5" value="10"></label>
+ <details class="atlas-tool-fold" data-carto-fog-section><summary>Mlha války</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
+  <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.1" value="5"></label>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-toggle>Zapnout mlhu</button><button type="button" data-carto-fog-reset>Úplně zahalit</button><button type="button" data-carto-fog-clear>Odstranit mlhu</button></div>
  </details>
@@ -95,6 +95,9 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const redoBtn=workspace.querySelector('[data-carto-redo]');
  const modeField=$('[data-carto-mode]'),title=$('[data-carto-title]'),note=$('[data-carto-note]'),color=$('[data-carto-color]'),opacity=$('[data-carto-opacity]');
  const fogRadius=$('[data-carto-fog-radius]'),layerArea=workspace.querySelector('[data-carto-layers]');
+ // Per-map default brush size (km); the user can still change it during this view.
+ const defaultFogRadius=map.id==='K5'?0.2:5;
+ fogRadius.value=String(defaultFogRadius);
  const fogSection=$('[data-carto-fog-section]'),fogGate=$('[data-carto-fog-gate]');
  const fogPassword=$('[data-carto-fog-password]'),fogError=$('[data-carto-fog-gate-error]');
  const dismissFogGate=()=>{fogGate.hidden=true;fogPassword.value='';fogError.textContent='';};
@@ -112,7 +115,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   else{fogError.textContent='Nesprávné heslo.';fogPassword.value='';fogPassword.focus({preventScroll:true});}
  });
  $('[data-carto-fog-gate-cancel]').addEventListener('click',dismissFogGate);
- const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||10));
+ const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||defaultFogRadius));
  let draftRadiusKm=0;
  let hovered=null,hoverTimer=null;
  const hideHover=()=>{hovered=null;if(hoverDelete){hoverDelete.hidden=true;hoverDelete.classList.remove('is-party-history');}};
