@@ -268,7 +268,7 @@ body #app main.content-atlas .atlas-custom-marker--draft{
 
 /* v94.064 — Atlas-only cartographic overlays and parchment tools. */
 .atlas-cartography-overlay,.atlas-fog-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;user-select:none}
-.atlas-cartography-overlay{z-index:7}
+.atlas-cartography-overlay{z-index:5}
 .atlas-fog-overlay{z-index:8}
 .atlas-scale{z-index:10}
 .atlas-viewport.is-cartographing{cursor:crosshair}
@@ -305,3 +305,50 @@ body #app main.content-atlas .atlas-tools .atlas-carto-row-actions button{font-s
 .atlas-marker-event-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px dotted #c2aa84;font:11px/1.4 Georgia,serif;color:#533621}
 .atlas-marker-event-row span{flex:1;min-width:0;overflow-wrap:anywhere}
 .atlas-marker-tooltip-description{white-space:pre-line}
+
+/* v94.065 — compact Atlas controls; sections start closed. */
+.atlas-tools .atlas-tool-fold{display:block;margin:9px 0;border:1px solid #ab8c61;border-radius:6px;background:#f7e8c9a3;min-width:0;padding:8px 9px}
+.atlas-tools .atlas-tool-fold[open]{background:#f9eddaa6}
+.atlas-tools .atlas-tool-fold>summary{cursor:pointer;font:700 15px/1.4 Georgia,serif;color:#4d3322;user-select:none}
+.atlas-tools .atlas-tool-fold>.atlas-tool-card{padding:10px 0 0;border:0;margin:0}
+.atlas-tools .atlas-tool-fold .atlas-custom-section{margin-top:0}
+.atlas-tools .atlas-tool-fold .atlas-tool-footnote{margin-bottom:0!important}
+.atlas-cartography .atlas-carto-actions button[aria-pressed="true"]{background:#506738!important;color:#fff4de!important;border-color:#364b2c!important}
+
+/* Every map annotation is deleted in place: hover / focus reveals an ×. */
+.atlas-custom-marker-overlay .atlas-marker-map-action{
+ position:absolute!important;z-index:2;transform:translate(-50%,-50%);
+ width:25px!important;height:25px!important;min-width:0!important;min-height:0!important;
+ padding:0!important;margin:0!important;border:1px solid #733d2f!important;border-radius:50%!important;
+ background:#f5e4c4!important;background-image:none!important;color:#7b211a!important;
+ font:700 20px/1 Georgia,serif!important;box-shadow:0 2px 5px #29180a88!important;
+ opacity:0;visibility:hidden;pointer-events:none;cursor:pointer;transition:opacity .08s;
+}
+.atlas-custom-marker-overlay .atlas-marker-map-edit{font-size:14px!important;color:#574021!important}
+.atlas-custom-marker:hover + .atlas-marker-map-edit,
+.atlas-custom-marker:hover + .atlas-marker-map-edit + .atlas-marker-map-delete,
+.atlas-custom-marker.is-selected + .atlas-marker-map-edit,
+.atlas-custom-marker.is-selected + .atlas-marker-map-edit + .atlas-marker-map-delete,
+.atlas-marker-map-action:hover,.atlas-marker-map-action:focus-visible{
+ opacity:1;visibility:visible;pointer-events:auto
+}
+.atlas-marker-map-action:hover{background:#ffdbb3!important;box-shadow:0 0 0 2px #fff5cf!important}
+.atlas-viewport.is-measuring .atlas-marker-map-action,
+.atlas-viewport.is-marking .atlas-marker-map-action,
+.atlas-viewport.is-cartographing .atlas-marker-map-action,
+.atlas-viewport.atlas-hide-own-markers .atlas-marker-map-action{pointer-events:none!important;visibility:hidden!important}
+
+/* Map geometry hit paths allow a transient delete cross without a right-hand history list. */
+.atlas-cartography-overlay .atlas-carto-hit{cursor:pointer}
+.atlas-carto-hover-delete{position:absolute;z-index:12;pointer-events:none}
+.atlas-carto-hover-delete[hidden],.atlas-fog-brush-cursor[hidden]{display:none!important}
+body #app main.content-atlas .atlas-carto-hover-delete button{
+ pointer-events:auto;display:flex!important;align-items:center;justify-content:center;
+ width:30px!important;height:30px!important;min-height:0!important;min-width:0!important;
+ padding:0!important;margin:0!important;border:2px solid #79291d!important;border-radius:50%!important;
+ color:#842619!important;background:#ffe3b6!important;background-image:none!important;
+ font:bold 24px/1 Georgia,serif!important;box-shadow:0 2px 6px #140f0a77!important;cursor:pointer
+}
+.atlas-fog-brush-cursor{position:absolute;z-index:11;pointer-events:none;transform:translate(-50%,-50%);
+ border:2px dashed #fff9e8;border-radius:50%;box-shadow:0 0 0 1px #38434acb,inset 0 0 12px #cbd0d54d;
+ background:#e9edf019;mix-blend-mode:normal;min-width:2px;min-height:2px}

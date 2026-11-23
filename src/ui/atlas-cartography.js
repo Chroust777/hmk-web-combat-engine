@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.064. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.065. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -49,24 +49,24 @@ const names={route:'Trasa',area:'Oblast',radius:'Dosah',draw:'Kresba',arrow:'Ši
 export function atlasCartographyPanel(){
  return `<section class="atlas-tool-card atlas-cartography" aria-label="Kartografické nástroje" data-atlas-carto>
  <h3>✎ Kartografické nástroje</h3>
- <div class="atlas-carto-top"><button type="button" data-carto-undo disabled>Zpět</button><button type="button" data-carto-redo disabled>Znovu</button><button type="button" data-carto-stop>Ukončit nástroj</button></div>
+ <div class="atlas-carto-top"><button type="button" data-carto-undo disabled>Zpět</button><button type="button" data-carto-redo disabled>Znovu</button></div>
  <details open><summary>Trasy, oblasti a kreslení</summary>
-  <label>Nástroj<select data-carto-mode><option value="">— Vyberte nástroj —</option><option value="route">Uložit trasu</option><option value="area">Zakreslit oblast a změřit plochu</option><option value="radius">Kružnice dosahu</option><option value="draw">Kreslení od ruky</option><option value="arrow">Šipka</option><option value="text">Textová poznámka na mapě</option><option value="edit-points">Upravit body vybraného objektu</option><option value="fog-reveal">Mlha: odhalovat</option><option value="fog-cover">Mlha: znovu zakrývat</option></select></label>
+  <label>Nástroj<select data-carto-mode><option value="">— Vyberte nástroj —</option><option value="route">Uložit trasu</option><option value="area">Zakreslit oblast a změřit plochu</option><option value="radius">Kružnice dosahu</option><option value="draw">Kreslení od ruky</option><option value="arrow">Šipka</option><option value="text">Textová poznámka na mapě</option><option value="edit-points">Upravit body vybraného objektu</option></select></label>
   <label>Název / text<input data-carto-title maxlength="120" placeholder="Název trasy, oblasti…"></label>
   <label>Poznámka<textarea data-carto-note maxlength="1500" rows="2" placeholder="Volitelná poznámka"></textarea></label>
   <label>Herní datum (volitelné)<input data-carto-date maxlength="80" placeholder="Např. 15. Nolus 720 TR"></label>
   <label>Barva<select data-carto-color>${COLORS.map((c,i)=>`<option value="${c}">${['Červená','Modrá','Zelená','Fialová','Zlatá','Hnědá'][i]}</option>`).join('')}</select></label>
   <label>Průhlednost vyplněných oblastí<select data-carto-opacity><option value="0.10">10 %</option><option value="0.18" selected>18 %</option><option value="0.35">35 %</option><option value="0.50">50 %</option></select></label>
   <label>Dosah / šířka štětce (km)<input type="number" data-carto-radius min="0.01" max="500" step="0.5" value="10"></label>
-  <p class="atlas-carto-hint" data-carto-hint>Vyberte nástroj. Vícebodové trasy a oblasti ukončíte tlačítkem Uložit. Při úpravě bodů přetáhněte vrchol; kliknutí mimo vrchol přidá bod.</p>
+  <p class="atlas-carto-hint" data-carto-hint>Trasu nebo oblast dokončete tlačítkem Uložit. Kliknutím na již zakreslený objekt zobrazíte jeho úpravy. Nástroj ukončíte volbou „Vyberte nástroj“ nebo klávesou Esc.</p>
   <div class="atlas-carto-actions"><button type="button" data-carto-save-meta disabled>Uložit změny popisu</button><button data-carto-finish type="button" disabled>Uložit objekt</button><button data-carto-point-undo type="button" disabled>Zpět bod</button><button data-carto-cancel type="button">Zrušit kreslení</button></div>
  </details>
  <details><summary>Vrstvy mapy</summary><div data-carto-layers class="atlas-carto-layers"></div></details>
- <details><summary>Vyhledávání a rychlý přesun</summary><input data-carto-search placeholder="Název značky, trasy, sektoru…" maxlength="120"><div data-carto-search-results class="atlas-carto-list"></div></details>
- <details><summary>Mapové záložky</summary><div class="atlas-carto-actions"><input data-carto-bookmark-name placeholder="Název záložky" maxlength="120"><button type="button" data-carto-bookmark-add>Uložit pohled</button></div><div data-carto-bookmarks class="atlas-carto-list"></div></details>
- <details><summary>Historie pohybu družiny</summary><p class="atlas-carto-hint">Přesunutí pozice družiny se může zaznamenat do historie. Záznam lze přidat i ručně z aktuální polohy.</p><div class="atlas-carto-actions"><button type="button" data-carto-history-add>Zapsat aktuální polohu</button><button type="button" data-carto-history-clear>Vymazat historii</button></div><div data-carto-history class="atlas-carto-list"></div></details>
- <details><summary>Mlha války</summary><p class="atlas-carto-hint">Samostatná vrstva Atlasu. Zapněte zakrytí mapy a štětcem odhalujte či zakrývejte. Neovlivňuje herní systém.</p><div class="atlas-carto-actions"><button type="button" data-carto-fog-toggle>Zapnout mlhu</button><button type="button" data-carto-fog-reset>Obnovit úplné zakrytí</button><button type="button" data-carto-fog-clear>Odstranit mlhu</button></div></details>
- <details open><summary>Uložené objekty na mapě (<span data-carto-count>0</span>)</summary><div data-carto-objects class="atlas-carto-list"></div></details>
+ <details><summary>Mlha války</summary><p class="atlas-carto-hint">Neprůhledná mlha se odhaluje i vrací přímo štětcem. Držte tlačítko myši a přejíždějte po mapě; území se nikdy nezakrývá více vrstvami.</p>
+  <label>Velikost štětce (poloměr v km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.5" value="10"></label>
+  <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
+  <div class="atlas-carto-actions"><button type="button" data-carto-fog-toggle>Zapnout mlhu</button><button type="button" data-carto-fog-reset>Úplně zahalit</button><button type="button" data-carto-fog-clear>Odstranit mlhu</button></div>
+ </details>
  <p class="atlas-marker-save-note">Mapové poznámky se synchronizují přes společný soukromý GitHub JSON. Zpět/Znovu platí v aktuálně otevřeném Atlasu.</p>
  </section>`;
 }
@@ -76,6 +76,8 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const area=workspace.querySelector('[data-atlas-carto]');
  const svg=workspace.querySelector('[data-atlas-carto-overlay]');
  const fogCanvas=workspace.querySelector('[data-atlas-fog]');
+ const hoverDelete=workspace.querySelector('[data-carto-hover-delete]');
+ const brushCursor=workspace.querySelector('[data-carto-fog-cursor]');
  if(!area||!svg||!fogCanvas)return null;
  let snapshot,corrupt=false;try{snapshot=normalizeAtlasCartography(read?.(),{overview:{width:2449,height:2363},K5:{width:4172,height:4031}});}catch(e){console.error('Atlas cartography:',e);snapshot=atlasCartographyEmpty();corrupt=true;status.textContent='Atlas: uložená kartografie je neplatná. Zápisy jsou zablokovány, aby se nepřepsala původní data.';}
  const local=snapshot.maps[map.id],undo=[],redo=[];
@@ -83,7 +85,12 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  let mode='',draft=[],painting=false,currentBrush=null,highlightId=null,editingFeatureId=null,editVertex=null,editOriginal=null;
  const $=selector=>area.querySelector(selector);
  const modeField=$('[data-carto-mode]'), title=$('[data-carto-title]'),note=$('[data-carto-note]'),date=$('[data-carto-date]'),color=$('[data-carto-color]'),opacity=$('[data-carto-opacity]'),radius=$('[data-carto-radius]');
- const getRadius=()=>Math.max(.01,Math.min(500,Number(radius.value)||10));
+ const fogRadius=$('[data-carto-fog-radius]');
+ const getRadius=()=>Math.max(.01,Math.min(500,Number(mode.startsWith('fog-')?fogRadius.value:radius.value)||10));
+ let hovered=null,hoverTimer=null;
+ const hideHover=()=>{hovered=null;if(hoverDelete)hoverDelete.hidden=true;};
+ const showHover=(kind,id,index,clientX,clientY)=>{if(mode)return;clearTimeout(hoverTimer);hovered={kind,id,index};if(!hoverDelete)return;const rect=viewport.getBoundingClientRect();hoverDelete.style.left=`${Math.max(3,Math.min(rect.width-34,clientX-rect.left+13))}px`;hoverDelete.style.top=`${Math.max(3,Math.min(rect.height-34,clientY-rect.top-24))}px`;hoverDelete.hidden=false;hoverDelete.querySelector('button').title=kind==='history'?'Smazat trasu od tohoto bodu po pozici družiny':'Odstranit mapový objekt';};
+ const refreshBrushCursor=(clientX,clientY)=>{if(!brushCursor)return;if(!mode.startsWith('fog-')||!local.fog.enabled||!local.layers.fog||clientX===null||!inMap(clientX,clientY)){brushCursor.hidden=true;return;}const r=getRadius()*map.pixelsPerKm*getCamera().zoom;const rect=viewport.getBoundingClientRect();const x=clientX-rect.left,y=clientY-rect.top;brushCursor.style.left=`${x}px`;brushCursor.style.top=`${y}px`;brushCursor.style.width=`${2*r}px`;brushCursor.style.height=`${2*r}px`;brushCursor.hidden=false;};
  const showStatus=s=>{status.textContent=s;};
  const save=(before,description='Změna')=>{
   const state=structuredClone(snapshot);
@@ -132,6 +139,14 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     const label=f.type==='route'?`${f.title||'Trasa'} · ${formatKm(routeLength(pts,map))} km`:f.type==='area'?`${f.title||'Oblast'} · ${formatKm(polygonArea(pts,map))} km²`:f.title;
     if(label)add('text',{x:center.x+8,y:center.y-12,fill:c,'font-size':'12','font-weight':'bold',stroke:'#f6e8cc','stroke-width':'3','paint-order':'stroke'},label.slice(0,76));
    }
+   if(!temporary){
+    const hitAttrs={'data-carto-hit':'feature','data-carto-id':f.id,'class':'atlas-carto-hit',fill:'transparent',stroke:'transparent','stroke-width':Math.max(18,sw+12),'pointer-events':'stroke'};
+    if(f.type==='radius'){
+     const center=screenPoint(pts[0]);add('circle',{...hitAttrs,cx:center.x,cy:center.y,r:f.radiusKm*map.pixelsPerKm*getCamera().zoom,fill:'none'});
+    }else if(f.type==='text'){
+     const p=screenPoint(pts[0]);add('rect',{...hitAttrs,x:p.x,y:p.y-26,width:Math.max(28,Math.min(230,(f.title||'Text').length*9)),height:33,fill:'transparent','pointer-events':'all'});
+    }else add('path',{...hitAttrs,d:path(pts,f.type==='area'),fill:f.type==='area'?'transparent':'none','pointer-events':f.type==='area'?'all':'stroke'});
+   }
   };
   for(const f of local.features)if(local.layers[f.type])draw(f);
   if(mode==='edit-points'&&editingFeatureId){
@@ -140,29 +155,61 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     for(const pt of points){const sp=screenPoint(pt);add('circle',{cx:sp.x,cy:sp.y,r:7,fill:'#fff6e5',stroke:'#b73520','stroke-width':2});}
    }
   }
-  if(local.layers.partyHistory&&local.partyHistory.length>1){
+  if(local.layers.partyHistory&&local.partyHistory.length){
    const pts=local.partyHistory;
    add('path',{d:path(pts),stroke:'#33694e','stroke-width':'2.5','stroke-dasharray':'5 5',fill:'none'});
-   pts.forEach((p,i)=>{const s=screenPoint(p);add('circle',{cx:s.x,cy:s.y,r:4,fill:'#33694e',stroke:'#fff4db','stroke-width':1.5});});
+   pts.forEach((p,i)=>{const s=screenPoint(p);add('circle',{cx:s.x,cy:s.y,r:4.5,fill:'#33694e',stroke:'#fff4db','stroke-width':1.5});add('circle',{cx:s.x,cy:s.y,r:12,fill:'transparent',stroke:'none','pointer-events':'all','class':'atlas-carto-hit','data-carto-hit':'history','data-carto-index':i});});
   }
   if(draft.length&&mode!=='edit-points')draw({type:mode==='fog-reveal'||mode==='fog-cover'?'draw':mode,points:draft,color:color.value,title:''},true);
  };
+ // An opaque fog texture is rendered once per viewport size. A single binary
+ // coverage mask controls exposure; repainting a covered area cannot stack fog.
+ const fogTexture=document.createElement('canvas'),fogMask=document.createElement('canvas');
+ let fogTextureWidth=0,fogTextureHeight=0;
  const paintFog=()=>{
   const ctx=fogCanvas.getContext('2d');if(!ctx)return;
   const dpr=Math.min(2,window.devicePixelRatio||1),w=viewport.clientWidth,h=viewport.clientHeight;
   if(!w||!h)return;
-  fogCanvas.width=Math.round(w*dpr);fogCanvas.height=Math.round(h*dpr);fogCanvas.style.width=`${w}px`;fogCanvas.style.height=`${h}px`;
-  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-  if(!local.fog.enabled||!local.layers.fog)return;
-  ctx.fillStyle='rgba(22,20,18,.91)';ctx.fillRect(0,0,w,h);
-  for(const stroke of local.fog.strokes){
-   ctx.globalCompositeOperation=stroke.action==='reveal'?'destination-out':'source-over';
-   const rr=stroke.radiusKm*map.pixelsPerKm*getCamera().zoom;
-   ctx.fillStyle=stroke.action==='reveal'?'#000':'rgba(22,20,18,.91)';
-   for(const pt of stroke.points){const p=screenPoint(pt);ctx.beginPath();ctx.arc(p.x,p.y,rr,0,Math.PI*2);ctx.fill();}
+  const bw=Math.round(w*dpr),bh=Math.round(h*dpr);
+  if(fogCanvas.width!==bw||fogCanvas.height!==bh){fogCanvas.width=bw;fogCanvas.height=bh;}
+  fogCanvas.style.width=`${w}px`;fogCanvas.style.height=`${h}px`;
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,bw,bh);
+  if(!local.fog.enabled||!local.layers.fog){refreshBrushCursor(null,null);return;}
+  if(fogTextureWidth!==bw||fogTextureHeight!==bh){
+   fogTextureWidth=bw;fogTextureHeight=bh;fogTexture.width=bw;fogTexture.height=bh;
+   const t=fogTexture.getContext('2d');t.setTransform(dpr,0,0,dpr,0,0);
+   const base=t.createLinearGradient(0,0,w,h);base.addColorStop(0,'#626a72');base.addColorStop(.45,'#424d58');base.addColorStop(1,'#313d49');
+   t.fillStyle=base;t.fillRect(0,0,w,h); // Fully opaque: no details are visible underneath.
+   // Subtle cloudy, non-repeating highlights and shadow eddies.
+   for(let i=0;i<65;i++){
+    const xx=(Math.sin(i*127.1+17.7)*43758.5453%1+1)%1*w;
+    const yy=(Math.sin(i*91.7+72.3)*12745.239%1+1)%1*h;
+    const r=Math.max(24,Math.min(w,h)*(.13+(i%7)*.045));
+    const g=t.createRadialGradient(xx,yy,0,xx,yy,r);
+    g.addColorStop(0,i%3===0?'rgba(225,233,232,.18)':'rgba(20,29,36,.12)');g.addColorStop(1,'rgba(160,170,177,0)');
+    t.fillStyle=g;t.fillRect(xx-r,yy-r,2*r,2*r);
+   }
   }
-  if(painting&&currentBrush){ctx.globalCompositeOperation=currentBrush.action==='reveal'?'destination-out':'source-over';ctx.fillStyle=currentBrush.action==='reveal'?'#000':'rgba(22,20,18,.91)';const r=currentBrush.radiusKm*map.pixelsPerKm*getCamera().zoom;for(const pt of currentBrush.points){const p=screenPoint(pt);ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();}}
-  ctx.globalCompositeOperation='source-over';
+  if(fogMask.width!==bw||fogMask.height!==bh){fogMask.width=bw;fogMask.height=bh;}
+  const m=fogMask.getContext('2d');m.setTransform(dpr,0,0,dpr,0,0);m.globalCompositeOperation='source-over';m.clearRect(0,0,w,h);
+  m.fillStyle='#000';m.fillRect(0,0,w,h);
+  const applyStroke=stroke=>{
+   const r=stroke.radiusKm*map.pixelsPerKm*getCamera().zoom;
+   m.globalCompositeOperation=stroke.action==='reveal'?'destination-out':'source-over';
+   m.strokeStyle='#000';m.fillStyle='#000';m.lineWidth=2*r;m.lineJoin='round';m.lineCap='round';
+   if(!stroke.points.length)return;
+   const path=stroke.points.map(screenPoint);
+   m.beginPath();m.moveTo(path[0].x,path[0].y);
+   for(let i=1;i<path.length;i++)m.lineTo(path[i].x,path[i].y);
+   if(path.length>1)m.stroke();
+   // Single-click stroke must erase/fill one complete circular brush footprint.
+   for(const pt of [path[0],...(path.length>1?[path[path.length-1]]:[])]){m.beginPath();m.arc(pt.x,pt.y,r,0,Math.PI*2);m.fill();}
+  };
+  for(const stroke of local.fog.strokes)applyStroke(stroke);
+  if(painting&&currentBrush)applyStroke(currentBrush);
+  m.globalCompositeOperation='source-over';
+  ctx.drawImage(fogTexture,0,0);
+  ctx.globalCompositeOperation='destination-in';ctx.drawImage(fogMask,0,0);ctx.globalCompositeOperation='source-over';
  };
  const list=(selector,items)=>{$(selector).replaceChildren();items.forEach(el=>$(selector).appendChild(el));};
  const button=(label,action,id)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.cartoAction=action;b.dataset.cartoId=id;return b;};
@@ -174,27 +221,14 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   $('[data-carto-save-meta]').disabled=!editingFeatureId;
   $('[data-carto-finish]').disabled=!(['route','area'].includes(mode)&&draft.length>=(mode==='area'?3:2));
   $('[data-carto-point-undo]').disabled=mode==='edit-points'?!(editingFeatureId&&draft.length>(local.features.find(f=>f.id===editingFeatureId)?.type==='area'?3:2)):!draft.length;
-  $('[data-carto-count]').textContent=String(local.features.length);
-  list('[data-carto-objects]',local.features.map(f=>entry(`${names[f.type]}: ${f.title||'Bez názvu'}`,[['Zobrazit','show',f.id],['Upravit','edit',f.id],...(f.points.length>1?[['Body','edit-points',f.id]]:[]),['Smazat','remove',f.id]],f.type==='route'?`${formatKm(routeLength(f.points,map))} km`:f.type==='area'?`${formatKm(polygonArea(f.points,map))} km²`:f.note.slice(0,60))));
-  list('[data-carto-bookmarks]',local.bookmarks.map(b=>entry(b.title,[['Přejít','bookmark',b.id],['Smazat','del-bookmark',b.id]])));
-  list('[data-carto-history]',local.partyHistory.map((h,i)=>entry(`${i+1}. ${h.date||'Bez data'}`,[['Přejít','history',h.id],['Smazat','del-history',h.id]],h.note)));
   $('[data-carto-fog-toggle]').textContent=local.fog.enabled?'Vypnout mlhu':'Zapnout mlhu';
+  area.querySelectorAll('[data-carto-fog-brush]').forEach(btn=>btn.setAttribute('aria-pressed',String(mode===btn.dataset.cartoFogBrush)));
   const layerArea=$('[data-carto-layers]');layerArea.replaceChildren();
   for(const key of LAYERS){const label=document.createElement('label');const input=document.createElement('input');input.type='checkbox';input.checked=local.layers[key];input.dataset.cartoLayer=key;label.append(input,document.createTextNode(' '+({route:'Trasy',area:'Oblasti',radius:'Kružnice dosahu',draw:'Volné kreslení',arrow:'Šipky',text:'Texty',markers:'Vlastní značky',partyHistory:'Historie družiny',fog:'Mlha války'}[key])));layerArea.appendChild(label);}
-  search();
- };
- const search=()=>{
-  const q=$('[data-carto-search]').value.trim().toLocaleLowerCase('cs-CZ');const results=[];
-  if(q){
-   for(const item of markers())if([item.name,item.description,item.type].some(s=>String(s).toLocaleLowerCase('cs-CZ').includes(q)))results.push(entry(`⌖ ${item.name||'Značka'}`,[['Přejít','find-marker',item.id]]));
-   for(const f of local.features)if([f.title,f.note,f.type,f.date].some(s=>String(s).toLocaleLowerCase('cs-CZ').includes(q)))results.push(entry(`${names[f.type]}: ${f.title||'Bez názvu'}`,[['Přejít','show',f.id]]));
-   if(map.id==='overview'&&/^[ijkl][4567]$/i.test(q))results.push(entry(`Sektor ${q.toUpperCase()}`,[['Přejít','sector',q.toUpperCase()]]));
-  }
-  list('[data-carto-search-results]',results.slice(0,60));
  };
  const redraw=()=>{paintSvg();paintFog();redrawList();onLayersChange?.();};
- const clearMode=()=>{mode='';draft=[];painting=false;currentBrush=null;editingFeatureId=null;editVertex=null;editOriginal=null;modeField.value='';viewport.classList.remove('is-cartographing');redraw();};
- const setMode=value=>{if(value)onModeStart?.();mode=value;draft=[];painting=false;currentBrush=null;if(value!=='edit-points')editingFeatureId=null;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Mlha války');}redraw();};
+ const clearMode=()=>{mode='';draft=[];painting=false;currentBrush=null;editingFeatureId=null;editVertex=null;editOriginal=null;modeField.value='';viewport.classList.remove('is-cartographing');hideHover();refreshBrushCursor(null,null);redraw();};
+ const setMode=value=>{if(value)onModeStart?.();mode=value;draft=[];painting=false;currentBrush=null;hideHover();if(value!=='edit-points')editingFeatureId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Mlha války');}refreshBrushCursor(null,null);redraw();};
  modeField.addEventListener('change',()=>setMode(modeField.value));
  const featureFromDraft=()=>({id:makeId(),type:mode,title:safeText(title.value,120),note:safeText(note.value,1500),date:safeText(date.value,80),color:color.value,opacity:Number(opacity.value),points:structuredClone(draft),...(mode==='radius'?{radiusKm:getRadius()}:{})});
  const finishFeature=()=>{
@@ -280,62 +314,63 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   commit(()=>{f.title=newTitle;f.note=newNote;f.date=newDate;f.color=newColor;f.opacity=newOpacity;if(f.type==='radius')f.radiusKm=newRadius;},'Popis mapového objektu');
  });
  $('[data-carto-cancel]').addEventListener('click',clearMode);
- $('[data-carto-stop]').addEventListener('click',clearMode);
  $('[data-carto-undo]').addEventListener('click',()=>applySnapshot(undo,redo));
  $('[data-carto-redo]').addEventListener('click',()=>applySnapshot(redo,undo,true));
- $('[data-carto-search]').addEventListener('input',search);
  $('[data-carto-layers]').addEventListener('change',e=>{const key=e.target.dataset.cartoLayer;if(LAYERS.includes(key)){commit(()=>{local.layers[key]=e.target.checked;},'Viditelnost vrstvy');paintSvg();paintFog();onLayersChange?.();}});
- $('[data-carto-bookmark-add]').addEventListener('click',()=>{
-  const title=$('[data-carto-bookmark-name]').value.trim()||`Pohled ${local.bookmarks.length+1}`;
-  const cam=getCamera();const x=Math.max(0,Math.min(map.width,cam.centerX)),y=Math.max(0,Math.min(map.height,cam.centerY));
-  if(local.bookmarks.length>=150)return;
-  commit(()=>local.bookmarks.push({id:makeId(),title:title.slice(0,120),x,y,zoom:cam.zoom}),'Mapová záložka');$('[data-carto-bookmark-name]').value='';
- });
- const addHistory=(pt)=>{
+ const addHistory=pt=>{
   if(!pt||local.partyHistory.length>=1000)return false;
-  const entry={id:makeId(),x:pt.x,y:pt.y,date:date.value.trim().slice(0,80),note:note.value.trim().slice(0,500)};
-  return commit(()=>{local.partyHistory.push(entry);},'Poloha družiny');
+  return commit(()=>{local.partyHistory.push({id:makeId(),x:pt.x,y:pt.y,date:'',note:''});},'Pohyb družiny');
  };
- $('[data-carto-history-add]').addEventListener('click',()=>{
-  const p=markers().find(item=>item.type==='party');if(!p){showStatus('Nejdříve umístěte značku Pozice družiny.');return;}
-  addHistory(p);
- });
- $('[data-carto-history-clear]').addEventListener('click',()=>{if(local.partyHistory.length&&window.confirm('Smazat celou historii pohybu družiny na této mapě?'))commit(()=>{local.partyHistory=[];},'Historie družiny');});
- $('[data-carto-fog-toggle]').addEventListener('click',()=>commit(()=>{local.fog.enabled=!local.fog.enabled;},'Viditelnost mlhy'));
+ $('[data-carto-fog-toggle]').addEventListener('click',()=>{if(mode.startsWith('fog-'))clearMode();commit(()=>{local.fog.enabled=!local.fog.enabled;},'Viditelnost mlhy');});
+ area.querySelectorAll('[data-carto-fog-brush]').forEach(btn=>btn.addEventListener('click',()=>{const next=mode===btn.dataset.cartoFogBrush?'':btn.dataset.cartoFogBrush;setMode(next);}));
+ fogRadius.addEventListener('input',()=>refreshBrushCursor(null,null));
  $('[data-carto-fog-reset]').addEventListener('click',()=>{if(window.confirm('Znovu zakrýt celou mapu a odstranit předchozí odhalení?'))commit(()=>{local.fog.enabled=true;local.fog.strokes=[];},'Mlha války');});
  $('[data-carto-fog-clear]').addEventListener('click',()=>{if(window.confirm('Odstranit všechno odhalování a vypnout mlhu?'))commit(()=>{local.fog.enabled=false;local.fog.strokes=[];},'Mlha války');});
- area.addEventListener('click',e=>{
-  const btn=e.target.closest('[data-carto-action]');if(!btn)return;
-  const action=btn.dataset.cartoAction,id=btn.dataset.cartoId;
-  const f=local.features.find(x=>x.id===id),b=local.bookmarks.find(x=>x.id===id),h=local.partyHistory.find(x=>x.id===id);
-  if(action==='show'&&f){highlightId=id;centerAt(objectPoint(f));redraw();}
-  if(action==='find-marker')selectMarker(id);
-  if(action==='sector'&&map.id==='overview'){
-   if(id==='K5'){openSector?.('K5');return;}
-   const col='IJKL'.indexOf(id[0]),row=Number(id[1])-4;
-   if(col>=0&&row>=0&&row<4)centerAt({x:map.width*(col+.5)/4,y:map.height*(row+.5)/4});
+ const openFeatureEditor=f=>{
+  if(!f)return;
+  clearMode();editingFeatureId=f.id;highlightId=f.id;
+  title.value=f.title;note.value=f.note;date.value=f.date;color.value=f.color;
+  if(f.type==='radius')radius.value=String(f.radiusKm);
+  opacity.value=String(f.opacity??.18);
+  modeField.closest('details').open=true;
+  showStatus('Vybraný mapový objekt: změňte popis a potvrďte tlačítkem „Uložit změny popisu“. Vrcholy lze upravit volbou příslušného nástroje.');
+  redraw();
+ };
+ const deleteHovered=()=>{
+  if(!hovered)return;
+  const h=hovered;hideHover();
+  if(h.kind==='feature'){
+   const f=local.features.find(f=>f.id===h.id);
+   if(f)commit(()=>{local.features.splice(local.features.indexOf(f),1);if(highlightId===f.id)highlightId=null;if(editingFeatureId===f.id){editingFeatureId=null;clearMode();}},'Odstranění objektu');
+  }else if(h.kind==='history'){
+   if(Number.isInteger(h.index)&&h.index>=0&&h.index<local.partyHistory.length)
+    commit(()=>{local.partyHistory.splice(h.index);},'Zkrácení trasy družiny');
   }
-  if(action==='remove'&&f&&window.confirm(`Smazat ${names[f.type].toLowerCase()} „${f.title||'Bez názvu'}“?`))commit(()=>{local.features.splice(local.features.indexOf(f),1);highlightId=null;},'Odstranění objektu');
-  if((action==='edit'||action==='edit-points')&&f){
-   editingFeatureId=f.id;highlightId=f.id;
-   title.value=f.title;note.value=f.note;date.value=f.date;color.value=f.color;
-   if(f.type==='radius')radius.value=String(f.radiusKm);
-   opacity.value=String(f.opacity??0.18);
-   const details=modeField.closest('details');details.open=true;
-   if(action==='edit-points'){
-    setMode('edit-points');modeField.value='edit-points';draft=structuredClone(f.points);
-    showStatus('Přetáhněte vrchol mapového objektu nebo klikněte pro přidání bodu. Změny se ukládají automaticky.');
-   }else{
-    clearMode();editingFeatureId=f.id;modeField.closest('details').open=true;
-    showStatus('Upravte název, poznámku, datum, barvu nebo dosah a klikněte na Uložit změny popisu.');
-   }
-   centerAt(objectPoint(f));redraw();
-  }
-  if(action==='bookmark'&&b)setCamera({centerX:b.x,centerY:b.y,zoom:b.zoom});
-  if(action==='del-bookmark'&&b)commit(()=>local.bookmarks.splice(local.bookmarks.indexOf(b),1),'Smazání záložky');
-  if(action==='history'&&h)centerAt(h);
-  if(action==='del-history'&&h)commit(()=>local.partyHistory.splice(local.partyHistory.indexOf(h),1),'Smazání záznamu');
+ };
+ hoverDelete?.querySelector('button')?.addEventListener('click',e=>{e.stopPropagation();e.preventDefault();deleteHovered();});
+ hoverDelete?.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));
+ hoverDelete?.addEventListener('pointerleave',()=>{hoverTimer=setTimeout(hideHover,180);});
+ hoverDelete?.addEventListener('pointerdown',e=>e.stopPropagation());
+ svg.addEventListener('pointerover',e=>{
+  const hit=e.target.closest?.('[data-carto-hit]');if(!hit||mode)return;
+  showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex),e.clientX,e.clientY);
  });
+ svg.addEventListener('pointermove',e=>{
+  const hit=e.target.closest?.('[data-carto-hit]');if(!hit||mode)return;
+  showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex),e.clientX,e.clientY);
+ });
+ svg.addEventListener('pointerout',e=>{
+  if(!e.target.closest?.('[data-carto-hit]'))return;
+  clearTimeout(hoverTimer);hoverTimer=setTimeout(hideHover,220);
+ });
+ svg.addEventListener('pointerdown',e=>{
+  const hit=e.target.closest?.('[data-carto-hit]');if(!hit||mode)return;
+  e.preventDefault();e.stopPropagation();
+  if(hit.dataset.cartoHit==='feature')openFeatureEditor(local.features.find(f=>f.id===hit.dataset.cartoId));
+ });
+ const trackBrush=e=>{if(!mode.startsWith('fog-')||e.pointerType==='touch')return;refreshBrushCursor(e.clientX,e.clientY);};
+ viewport.addEventListener('pointermove',trackBrush);
+ viewport.addEventListener('pointerleave',()=>refreshBrushCursor(null,null));
  redraw();
  return {
   get active(){return !!mode;},
@@ -343,12 +378,12 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   pointerStart,pointerMove,pointerEnd,
   cancelGesture(){painting=false;currentBrush=null;if(['draw','arrow'].includes(mode))draft=[];redraw();},
   handleClick(clientX,clientY){return !!mode&&addPoint(inMap(clientX,clientY));},
-  repaint(){paintSvg();paintFog();},
+  repaint(){paintSvg();paintFog();refreshBrushCursor(null,null);},
   stop:clearMode,
   // Atlas markers are stored separately; layers hide them without touching the record.
   markersVisible(){return local.layers.markers;},
-  refreshSearch:search,
   recordPartyMove(item){if(item?.type==='party')addHistory(item);},
+  discardPartyHistory(){local.partyHistory=[];snapshot.maps[map.id].partyHistory=[];undo.length=0;redo.length=0;hideHover();redraw();},
   recordMarkerChange(before,after){undo.push({kind:'markers',before:structuredClone(before),after:structuredClone(after)});if(undo.length>30)undo.shift();redo.length=0;redrawList();},
   onLayerChange:()=>{onLayersChange?.();}
  };

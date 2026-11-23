@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography} from './atlas-cartography.js?v=94.064';
+import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.065';
 /**
- * Hârn Atlas v94.064 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.065 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -56,7 +56,7 @@ const MARKER_TYPES=Object.freeze({party:{label:'Pozice družiny',symbol:'♟'},v
 const markerDisplayName=item=>item.name||MARKER_TYPES[item.type]?.label||'Značka';
 const MARKER_EVENTS=Object.freeze({discovery:'Objeveno',visit:'Navštíveno',departure:'Opuštěno',other:'Poznámka'});
 const markersByMap={overview:[],K5:[]};
-let markerStoreLoaded=false,markerSequence=0,markerPersistence=null,atlasPartyMoved=null,atlasMarkerChanged=null;
+let markerStoreLoaded=false,markerSequence=0,markerPersistence=null,atlasPartyMoved=null,atlasPartyRemoved=null,atlasMarkerChanged=null;
 const cleanMarker=(item,map)=>{
  if(!item||typeof item!=='object'||typeof item.id!=='string'||item.id.length>90)return null;
  if(!Number.isFinite(item.x)||!Number.isFinite(item.y)||item.x<0||item.y<0||item.x>=map.width||item.y>=map.height)return null;
@@ -120,12 +120,23 @@ function saveAtlasMarkers(){
  if(!markerPersistence?.write)return false;
  const next=parseMarkers(markersByMap);
  try{
-  if(markerPersistence.write(next)===true){
+  const oldParty=lastCommittedMarkers[currentMapId]?.find(m=>m.type==='party');
+  const newParty=next[currentMapId]?.find(m=>m.type==='party');
+  const removedParty=!!oldParty&&!newParty;
+  let ok;
+  if(removedParty&&typeof markerPersistence.writeBundle==='function'){
+   const carto=structuredClone(markerPersistence.readCartography?.()||atlasCartographyEmpty());
+   if(carto.maps?.[currentMapId])carto.maps[currentMapId].partyHistory=[];
+   ok=markerPersistence.writeBundle(next,carto)===true;
+  }else if(removedParty){
+   // Do not allow an orphaned path when cloud storage lacks an atomic writer.
+   throw Error('Atlas: bezpečné smazání trasy vyžaduje společný zápis značky a kartografie.');
+  }else ok=markerPersistence.write(next)===true;
+  if(ok){
    const previous=parseMarkers(lastCommittedMarkers);
-   const oldParty=lastCommittedMarkers[currentMapId]?.find(m=>m.type==='party');
-   const newParty=next[currentMapId]?.find(m=>m.type==='party');
    lastCommittedMarkers=parseMarkers(next);
    atlasMarkerChanged?.(previous,next);
+   if(removedParty)atlasPartyRemoved?.();
    if(newParty&&(!oldParty||oldParty.x!==newParty.x||oldParty.y!==newParty.y))
     atlasPartyMoved?.(newParty);
    return true;
@@ -197,16 +208,17 @@ export function atlasView(){
       <g data-atlas-measure-markers></g>
      </svg>
      <div class="atlas-custom-marker-overlay" data-atlas-custom-marker-overlay aria-label="Vlastní značky na mapě"></div>
-     <svg class="atlas-cartography-overlay" data-atlas-carto-overlay aria-hidden="true"></svg>
+     <svg class="atlas-cartography-overlay" data-atlas-carto-overlay aria-label="Mapové objekty a body trasy družiny"></svg>
      <canvas class="atlas-fog-overlay" data-atlas-fog aria-hidden="true"></canvas>
+     <div class="atlas-carto-hover-delete" data-carto-hover-delete hidden><button type="button" aria-label="Smazat objekt nebo navazující trasu" title="Smazat">×</button></div>
+     <div class="atlas-fog-brush-cursor" data-carto-fog-cursor hidden aria-hidden="true"></div>
      <div class="atlas-scale" aria-label="Grafické měřítko mapy"><div data-atlas-scale-line class="atlas-scale-line"></div><span data-atlas-scale-label>≈ 20 km</span></div>
     </div>
     <div class="atlas-status" role="status" aria-live="polite" data-atlas-status>${hint}</div>
    </div>
    <aside class="atlas-tools" aria-label="Nástroje mapy">
     <h2>Nástroje mapy</h2><p class="atlas-tools-subtitle">Práce přímo nad mapou · ${overview?'I4–L7':'K5'}</p>
-    <section class="atlas-tool-card" aria-label="Měření vzdálenosti">
-     <h3><span aria-hidden="true">↝</span> Měření trasy</h3>
+    <details class="atlas-tool-fold"><summary>↝ Měření trasy</summary><section class="atlas-tool-card" aria-label="Měření vzdálenosti">
      <p class="atlas-tool-help">Postupně označte A → B → C → … Mapa ukáže délku každého úseku přímo u spojnice; vpravo se sčítá celá trasa.</p>
      <button type="button" class="atlas-tool-action" data-atlas-measure-toggle aria-pressed="false">Zapnout měření</button>
      <div class="atlas-measure-instructions" data-atlas-measure-help role="status" aria-live="polite" hidden></div>
@@ -222,9 +234,8 @@ export function atlasView(){
       <button type="button" data-atlas-measure-reset disabled>Nové měření</button>
      </div>
      <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km.</p>
-    </section>
-    <section class="atlas-tool-card atlas-custom-section" aria-label="Vlastní značky mapy">
-     <h3><span aria-hidden="true">⌖</span> Vlastní značky</h3>
+    </section></details>
+    <details class="atlas-tool-fold"><summary>⌖ Vlastní značky</summary><section class="atlas-tool-card atlas-custom-section" aria-label="Vlastní značky mapy">
      <p class="atlas-tool-help">Umístěte značku kliknutím do mapy. Kliknutím na značku zobrazíte popisek; přetažením ji rovnou přesunete.</p>
      <div class="atlas-marker-placement-controls">
       <button type="button" class="atlas-tool-action" data-atlas-marker-party aria-pressed="false">Pozice družiny</button>
@@ -248,8 +259,8 @@ export function atlasView(){
      </div>
      <div class="atlas-marker-list-heading">Značky na této mapě (<span data-atlas-marker-count>0</span>)</div>
      <div class="atlas-marker-list" data-atlas-marker-list aria-label="Seznam značek na aktuální mapě"></div>
-     <p class="atlas-marker-save-note">Značky jsou součástí stejného JSON kampaně. Na dalších zařízeních se načtou přes existující GitHub Cloud.</p>
-    </section>
+     <p class="atlas-marker-save-note">Značky jsou součástí společného JSON kampaně. Pro úpravu nebo smazání přejděte přímo na značku na mapě.</p>
+    </section></details>
     ${atlasCartographyPanel()}
    </aside>
   </div>
@@ -304,7 +315,7 @@ export function mountAtlasView(root,persistence=null){
  const eventNote=workspace.querySelector('[data-atlas-event-note]');
  const eventList=workspace.querySelector('[data-atlas-event-list]');
  let pendingMarkerEvents=[];
- const markerNodes=new Map();
+ const markerNodes=new Map(),markerButtons=new Map();
  let markerPlacement=false,markerPlacementType='village',markerDraft=null,editingMarkerId=null,selectedMarkerId=null;
  let markerDrag=null,suppressMarkerClick=null;
  let atlasCarto=null,cartoPointer=null,restoringMarkerUndo=false;
@@ -455,7 +466,7 @@ export function mountAtlasView(root,persistence=null){
  markerType.addEventListener('change',syncMarkerFormType);
  const paintCustomMarkers=()=>{
   const present=new Set(mapMarkers.map(item=>item.id));
-  for(const [id,node] of markerNodes){if(!present.has(id)){node.remove();markerNodes.delete(id);}}
+  for(const [id,node] of markerNodes){if(!present.has(id)){node.remove();markerNodes.delete(id);for(const btn of markerButtons.get(id)||[])btn.remove();markerButtons.delete(id);}}
   for(const item of mapMarkers){
    let node=markerNodes.get(item.id);
    if(!node){
@@ -468,9 +479,13 @@ export function mountAtlasView(root,persistence=null){
     const details=document.createElement('span');details.className='atlas-marker-tooltip-description';
     bubble.append(title,details);node.append(pin,bubble);
     customMarkerOverlay.appendChild(node);markerNodes.set(item.id,node);
+    const modify=document.createElement('button');modify.type='button';modify.className='atlas-marker-map-action atlas-marker-map-edit';modify.textContent='✎';modify.title='Upravit značku';modify.setAttribute('aria-label','Upravit značku');modify.dataset.atlasMarkerEditId=item.id;
+    const deleteBtn=document.createElement('button');deleteBtn.type='button';deleteBtn.className='atlas-marker-map-action atlas-marker-map-delete';deleteBtn.textContent='×';deleteBtn.title='Smazat značku';deleteBtn.setAttribute('aria-label','Smazat značku');deleteBtn.dataset.atlasMarkerDeleteId=item.id;
+    customMarkerOverlay.append(modify,deleteBtn);markerButtons.set(item.id,[modify,deleteBtn]);
    }
    const pos=screenPoint(item);
    node.style.left=`${pos.x}px`;node.style.top=`${pos.y}px`;
+   const controls=markerButtons.get(item.id);if(controls){controls[0].style.left=`${pos.x-21}px`;controls[0].style.top=`${pos.y-23}px`;controls[1].style.left=`${pos.x+20}px`;controls[1].style.top=`${pos.y-23}px`;}
    // When relocating a party icon, show the draft in the new location until Save.
    node.style.visibility=editingMarkerId===item.id&&markerDraft?'hidden':'';
    const selected=item.id===selectedMarkerId;
@@ -527,10 +542,7 @@ export function mountAtlasView(root,persistence=null){
    nameBtn.dataset.atlasMarkerSelect=item.id;
    nameBtn.textContent=`${MARKER_TYPES[item.type].symbol} ${markerDisplayName(item)}`;
    nameBtn.title='Zvýraznit značku na mapě';
-   const actions=document.createElement('div');actions.className='atlas-marker-row-actions';
-   const edit=document.createElement('button');edit.type='button';edit.textContent='Upravit';edit.dataset.atlasMarkerEdit=item.id;
-   const remove=document.createElement('button');remove.type='button';remove.textContent='Zrušit';remove.dataset.atlasMarkerRemove=item.id;
-   actions.append(edit,remove);row.append(nameBtn,actions);markerList.appendChild(row);
+   row.append(nameBtn);markerList.appendChild(row);
   }
  };
  const clearMarkerSelection=()=>{
@@ -604,24 +616,30 @@ export function mountAtlasView(root,persistence=null){
   // Creating or editing never auto-opens a tooltip or leaves a yellow halo.
   selectedMarkerId=null;
   closeMarkerEditor();
-  markerNodes.get(marker.id)?.remove();markerNodes.delete(marker.id);
+  markerNodes.get(marker.id)?.remove();markerNodes.delete(marker.id);for(const btn of markerButtons.get(marker.id)||[])btn.remove();markerButtons.delete(marker.id);
   const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
   status.textContent=`Značka „${markerDisplayName(marker)}“ ${existing?'byla upravena':'byla přidána'}.${saved?'':' Zápis do společné kampaně se nezdařil; změna byla vrácena.'}`;
  });
+ const removeMarker=id=>{
+  const index=mapMarkers.findIndex(entry=>entry.id===id);if(index<0)return;
+  const item=mapMarkers[index];mapMarkers.splice(index,1);
+  if(selectedMarkerId===id)selectedMarkerId=null;
+  if(editingMarkerId===id)closeMarkerEditor();
+  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
+  status.textContent=`Značka „${markerDisplayName(item)}“ ${saved?'byla odstraněna.':'nebyla odstraněna; cloudový zápis byl odmítnut.'}`;
+ };
  markerList.addEventListener('click',e=>{
-  const target=e.target.closest('button');if(!target)return;
-  const selectId=target.dataset.atlasMarkerSelect,editId=target.dataset.atlasMarkerEdit,removeId=target.dataset.atlasMarkerRemove;
-  if(selectId){selectMarker(selectId);return;}
-  if(editId){const item=mapMarkers.find(entry=>entry.id===editId);if(item){clearMarkerSelection();openMarkerEditor(item);}return;}
-  if(removeId){
-   const index=mapMarkers.findIndex(entry=>entry.id===removeId);if(index<0)return;
-   const item=mapMarkers[index];
-   if(!window.confirm(`Opravdu odstranit značku „${markerDisplayName(item)}“?`))return;
-   mapMarkers.splice(index,1);if(selectedMarkerId===removeId)selectedMarkerId=null;
-   if(editingMarkerId===removeId)closeMarkerEditor();
-   const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
-   status.textContent=`Značka „${markerDisplayName(item)}“ byla odstraněna.${saved?'':' Zápis do společné kampaně se nezdařil; změna byla vrácena.'}`;
-  }
+  const selectId=e.target.closest('[data-atlas-marker-select]')?.dataset.atlasMarkerSelect;
+  if(selectId)selectMarker(selectId);
+ });
+ customMarkerOverlay.addEventListener('pointerdown',e=>{
+  if(e.target.closest('[data-atlas-marker-edit-id],[data-atlas-marker-delete-id]'))e.stopPropagation();
+ });
+ customMarkerOverlay.addEventListener('click',e=>{
+  const editId=e.target.closest('[data-atlas-marker-edit-id]')?.dataset.atlasMarkerEditId;
+  const removeId=e.target.closest('[data-atlas-marker-delete-id]')?.dataset.atlasMarkerDeleteId;
+  if(editId){e.stopPropagation();const item=mapMarkers.find(x=>x.id===editId);if(item){clearMarkerSelection();openMarkerEditor(item);}return;}
+  if(removeId){e.stopPropagation();removeMarker(removeId);}
  });
  // Marker pointer capture is independent from the map's pan gesture.
  // Drag directly: no 'move' mode, no confirmation, save at pointer release.
@@ -1033,6 +1051,7 @@ export function mountAtlasView(root,persistence=null){
   status
  });
  atlasPartyMoved=item=>{if(!restoringMarkerUndo)atlasCarto?.recordPartyMove(item);};
+ atlasPartyRemoved=()=>atlasCarto?.discardPartyHistory();
  atlasMarkerChanged=(before,after)=>{if(!restoringMarkerUndo)atlasCarto?.recordMarkerChange(before,after);};
  viewport.classList.toggle('atlas-hide-own-markers',atlasCarto?.markersVisible()===false);
  if(typeof ResizeObserver==='function'){
