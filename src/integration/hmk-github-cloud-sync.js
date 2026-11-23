@@ -125,7 +125,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
    const {raw,resetId}=await decodeCloudEnvelope(r.content);validate(JSON.parse(raw));return {sha:r.sha,raw,resetId};
   }catch(err){if(err.httpStatus===404)return null;throw err}
  }
- function flagPending(serialized){localStorage.setItem(CLOUD_PENDING_KEY,JSON.stringify({repository:pendingKey(),sha,at:clock()}));pending=true;dirty=serialized;}
+ function flagPending(serialized){localStorage.setItem(CLOUD_PENDING_KEY,JSON.stringify({repository:pendingKey(),sha,resetId:cloudResetId,at:clock()}));pending=true;dirty=serialized;}
  function clearPending(){localStorage.removeItem(CLOUD_PENDING_KEY);pending=false;dirty=null;}
  function canWrite(){return (!config||['ready','syncing','pending','error-pending'].includes(status))&&!liveStorageWasCleared();}
  function onLocalWrite(serialized){if(!config)return;
@@ -156,7 +156,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
     sha=remote.sha;cloudResetId=remote.resetId;
     const local=readLocal(),hasPending=isPending();
     if(hasPending&&local!==remote.raw){
-     if(remote.resetId){
+     if(remote.resetId&&remote.resetId!==savedPending().resetId&&savedPending().sha!==sha){
       // A deliberate shared reset has priority over an obsolete offline edit.
       applyRemote(remote.raw);clearPending();
      }else{
@@ -200,7 +200,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
     const result=await request('PUT',api('/contents/'+CLOUD_PATH),{message:'HMK: saved campaign '+clock(),content:await encodeCloudSnapshot(snapshot,{resetId:cloudResetId}),...(sha?{sha}:{})});
     if(!result.content?.sha)throw Error('GitHub nevrátil SHA potvrzeného zápisu.');
     sha=result.content.sha;
-    if(dirty===snapshot)clearPending();
+    if(dirty===snapshot)clearPending();else flagPending(dirty);
    }
    setStatus('ready');
   }catch(e){if(e.httpStatus===409||e.httpStatus===422)setStatus('conflict','Konflikt verzí na GitHubu – místní změny jsou zachované.');
@@ -254,7 +254,7 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
    const current=await getCloudReference();
    // If the current device already tracks a cloud revision, do not erase someone
    // else's more recent revision without reconnecting and reviewing it first.
-   if(!developerMode&&usingConnection&&(current?.sha||null)!==sha)throw Error('Repozitář se změnil na jiném zařízení. Nejprve načtěte aktuální stav a reset znovu potvrďte.');
+   if(usingConnection&&(current?.sha||null)!==sha)throw Error('Repozitář se změnil na jiném zařízení. Nejprve načtěte aktuální stav a reset znovu potvrďte.');
    const resetId=freshResetId();
    const result=await request('PUT',api('/contents/'+CLOUD_PATH),{
     message:'HMK: shared campaign development reset '+clock(),
