@@ -1,7 +1,8 @@
-/** Hârn Atlas cartography v94.066. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.067. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
+const VISIBLE_LAYER_TOGGLES=LAYERS.filter(key=>key!=='fog');
 const DEFAULT_LAYERS=Object.freeze(Object.fromEntries(LAYERS.map(key=>[key,true])));
 const COLORS=['#a03b24','#246d83','#547036','#724b94','#bb7622','#473629'];
 const MAX_ITEMS=400,MAX_POINTS=750,MAX_FOG=1400;
@@ -42,6 +43,8 @@ export function normalizeAtlasCartography(value,maps){
  return result;
 }
 const formatKm=km=>new Intl.NumberFormat('cs-CZ',{maximumFractionDigits:2}).format(km);
+const formatRouteSegment=km=>km<1?`${Math.round(km*1000).toLocaleString('cs-CZ')} m`:`${formatKm(km)} km`;
+
 const distance=(a,b,map)=>Math.hypot(a.x-b.x,a.y-b.y)/map.pixelsPerKm;
 const routeLength=(pts,map)=>pts.slice(1).reduce((acc,p,i)=>acc+distance(pts[i],p,map),0);
 const polygonArea=(pts,map)=>Math.abs(pts.reduce((sum,p,i)=>{const q=pts[(i+1)%pts.length];return sum+p.x*q.y-p.y*q.x;},0))/(2*map.pixelsPerKm**2);
@@ -87,7 +90,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||10));
  let draftRadiusKm=0;
  let hovered=null,hoverTimer=null;
- const hideHover=()=>{hovered=null;if(hoverDelete)hoverDelete.hidden=true;};
+ const hideHover=()=>{hovered=null;if(hoverDelete){hoverDelete.hidden=true;hoverDelete.classList.remove('is-party-history');}};
  const showHover=(kind,id,index,clientX,clientY)=>{
   if(mode&&mode!=='edit-points')return;
   const same=hovered?.kind===kind&&hovered?.id===id&&hovered?.index===index;
@@ -99,15 +102,17 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    hoverDelete.style.top=`${Math.max(4,Math.min(h-84,y+12))}px`;
   }
   const f=kind==='feature'?local.features.find(f=>f.id===id):null;
+  hoverDelete.classList.toggle('is-party-history',kind==='history');
   const tip=hoverDelete.querySelector('[data-carto-hover-tip]');
-  if(tip){tip.textContent=f?.note?`${f.title||names[f.type]}: ${f.note}`:'';tip.hidden=!f?.note;}
+  // The text object is already readable directly on the map: do not echo it.
+  if(tip){const hasTip=!!f?.note&&f.type!=='text';tip.textContent=hasTip?`${f.title||names[f.type]}: ${f.note}`:'';tip.hidden=!hasTip;}
   const edit=hoverDelete.querySelector('[data-carto-hover-edit]');if(edit)edit.hidden=kind!=='feature';
   const del=hoverDelete.querySelector('[data-carto-hover-remove]');if(del)del.title=kind==='history'?'Smazat trasu od tohoto bodu po pozici družiny':'Odstranit mapový objekt';
   hoverDelete.hidden=false;
  };
  const refreshBrushCursor=(clientX,clientY)=>{
   if(!brushCursor)return;
-  if(!mode.startsWith('fog-')||!local.fog.enabled||!local.layers.fog||clientX===null||!inMap(clientX,clientY)){brushCursor.hidden=true;return;}
+  if(!mode.startsWith('fog-')||!local.fog.enabled||clientX===null||!inMap(clientX,clientY)){brushCursor.hidden=true;return;}
   const r=getFogRadius()*map.pixelsPerKm*getCamera().zoom,rect=viewport.getBoundingClientRect();
   brushCursor.style.left=`${clientX-rect.left}px`;brushCursor.style.top=`${clientY-rect.top}px`;
   brushCursor.style.width=`${2*r}px`;brushCursor.style.height=`${2*r}px`;brushCursor.hidden=false;
@@ -157,8 +162,24 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
      add('path',{d:`M${q1.x} ${q1.y} L${b.x} ${b.y} L${q2.x} ${q2.y}`,fill:'none',stroke:c,'stroke-width':sw});
     }
     const center=screenPoint(pts[Math.floor(pts.length/2)]);
-    const label=f.type==='route'?`${f.title||'Trasa'} · ${formatKm(routeLength(pts,map))} km`:f.type==='area'?`${f.title||'Oblast'} · ${formatKm(polygonArea(pts,map))} km²`:f.title;
-    if(label)add('text',{x:center.x+8,y:center.y-12,fill:c,'font-size':'12','font-weight':'bold',stroke:'#f6e8cc','stroke-width':'3','paint-order':'stroke'},label.slice(0,76));
+    const label=f.type==='route'?(f.title?`${f.title} · `:'')+`${formatKm(routeLength(pts,map))} km`:f.type==='area'?`${f.title||'Oblast'} · ${formatKm(polygonArea(pts,map))} km²`:f.title;
+    if(label)add('text',{x:center.x+8,y:center.y-21,fill:c,'font-size':'12','font-weight':'bold',stroke:'#f6e8cc','stroke-width':'3','paint-order':'stroke','pointer-events':'none'},label.slice(0,76));
+    if(f.type==='route'){
+     // Vertex dots and independent live segment lengths, also for drafts and edits.
+     // Distances come from map coordinates, so moving a vertex recalculates them.
+     pts.forEach((pt,i)=>{
+      const sp=screenPoint(pt);
+      add('circle',{cx:sp.x,cy:sp.y,r:3.9,fill:'#fff5db',stroke:c,'stroke-width':'2','pointer-events':'none'});
+      if(i===0)return;
+      const a=screenPoint(pts[i-1]),dx=sp.x-a.x,dy=sp.y-a.y,len=Math.hypot(dx,dy);
+      if(len<1)return;
+      const offset=14*((i%2)?-1:1),mx=(a.x+sp.x)/2-dy/len*offset,my=(a.y+sp.y)/2+dx/len*offset;
+      const label=formatRouteSegment(distance(pts[i-1],pt,map));
+      const width=Math.max(42,label.length*6.3+11);
+      add('rect',{x:mx-width/2,y:my-10,width,height:20,rx:4,fill:'#fff3db','fill-opacity':'.96',stroke:c,'stroke-width':'.9','pointer-events':'none'});
+      add('text',{x:mx,y:my+3.5,'text-anchor':'middle',fill:'#443026','font-size':'11','font-weight':'bold','pointer-events':'none'},label);
+     });
+    }
    }
    if(!temporary){
     const hitAttrs={'data-carto-hit':'feature','data-carto-id':f.id,'class':'atlas-carto-hit',fill:'transparent',stroke:'transparent','stroke-width':Math.max(18,sw+12),'pointer-events':'stroke'};
@@ -171,7 +192,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     }else add('path',{...hitAttrs,d:path(pts,f.type==='area'),fill:f.type==='area'?'transparent':'none','pointer-events':f.type==='area'?'all':'stroke'});
    }
   };
-  for(const f of local.features)if(local.layers[f.type])draw(f);
+  for(const f of local.features)if(local.layers[f.type]&&!(mode==='edit-points'&&editingFeatureId===f.id))draw(f);
   if(mode==='edit-points'&&editingFeatureId){
    const f=local.features.find(x=>x.id===editingFeatureId);
    if(f){const points=draft.length?draft:f.points;draw({...f,points,radiusKm:f.type==='radius'?draftRadiusKm:f.radiusKm},true);
@@ -198,7 +219,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   if(fogCanvas.width!==bw||fogCanvas.height!==bh){fogCanvas.width=bw;fogCanvas.height=bh;}
   fogCanvas.style.width=`${w}px`;fogCanvas.style.height=`${h}px`;
   ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,bw,bh);
-  if(!local.fog.enabled||!local.layers.fog){refreshBrushCursor(null,null);return;}
+  if(!local.fog.enabled){refreshBrushCursor(null,null);return;}
   if(fogTextureWidth!==bw||fogTextureHeight!==bh){
    fogTextureWidth=bw;fogTextureHeight=bh;fogTexture.width=bw;fogTexture.height=bh;
    const t=fogTexture.getContext('2d');t.setTransform(dpr,0,0,dpr,0,0);
@@ -253,7 +274,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   hint.textContent=editing?'Vybraný objekt: tažením změňte polohu jeho bodů, kliknutím na mapu můžete přidat další bod. Změnu popisu uložte tlačítkem. Esc ukončí úpravy.':mode==='radius'?'Stiskněte na mapě střed kružnice, táhněte k okraji a pusťte. Velikost i vzdálenost kruhu jsou vidět během tažení.':mode==='route'||mode==='area'?'Klikáním označte body. Nakonec stiskněte „Dokončit objekt“.':mode==='draw'||mode==='arrow'?'Držte tlačítko myši, nakreslete objekt a pusťte.':'Vyberte typ objektu. Jeho poznámku můžete kdykoliv upravit tužkou přímo na mapě.';
   $('[data-carto-fog-toggle]').textContent=local.fog.enabled?'Vypnout mlhu':'Zapnout mlhu';
   area.querySelectorAll('[data-carto-fog-brush]').forEach(btn=>btn.setAttribute('aria-pressed',String(mode===btn.dataset.cartoFogBrush)));
-  if(layerArea){layerArea.replaceChildren();for(const key of LAYERS){
+  if(layerArea){layerArea.replaceChildren();for(const key of VISIBLE_LAYER_TOGGLES){
    const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=local.layers[key];input.dataset.cartoLayer=key;
    label.append(input,document.createTextNode(' '+({route:'Trasy',area:'Oblasti',radius:'Kružnice dosahu',draw:'Volné kreslení',arrow:'Šipky',text:'Texty',markers:'Vlastní značky',partyHistory:'Historie družiny',fog:'Mlha války'}[key])));layerArea.appendChild(label);
   }}

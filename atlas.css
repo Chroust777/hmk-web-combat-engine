@@ -379,3 +379,29 @@ body #app main.content-atlas .atlas-carto-hover-delete .atlas-carto-hover-action
 .atlas-viewport.is-cartographing .atlas-carto-hit{cursor:crosshair}
 body #app main.content-atlas .atlas-tools .atlas-cartography button[hidden]{display:none!important}
 body #app main.content-atlas .atlas-carto-hover-delete [hidden]{display:none!important}
+
+
+/* v94.067: placing pins / measuring always wins over old geometry hit targets. */
+.atlas-viewport.is-marking .atlas-cartography-overlay,
+.atlas-viewport.is-marking .atlas-cartography-overlay *,
+.atlas-viewport.is-measuring .atlas-cartography-overlay,
+.atlas-viewport.is-measuring .atlas-cartography-overlay *{pointer-events:none!important}
+
+/* The party's history-point cross is about 30% of the previous 42px icon.
+   Keep a modest hovering pad around it so it remains reachable. */
+.atlas-carto-hover-delete.is-party-history{
+ min-width:22px!important;width:22px!important;box-sizing:border-box!important;
+ padding:2px!important;border-radius:5px!important;
+}
+body #app main.content-atlas .atlas-carto-hover-delete.is-party-history .atlas-carto-hover-actions button[data-carto-hover-remove]{
+ width:13px!important;height:13px!important;min-width:13px!important;min-height:13px!important;
+ padding:0!important;border-width:1px!important;font:700 12px/11px Georgia,serif!important;
+}
+.atlas-carto-hover-delete.is-party-history .atlas-carto-hover-actions{gap:0}
+/* The base pin rule has a strong selector; override it explicitly while
+   positioning a different pin, measuring, or drawing on the same location. */
+body #app main.content-atlas .atlas-viewport.is-marking .atlas-custom-marker,
+body #app main.content-atlas .atlas-viewport.is-measuring .atlas-custom-marker,
+body #app main.content-atlas .atlas-viewport.is-cartographing .atlas-custom-marker{
+ pointer-events:none!important;
+}

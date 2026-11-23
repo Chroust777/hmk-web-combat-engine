@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.066';
+import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.067';
 /**
- * Hârn Atlas v94.065 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.067 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -420,7 +420,8 @@ export function mountAtlasView(root,persistence=null){
   const partyActive=markerPlacement&&markerPlacementType==='party';
   const genericActive=markerPlacement&&!partyActive;
   markerAdd.textContent=genericActive?'Zrušit umístění':'Přidat značku';
-  markerParty.textContent=partyActive?'Zrušit pozici družiny':'Pozice družiny';
+  // This button always identifies/navigates to the party; it is not a 'delete position' toggle.
+  markerParty.textContent='Pozice družiny';
   markerAdd.setAttribute('aria-pressed',String(genericActive));
   markerParty.setAttribute('aria-pressed',String(partyActive));
   viewport.classList.toggle('is-marking',markerPlacement);
@@ -560,7 +561,18 @@ export function mountAtlasView(root,persistence=null){
   refreshMarkerAdd();
  };
  markerAdd.addEventListener('click',()=>toggleMarkerPlacement('village'));
- markerParty.addEventListener('click',()=>toggleMarkerPlacement('party'));
+ markerParty.addEventListener('click',()=>{
+  const party=mapMarkers.find(item=>item.type==='party');
+  if(party){
+   atlasCarto?.stop();measurement.active=false;measurement.points=[];paintMeasurement();
+   markerPlacement=false;closeMarkerEditor();refreshMarkerAdd();
+   selectMarker(party.id,true);
+   status.textContent='Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě.';
+  }else{
+   // The very first position is placed by clicking the map, then saved in its editor.
+   toggleMarkerPlacement('party');
+  }
+ });
  const placePartyPosition=position=>{
   if(!position)return;
   // One party marker per map. While editing, the existing one is untouched.
