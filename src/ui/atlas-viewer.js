@@ -1,8 +1,8 @@
 /**
- * Hârn Atlas v94.060 — visible draft pins, simplified party icon and correctly scaled map markers.
+ * Hârn Atlas v94.061 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
- * Measurement is ephemeral. Custom markers use localStorage only, separately from campaign/travel/other game data.
+ * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
  */
 const OVERVIEW=Object.freeze({
  id:'overview', width:2449,height:2363,margin:48,
@@ -48,13 +48,15 @@ const rememberedByMap={overview:{initialized:false},K5:{initialized:false}};
 // Coordinates are in original map pixels, never viewport/screen pixels.
 const measurementsByMap={overview:{active:false,points:[]},K5:{active:false,points:[]}};
 
-// User-created Atlas annotations are kept separate from gameplay/cloud data.
-// Saving is local to this browser and this GitHub Pages origin.
+// Atlas markers are a separate top-level field in the EXISTING campaign JSON.
+// The persisted coordinates are source-map pixels; this data does not affect travel,
+// time, health, or any other rules module. The old localStorage key is read ONLY for
+// a one-time, opt-in migration (never authoritative once cloud data is available).
 const ATLAS_MARKER_KEY='hmk-atlas-markers-v1';
 const MARKER_TYPES=Object.freeze({party:{label:'Pozice družiny',symbol:'♟'},village:{label:'Vesnice',symbol:'⌂'},camp:{label:'Tábor',symbol:'⚑'},discovery:{label:'Nález',symbol:'✦'},danger:{label:'Nebezpečí',symbol:'!'},other:{label:'Jiné',symbol:'●'}});
 const markerDisplayName=item=>item.type==='party'?MARKER_TYPES.party.label:item.name;
 const markersByMap={overview:[],K5:[]};
-let markerStoreLoaded=false,markerSequence=0;
+let markerStoreLoaded=false,markerSequence=0,markerPersistence=null;
 const cleanMarker=(item,map)=>{
  if(!item||typeof item!=='object'||typeof item.id!=='string'||item.id.length>90)return null;
  if(!Number.isFinite(item.x)||!Number.isFinite(item.y)||item.x<0||item.y<0||item.x>=map.width||item.y>=map.height)return null;
@@ -65,23 +67,86 @@ const cleanMarker=(item,map)=>{
  const description=type==='party'?'':(typeof item.description==='string'?item.description.slice(0,1000):'');
  return {id:item.id,x:item.x,y:item.y,name,description,type};
 };
+const atlasEmptyMarkers=()=>({overview:[],K5:[]});
+function parseMarkers(document){
+ const out=atlasEmptyMarkers();
+ for(const mapId of Object.keys(MAPS)){
+  const rows=document?.[mapId];
+  if(!Array.isArray(rows))continue;
+  const ids=new Set();let partySeen=false;
+  out[mapId]=rows.slice(0,250).map(row=>cleanMarker(row,MAPS[mapId])).filter(item=>{
+   if(!item||ids.has(item.id)||item.type==='party'&&partySeen)return false;
+   ids.add(item.id);if(item.type==='party')partySeen=true;return true;
+  });
+ }
+ return out;
+}
+// Validate rather than silently sanitize a received cloud snapshot. Old snapshots
+// without an Atlas field are valid and acquire it only on the next Atlas edit.
+export function validateAtlasMarkers(document){
+ if(document===undefined)return true;
+ if(!document||typeof document!=='object'||Array.isArray(document))throw Error('Atlas: neplatná struktura značek.');
+ for(const [mapId,rows] of Object.entries(document)){
+  if(!Object.hasOwn(MAPS,mapId)||!Array.isArray(rows)||rows.length>250)throw Error('Atlas: neplatná mapa nebo počet značek.');
+  const ids=new Set();let partySeen=false;
+  for(const row of rows){
+   const marker=cleanMarker(row,MAPS[mapId]);
+   if(!marker||!Object.hasOwn(MARKER_TYPES,row.type)||ids.has(marker.id)||marker.type==='party'&&partySeen)
+    throw Error('Atlas: poškozená, duplicitní nebo neplatná značka na '+mapId+'.');
+   if(row.name!==marker.name||row.description!==marker.description||row.type!==marker.type)
+    throw Error('Atlas: nesouhlasí údaje značky na '+mapId+'.');
+   ids.add(marker.id);if(marker.type==='party')partySeen=true;
+  }
+ }
+ return true;
+}
+function replaceMarkersInPlace(document){
+ const next=parseMarkers(document);
+ for(const mapId of Object.keys(MAPS))markersByMap[mapId].splice(0,markersByMap[mapId].length,...next[mapId]);
+}
+let lastCommittedMarkers=atlasEmptyMarkers();
 function loadAtlasMarkers(){
  if(markerStoreLoaded)return;
  markerStoreLoaded=true;
- try{
-  const raw=localStorage.getItem(ATLAS_MARKER_KEY);if(!raw)return;
-  const parsed=JSON.parse(raw);
-  for(const mapId of Object.keys(MAPS)){
-   if(!Array.isArray(parsed?.[mapId]))continue;
-   const seen=new Set();
-   markersByMap[mapId]=parsed[mapId].slice(0,250).map(item=>cleanMarker(item,MAPS[mapId]))
-    .filter(item=>{if(!item||seen.has(item.id))return false;seen.add(item.id);return true;});
-  }
- }catch(_){/* localStorage may be blocked; in-memory markers still work */}
+ // Do not let legacy per-device data overwrite authoritative shared annotations.
+ const persisted=markerPersistence?.read?.();
+ replaceMarkersInPlace(persisted);
+ lastCommittedMarkers=parseMarkers(persisted);
 }
 function saveAtlasMarkers(){
- try{localStorage.setItem(ATLAS_MARKER_KEY,JSON.stringify(markersByMap));return true;}
- catch(_){return false;}
+ if(!markerPersistence?.write)return false;
+ const next=parseMarkers(markersByMap);
+ try{
+  if(markerPersistence.write(next)===true){lastCommittedMarkers=parseMarkers(next);return true;}
+ }catch(err){console.error('Atlas cloud save:',err)}
+ // CAS, cloud lock, quota or validation refused: always revert visual markers.
+ replaceMarkersInPlace(lastCommittedMarkers);
+ return false;
+}
+function readLegacyMarkers(){
+ try{
+  const raw=localStorage.getItem(ATLAS_MARKER_KEY);
+  if(!raw)return null;
+  const data=JSON.parse(raw),parsed=parseMarkers(data);
+  return Object.values(parsed).some(rows=>rows.length)?parsed:null;
+ }catch{return null;}
+}
+function mergeLegacyMarkers(legacy){
+ const merged=parseMarkers(markersByMap);
+ let count=0;
+ for(const mapId of Object.keys(MAPS)){
+  const ids=new Set(merged[mapId].map(x=>x.id));
+  const partyExists=merged[mapId].some(x=>x.type==='party');
+  for(const marker of legacy[mapId]||[]){
+   if(merged[mapId].length>=250)break;
+   if(ids.has(marker.id)||marker.type==='party'&&partyExists)continue;
+   if(marker.type==='party'){
+    if(merged[mapId].some(x=>x.type==='party'))continue;
+   }
+   merged[mapId].push({...marker});ids.add(marker.id);count++;
+  }
+ }
+ return {merged,count};
 }
 
 const LEAGUE_KM=4; // 1 Hârnic league = 4 km, confirmed by both source map scales.
@@ -188,7 +253,9 @@ export function atlasView(){
      </div>
      <div class="atlas-marker-list-heading">Značky na této mapě (<span data-atlas-marker-count>0</span>)</div>
      <div class="atlas-marker-list" data-atlas-marker-list aria-label="Seznam značek na aktuální mapě"></div>
-     <p class="atlas-marker-save-note">Značky se ukládají lokálně v tomto prohlížeči, nezávisle na herních datech.</p>
+     <p class="atlas-marker-save-note">Značky jsou součástí stejného JSON kampaně. Na dalších zařízeních se načtou přes existující GitHub Cloud.</p>
+     <div data-atlas-marker-migration hidden><p class="atlas-tool-help">V tomto prohlížeči jsou staré místní značky. Můžete je jednorázově převzít do společné kampaně.</p>
+      <button type="button" class="atlas-tool-action" data-atlas-marker-import>Převzít místní značky do cloudu</button></div>
     </section>
    </aside>
   </div>
@@ -196,7 +263,10 @@ export function atlasView(){
 }
 
 /** Bind per-view ephemeral controls; only Atlas DOM is replaced when K5 opens. */
-export function mountAtlasView(root){
+export function mountAtlasView(root,persistence=null){
+ // The application owns persistence. Atlas never receives the GitHub token and
+ // cannot write its own unguarded JSON; it uses the existing CAS/cloud writer.
+ if(persistence&&typeof persistence.read==='function'&&typeof persistence.write==='function')markerPersistence=persistence;
  const workspace=root.querySelector('.atlas-workspace');
  const viewport=workspace?.querySelector('[data-atlas-viewport]');
  if(!workspace||!viewport)return;
@@ -222,6 +292,8 @@ export function mountAtlasView(root){
  loadAtlasMarkers();
  const measurement=measurementsByMap[map.id];
  const mapMarkers=markersByMap[map.id];
+ const migrationPanel=workspace.querySelector('[data-atlas-marker-migration]');
+ const migrationButton=workspace.querySelector('[data-atlas-marker-import]');
  const customMarkerOverlay=workspace.querySelector('[data-atlas-custom-marker-overlay]');
  const markerAdd=workspace.querySelector('[data-atlas-marker-add]');
  const markerParty=workspace.querySelector('[data-atlas-marker-party]');
@@ -495,7 +567,7 @@ export function mountAtlasView(root){
   selectedMarkerId=null;
   markerPlacement=false;refreshMarkerAdd();closeMarkerEditor();
   const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
-  status.textContent=`Pozice družiny ${existing?'je vyznačena na mapě.':''}${saved?'':' Prohlížeč blokuje trvalé uložení.'}`;
+  status.textContent=`Pozice družiny ${existing?'je vyznačena na mapě.':''}${saved?'':' Uložení do sdílené kampaně selhalo.'}`;
  };
  workspace.querySelector('[data-atlas-marker-cancel]').addEventListener('click',()=>{
   closeMarkerEditor();markerPlacement=false;refreshMarkerAdd();
@@ -519,7 +591,7 @@ export function mountAtlasView(root){
   closeMarkerEditor();
   markerNodes.get(marker.id)?.remove();markerNodes.delete(marker.id);
   const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
-  status.textContent=`Značka „${markerDisplayName(marker)}“ ${existing?'byla upravena':'byla přidána'}.${saved?'':' Upozornění: prohlížeč blokuje trvalé uložení; značka zůstává pouze do obnovení stránky.'}`;
+  status.textContent=`Značka „${markerDisplayName(marker)}“ ${existing?'byla upravena':'byla přidána'}.${saved?'':' Zápis do společné kampaně se nezdařil; změna byla vrácena.'}`;
  });
  markerList.addEventListener('click',e=>{
   const target=e.target.closest('button');if(!target)return;
@@ -533,7 +605,7 @@ export function mountAtlasView(root){
    mapMarkers.splice(index,1);if(selectedMarkerId===removeId)selectedMarkerId=null;
    if(editingMarkerId===removeId)closeMarkerEditor();
    const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
-   status.textContent=`Značka „${markerDisplayName(item)}“ byla odstraněna.${saved?'':' Upozornění: změnu nebylo možné uložit do prohlížeče.'}`;
+   status.textContent=`Značka „${markerDisplayName(item)}“ byla odstraněna.${saved?'':' Zápis do společné kampaně se nezdařil; změna byla vrácena.'}`;
   }
  });
  // Marker pointer capture is independent from the map's pan gesture.
@@ -570,7 +642,7 @@ export function mountAtlasView(root){
     else{
      suppressMarkerClick={id:gesture.id,at:Date.now()};
      const saved=saveAtlasMarkers();
-     status.textContent=`Značka „${markerDisplayName(item)}“ byla přemístěna.${saved?'':' Novou polohu nelze trvale uložit v tomto prohlížeči.'}`;
+     status.textContent=`Značka „${markerDisplayName(item)}“ byla přemístěna.${saved?'':' Zápis do společné kampaně se nezdařil; původní poloha byla obnovena.'}`;
     }
    }
    paintCustomMarkers();renderMarkerList();
@@ -586,7 +658,28 @@ export function mountAtlasView(root){
   }
   suppressMarkerClick=null;selectMarker(pin.dataset.atlasMarker,false);
  });
- renderMarkerList();refreshMarkerAdd();
+ const refreshLegacyImport=()=>{const old=readLegacyMarkers();migrationPanel.hidden=!old||mergeLegacyMarkers(old).count===0;};
+ migrationButton.addEventListener('click',()=>{
+  const legacy=readLegacyMarkers();if(!legacy){refreshLegacyImport();return;}
+  const {merged,count}=mergeLegacyMarkers(legacy);
+  if(count===0){
+   // Nothing is missing in shared data. Do not remove the local backup silently.
+   status.textContent='Značky z tohoto zařízení jsou už v kampani, nebo na mapě existuje pozice družiny.';
+   return;
+  }
+  // This write goes to the SAME existing campaign JSON as characters and journals.
+  const previous=parseMarkers(markersByMap);
+  replaceMarkersInPlace(merged);
+  const ok=saveAtlasMarkers();
+  if(!ok){replaceMarkersInPlace(previous);status.textContent='Převzetí značek se nepodařilo bezpečně uložit. Staré místní značky zůstávají zachované.';}
+  else{
+   // Preserve the original browser backup until the user explicitly deletes it:
+   // it may contain a different party position ignored to avoid overwrite.
+   status.textContent=`Do společné kampaně bylo přidáno ${count} místních značek. Původní místní kopie zůstává zachována.`;
+  }
+  paintCustomMarkers();renderMarkerList();refreshLegacyImport();
+ });
+ renderMarkerList();refreshMarkerAdd();refreshLegacyImport();
  measureToggle.addEventListener('click',()=>{
   if(measurement.active){
    measurement.active=false;measurement.points=[];paintMeasurement();
