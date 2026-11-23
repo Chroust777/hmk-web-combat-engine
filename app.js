@@ -1,4 +1,4 @@
-import {atlasView,mountAtlasView} from './src/ui/atlas-viewer.js?v=94.060';
+import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.061';
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.007';
 import {armourWorkItem} from './src/integration/hmk-making-armour.js?v=94.012';
@@ -408,7 +408,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.060';
+const APP_VERSION='94.061';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -712,6 +712,7 @@ function assertAnimalTrainingCalendarAppendOnly590(before,after){
    throw Error('Animalcraft: kalendářní doklad nelze změnit ani odstranit.');}
 }
 function validate(d){
+ validateAtlasMarkers(d?.atlasMarkers);
  assertFiniteState93897(d);
  validateGMHealthOverrideEvidence(d?.characters||[],d?.journal||[],d?.trash||[]);
  validateGlobalActionLedger(d);
@@ -860,6 +861,20 @@ function validate(d){
  for(const c of ids){for(const slot of ['main_hand','off_hand']){if(d.inventory.filter(x=>x.characterId===c&&x.slot===slot).length>1)throw Error('Více předmětů v jednom slotu ruky')}}
  return d
 }
+// Atlas is an independent *field* of the existing cloud campaign JSON.
+// It uses the same guarded CAS snapshot writer, GitHub pending queue and
+// load/backup routines. Never write directly to the private repository here.
+const atlasPersistence={
+ read:()=>data.atlasMarkers,
+ write:next=>{
+  try{validateAtlasMarkers(next)}catch(err){notice='Atlas: '+String(err.message||err);return false;}
+  const before=data.atlasMarkers;
+  data.atlasMarkers=structuredClone(next);
+  const ok=save();
+  if(!ok){data.atlasMarkers=before;return false;}
+  return true;
+ }
+};
 function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null,episodeCommit=false}={}){
  // Uncommitted Skill Test receipts belong ONLY to the in-progress episode.
  // No unrelated save (including cloud sync) may accidentally publish them.
@@ -14663,7 +14678,7 @@ function render(){
  if(!uiNavigationRestoring)uiNavigation.visit(nextRoute,{scrollY:window.scrollY});
  writeGuidedDraft();
  app.innerHTML=main()+(overlay||'');
- if(view==='atlas')mountAtlasView(app);
+ if(view==='atlas')mountAtlasView(app,atlasPersistence);
  const returnRoute=characterProjectReturn;
  if(returnRoute&&(view===returnRoute.view||(returnRoute.view==='stable'&&view==='sheet'&&activeSheetSection==='stable'))&&returnRoute.actorId===selected&&returnRoute.campaignId===campaignKey(data.campaignClock)){
   app.querySelector('main.content')?.insertAdjacentHTML('afterbegin','<div class="hmk-project-return"><button type="button" class="secondary" data-character-project-return>‹ Zpět k projektu postavy</button></div>');
