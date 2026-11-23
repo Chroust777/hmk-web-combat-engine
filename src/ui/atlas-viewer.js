@@ -1,5 +1,5 @@
 /**
- * Hârn Atlas v94.061 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.062 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -50,9 +50,7 @@ const measurementsByMap={overview:{active:false,points:[]},K5:{active:false,poin
 
 // Atlas markers are a separate top-level field in the EXISTING campaign JSON.
 // The persisted coordinates are source-map pixels; this data does not affect travel,
-// time, health, or any other rules module. The old localStorage key is read ONLY for
-// a one-time, opt-in migration (never authoritative once cloud data is available).
-const ATLAS_MARKER_KEY='hmk-atlas-markers-v1';
+// time, health, or any other rules module.
 const MARKER_TYPES=Object.freeze({party:{label:'Pozice družiny',symbol:'♟'},village:{label:'Vesnice',symbol:'⌂'},camp:{label:'Tábor',symbol:'⚑'},discovery:{label:'Nález',symbol:'✦'},danger:{label:'Nebezpečí',symbol:'!'},other:{label:'Jiné',symbol:'●'}});
 const markerDisplayName=item=>item.type==='party'?MARKER_TYPES.party.label:item.name;
 const markersByMap={overview:[],K5:[]};
@@ -123,32 +121,6 @@ function saveAtlasMarkers(){
  replaceMarkersInPlace(lastCommittedMarkers);
  return false;
 }
-function readLegacyMarkers(){
- try{
-  const raw=localStorage.getItem(ATLAS_MARKER_KEY);
-  if(!raw)return null;
-  const data=JSON.parse(raw),parsed=parseMarkers(data);
-  return Object.values(parsed).some(rows=>rows.length)?parsed:null;
- }catch{return null;}
-}
-function mergeLegacyMarkers(legacy){
- const merged=parseMarkers(markersByMap);
- let count=0;
- for(const mapId of Object.keys(MAPS)){
-  const ids=new Set(merged[mapId].map(x=>x.id));
-  const partyExists=merged[mapId].some(x=>x.type==='party');
-  for(const marker of legacy[mapId]||[]){
-   if(merged[mapId].length>=250)break;
-   if(ids.has(marker.id)||marker.type==='party'&&partyExists)continue;
-   if(marker.type==='party'){
-    if(merged[mapId].some(x=>x.type==='party'))continue;
-   }
-   merged[mapId].push({...marker});ids.add(marker.id);count++;
-  }
- }
- return {merged,count};
-}
-
 const LEAGUE_KM=4; // 1 Hârnic league = 4 km, confirmed by both source map scales.
 const formatDistance=(km)=>new Intl.NumberFormat('cs-CZ',{maximumFractionDigits:km<1?3:2}).format(km);
 const formatSegment=(km)=>km<1?`${new Intl.NumberFormat('cs-CZ',{maximumFractionDigits:km<.1?1:0}).format(km*1000)} m`:`${formatDistance(km)} km`;
@@ -254,8 +226,6 @@ export function atlasView(){
      <div class="atlas-marker-list-heading">Značky na této mapě (<span data-atlas-marker-count>0</span>)</div>
      <div class="atlas-marker-list" data-atlas-marker-list aria-label="Seznam značek na aktuální mapě"></div>
      <p class="atlas-marker-save-note">Značky jsou součástí stejného JSON kampaně. Na dalších zařízeních se načtou přes existující GitHub Cloud.</p>
-     <div data-atlas-marker-migration hidden><p class="atlas-tool-help">V tomto prohlížeči jsou staré místní značky. Můžete je jednorázově převzít do společné kampaně.</p>
-      <button type="button" class="atlas-tool-action" data-atlas-marker-import>Převzít místní značky do cloudu</button></div>
     </section>
    </aside>
   </div>
@@ -292,8 +262,6 @@ export function mountAtlasView(root,persistence=null){
  loadAtlasMarkers();
  const measurement=measurementsByMap[map.id];
  const mapMarkers=markersByMap[map.id];
- const migrationPanel=workspace.querySelector('[data-atlas-marker-migration]');
- const migrationButton=workspace.querySelector('[data-atlas-marker-import]');
  const customMarkerOverlay=workspace.querySelector('[data-atlas-custom-marker-overlay]');
  const markerAdd=workspace.querySelector('[data-atlas-marker-add]');
  const markerParty=workspace.querySelector('[data-atlas-marker-party]');
@@ -658,28 +626,7 @@ export function mountAtlasView(root,persistence=null){
   }
   suppressMarkerClick=null;selectMarker(pin.dataset.atlasMarker,false);
  });
- const refreshLegacyImport=()=>{const old=readLegacyMarkers();migrationPanel.hidden=!old||mergeLegacyMarkers(old).count===0;};
- migrationButton.addEventListener('click',()=>{
-  const legacy=readLegacyMarkers();if(!legacy){refreshLegacyImport();return;}
-  const {merged,count}=mergeLegacyMarkers(legacy);
-  if(count===0){
-   // Nothing is missing in shared data. Do not remove the local backup silently.
-   status.textContent='Značky z tohoto zařízení jsou už v kampani, nebo na mapě existuje pozice družiny.';
-   return;
-  }
-  // This write goes to the SAME existing campaign JSON as characters and journals.
-  const previous=parseMarkers(markersByMap);
-  replaceMarkersInPlace(merged);
-  const ok=saveAtlasMarkers();
-  if(!ok){replaceMarkersInPlace(previous);status.textContent='Převzetí značek se nepodařilo bezpečně uložit. Staré místní značky zůstávají zachované.';}
-  else{
-   // Preserve the original browser backup until the user explicitly deletes it:
-   // it may contain a different party position ignored to avoid overwrite.
-   status.textContent=`Do společné kampaně bylo přidáno ${count} místních značek. Původní místní kopie zůstává zachována.`;
-  }
-  paintCustomMarkers();renderMarkerList();refreshLegacyImport();
- });
- renderMarkerList();refreshMarkerAdd();refreshLegacyImport();
+ renderMarkerList();refreshMarkerAdd();
  measureToggle.addEventListener('click',()=>{
   if(measurement.active){
    measurement.active=false;measurement.points=[];paintMeasurement();
