@@ -1,4 +1,4 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.065';
+import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.066';
 /**
  * Hârn Atlas v94.065 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
@@ -191,6 +191,7 @@ export function atlasView(){
      <output class="atlas-zoom-label" data-atlas-zoom aria-live="off">100 %</output>
      <button type="button" data-atlas-control="plus" aria-label="Přiblížit mapu" title="Přiblížit">+</button>
      <button type="button" data-atlas-control="fit" class="atlas-fit" title="Zobrazit celou mapu">Celá mapa</button>
+     <details class="atlas-toolbar-layers"><summary aria-label="Zobrazit vrstvy mapy">Vrstvy mapy</summary><div data-carto-layers class="atlas-carto-layers"></div></details>
      <div class="atlas-toolbar-help">Kolečko myši nebo dva prsty: přiblížení · tažení: posun</div>
     </div>
     <div class="atlas-viewport" data-atlas-viewport tabindex="0" role="region" aria-label="${overview?'Mapa I4–L7, K5 je klikací sektor':'Mapa K5'}, kolečko myši přibližuje, tažení posouvá, klávesy se šipkami posouvají">
@@ -210,7 +211,7 @@ export function atlasView(){
      <div class="atlas-custom-marker-overlay" data-atlas-custom-marker-overlay aria-label="Vlastní značky na mapě"></div>
      <svg class="atlas-cartography-overlay" data-atlas-carto-overlay aria-label="Mapové objekty a body trasy družiny"></svg>
      <canvas class="atlas-fog-overlay" data-atlas-fog aria-hidden="true"></canvas>
-     <div class="atlas-carto-hover-delete" data-carto-hover-delete hidden><button type="button" aria-label="Smazat objekt nebo navazující trasu" title="Smazat">×</button></div>
+     <div class="atlas-carto-hover-delete" data-carto-hover-delete hidden><div class="atlas-carto-hover-tip" data-carto-hover-tip hidden></div><div class="atlas-carto-hover-actions"><button type="button" data-carto-hover-edit aria-label="Upravit poznámku nebo body objektu" title="Upravit objekt">✎</button><button type="button" data-carto-hover-remove aria-label="Smazat objekt nebo navazující trasu" title="Smazat">×</button></div></div>
      <div class="atlas-fog-brush-cursor" data-carto-fog-cursor hidden aria-hidden="true"></div>
      <div class="atlas-scale" aria-label="Grafické měřítko mapy"><div data-atlas-scale-line class="atlas-scale-line"></div><span data-atlas-scale-label>≈ 20 km</span></div>
     </div>
@@ -247,13 +248,6 @@ export function atlasView(){
        <label>Typ značky <select data-atlas-marker-type><option value="party">♟ Pozice družiny</option><option value="village">⌂ Vesnice</option><option value="camp">⚑ Tábor</option><option value="discovery">✦ Nález</option><option value="danger">! Nebezpečí</option><option value="other">● Jiné</option></select></label>
        <label data-atlas-marker-name-wrap>Název značky (volitelné) <input data-atlas-marker-name type="text" maxlength="90" autocomplete="off" placeholder="Např. Opuštěná vesnice"></label>
        <label data-atlas-marker-description-wrap>Popisek <textarea data-atlas-marker-description maxlength="1000" rows="4" placeholder="Co družina na tomto místě objevila…"></textarea></label>
-       <fieldset class="atlas-marker-events"><legend>Časové poznámky k místu</legend>
-        <label>Událost <select data-atlas-event-kind><option value="discovery">Objeveno</option><option value="visit">Navštíveno</option><option value="departure">Opuštěno</option><option value="other">Poznámka</option></select></label>
-        <label>Herní datum <input data-atlas-event-date maxlength="80" placeholder="Např. 15. Nolus 720 TR"></label>
-        <label>Text poznámky <textarea data-atlas-event-note maxlength="500" rows="2" placeholder="Co se tu stalo…"></textarea></label>
-        <button type="button" data-atlas-event-add>Přidat časovou poznámku</button>
-        <div data-atlas-event-list class="atlas-marker-event-list"></div>
-       </fieldset>
        <div class="atlas-marker-form-actions"><button type="submit">Uložit značku</button><button type="button" data-atlas-marker-cancel>Zrušit</button></div>
       </form>
      </div>
@@ -310,10 +304,6 @@ export function mountAtlasView(root,persistence=null){
  const markerDescription=workspace.querySelector('[data-atlas-marker-description]');
  const markerNameWrap=workspace.querySelector('[data-atlas-marker-name-wrap]');
  const markerDescriptionWrap=workspace.querySelector('[data-atlas-marker-description-wrap]');
- const eventKind=workspace.querySelector('[data-atlas-event-kind]');
- const eventDate=workspace.querySelector('[data-atlas-event-date]');
- const eventNote=workspace.querySelector('[data-atlas-event-note]');
- const eventList=workspace.querySelector('[data-atlas-event-list]');
  let pendingMarkerEvents=[];
  const markerNodes=new Map(),markerButtons=new Map();
  let markerPlacement=false,markerPlacementType='village',markerDraft=null,editingMarkerId=null,selectedMarkerId=null;
@@ -439,24 +429,6 @@ export function mountAtlasView(root,persistence=null){
   markerDraft=null;editingMarkerId=null;pendingMarkerEvents=[];markerEditor.hidden=true;markerForm.reset();
   paintCustomMarkers(); // Remove an unsaved preview immediately on cancel/save.
  };
- const renderMarkerEvents=()=>{
-  eventList.replaceChildren();
-  for(const evt of pendingMarkerEvents){
-   const row=document.createElement('div');row.className='atlas-marker-event-row';
-   const text=document.createElement('span');text.textContent=`${MARKER_EVENTS[evt.kind]} · ${evt.date||'Bez data'}${evt.note?' · '+evt.note:''}`;
-   const remove=document.createElement('button');remove.type='button';remove.textContent='Smazat';remove.dataset.atlasEventDelete=evt.id;
-   row.append(text,remove);eventList.appendChild(row);
-  }
- };
- workspace.querySelector('[data-atlas-event-add]').addEventListener('click',()=>{
-  if(pendingMarkerEvents.length>=80){status.textContent='Na jednu značku lze vložit nejvýše 80 časových poznámek.';return;}
-  pendingMarkerEvents.push({id:`e-${Date.now().toString(36)}-${(++markerSequence).toString(36)}`,kind:eventKind.value,date:eventDate.value.trim(),note:eventNote.value.trim()});
-  eventDate.value='';eventNote.value='';renderMarkerEvents();
- });
- eventList.addEventListener('click',e=>{
-  const id=e.target.closest('[data-atlas-event-delete]')?.dataset.atlasEventDelete;
-  if(id){pendingMarkerEvents=pendingMarkerEvents.filter(x=>x.id!==id);renderMarkerEvents();}
- });
  const syncMarkerFormType=()=>{
   // Name and description are always optional, even for the party icon.
   markerNameWrap.hidden=false;markerDescriptionWrap.hidden=false;
@@ -485,7 +457,8 @@ export function mountAtlasView(root,persistence=null){
    }
    const pos=screenPoint(item);
    node.style.left=`${pos.x}px`;node.style.top=`${pos.y}px`;
-   const controls=markerButtons.get(item.id);if(controls){controls[0].style.left=`${pos.x-21}px`;controls[0].style.top=`${pos.y-23}px`;controls[1].style.left=`${pos.x+20}px`;controls[1].style.top=`${pos.y-23}px`;}
+   // Actions are BELOW the pin, never above it where the text balloon opens.
+   const controls=markerButtons.get(item.id);if(controls){controls[0].style.left=`${pos.x-17}px`;controls[0].style.top=`${pos.y+27}px`;controls[1].style.left=`${pos.x+17}px`;controls[1].style.top=`${pos.y+27}px`;}
    // When relocating a party icon, show the draft in the new location until Save.
    node.style.visibility=editingMarkerId===item.id&&markerDraft?'hidden':'';
    const selected=item.id===selectedMarkerId;
@@ -501,9 +474,11 @@ export function mountAtlasView(root,persistence=null){
    node.setAttribute('aria-label',`${MARKER_TYPES[item.type].label}: ${markerDisplayName(item)}${item.description?' – '+item.description:''}`);
    node.querySelector('.atlas-custom-symbol').textContent=MARKER_TYPES[item.type].symbol;
    node.querySelector('.atlas-marker-tooltip-title').textContent=markerDisplayName(item);
-   const latest=item.events?.at(-1);
-   node.querySelector('.atlas-marker-tooltip-description').textContent=item.description+(latest?`${item.description?'\n':''}${MARKER_EVENTS[latest.kind]} · ${latest.date||'bez data'}${latest.note?' – '+latest.note:''}`:'');
-   node.querySelector('.atlas-marker-tooltip-description').hidden=!item.description&&!item.events?.length;
+   // Legacy event entries are preserved in stored JSON; only their freeform notes
+   // remain visible. The event/date editor has been removed from the Atlas UI.
+   const oldNotes=(item.events||[]).map(ev=>ev.note||'').filter(Boolean);
+   node.querySelector('.atlas-marker-tooltip-description').textContent=[item.description,...oldNotes].filter(Boolean).join('\n');
+   node.querySelector('.atlas-marker-tooltip-description').hidden=!item.description&&!oldNotes.length;
    const tipShift=pos.x<125?125-pos.x:pos.x>viewport.clientWidth-125?viewport.clientWidth-125-pos.x:0;
    node.style.setProperty('--atlas-tip-shift',`${tipShift}px`);
   }
@@ -569,7 +544,7 @@ export function mountAtlasView(root,persistence=null){
   markerName.value=item?.name||'';
   markerType.value=item?.type||markerPlacementType;
   markerDescription.value=item?.description||'';
-  pendingMarkerEvents=structuredClone(item?.events||[]);renderMarkerEvents();
+  pendingMarkerEvents=structuredClone(item?.events||[]);
   markerEditor.hidden=false;
   syncMarkerFormType();
   markerType.focus({preventScroll:true});
@@ -639,7 +614,18 @@ export function mountAtlasView(root,persistence=null){
   const editId=e.target.closest('[data-atlas-marker-edit-id]')?.dataset.atlasMarkerEditId;
   const removeId=e.target.closest('[data-atlas-marker-delete-id]')?.dataset.atlasMarkerDeleteId;
   if(editId){e.stopPropagation();const item=mapMarkers.find(x=>x.id===editId);if(item){clearMarkerSelection();openMarkerEditor(item);}return;}
-  if(removeId){e.stopPropagation();removeMarker(removeId);}
+  if(removeId){e.stopPropagation();const item=mapMarkers.find(x=>x.id===removeId);if(item&&window.confirm(`Opravdu odstranit značku „${markerDisplayName(item)}“${item.type==='party'?' i celou historii jejího pohybu na této mapě':''}?`))removeMarker(removeId);}
+ });
+ // Keep the edit/delete buttons visible while moving the pointer off the pin.
+ let markerActionTimer=null;
+ const revealMarkerActions=id=>{clearTimeout(markerActionTimer);for(const [key,buttons] of markerButtons)buttons.forEach(btn=>btn.classList.toggle('atlas-marker-action-visible',key===id));};
+ customMarkerOverlay.addEventListener('pointerover',e=>{
+  const target=e.target.closest?.('[data-atlas-marker],[data-atlas-marker-edit-id],[data-atlas-marker-delete-id]');
+  if(target)revealMarkerActions(target.dataset.atlasMarker||target.dataset.atlasMarkerEditId||target.dataset.atlasMarkerDeleteId);
+ });
+ customMarkerOverlay.addEventListener('pointerout',e=>{
+  if(!e.target.closest?.('[data-atlas-marker],[data-atlas-marker-edit-id],[data-atlas-marker-delete-id]'))return;
+  clearTimeout(markerActionTimer);markerActionTimer=setTimeout(()=>revealMarkerActions(null),500);
  });
  // Marker pointer capture is independent from the map's pan gesture.
  // Drag directly: no 'move' mode, no confirmation, save at pointer release.
@@ -945,7 +931,7 @@ export function mountAtlasView(root,persistence=null){
   if(pinch)return;
   if(cartoPointer===e.pointerId){
    cartoPointer=null;
-   if(['draw','arrow','fog-reveal','fog-cover'].includes(atlasCarto?.mode))atlasCarto?.pointerEnd();
+   if(['draw','arrow','radius','fog-reveal','fog-cover'].includes(atlasCarto?.mode))atlasCarto?.pointerEnd();
    else if(atlasCarto?.mode==='edit-points'){if(!atlasCarto.pointerEnd())atlasCarto.handleClick(e.clientX,e.clientY);}
    else atlasCarto?.handleClick(e.clientX,e.clientY);
    if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);

@@ -299,11 +299,6 @@ body #app main.content-atlas .atlas-custom-marker--draft{
 .atlas-carto-row-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 body #app main.content-atlas .atlas-tools .atlas-carto-row-actions button{font-size:11px!important;padding:5px 7px!important;flex:1 1 auto}
 @media(max-width:1050px){.atlas-cartography{display:block!important}}
-.atlas-marker-events{border:1px solid #b09a73;border-radius:5px;margin:10px 0 6px;padding:7px}
-.atlas-marker-events legend{color:#5b3c25;font:bold 12px Georgia,serif;padding:0 5px}
-.atlas-marker-event-list{max-height:190px;overflow:auto;margin-top:7px}
-.atlas-marker-event-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px dotted #c2aa84;font:11px/1.4 Georgia,serif;color:#533621}
-.atlas-marker-event-row span{flex:1;min-width:0;overflow-wrap:anywhere}
 .atlas-marker-tooltip-description{white-space:pre-line}
 
 /* v94.065 — compact Atlas controls; sections start closed. */
@@ -352,3 +347,35 @@ body #app main.content-atlas .atlas-carto-hover-delete button{
 .atlas-fog-brush-cursor{position:absolute;z-index:11;pointer-events:none;transform:translate(-50%,-50%);
  border:2px dashed #fff9e8;border-radius:50%;box-shadow:0 0 0 1px #38434acb,inset 0 0 12px #cbd0d54d;
  background:#e9edf019;mix-blend-mode:normal;min-width:2px;min-height:2px}
+
+/* v94.066 — marker control pair sits below the pin and away from the note. */
+.atlas-custom-marker-overlay .atlas-marker-map-action{width:29px!important;height:29px!important}
+.atlas-custom-marker-overlay .atlas-marker-map-action.atlas-marker-action-visible{opacity:1;visibility:visible;pointer-events:auto}
+.atlas-custom-marker-overlay .atlas-marker-map-action:focus-visible{opacity:1;visibility:visible;pointer-events:auto}
+/* Keep buttons discoverable when the pin was selected. */
+.atlas-marker-map-action:hover{opacity:1;visibility:visible;pointer-events:auto}
+
+/* The layer switch belongs to the map toolbar rather than the tool sidebar. */
+.atlas-toolbar{position:relative;z-index:22}
+.atlas-toolbar-layers{position:relative;flex:0 0 auto}
+.atlas-toolbar-layers>summary{list-style:none;cursor:pointer;background:#f0dfbd;border:1px solid #ad926b;color:#503821;border-radius:5px;padding:7px 10px;font:700 12px/1.5 Georgia,serif;min-height:34px;box-sizing:border-box}
+.atlas-toolbar-layers>summary::-webkit-details-marker{display:none}
+.atlas-toolbar-layers>summary::after{content:' ▾'}
+.atlas-toolbar-layers[open]>summary{background:#d9b98b}
+.atlas-toolbar-layers>.atlas-carto-layers{position:absolute;top:100%;left:0;z-index:60;width:min(310px,75vw);max-height:50vh;overflow:auto;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;gap:9px;background:#f7e7c9;border:1px solid #85633e;border-radius:5px;padding:12px;box-shadow:0 5px 18px #1f160c88}
+.atlas-toolbar-layers>.atlas-carto-layers label{font:12px/1.4 Georgia,serif;color:#4b3423}
+
+/* Hide controls not belonging to the currently chosen tool, including global CSS overrides. */
+.atlas-carto-fields[hidden],.atlas-carto-fields [hidden],.atlas-cartography button[hidden]{display:none!important}
+.atlas-carto-fields{margin-top:8px}
+
+/* Stable large map-object action pad with a tooltip; no chasing the moving cursor. */
+.atlas-carto-hover-delete{transform:translateX(-50%);z-index:25;pointer-events:auto;min-width:102px;padding:4px 5px;border:1px solid #8b6b46;border-radius:8px;background:#f8ecd3;box-shadow:0 3px 13px #22160c99}
+.atlas-carto-hover-actions{display:flex;gap:6px;align-items:center;justify-content:center}
+body #app main.content-atlas .atlas-carto-hover-delete .atlas-carto-hover-actions button{pointer-events:auto;min-width:42px!important;width:42px!important;height:36px!important;min-height:36px!important;border-radius:6px!important;font-size:20px!important}
+body #app main.content-atlas .atlas-carto-hover-delete .atlas-carto-hover-actions button[data-carto-hover-edit]{color:#28546d!important;border-color:#35617a!important}
+.atlas-carto-hover-tip{max-width:220px;max-height:105px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 Georgia,serif;color:#4d3423;padding:5px 6px;margin-bottom:4px;background:#fff5e4;border-radius:3px}
+.atlas-carto-hover-tip[hidden],.atlas-carto-hover-actions button[hidden]{display:none!important}
+.atlas-viewport.is-cartographing .atlas-carto-hit{cursor:crosshair}
+body #app main.content-atlas .atlas-tools .atlas-cartography button[hidden]{display:none!important}
+body #app main.content-atlas .atlas-carto-hover-delete [hidden]{display:none!important}
