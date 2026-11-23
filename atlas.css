@@ -405,3 +405,22 @@ body #app main.content-atlas .atlas-viewport.is-measuring .atlas-custom-marker,
 body #app main.content-atlas .atlas-viewport.is-cartographing .atlas-custom-marker{
  pointer-events:none!important;
 }
+
+/* v94.068 – Compact, accessible Atlas toolbar and cartography title. */
+body #app main.content-atlas .atlas-toolbar .atlas-party-position{
+ width:auto!important;min-width:0!important;padding:3px 10px!important;font-size:12px!important;
+ white-space:nowrap;
+}
+body #app main.content-atlas .atlas-toolbar .atlas-party-position[aria-pressed="true"]{
+ background:#d5dfbf!important;border-color:#647747!important;
+}
+.atlas-tools-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;padding-bottom:9px;border-bottom:1px solid #ab8656a8}
+.atlas-tools .atlas-tools-head h2{margin:0!important;font:700 16px/1.25 Georgia,serif!important}
+.atlas-tools-head .atlas-carto-top{display:flex;align-items:center;gap:5px;margin:0}
+body #app main.content-atlas .atlas-tools-head .atlas-carto-top button{min-height:29px!important;padding:5px 8px!important;font-size:11px!important}
+.atlas-marker-index{margin-top:12px;border:1px solid #af9066;border-radius:5px;background:#f8e9cd75;min-width:0}
+.atlas-marker-index>summary{cursor:pointer;padding:9px 10px;font:700 12px/1.4 Georgia,serif;color:#503723;user-select:none;list-style:none}
+.atlas-marker-index>summary::-webkit-details-marker{display:none}
+.atlas-marker-index>summary::after{content:' ▾';float:right}
+.atlas-marker-index[open]>summary::after{content:' ▴'}
+.atlas-marker-index[open]>.atlas-marker-list{margin:0 8px 8px;padding-top:8px;border-top:1px solid #b69c75aa}

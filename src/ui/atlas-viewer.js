@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.067';
+import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.068';
 /**
- * Hârn Atlas v94.067 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.068 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -191,6 +191,7 @@ export function atlasView(){
      <output class="atlas-zoom-label" data-atlas-zoom aria-live="off">100 %</output>
      <button type="button" data-atlas-control="plus" aria-label="Přiblížit mapu" title="Přiblížit">+</button>
      <button type="button" data-atlas-control="fit" class="atlas-fit" title="Zobrazit celou mapu">Celá mapa</button>
+     <button type="button" data-atlas-marker-party class="atlas-party-position" aria-pressed="false" title="Zobrazit nebo umístit pozici družiny">Pozice družiny</button>
      <details class="atlas-toolbar-layers"><summary aria-label="Zobrazit vrstvy mapy">Vrstvy mapy</summary><div data-carto-layers class="atlas-carto-layers"></div></details>
      <div class="atlas-toolbar-help">Kolečko myši nebo dva prsty: přiblížení · tažení: posun</div>
     </div>
@@ -218,9 +219,8 @@ export function atlasView(){
     <div class="atlas-status" role="status" aria-live="polite" data-atlas-status>${hint}</div>
    </div>
    <aside class="atlas-tools" aria-label="Nástroje mapy">
-    <h2>Nástroje mapy</h2><p class="atlas-tools-subtitle">Práce přímo nad mapou · ${overview?'I4–L7':'K5'}</p>
+    <div class="atlas-tools-head"><h2>✎ Kartografické nástroje</h2><div class="atlas-carto-top" role="group" aria-label="Historie úprav kartografie"><button type="button" data-carto-undo disabled>Zpět</button><button type="button" data-carto-redo disabled>Znovu</button></div></div>
     <details class="atlas-tool-fold"><summary>↝ Měření trasy</summary><section class="atlas-tool-card" aria-label="Měření vzdálenosti">
-     <p class="atlas-tool-help">Postupně označte A → B → C → … Mapa ukáže délku každého úseku přímo u spojnice; vpravo se sčítá celá trasa.</p>
      <button type="button" class="atlas-tool-action" data-atlas-measure-toggle aria-pressed="false">Zapnout měření</button>
      <div class="atlas-measure-instructions" data-atlas-measure-help role="status" aria-live="polite" hidden></div>
      <div class="atlas-measure-results" data-atlas-measure-result aria-live="polite" hidden>
@@ -237,9 +237,7 @@ export function atlasView(){
      <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km.</p>
     </section></details>
     <details class="atlas-tool-fold"><summary>⌖ Vlastní značky</summary><section class="atlas-tool-card atlas-custom-section" aria-label="Vlastní značky mapy">
-     <p class="atlas-tool-help">Umístěte značku kliknutím do mapy. Kliknutím na značku zobrazíte popisek; přetažením ji rovnou přesunete.</p>
      <div class="atlas-marker-placement-controls">
-      <button type="button" class="atlas-tool-action" data-atlas-marker-party aria-pressed="false">Pozice družiny</button>
       <button type="button" class="atlas-tool-action" data-atlas-marker-add aria-pressed="false">Přidat značku</button>
      </div>
      <div class="atlas-marker-editor" data-atlas-marker-editor hidden>
@@ -251,8 +249,9 @@ export function atlasView(){
        <div class="atlas-marker-form-actions"><button type="submit">Uložit značku</button><button type="button" data-atlas-marker-cancel>Zrušit</button></div>
       </form>
      </div>
-     <div class="atlas-marker-list-heading">Značky na této mapě (<span data-atlas-marker-count>0</span>)</div>
-     <div class="atlas-marker-list" data-atlas-marker-list aria-label="Seznam značek na aktuální mapě"></div>
+     <details class="atlas-marker-index"><summary>Značky na této mapě (<span data-atlas-marker-count>0</span>)</summary>
+      <div class="atlas-marker-list" data-atlas-marker-list aria-label="Seznam značek na aktuální mapě"></div>
+     </details>
      <p class="atlas-marker-save-note">Značky jsou součástí společného JSON kampaně. Pro úpravu nebo smazání přejděte přímo na značku na mapě.</p>
     </section></details>
     ${atlasCartographyPanel()}
@@ -506,13 +505,14 @@ export function mountAtlasView(root,persistence=null){
   }else draftNode?.remove();
  };
  const renderMarkerList=()=>{
-  markerCount.textContent=String(mapMarkers.length);
+  const listed=mapMarkers.filter(item=>item.type!=='party');
+  markerCount.textContent=String(listed.length);
   markerList.replaceChildren();
-  if(!mapMarkers.length){
+  if(!listed.length){
    const empty=document.createElement('p');empty.className='atlas-marker-empty';
    empty.textContent='Zatím nemáte na této mapě žádné značky.';markerList.appendChild(empty);return;
   }
-  for(const item of mapMarkers){
+  for(const item of listed){
    const row=document.createElement('div');row.className='atlas-marker-row';row.classList.toggle('is-selected',item.id===selectedMarkerId);
    const nameBtn=document.createElement('button');nameBtn.type='button';nameBtn.className='atlas-marker-list-select';
    nameBtn.dataset.atlasMarkerSelect=item.id;
@@ -546,6 +546,8 @@ export function mountAtlasView(root,persistence=null){
   markerType.value=item?.type||markerPlacementType;
   markerDescription.value=item?.description||'';
   pendingMarkerEvents=structuredClone(item?.events||[]);
+  // The party shortcut now lives in the map toolbar: reveal its editor in the folded sidebar.
+  markerEditor.closest('.atlas-tool-fold').open=true;
   markerEditor.hidden=false;
   syncMarkerFormType();
   markerType.focus({preventScroll:true});

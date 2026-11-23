@@ -51,8 +51,6 @@ const polygonArea=(pts,map)=>Math.abs(pts.reduce((sum,p,i)=>{const q=pts[(i+1)%p
 const names={route:'Trasa',area:'Oblast',radius:'Dosah',draw:'Kresba',arrow:'Šipka',text:'Text'};
 export function atlasCartographyPanel(){
  return `<section class="atlas-tool-card atlas-cartography" aria-label="Kartografické nástroje" data-atlas-carto>
- <h3>✎ Kartografické nástroje</h3>
- <div class="atlas-carto-top"><button type="button" data-carto-undo disabled>Zpět</button><button type="button" data-carto-redo disabled>Znovu</button></div>
  <details open><summary>Trasy, oblasti a kreslení</summary>
   <label>Nástroj<select data-carto-mode><option value="">— Vyberte nástroj —</option><option value="route">Zakreslit trasu</option><option value="area">Zakreslit oblast / změřit plochu</option><option value="radius">Kružnice dosahu (tažením)</option><option value="draw">Kreslení od ruky</option><option value="arrow">Šipka</option><option value="text">Text na mapě</option></select></label>
   <div class="atlas-carto-fields" data-carto-fields hidden>
@@ -85,6 +83,8 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const loadSnapshot=source=>{const copy=structuredClone(source);Object.assign(local,copy.maps[map.id]);snapshot=copy;snapshot.maps[map.id]=local;};
  let mode='',draft=[],painting=false,currentBrush=null,highlightId=null,editingFeatureId=null,editVertex=null,editOriginal=null;
  const $=selector=>area.querySelector(selector);
+ const undoBtn=workspace.querySelector('[data-carto-undo]');
+ const redoBtn=workspace.querySelector('[data-carto-redo]');
  const modeField=$('[data-carto-mode]'),title=$('[data-carto-title]'),note=$('[data-carto-note]'),color=$('[data-carto-color]'),opacity=$('[data-carto-opacity]');
  const fogRadius=$('[data-carto-fog-radius]'),layerArea=workspace.querySelector('[data-carto-layers]');
  const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||10));
@@ -262,7 +262,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const centerAt=p=>zoomTo(p,1.07);
  const objectPoint=f=>f.points[Math.floor(f.points.length/2)];
  const redrawList=()=>{
-  $('[data-carto-undo]').disabled=undo.length===0;$('[data-carto-redo]').disabled=redo.length===0;
+  undoBtn.disabled=undo.length===0;redoBtn.disabled=redo.length===0;
   const editing=editingFeatureId?local.features.find(f=>f.id===editingFeatureId):null;
   const kind=editing?.type||mode;
   const fields=$('[data-carto-fields]');fields.hidden=!FEATURE_TYPES.includes(kind);
@@ -376,8 +376,8 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const newOpacity=Number(opacity.value);
   if(commit(()=>{f.title=newTitle;f.note=newNote;f.color=newColor;f.opacity=newOpacity;},'Popis mapového objektu'))clearMode();
  });
- $('[data-carto-undo]').addEventListener('click',()=>applySnapshot(undo,redo));
- $('[data-carto-redo]').addEventListener('click',()=>applySnapshot(redo,undo,true));
+ undoBtn.addEventListener('click',()=>applySnapshot(undo,redo));
+ redoBtn.addEventListener('click',()=>applySnapshot(redo,undo,true));
  layerArea?.addEventListener('change',e=>{const key=e.target.dataset.cartoLayer;if(LAYERS.includes(key)){commit(()=>{local.layers[key]=e.target.checked;},'Viditelnost vrstvy');paintSvg();paintFog();onLayersChange?.();}});
  const addHistory=pt=>{
   if(!pt||local.partyHistory.length>=1000)return false;
