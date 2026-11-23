@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.073. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.074. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -292,6 +292,12 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   }
   if(fogMask.width!==bw||fogMask.height!==bh){fogMask.width=bw;fogMask.height=bh;}
   const m=fogMask.getContext('2d');m.setTransform(dpr,0,0,dpr,0,0);m.globalCompositeOperation='source-over';m.clearRect(0,0,w,h);
+  // Fog belongs ONLY to the cartographic image, not to the brown viewport,
+  // row/column coordinate strips, or empty space exposed by zooming out.
+  // Clip the actual coverage mask, including all cover/reveal brush strokes,
+  // to the map image's projected rectangle in viewport coordinates.
+  const camera=getCamera(),mapOrigin=screenPoint({x:0,y:0});
+  m.save();m.beginPath();m.rect(mapOrigin.x,mapOrigin.y,map.width*camera.zoom,map.height*camera.zoom);m.clip();
   m.fillStyle='#000';m.fillRect(0,0,w,h);
   const applyStroke=stroke=>{
    const r=stroke.radiusKm*map.pixelsPerKm*getCamera().zoom;
@@ -307,7 +313,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   };
   for(const stroke of local.fog.strokes)applyStroke(stroke);
   if(painting&&currentBrush)applyStroke(currentBrush);
-  m.globalCompositeOperation='source-over';
+  m.restore(); // End map-only clip before composing the texture with the mask.
   ctx.drawImage(fogTexture,0,0);
   ctx.globalCompositeOperation='destination-in';ctx.drawImage(fogMask,0,0);ctx.globalCompositeOperation='source-over';
  };
