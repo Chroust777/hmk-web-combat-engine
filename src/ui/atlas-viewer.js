@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.075';
+import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.076';
 /**
- * Hârn Atlas v94.075 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.076 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -43,7 +43,7 @@ export const ATLAS_SECTORS=Object.freeze(ROWS.flatMap(row=>LETTERS.map(column=>O
  id:`${column}${row}`,column,row,detailMap:column==='K'&&row===5?'K5':null
 }))));
 let currentMapId='overview';
-let selectedSector=null;
+
 const rememberedByMap={overview:{initialized:false},K5:{initialized:false}};
 // Measurement is intentionally ephemeral and independent of campaign/game data.
 // Coordinates are in original map pixels, never viewport/screen pixels.
@@ -165,7 +165,7 @@ export function atlasRouteDistancesKm(mapId,points){
 
 const sectorButtons=()=>ATLAS_SECTORS.map(sector=>{
  const ready=!!sector.detailMap;
- return `<button type="button" class="atlas-sector${ready?' atlas-sector--has-detail':''}${selectedSector===sector.id?' is-selected':''}" data-atlas-sector="${sector.id}" aria-label="Sektor ${sector.id}${ready?', otevřít detailní mapu':' – detailní mapa zatím nepřipojena'}" title="${ready?'Otevřít detailní mapu K5':'Sektor '+sector.id+' · detailní mapa bude přidána později'}" tabindex="0"></button>`;
+ return `<button type="button" class="atlas-sector${ready?' atlas-sector--has-detail':''}" data-atlas-sector="${sector.id}" aria-label="Sektor ${sector.id}${ready?', otevřít detailní mapu':' – detailní mapa zatím nepřipojena'}" title="${ready?'Otevřít detailní mapu K5':'Sektor '+sector.id+' · detailní mapa bude přidána později'}" tabindex="0"></button>`;
 }).join('');
 
 export function atlasView(){
@@ -852,9 +852,6 @@ export function mountAtlasView(root,persistence=null){
  };
  const clickSector=id=>{
   const def=ATLAS_SECTORS.find(s=>s.id===id);if(!def||!overview)return;
-  selectedSector=id;
-  viewport.querySelectorAll('.atlas-sector.is-selected').forEach(el=>el.classList.remove('is-selected'));
-  viewport.querySelector(`[data-atlas-sector="${id}"]`)?.classList.add('is-selected');
   if(def.detailMap){switchTo(def.detailMap);return;}
   status.textContent=`Sektor ${id} zatím nemá připojenou detailní mapu. K dispozici je nyní K5.`;
  };

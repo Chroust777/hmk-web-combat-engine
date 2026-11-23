@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.075. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.076. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -89,7 +89,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  let snapshot,corrupt=false;try{snapshot=normalizeAtlasCartography(read?.(),{overview:{width:2449,height:2363},K5:{width:4172,height:4031}});}catch(e){console.error('Atlas cartography:',e);snapshot=atlasCartographyEmpty();corrupt=true;status.textContent='Atlas: uložená kartografie je neplatná. Zápisy jsou zablokovány, aby se nepřepsala původní data.';}
  const local=snapshot.maps[map.id],undo=[],redo=[];
  const loadSnapshot=source=>{const copy=structuredClone(source);Object.assign(local,copy.maps[map.id]);snapshot=copy;snapshot.maps[map.id]=local;};
- let mode='',draft=[],painting=false,currentBrush=null,highlightId=null,editingFeatureId=null,editVertex=null,editOriginal=null,editStartClient=null,routeExtendFromLast=false;
+ let mode='',draft=[],painting=false,currentBrush=null,highlightId=null,editingFeatureId=null,editVertex=null,editOriginal=null,editStartClient=null,routeExtendEndpoint=null;
  const $=selector=>area.querySelector(selector);
  const undoBtn=workspace.querySelector('[data-carto-undo]');
  const redoBtn=workspace.querySelector('[data-carto-redo]');
@@ -334,7 +334,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const finish=$('[data-carto-finish]');finish.hidden=!(['route','area'].includes(mode));finish.disabled=!(draft.length>=(mode==='area'?3:2));
   const pointUndo=$('[data-carto-point-undo]');pointUndo.hidden=!(['route','area'].includes(mode));pointUndo.disabled=!draft.length;
   const hint=$('[data-carto-hint]');
-  hint.textContent=editing?(editing.type==='route'?(routeExtendFromLast?'Prodlužování trasy: dalším kliknutím do mapy přidáte nový bod na konec. Body můžete i přetahovat; Esc ponechá uložené změny.':'Body trasy přesunete tažením. Kliknutí na bod nabídne tužku a křížek; tužkou u posledního bodu zapnete prodlužování. Esc ponechá uložené změny.'):'Vybraný objekt: tažením změňte polohu jeho bodů, kliknutím na mapu můžete přidat další bod. Změnu popisu uložte tlačítkem. Esc ukončí úpravy.'):mode==='radius'?'Stiskněte na mapě střed kružnice, táhněte k okraji a pusťte. Velikost i vzdálenost kruhu jsou vidět během tažení.':mode==='route'||mode==='area'?'Klikáním označte body. Nakonec stiskněte „Dokončit objekt“.':mode==='draw'||mode==='arrow'?'Držte tlačítko myši, nakreslete objekt a pusťte.':'Vyberte typ objektu. Jeho poznámku můžete kdykoliv upravit tužkou přímo na mapě.';
+  hint.textContent=editing?(editing.type==='route'?(routeExtendEndpoint!==null?`Prodlužování trasy: dalším kliknutím do mapy přidáte nový bod ${routeExtendEndpoint==='start'?'na začátek':'na konec'}. Body lze i přetahovat; Esc zachová uložené změny.`:'Body trasy lze pouze přemisťovat tažením. Nový úsek připojíte tužkou na prvním nebo posledním bodu. Kliknutí do prázdné mapy zde nový bod nevytvoří.'):'Vybraný objekt: tažením změňte polohu jeho bodů, kliknutím na mapu můžete přidat další bod. Změnu popisu uložte tlačítkem. Esc ukončí úpravy.'):mode==='radius'?'Stiskněte na mapě střed kružnice, táhněte k okraji a pusťte. Velikost i vzdálenost kruhu jsou vidět během tažení.':mode==='route'||mode==='area'?'Klikáním označte body. Nakonec stiskněte „Dokončit objekt“.':mode==='draw'||mode==='arrow'?'Držte tlačítko myši, nakreslete objekt a pusťte.':'Vyberte typ objektu. Jeho poznámku můžete kdykoliv upravit tužkou přímo na mapě.';
   $('[data-carto-fog-toggle]').textContent=local.fog.enabled?'Vypnout mlhu':'Zapnout mlhu';
   area.querySelectorAll('[data-carto-fog-brush]').forEach(btn=>btn.setAttribute('aria-pressed',String(mode===btn.dataset.cartoFogBrush)));
   if(layerArea){layerArea.replaceChildren();for(const key of VISIBLE_LAYER_TOGGLES){
@@ -343,8 +343,8 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   }}
  };
  const redraw=()=>{paintSvg();paintFog();redrawList();onLayersChange?.();};
- const clearMode=()=>{mode='';routeExtendFromLast=false;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;editingFeatureId=null;highlightId=null;editVertex=null;editOriginal=null;editStartClient=null;modeField.value='';viewport.classList.remove('is-cartographing');hideHover();refreshBrushCursor(null,null);redraw();};
- const setMode=value=>{if(value)onModeStart?.();mode=value;routeExtendFromLast=false;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Mlha války');}refreshBrushCursor(null,null);redraw();};
+ const clearMode=()=>{mode='';routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;editingFeatureId=null;highlightId=null;editVertex=null;editOriginal=null;editStartClient=null;modeField.value='';viewport.classList.remove('is-cartographing');hideHover();refreshBrushCursor(null,null);redraw();};
+ const setMode=value=>{if(value)onModeStart?.();mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Mlha války');}refreshBrushCursor(null,null);redraw();};
  modeField.addEventListener('change',()=>setMode(modeField.value));
  const featureFromDraft=()=>({id:makeId(),type:mode,title:safeText(title.value,120),note:safeText(note.value,1500),date:'',color:color.value,opacity:Number(opacity.value),points:structuredClone(draft),...(mode==='radius'?{radiusKm:draftRadiusKm}:{})});
  const finishFeature=()=>{
@@ -361,9 +361,14 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    const f=local.features.find(x=>x.id===editingFeatureId);if(!f||f.points.length>=MAX_POINTS)return true;
    const pts=structuredClone(f.points);
    let insert=pts.length;
-   // The pencil on the LAST route node activates append mode. Ordinary
-   // point editing retains the existing closest-segment insertion behavior.
-   if(!(f.type==='route'&&routeExtendFromLast)){
+   // A saved route is extendable ONLY from one of its two endpoints.
+   // Editing a middle vertex (or the line itself) must never add a branch
+   // or insert an extra node by clicking on an empty part of the map.
+   if(f.type==='route'){
+    if(routeExtendEndpoint===null)return true;
+    insert=routeExtendEndpoint==='start'?0:pts.length;
+   }else{
+    // Non-route polygons retain their existing closest-segment insertion.
     let best=Infinity;
     for(let i=0;i<pts.length-(f.type==='area'?0:1);i++){
      const a=pts[i],b=pts[(i+1)%pts.length],dx=b.x-a.x,dy=b.y-a.y;
@@ -373,7 +378,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    }
    pts.splice(insert,0,pt);
    const id=f.id;
-   const ok=commit(()=>{f.points=pts;},f.type==='route'&&routeExtendFromLast?'Prodloužení trasy':'Nový vrchol');
+   const ok=commit(()=>{f.points=pts;},f.type==='route'?'Prodloužení trasy':'Nový vrchol');
    // Always restore the draft from the authoritative snapshot, including on
    // failed cloud writes, which may replace the feature object on rollback.
    draft=structuredClone(local.features.find(item=>item.id===id)?.points||[]);
@@ -487,10 +492,10 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const openFeatureEditor=(f,argumentsVertex=null)=>{
   if(!f)return;
   clearMode();editingFeatureId=f.id;highlightId=f.id;mode='edit-points';draft=structuredClone(f.points);draftRadiusKm=f.type==='radius'?f.radiusKm:0;
-  // Opening a saved route via the pencil on its LAST vertex allows the GM to
-  // click further destinations to extend this same route, without creating a
-  // second route or moving the original last point.
-  routeExtendFromLast=f.type==='route'&&Number.isInteger(argumentsVertex)&&argumentsVertex===f.points.length-1;
+  // Only the first and last route vertices may extend the route.
+  // A middle vertex opens movement-only edit mode (no click-to-insert).
+  routeExtendEndpoint=f.type==='route'&&Number.isInteger(argumentsVertex)
+   ?(argumentsVertex===0?'start':argumentsVertex===f.points.length-1?'end':null):null;
   title.value=f.title;note.value=f.note;color.value=f.color;opacity.value=String(f.opacity??.18);
   modeField.closest('details').open=true;viewport.classList.add('is-cartographing');
   showStatus('Vybraný objekt: body upravíte přímo na mapě a poznámku vpravo. Esc ukončí úpravu.');
