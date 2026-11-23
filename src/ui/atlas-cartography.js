@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.070. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.071. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -117,11 +117,19 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  $('[data-carto-fog-gate-cancel]').addEventListener('click',dismissFogGate);
  const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||defaultFogRadius));
  let draftRadiusKm=0;
- let hovered=null,hoverTimer=null;
- const hideHover=()=>{hovered=null;if(hoverDelete){hoverDelete.hidden=true;hoverDelete.classList.remove('is-party-history');}};
+ let hovered=null,selectedHit=null,hoverTimer=null,suppressHover=false;
+ const hitMatches=(a,kind,id,index)=>!!a&&a.kind===kind&&a.id===id&&a.index===index;
+ const hideHover=()=>{
+  hovered=null;selectedHit=null;clearTimeout(hoverTimer);
+  if(hoverDelete){hoverDelete.hidden=true;hoverDelete.classList.remove('is-party-history','atlas-carto-tip-only');}
+ };
  const showHover=(kind,id,index,clientX,clientY)=>{
-  if(mode&&mode!=='edit-points')return;
-  const same=hovered?.kind===kind&&hovered?.id===id&&hovered?.index===index;
+  if(suppressHover||mode&&mode!=='edit-points')return;
+  // Hover can show an object's textual note, never the edit/delete controls.
+  // A clicked selection stays fixed even when the pointer moves off the hit area.
+  const chosen=hitMatches(selectedHit,kind,id,index);
+  if(selectedHit&&!chosen)return;
+  const same=hitMatches(hovered,kind,id,index);
   clearTimeout(hoverTimer);hovered={kind,id,index};if(!hoverDelete)return;
   if(!same){
    const rect=viewport.getBoundingClientRect(),w=rect.width,h=rect.height;
@@ -131,12 +139,13 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   }
   const f=kind==='feature'?local.features.find(f=>f.id===id):null;
   hoverDelete.classList.toggle('is-party-history',kind==='history');
+  hoverDelete.classList.toggle('atlas-carto-tip-only',!chosen);
   const tip=hoverDelete.querySelector('[data-carto-hover-tip]');
-  // The text object is already readable directly on the map: do not echo it.
+  // A text object needs no duplicate tooltip. Other objects retain their hover note.
   if(tip){const hasTip=!!f?.note&&f.type!=='text';tip.textContent=hasTip?`${f.title||names[f.type]}: ${f.note}`:'';tip.hidden=!hasTip;}
-  const edit=hoverDelete.querySelector('[data-carto-hover-edit]');if(edit)edit.hidden=kind!=='feature';
-  const del=hoverDelete.querySelector('[data-carto-hover-remove]');if(del)del.title=kind==='history'?'Smazat trasu od tohoto bodu po pozici družiny':'Odstranit mapový objekt';
-  hoverDelete.hidden=false;
+  const edit=hoverDelete.querySelector('[data-carto-hover-edit]');if(edit)edit.hidden=!chosen||kind!=='feature';
+  const del=hoverDelete.querySelector('[data-carto-hover-remove]');if(del){del.hidden=!chosen;del.title=kind==='history'?'Smazat trasu od tohoto bodu po pozici družiny':'Odstranit mapový objekt';}
+  hoverDelete.hidden=!chosen&&!tip?.textContent;
  };
  const refreshBrushCursor=(clientX,clientY)=>{
   if(!brushCursor)return;
@@ -231,7 +240,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   if(local.layers.partyHistory&&local.partyHistory.length){
    const pts=local.partyHistory;
    add('path',{d:path(pts),stroke:'#33694e','stroke-width':'2.5','stroke-dasharray':'5 5',fill:'none'});
-   pts.forEach((p,i)=>{const s=screenPoint(p);add('circle',{cx:s.x,cy:s.y,r:4.5,fill:'#33694e',stroke:'#fff4db','stroke-width':1.5});add('circle',{cx:s.x,cy:s.y,r:12,fill:'transparent',stroke:'none','pointer-events':'all','class':'atlas-carto-hit','data-carto-hit':'history','data-carto-index':i});});
+   pts.forEach((p,i)=>{const s=screenPoint(p);add('circle',{cx:s.x,cy:s.y,r:selectedHit?.kind==='history'&&selectedHit.index===i?7.2:4.5,fill:selectedHit?.kind==='history'&&selectedHit.index===i?'#e5c766':'#33694e',stroke:'#fff4db','stroke-width':selectedHit?.kind==='history'&&selectedHit.index===i?2.4:1.5});add('circle',{cx:s.x,cy:s.y,r:12,fill:'transparent',stroke:'none','pointer-events':'all','class':'atlas-carto-hit','data-carto-hit':'history','data-carto-index':i});});
   }
   if(draft.length&&mode!=='edit-points')draw({type:mode==='fog-reveal'||mode==='fog-cover'?'draw':mode,points:draft,color:color.value,title:'',radiusKm:draftRadiusKm,opacity:Number(opacity.value)},true);
  };
@@ -445,21 +454,29 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  hoverDelete?.addEventListener('pointerdown',e=>e.stopPropagation());
  svg.addEventListener('pointerover',e=>{
   const hit=e.target.closest?.('[data-carto-hit]');if(!hit||(mode&&mode!=='edit-points'))return;
-  showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex),e.clientX,e.clientY);
+  showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex??-1),e.clientX,e.clientY);
  });
  svg.addEventListener('pointermove',e=>{
+  suppressHover=false; // A real new pointer movement can show a note again after Esc.
   const hit=e.target.closest?.('[data-carto-hit]');if(!hit||(mode&&mode!=='edit-points'))return;
-  showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex),e.clientX,e.clientY);
+  showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex??-1),e.clientX,e.clientY);
  });
  svg.addEventListener('pointerout',e=>{
-  if(!e.target.closest?.('[data-carto-hit]'))return;
-  clearTimeout(hoverTimer);hoverTimer=setTimeout(hideHover,600);
+  if(selectedHit||!e.target.closest?.('[data-carto-hit]'))return;
+  clearTimeout(hoverTimer);hoverTimer=setTimeout(hideHover,350);
  });
  svg.addEventListener('pointerdown',e=>{
   const hit=e.target.closest?.('[data-carto-hit]');if(!hit||(mode&&mode!=='edit-points'))return;
   e.preventDefault();e.stopPropagation();
-  if(hit.dataset.cartoHit==='feature')openFeatureEditor(local.features.find(f=>f.id===hit.dataset.cartoId));
+  const kind=hit.dataset.cartoHit,id=hit.dataset.cartoId,index=Number(hit.dataset.cartoIndex??-1);
+  suppressHover=false;
+  if(hitMatches(selectedHit,kind,id,index)){hideHover();}
+  else{selectedHit={kind,id,index};hovered=null;showHover(kind,id,index,e.clientX,e.clientY);}
+  paintSvg(); // The clicked party-history dot grows slightly until dismissed.
  });
+ viewport.addEventListener('pointerdown',e=>{
+  if(selectedHit&&!e.target.closest?.('[data-carto-hit],.atlas-carto-hover-delete')){hideHover();paintSvg();}
+ },true);
  const trackBrush=e=>{if(!mode.startsWith('fog-')||e.pointerType==='touch')return;refreshBrushCursor(e.clientX,e.clientY);};
  viewport.addEventListener('pointermove',trackBrush);
  viewport.addEventListener('pointerleave',()=>refreshBrushCursor(null,null));
@@ -478,7 +495,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    if(mode||painting||editingFeatureId){
     painting=false;currentBrush=null;editVertex=null;clearMode();handled=true;
    }
-   if(hovered||!hoverDelete.hidden){hideHover();clearTimeout(hoverTimer);handled=true;}
+   if(hovered||!hoverDelete.hidden){suppressHover=true;hideHover();clearTimeout(hoverTimer);paintSvg();handled=true;}
    if(fogSection.open){fogSection.open=false;handled=true;}
    return handled;
   },

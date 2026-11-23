@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.070';
+import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.071';
 /**
- * Hârn Atlas v94.070 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.071 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -507,6 +507,7 @@ export function mountAtlasView(root,persistence=null){
   }else draftNode?.remove();
  };
  const renderMarkerList=()=>{
+  const openGroups=new Set([...markerList.querySelectorAll('.atlas-marker-type-group[open]')].map(group=>group.dataset.atlasMarkerGroup));
   const listed=mapMarkers.filter(item=>item.type!=='party');
   markerCount.textContent=String(listed.length);
   markerList.replaceChildren();
@@ -514,18 +515,31 @@ export function mountAtlasView(root,persistence=null){
    const empty=document.createElement('p');empty.className='atlas-marker-empty';
    empty.textContent='Zatím nemáte na této mapě žádné značky.';markerList.appendChild(empty);return;
   }
-  for(const item of listed){
-   const row=document.createElement('div');row.className='atlas-marker-row';row.classList.toggle('is-selected',item.id===selectedMarkerId);
-   const nameBtn=document.createElement('button');nameBtn.type='button';nameBtn.className='atlas-marker-list-select';
-   nameBtn.dataset.atlasMarkerSelect=item.id;
-   nameBtn.textContent=`${MARKER_TYPES[item.type].symbol} ${markerDisplayName(item)}`;
-   nameBtn.title='Zvýraznit značku na mapě';
-   row.append(nameBtn);markerList.appendChild(row);
+  // Type-by-type collapsible index. Preserve which groups the GM has opened
+  // when a marker is selected or renamed, instead of folding them on every rerender.
+  for(const [type,kind] of Object.entries(MARKER_TYPES)){
+   if(type==='party')continue; // Party has its own button in the map toolbar.
+   const items=listed.filter(item=>item.type===type);
+   if(!items.length)continue;
+   const group=document.createElement('details');group.className='atlas-marker-type-group';group.dataset.atlasMarkerGroup=type;
+   group.open=openGroups.has(type);
+   const heading=document.createElement('summary');heading.textContent=`${kind.symbol} ${kind.label} (${items.length})`;
+   group.append(heading);
+   const entries=document.createElement('div');entries.className='atlas-marker-type-entries';
+   for(const item of items){
+    const row=document.createElement('div');row.className='atlas-marker-row';row.classList.toggle('is-selected',item.id===selectedMarkerId);
+    const nameBtn=document.createElement('button');nameBtn.type='button';nameBtn.className='atlas-marker-list-select';
+    nameBtn.dataset.atlasMarkerSelect=item.id;
+    nameBtn.textContent=markerDisplayName(item);
+    nameBtn.title='Přejít na značku (107 %)';
+    row.append(nameBtn);entries.append(row);
+   }
+   group.append(entries);markerList.append(group);
   }
  };
  const clearMarkerSelection=()=>{
   if(selectedMarkerId===null)return;
-  selectedMarkerId=null;paintCustomMarkers();renderMarkerList();
+  selectedMarkerId=null;revealMarkerActions(null);paintCustomMarkers();renderMarkerList();
  };
  const selectMarker=(id,centerOnMarker=true)=>{
   const item=mapMarkers.find(entry=>entry.id===id);if(!item)return;
@@ -537,7 +551,7 @@ export function mountAtlasView(root,persistence=null){
    state.x=viewport.clientWidth/2-(map.margin+item.x)*state.zoom;
    state.y=viewport.clientHeight/2-(map.margin+item.y)*state.zoom;
   }
-  repaint();renderMarkerList();
+  repaint();renderMarkerList();revealMarkerActions(selectedMarkerId);
   status.textContent=selectedMarkerId?`Značka „${markerDisplayName(item)}“ je vybrána.`:'Popisek značky byl zavřen.';
  };
  const openMarkerEditor=(item,position)=>{
@@ -629,17 +643,10 @@ export function mountAtlasView(root,persistence=null){
   if(editId){e.stopPropagation();const item=mapMarkers.find(x=>x.id===editId);if(item){clearMarkerSelection();openMarkerEditor(item);}return;}
   if(removeId){e.stopPropagation();const item=mapMarkers.find(x=>x.id===removeId);if(item&&window.confirm(`Opravdu odstranit značku „${markerDisplayName(item)}“${item.type==='party'?' i celou historii jejího pohybu na této mapě':''}?`))removeMarker(removeId);}
  });
- // Keep the edit/delete buttons visible while moving the pointer off the pin.
+ // The edit/delete pair opens ONLY after clicking the pin (or navigating to
+ // it from the type index). Hovering cannot open it. Esc closes the selection.
  let markerActionTimer=null;
- const revealMarkerActions=id=>{clearTimeout(markerActionTimer);for(const [key,buttons] of markerButtons)buttons.forEach(btn=>btn.classList.toggle('atlas-marker-action-visible',key===id));};
- customMarkerOverlay.addEventListener('pointerover',e=>{
-  const target=e.target.closest?.('[data-atlas-marker],[data-atlas-marker-edit-id],[data-atlas-marker-delete-id]');
-  if(target)revealMarkerActions(target.dataset.atlasMarker||target.dataset.atlasMarkerEditId||target.dataset.atlasMarkerDeleteId);
- });
- customMarkerOverlay.addEventListener('pointerout',e=>{
-  if(!e.target.closest?.('[data-atlas-marker],[data-atlas-marker-edit-id],[data-atlas-marker-delete-id]'))return;
-  clearTimeout(markerActionTimer);markerActionTimer=setTimeout(()=>revealMarkerActions(null),500);
- });
+ const revealMarkerActions=id=>{for(const [key,buttons] of markerButtons)buttons.forEach(btn=>btn.classList.toggle('atlas-marker-action-visible',key===id));};
  // Marker pointer capture is independent from the map's pan gesture.
  // Drag directly: no 'move' mode, no confirmation, save at pointer release.
  customMarkerOverlay.addEventListener('pointerdown',e=>{

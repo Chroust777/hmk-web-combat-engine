@@ -450,3 +450,21 @@ body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fol
 body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fold > summary {
  cursor:pointer; font:700 15px/1.4 Georgia,serif; color:#4d3322; user-select:none;
 }
+
+/* v94.071 — The Atlas folds match the 12px label of "Pozice družiny". */
+body #app main.content-atlas .atlas-tools > .atlas-tool-fold > summary,
+body #app main.content-atlas .atlas-tools > .atlas-cartography > .atlas-tool-fold > summary{
+ font-size:12px!important;line-height:1.5!important;
+}
+/* Hover alone never reveals edit/delete, including global inherited hover rules.
+   Selection (click) or keyboard focus is the only trigger. */
+body #app main.content-atlas .atlas-custom-marker-overlay .atlas-custom-marker:hover:not(.is-selected) + .atlas-marker-map-edit,
+body #app main.content-atlas .atlas-custom-marker-overlay .atlas-custom-marker:hover:not(.is-selected) + .atlas-marker-map-edit + .atlas-marker-map-delete{
+ opacity:0!important;visibility:hidden!important;pointer-events:none!important;
+}
+.atlas-marker-type-group{border:1px solid #c6ae85;border-radius:5px;background:#faefd9;margin:5px 0;min-width:0}
+.atlas-marker-type-group>summary{padding:7px 9px;cursor:pointer;user-select:none;font:700 12px/1.4 Georgia,serif;color:#503723}
+.atlas-marker-type-group[open]>.atlas-marker-type-entries{padding:3px 6px 7px;border-top:1px solid #d1bc96;display:flex;flex-direction:column;gap:4px}
+/* Only the note is shown on hover. Editing/deletion appears after a click. */
+.atlas-carto-hover-delete.atlas-carto-tip-only{min-width:0;max-width:240px;padding:0;border:0;box-shadow:none;pointer-events:none;background:transparent}
+.atlas-carto-hover-delete.atlas-carto-tip-only .atlas-carto-hover-actions{display:none!important}
