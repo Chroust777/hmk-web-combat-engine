@@ -468,3 +468,12 @@ body #app main.content-atlas .atlas-custom-marker-overlay .atlas-custom-marker:h
 /* Only the note is shown on hover. Editing/deletion appears after a click. */
 .atlas-carto-hover-delete.atlas-carto-tip-only{min-width:0;max-width:240px;padding:0;border:0;box-shadow:none;pointer-events:none;background:transparent}
 .atlas-carto-hover-delete.atlas-carto-tip-only .atlas-carto-hover-actions{display:none!important}
+
+/* v94.077 – the irreversible whole-map fog actions live in a collapsed sub-menu. */
+body #app main.content-atlas .atlas-cartography .atlas-fog-advanced{
+ margin:9px 0 2px; padding:6px 8px; border:1px solid #c8b18b;
+ border-radius:5px; background:#f3e6ce80;
+}
+body #app main.content-atlas .atlas-cartography .atlas-fog-advanced>summary{
+ font:700 12px/1.45 Georgia,serif; color:#5c4330; cursor:pointer;
+}

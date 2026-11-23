@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.076. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.077. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -62,14 +62,17 @@ export function atlasCartographyPanel(){
   <p class="atlas-carto-hint" data-carto-hint>Vyberte nástroj. Kružnici vytvoříte přímo tažením od středu k okraji; její dosah se při kreslení zobrazuje na mapě.</p>
   <div class="atlas-carto-actions"><button type="button" data-carto-save-meta hidden>Uložit změny</button><button type="button" data-carto-delete-route hidden>Odebrat celou trasu</button><button data-carto-finish type="button" hidden disabled>Dokončit objekt</button><button data-carto-point-undo type="button" hidden disabled>Odebrat bod</button></div>
  </details>
- <details class="atlas-tool-fold" data-carto-fog-section><summary>Mlha války</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
+ <details class="atlas-tool-fold" data-carto-fog-section><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
   <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.1" value="5"></label>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
-  <div class="atlas-carto-actions"><button type="button" data-carto-fog-toggle>Zapnout mlhu</button><button type="button" data-carto-fog-reset>Úplně zahalit</button><button type="button" data-carto-fog-clear>Odstranit mlhu</button></div>
+  <div class="atlas-carto-actions"><button type="button" data-carto-fog-toggle>Zapnout mlhu</button></div>
+  <details class="atlas-fog-advanced" data-carto-fog-advanced><summary>Další možnosti zakrytí</summary>
+   <div class="atlas-carto-actions"><button type="button" data-carto-fog-reset>Úplně zahalit</button><button type="button" data-carto-fog-clear>Odstranit mlhu</button></div>
+  </details>
  </details>
  <div class="atlas-fog-gate" data-carto-fog-gate hidden role="dialog" aria-modal="true" aria-labelledby="atlas-fog-gate-title">
   <form data-carto-fog-gate-form class="atlas-fog-gate-box" autocomplete="off">
-   <h3 id="atlas-fog-gate-title">Mlha války – přístupové heslo</h3>
+   <h3 id="atlas-fog-gate-title">Zakrytí mapy – přístupové heslo</h3>
    <label>Heslo <input type="password" data-carto-fog-password autocomplete="off" spellcheck="false" required></label>
    <p data-carto-fog-gate-error class="atlas-fog-gate-error" role="status" aria-live="polite"></p>
    <div class="atlas-carto-actions"><button type="submit">Odemknout</button><button type="button" data-carto-fog-gate-cancel>Zrušit</button></div>
@@ -99,6 +102,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const defaultFogRadius=map.id==='K5'?0.2:5;
  fogRadius.value=String(defaultFogRadius);
  const fogSection=$('[data-carto-fog-section]'),fogGate=$('[data-carto-fog-gate]');
+ const fogAdvanced=$('[data-carto-fog-advanced]');
  const fogPassword=$('[data-carto-fog-password]'),fogError=$('[data-carto-fog-gate-error]');
  const dismissFogGate=()=>{fogGate.hidden=true;fogPassword.value='';fogError.textContent='';};
  // Every attempted expansion requires the password again. This is an interface
@@ -108,7 +112,9 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   event.preventDefault();fogPassword.value='';fogError.textContent='';fogGate.hidden=false;
   fogPassword.focus({preventScroll:true});
  });
- fogSection.addEventListener('toggle',()=>{if(!fogSection.open&&mode.startsWith('fog-'))clearMode();});
+ fogSection.addEventListener('toggle',()=>{
+  if(!fogSection.open){fogAdvanced.open=false;if(mode.startsWith('fog-'))clearMode();}
+ });
  $('[data-carto-fog-gate-form]').addEventListener('submit',event=>{
   event.preventDefault();
   if(fogPassword.value==='anakin'){dismissFogGate();fogSection.open=true;}
@@ -344,7 +350,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  };
  const redraw=()=>{paintSvg();paintFog();redrawList();onLayersChange?.();};
  const clearMode=()=>{mode='';routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;editingFeatureId=null;highlightId=null;editVertex=null;editOriginal=null;editStartClient=null;modeField.value='';viewport.classList.remove('is-cartographing');hideHover();refreshBrushCursor(null,null);redraw();};
- const setMode=value=>{if(value)onModeStart?.();mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Mlha války');}refreshBrushCursor(null,null);redraw();};
+ const setMode=value=>{if(value)onModeStart?.();mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Zakrytí mapy');}refreshBrushCursor(null,null);redraw();};
  modeField.addEventListener('change',()=>setMode(modeField.value));
  const featureFromDraft=()=>({id:makeId(),type:mode,title:safeText(title.value,120),note:safeText(note.value,1500),date:'',color:color.value,opacity:Number(opacity.value),points:structuredClone(draft),...(mode==='radius'?{radiusKm:draftRadiusKm}:{})});
  const finishFeature=()=>{
@@ -487,8 +493,8 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  $('[data-carto-fog-toggle]').addEventListener('click',()=>{if(mode.startsWith('fog-'))clearMode();commit(()=>{local.fog.enabled=!local.fog.enabled;},'Viditelnost mlhy');});
  area.querySelectorAll('[data-carto-fog-brush]').forEach(btn=>btn.addEventListener('click',()=>{const next=mode===btn.dataset.cartoFogBrush?'':btn.dataset.cartoFogBrush;setMode(next);}));
  fogRadius.addEventListener('input',()=>refreshBrushCursor(null,null));
- $('[data-carto-fog-reset]').addEventListener('click',()=>{if(window.confirm('Znovu zakrýt celou mapu a odstranit předchozí odhalení?'))commit(()=>{local.fog.enabled=true;local.fog.strokes=[];},'Mlha války');});
- $('[data-carto-fog-clear]').addEventListener('click',()=>{if(window.confirm('Odstranit všechno odhalování a vypnout mlhu?'))commit(()=>{local.fog.enabled=false;local.fog.strokes=[];},'Mlha války');});
+ $('[data-carto-fog-reset]').addEventListener('click',()=>{if(window.confirm('Znovu zakrýt celou mapu a odstranit předchozí odhalení?'))commit(()=>{local.fog.enabled=true;local.fog.strokes=[];},'Zakrytí mapy');});
+ $('[data-carto-fog-clear]').addEventListener('click',()=>{if(window.confirm('Odstranit všechno odhalování a vypnout mlhu?'))commit(()=>{local.fog.enabled=false;local.fog.strokes=[];},'Zakrytí mapy');});
  const openFeatureEditor=(f,argumentsVertex=null)=>{
   if(!f)return;
   clearMode();editingFeatureId=f.id;highlightId=f.id;mode='edit-points';draft=structuredClone(f.points);draftRadiusKm=f.type==='radius'?f.radiusKm:0;
