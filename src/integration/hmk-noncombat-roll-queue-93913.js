@@ -1,4 +1,3 @@
-import {trackForm} from './hmk-form-work.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 /** HMK GM non-combat staged dice entry, v93.913.
  * Presentation-only: never mutates calendar, game state, receipts or RNG until
@@ -112,14 +111,6 @@ export function decorateNoncombatRollQueue93913(root,die){
    e.preventDefault();e.stopImmediatePropagation();output.textContent='Nejdříve jednotlivě potvrďte všechny skutečné hody tlačítkem Vložit hodnotu.';
    if(!input.disabled)input.focus({preventScroll:true});
   }},true);
-  trackForm(form,attribute,[...form.elements].filter(x=>x.name&&!fields.includes(x.name)&&x.type!=='hidden').map(x=>x.name),
-   ()=>({rolls:[...state.rolls],origins:[...state.origins],pending:input.value,generated:state.generated,count}),saved=>{
-    if(saved.count!==count||saved.rolls.length>count||saved.rolls.length!==saved.origins.length||!saved.rolls.every(v=>valid(v,getFaces())))return false;
-    state.step=saved.rolls.length;state.rolls=[...saved.rolls];state.origins=[...saved.origins];state.generated=saved.generated;
-    if(spoil||training||nutrition)weatherFields[0].value=state.rolls.join(',');
-    else state.rolls.forEach((v,i)=>{const field=weatherFields[i];field.value=String(v);if(state.origins[i]==='software')field.dataset[attribute==='data-trek-global-weather'?'cryptographicValue':'trekGenerated']=field.value});
-    input.value=saved.pending;show();return true;
-   });
   show();
  }
 }

@@ -1,4 +1,3 @@
-import {trackForm} from './hmk-form-work.js';
 import {specialSecondaryById} from './hmk-special-secondary-routines.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 /** HMK v93.916 · rule-aware, noncombat Skill Workbench roll confirmation.
@@ -9,15 +8,6 @@ import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 const FORM_IDS=['skill-secondary-form','skill-value-form','skill-assistance-form','skill-tiebreak-form'];
 const WHOLE=/^[1-9][0-9]*$/;
 const controllers=new Map();
-function ruleChoices(form,state){
- return Array.from(form.elements).filter(x=>x.name&&!state.has(x.name)).map(x=>[x.name,x.value,x.checked??null]);
-}
-export function readSkillDice(){
- return [...controllers.values()].filter(x=>x.form.isConnected).map(x=>x.snapshot());
-}
-export function restoreSkillDice(list){
- for(const saved of list||[])controllers.get(saved.id)?.restore(saved);
-}
 let tabFocusInstalled=false;
 function installTabFocus(){
  if(tabFocusInstalled)return;tabFocusInstalled=true;
@@ -184,17 +174,7 @@ export function decorateSkillWorkbenchRolls93916(root,secureDie,skipPrimary=()=>
   });
   // Rule-specific controls update disabled/hidden without rebuilding DOM.
   dispose.observe(form,{subtree:true,attributes:true,attributeFilter:['disabled','hidden']});
-  controllers.set(id,{form,onSubmit,observer:dispose,
-   snapshot:()=>({id,choices:ruleChoices(form,state),rolls:[...state].map(([name,x])=>[name,x.field.value,x.accepted,x.field.dataset.hmkAutoDice||null])}),
-   restore(saved){
-    if(JSON.stringify(ruleChoices(form,state))!==JSON.stringify(saved.choices))return;
-    for(const [name,value,accepted,origin] of saved.rolls){
-     const x=state.get(name);if(!x)continue;
-     x.field.value=value;x.accepted=accepted===value&&inRange(x.field)?accepted:null;
-     if(origin)x.field.dataset.hmkAutoDice=origin;
-    }
-    rollingStarted=true;refresh();
-   }});
+  controllers.set(id,{form,onSubmit,observer:dispose});
   refresh();
   // When a new workflow appears, guide the user to the only active red die.
   window.setTimeout(()=>{
@@ -376,16 +356,5 @@ export function decorateSpecialSecondaryRolls93917(root,secureDie,previewPrimary
   if(!form.isConnected){window.removeEventListener('submit',submitGate,true);observer.disconnect();}
  });
  observer.observe(root,{childList:true,subtree:true});
- trackForm(form,'special-sr',['specialRoutine','specialPriest','specialRitual','specialStyle','specialOutsider','moralityDifference'],
-  ()=>({primary:primary.value,will:will.value,p:state.primary,w:state.will,origins:[primary.dataset.hmkAutoDice,will.dataset.hmkAutoDice],
-   dice:state.dice.map(d=>[d.input.value,d.accepted,d.source])}),saved=>{
-   primary.value=saved.primary;will.value=saved.will;
-   state.primary=valid(primary,100)&&saved.p===primary.value?saved.p:null;state.will=valid(will,100)&&saved.w===will.value?saved.w:null;
-   if(saved.origins[0]===primary.value)primary.dataset.hmkAutoDice=primary.value;
-   if(saved.origins[1]===will.value)will.dataset.hmkAutoDice=will.value;
-   refresh();if(saved.dice.length!==state.dice.length)return false;
-   saved.dice.forEach(([v,accepted,source],i)=>{const d=state.dice[i];d.input.value=v;d.accepted=accepted===v&&valid(d.input,10)?v:null;d.source=source});
-   refresh();return true;
-  });
  refresh();
 }

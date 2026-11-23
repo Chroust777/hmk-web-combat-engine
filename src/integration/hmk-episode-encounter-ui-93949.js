@@ -1,4 +1,3 @@
-import {trackForm} from './hmk-form-work.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
 import {trekSurpriseProcedure} from './hmk-trekking-wilderness-tasks.js';
 
@@ -122,13 +121,6 @@ export function decorateEpisodeEncounter93949(root,rollDie,preview){
    reset.hidden=!accepted.size;
    return target;
   }
-  trackForm(form,'encounter',['offset','terrain','moon','wantHearing','encounterKind','foeIsBeast','foeWatchfulness','partySkill','foeSkill','partyEML','foeEML','decision'],
-   ()=>({accepted:[...accepted],values:[...controls].map(([k,c])=>[k,c.input.value])}),saved=>{
-    accepted.clear();for(const [k,v] of saved.values){const c=controls.get(k);if(!c)return false;c.input.value=v}
-    for(const [k,v] of saved.accepted){const next=repaint(),c=controls.get(k);if(!c||next!==c.input||v!==c.input.value||!c.input.validity.valid){accepted.clear();repaint();return false}
-     accepted.set(k,v)}
-    repaint();return true;
-   });
   reset.addEventListener('click',()=>{
    accepted.clear();
    for(const {input} of controls.values())input.value='';

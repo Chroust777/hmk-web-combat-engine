@@ -1,4 +1,3 @@
-import {trackForm} from './hmk-form-work.js';
 /** HMK v93.919 — presentation and early-submit gate for Talisman Bestowal.
  * The authoritative Trance/Will calculations and persistent effects remain
  * exclusively in the original app submit handler. Never touches Combat.
@@ -75,13 +74,5 @@ export function decorateTalismanDice93919(root,secureDie,requiresWill){
    secondaryDue?'ČERVENÝ AKTIVNÍ KROK 2 · po Trance CF povinný Will d100 → Vložit hodnotu':
    'Povinné kostky potvrzené; původní pravidlové vyhodnocení provede zápis.';
  };
- trackForm(form,'talisman',[...form.elements].filter(x=>x.name&&x!==trance&&x!==will&&x.type!=='hidden').map(x=>x.name),
-  ()=>({trance:trance.value,will:will.value,primary:s.trance,secondary:s.will,origin:[trance.dataset.hmkAutoDice,will.dataset.hmkAutoDice]}),saved=>{
-   trance.value=saved.trance;will.value=saved.will;s.trance=saved.primary===trance.value&&integer(trance.value)?saved.primary:null;
-   s.will=s.requiresWill()&&saved.secondary===will.value&&integer(will.value)?saved.secondary:null;
-   if(saved.origin[0]===trance.value)trance.dataset.hmkAutoDice=trance.value;
-   if(saved.origin[1]===will.value)will.dataset.hmkAutoDice=will.value;
-   s.repaint();return true;
-  });
  s.repaint();return 1;
 }

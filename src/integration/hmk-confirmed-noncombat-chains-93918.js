@@ -6,13 +6,6 @@
 import {writingPageSpread} from './hmk-scribing-work.js?v=94.006';
 import {successLevel} from '../rules/tests.js';
 import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
-const workControllers=new WeakMap();
-export function readChainDraft(form){return workControllers.get(form)?.snapshot()||null}
-export function restoreChainDraft(saved){
- if(!saved)return false;
- const matches=[...document.querySelectorAll(SELECTOR)].map(f=>workControllers.get(f)).filter(c=>c&&c.identity()===saved.identity);
- return matches.length===1&&matches[0].restore(saved);
-}
 const SELECTOR='form[data-skill-critical-form],form[data-hmk-fishing-catch],form[data-herb-assess],form[data-herb-complete],form[data-weather-blood-start],'+
  'form[data-skill-cold-shock],form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
  'form[data-faerie-roll],form[data-hmk-engineering-design],form[data-shipwright-roll],form[data-construction-roll],form[data-fletching-finish="roll"],form[data-brew-start],form[data-brew-wine],form[data-jewelcraft-work],form[data-writing-spread],form[data-script-reading]:not([data-script-reading="done"]),form[data-script-copy="test"],form[data-hmk-scribing-work],form[data-parallel-cold-reroll],form[data-parallel-cold-course],.hmk-weather-care form#hmk-frost-amputation-form';
@@ -383,27 +376,6 @@ export function decorateConfirmedNoncombatChains93918(root,rollDie){
   observer.observe(root,{subtree:true,childList:true});
   // Prevent submitting externally disabled forms from being unlocked by UI decoration.
   if(submit.disabled)submit.dataset.hmkExternalDisabled93918='yes';
-  // Restore data into the original queue, validating each conditional die in order.
-  const identity=()=>JSON.stringify([kind,form.id,...[...form.elements].filter(x=>
-   x.type==='hidden'&&x.name&&!sources.has(x.name)).map(x=>[x.name,x.value])]);
-  const choices=()=>[...(new Set([...SELECTIONS[kind],...(comaHR?['immersionComaHR']:[])]))].flatMap(name=>{
-   const x=form.elements.namedItem(name);return x?[[name,x.value,x.checked??null]]:[];
-  });
-  workControllers.set(form,{identity,snapshot:()=>({identity:identity(),choices:choices(),rolls:[...accepted],
-   pending:input.value,generated}),restore(record){
-   for(const [name,val,checked] of record.choices){
-    const x=form.elements.namedItem(name);if(!x||(!SELECTIONS[kind].includes(name)&&name!=='immersionComaHR'))return false;
-    x.value=val;if(typeof checked==='boolean')x.checked=checked;
-   }
-   accepted.clear();syncUnderlying();
-   for(const [key,proof] of record.rolls){
-    const step=pending();if(!step||step.key!==key||!die(proof.value,step.faces)||!['manual','software'].includes(proof.origin)){clear();return false}
-    accepted.set(key,proof);syncUnderlying();
-   }
-   generated=record.generated;input.value=record.pending||'';repaint();
-   for(let el=form.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;
-   return true;
-  }});
   syncUnderlying();repaint();decorated++;
  }
  return decorated;
