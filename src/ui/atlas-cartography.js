@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.067. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.069. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -62,11 +62,19 @@ export function atlasCartographyPanel(){
   <p class="atlas-carto-hint" data-carto-hint>Vyberte nástroj. Kružnici vytvoříte přímo tažením od středu k okraji; její dosah se při kreslení zobrazuje na mapě.</p>
   <div class="atlas-carto-actions"><button type="button" data-carto-save-meta hidden>Uložit změny</button><button data-carto-finish type="button" hidden disabled>Dokončit objekt</button><button data-carto-point-undo type="button" hidden disabled>Odebrat bod</button></div>
  </details>
- <details><summary>Mlha války</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
+ <details data-carto-fog-section><summary>Mlha války</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
   <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.5" value="10"></label>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-toggle>Zapnout mlhu</button><button type="button" data-carto-fog-reset>Úplně zahalit</button><button type="button" data-carto-fog-clear>Odstranit mlhu</button></div>
  </details>
+ <div class="atlas-fog-gate" data-carto-fog-gate hidden role="dialog" aria-modal="true" aria-labelledby="atlas-fog-gate-title">
+  <form data-carto-fog-gate-form class="atlas-fog-gate-box" autocomplete="off">
+   <h3 id="atlas-fog-gate-title">Mlha války – přístupové heslo</h3>
+   <label>Heslo <input type="password" data-carto-fog-password autocomplete="off" spellcheck="false" required></label>
+   <p data-carto-fog-gate-error class="atlas-fog-gate-error" role="status" aria-live="polite"></p>
+   <div class="atlas-carto-actions"><button type="submit">Odemknout</button><button type="button" data-carto-fog-gate-cancel>Zrušit</button></div>
+  </form>
+ </div>
  </section>`;
 }
 
@@ -87,6 +95,23 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const redoBtn=workspace.querySelector('[data-carto-redo]');
  const modeField=$('[data-carto-mode]'),title=$('[data-carto-title]'),note=$('[data-carto-note]'),color=$('[data-carto-color]'),opacity=$('[data-carto-opacity]');
  const fogRadius=$('[data-carto-fog-radius]'),layerArea=workspace.querySelector('[data-carto-layers]');
+ const fogSection=$('[data-carto-fog-section]'),fogGate=$('[data-carto-fog-gate]');
+ const fogPassword=$('[data-carto-fog-password]'),fogError=$('[data-carto-fog-gate-error]');
+ const dismissFogGate=()=>{fogGate.hidden=true;fogPassword.value='';fogError.textContent='';};
+ // Every attempted expansion requires the password again. This is an interface
+ // gate, not authentication: all browser-side source code is public.
+ fogSection.querySelector('summary').addEventListener('click',event=>{
+  if(fogSection.open){return;}
+  event.preventDefault();fogPassword.value='';fogError.textContent='';fogGate.hidden=false;
+  fogPassword.focus({preventScroll:true});
+ });
+ fogSection.addEventListener('toggle',()=>{if(!fogSection.open&&mode.startsWith('fog-'))clearMode();});
+ $('[data-carto-fog-gate-form]').addEventListener('submit',event=>{
+  event.preventDefault();
+  if(fogPassword.value==='anakin'){dismissFogGate();fogSection.open=true;}
+  else{fogError.textContent='Nesprávné heslo.';fogPassword.value='';fogPassword.focus({preventScroll:true});}
+ });
+ $('[data-carto-fog-gate-cancel]').addEventListener('click',dismissFogGate);
  const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||10));
  let draftRadiusKm=0;
  let hovered=null,hoverTimer=null;
@@ -444,6 +469,16 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   handleClick(clientX,clientY){return !!mode&&addPoint(inMap(clientX,clientY));},
   repaint(){paintSvg();paintFog();refreshBrushCursor(null,null);},
   stop:clearMode,
+  escape(){
+   let handled=false;
+   if(!fogGate.hidden){dismissFogGate();handled=true;}
+   if(mode||painting||editingFeatureId){
+    painting=false;currentBrush=null;editVertex=null;clearMode();handled=true;
+   }
+   if(hovered||!hoverDelete.hidden){hideHover();clearTimeout(hoverTimer);handled=true;}
+   if(fogSection.open){fogSection.open=false;handled=true;}
+   return handled;
+  },
   // Atlas markers are stored separately; layers hide them without touching the record.
   markersVisible(){return local.layers.markers;},
   recordPartyMove(item){if(item?.type==='party')addHistory(item);},

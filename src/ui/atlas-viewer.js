@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.068';
+import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.069';
 /**
- * Hârn Atlas v94.068 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.069 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -421,6 +421,8 @@ export function mountAtlasView(root,persistence=null){
   markerAdd.textContent=genericActive?'Zrušit umístění':'Přidat značku';
   // This button always identifies/navigates to the party; it is not a 'delete position' toggle.
   markerParty.textContent='Pozice družiny';
+  markerParty.disabled=!mapMarkers.some(item=>item.type==='party');
+  markerParty.title=markerParty.disabled?'Nejdříve vytvořte značku typu Pozice družiny přes Přidat značku.':'Zobrazit pozici družiny';
   markerAdd.setAttribute('aria-pressed',String(genericActive));
   markerParty.setAttribute('aria-pressed',String(partyActive));
   viewport.classList.toggle('is-marking',markerPlacement);
@@ -570,9 +572,6 @@ export function mountAtlasView(root,persistence=null){
    markerPlacement=false;closeMarkerEditor();refreshMarkerAdd();
    selectMarker(party.id,true);
    status.textContent='Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě.';
-  }else{
-   // The very first position is placed by clicking the map, then saved in its editor.
-   toggleMarkerPlacement('party');
   }
  });
  const placePartyPosition=position=>{
@@ -606,7 +605,7 @@ export function mountAtlasView(root,persistence=null){
   selectedMarkerId=null;
   closeMarkerEditor();
   markerNodes.get(marker.id)?.remove();markerNodes.delete(marker.id);for(const btn of markerButtons.get(marker.id)||[])btn.remove();markerButtons.delete(marker.id);
-  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
+  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();refreshMarkerAdd();
   status.textContent=`Značka „${markerDisplayName(marker)}“ ${existing?'byla upravena':'byla přidána'}.${saved?'':' Zápis do společné kampaně se nezdařil; změna byla vrácena.'}`;
  });
  const removeMarker=id=>{
@@ -614,7 +613,7 @@ export function mountAtlasView(root,persistence=null){
   const item=mapMarkers[index];mapMarkers.splice(index,1);
   if(selectedMarkerId===id)selectedMarkerId=null;
   if(editingMarkerId===id)closeMarkerEditor();
-  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
+  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();refreshMarkerAdd();
   status.textContent=`Značka „${markerDisplayName(item)}“ ${saved?'byla odstraněna.':'nebyla odstraněna; cloudový zápis byl odmítnut.'}`;
  };
  markerList.addEventListener('click',e=>{
@@ -985,9 +984,49 @@ export function mountAtlasView(root,persistence=null){
   const button=e.target.closest?.('[data-atlas-sector]');
   if(button)clickSector(button.dataset.atlasSector);
  });
+ // Escape works anywhere inside the Atlas, not only with focus on the map.
+ // It dismisses temporary UI without undoing completed/saved map movements.
+ const escapeAtlas=()=>{
+  let handled=false;
+  const layers=workspace.querySelector('.atlas-toolbar-layers');
+  if(layers?.open){layers.open=false;handled=true;}
+  const markerIndex=workspace.querySelector('.atlas-marker-index');
+  if(markerIndex?.open){markerIndex.open=false;handled=true;}
+  clearTimeout(markerActionTimer);
+  if([...markerButtons.values()].some(buttons=>buttons.some(btn=>btn.classList.contains('atlas-marker-action-visible')))){
+   revealMarkerActions(null);handled=true;
+  }
+  if(markerDrag){
+   // Only an unfinished pointer gesture is cancelled. Released moves are preserved.
+   const gesture=markerDrag;markerDrag=null;
+   const pin=mapMarkers.find(x=>x.id===gesture.id);
+   if(pin){pin.x=gesture.x;pin.y=gesture.y;}
+   try{if(gesture.node.hasPointerCapture(gesture.pointerId))gesture.node.releasePointerCapture(gesture.pointerId);}catch(_){}
+   paintCustomMarkers();handled=true;
+  }
+  if(cartoPointer!==null){
+   atlasCarto?.cancelGesture();
+   try{if(viewport.hasPointerCapture(cartoPointer))viewport.releasePointerCapture(cartoPointer);}catch(_){}
+   cartoPointer=null;handled=true;
+  }
+  if(atlasCarto?.escape?.())handled=true;
+  if(!markerEditor.hidden||markerDraft){closeMarkerEditor();handled=true;}
+  if(markerPlacement){markerPlacement=false;refreshMarkerAdd();handled=true;}
+  if(selectedMarkerId){clearMarkerSelection();handled=true;}
+  if(measurement.active||measurement.points.length){
+   measurement.active=false;measurement.points=[];paintMeasurement();handled=true;
+  }
+  if(drag){try{if(viewport.hasPointerCapture(drag.id))viewport.releasePointerCapture(drag.id);}catch(_){}
+   drag=null;viewport.classList.remove('is-dragging');handled=true;}
+  if(handled)status.textContent='Aktivní ovládání bylo ukončeno. Již uložené změny zůstávají zachované.';
+  return handled;
+ };
+ const escapeListener=new AbortController();
+ window.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'||!workspace.isConnected)return;
+  if(escapeAtlas()){e.preventDefault();e.stopImmediatePropagation();}
+ },{capture:true,signal:escapeListener.signal});
  viewport.addEventListener('keydown',e=>{
-  if(e.key==='Escape'&&atlasCarto?.active){e.preventDefault();atlasCarto.stop();return;}
-  if(e.key==='Escape'&&selectedMarkerId){e.preventDefault();clearMarkerSelection();return;}
   if(atlasCarto?.active&&(e.key==='Enter'||e.key===' ')&&e.target===viewport){
    e.preventDefault();const [x,y]=center();atlasCarto.handleClick(x,y);return;
   }
@@ -1046,7 +1085,7 @@ export function mountAtlasView(root,persistence=null){
    const ok=saveAtlasMarkers();
    if(!ok)replaceMarkersInPlace(old);
    restoringMarkerUndo=false;
-   paintCustomMarkers();renderMarkerList();return ok;
+   paintCustomMarkers();renderMarkerList();refreshMarkerAdd();return ok;
   },
   status
  });
@@ -1062,7 +1101,7 @@ export function mountAtlasView(root,persistence=null){
   });
   observer.observe(viewport);
   const disconnect=new MutationObserver(()=>{
-   if(!viewport.isConnected){observer.disconnect();disconnect.disconnect();if(pdfLayer&&!pdfDisposed)releasePdf();}
+   if(!viewport.isConnected){observer.disconnect();disconnect.disconnect();escapeListener.abort();if(pdfLayer&&!pdfDisposed)releasePdf();}
   });
   disconnect.observe(root,{childList:true,subtree:true});
  }

@@ -424,3 +424,13 @@ body #app main.content-atlas .atlas-tools-head .atlas-carto-top button{min-heigh
 .atlas-marker-index>summary::after{content:' ▾';float:right}
 .atlas-marker-index[open]>summary::after{content:' ▴'}
 .atlas-marker-index[open]>.atlas-marker-list{margin:0 8px 8px;padding-top:8px;border-top:1px solid #b69c75aa}
+
+/* v94.069 — Password prompt for the Fog of War fold. */
+.atlas-fog-gate[hidden]{display:none!important}
+.atlas-fog-gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(28,23,19,.78);padding:16px;box-sizing:border-box}
+.atlas-fog-gate-box{display:block;box-sizing:border-box;width:min(410px,95vw);max-height:90vh;overflow:auto;padding:20px 24px;background:#f6e6c5;border:2px solid #86613c;box-shadow:0 14px 35px #180e09bb;border-radius:8px;color:#47301d}
+.atlas-fog-gate-box h3{font:700 20px/1.35 Georgia,serif;margin:0 0 12px;color:#4a2f1a}
+.atlas-fog-gate-box label{display:block;margin:7px 0;font:700 14px/1.4 Georgia,serif}
+.atlas-fog-gate-box input[type=password]{width:100%;margin-top:6px;min-height:38px;box-sizing:border-box;font:16px Georgia,serif;padding:6px 10px;background:#fff8e9;border:1px solid #977850;border-radius:5px}
+.atlas-fog-gate-error{min-height:1.25em;color:#8a241c;font:700 12px/1.35 Georgia,serif;margin:5px 0!important}
+body #app main.content-atlas .atlas-toolbar .atlas-party-position:disabled{opacity:.46!important;cursor:not-allowed!important;background:#ece3d3!important;color:#7d7165!important}
