@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.072. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.073. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -231,6 +231,18 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     }else if(f.type==='text'){
      const p=screenPoint(pts[0]);add('rect',{...hitAttrs,x:p.x,y:p.y-26,width:Math.max(28,Math.min(230,(f.title||'Text').length*9)),height:33,fill:'transparent','pointer-events':'all'});
     }else add('path',{...hitAttrs,d:path(pts,f.type==='area'),fill:f.type==='area'?'transparent':'none','pointer-events':f.type==='area'?'all':'stroke'});
+    if(f.type==='route'){
+     // The saved route's nodes must be clickable BEFORE opening its editor.
+     // Hit disks are placed AFTER the wide route hit path so the line's pencil
+     // cannot intercept the node's shorten-route cross.
+     pts.forEach((pt,i)=>{
+      const p=screenPoint(pt),chosen=selectedHit?.kind==='vertex'&&selectedHit.id===f.id&&selectedHit.index===i;
+      add('circle',{'data-carto-hit':'vertex','data-carto-id':f.id,'data-carto-index':i,
+       'class':'atlas-carto-hit atlas-carto-route-vertex',cx:p.x,cy:p.y,r:chosen?13:12,
+       fill:'transparent',stroke:'transparent','pointer-events':'all',cursor:'pointer'});
+      if(chosen)add('circle',{cx:p.x,cy:p.y,r:6.7,fill:'#e9ca72',stroke:c,'stroke-width':2,'pointer-events':'none'});
+     });
+    }
    }
   };
   for(const f of local.features)if(local.layers[f.type]&&!(mode==='edit-points'&&editingFeatureId===f.id))draw(f);
@@ -467,7 +479,9 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const h=hovered;
   if(h.kind==='vertex'){
    const f=local.features.find(item=>item.id===h.id);
-   if(!f||f.type!=='route'||editingFeatureId!==f.id||mode!=='edit-points')return;
+   // A route can be shortened by selecting one of its visible nodes directly,
+   // whether or not its detailed editor is currently open.
+   if(!f||f.type!=='route'||(mode&&!(mode==='edit-points'&&editingFeatureId===f.id)))return;
    const index=h.index;
    if(!Number.isInteger(index)||index<0||index>=f.points.length)return;
    // Keep the chosen vertex and all preceding segments. At the last vertex,
