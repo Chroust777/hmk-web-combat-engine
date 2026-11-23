@@ -1,4 +1,3 @@
-import {readFormWork,restoreFormWork} from './src/integration/hmk-form-work.js';
 import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.063';
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.007';
@@ -9,12 +8,12 @@ import {READING_CONDITION_RULES,readingCondition,readingSource,externalReadingSo
 import {copySource,resolveScriptCopy,copyStars,copySettlement,copyRecords,findCopyStages,copyRetryAllowed,validateScriptCopies,assertScriptCopiesAppendOnly} from './src/integration/hmk-script-copy.js?v=94.006';
 import {WRITING_LANGUAGES,writingScripts,WRITING_PAGES,writingPageSpread,writingVariation,writingPlannedMinutes,writingIsText,validWritingPlan,writingFixedSubject,writingRollSkills,rewriteBaseline,rewriteAllowed,resolveAuthoredScribing} from './src/integration/hmk-scribing-work.js?v=94.006';
 import {healingBase,treatmentContract,treatmentRequirements,treatmentRollEMLFromInjury} from './src/rules/healing.js';
-import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js?v=94.064';
-import {readSkillDice,restoreSkillDice,decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=94.064';
+import {decorateTalismanDice93919} from './src/integration/hmk-talisman-roll-confirm-93919.js';
+import {decorateSkillWorkbenchRolls93916,decorateSpecialSecondaryRolls93917} from './src/integration/hmk-skill-roll-queue-93916.js?v=93.992';
 import {groupConfirmedDieControls93928} from './src/integration/hmk-confirmed-dice-ui-93928.js?v=93.929';
-import {readChainDraft,restoreChainDraft,decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.064';
+import {decorateConfirmedNoncombatChains93918} from './src/integration/hmk-confirmed-noncombat-chains-93918.js?v=94.031';
 import {decorateSimpleNoncombatRolls93915} from './src/integration/hmk-simple-roll-confirm-93915.js';
-import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js?v=94.064';
+import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-roll-queue-93913.js';
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
@@ -29,7 +28,7 @@ import {randomEpisodeMinute93868,deferredEpisodeEvent93868,validateDeferredEpiso
 import {UNIVERSAL_STOP_REASONS_93869,confirmUniversalStop93869,validateUniversalStop93869,effectiveActivityMinutes93869,UNIVERSAL_STOP_RESOLUTION_FORMAT_93869} from './src/integration/hmk-universal-window-interruption-93869.js';
 import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
-import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js?v=94.064';
+import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
 import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
 import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-archery-choice.js';
 import {prepareSleeplessDay,prepareSleeplessNight,prepareSleeplessFourHourRest} from './src/integration/hmk-sleep-deprivation.js';
@@ -258,7 +257,7 @@ import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {weatherSkinComplexion} from './src/integration/hmk-weather-skin-coverage.js';
-import {decorateEpisodeEncounter93949} from './src/integration/hmk-episode-encounter-ui-93949.js?v=94.064';
+import {decorateEpisodeEncounter93949} from './src/integration/hmk-episode-encounter-ui-93949.js';
 import {episodeEncounterPartyWatchfulness,episodeEncounterGMReceipt93902,validateEpisodeEncounterGM93902,assertEpisodeEncounterGMAppendOnly93902} from './src/integration/hmk-episode-encounter-gm-93902.js';
 import {createTrainingInterruption93902,trainingEffectiveDue93902,validateTrainingInterruption93902,assertTrainingInterruptionAppendOnly93902} from './src/integration/hmk-animal-training-interruption-93902.js';
 import {createDirectionGMResolution,directionGMResolution,validateDirectionGMJournal,assertDirectionGMAppendOnly,lastDocumentedDirectionStatus} from './src/integration/hmk-trekking-direction-gm.js';
@@ -409,7 +408,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.064';
+const APP_VERSION='94.063';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -536,51 +535,10 @@ function cloudPanel(){
  </div>
  <p class="tiny">Na tomto zařízení si můžeš token zapamatovat až do vypršení nebo ručního odstranění. Po jeho zrušení či vypršení vlož nový. Bez zapamatování zůstává jen v aktuální relaci prohlížeče. Neodeslané změny a konflikty se nezahazují; jiné zařízení je nemůže potichu přepsat.</p></section>`;
 }
-// Keep the original serialized ledger byte-for-byte. Its exact bytes anchor travel receipts.
-const WORK_KEY=STORAGE+':gm-work-v1';
-let observedWork=localStorage.getItem(WORK_KEY),receivingWork=false;
-const SESSION_WORK=['hmk-guided-transaction-draft-v1','hmk-combat-manual-clock-v1','hmk-injury-timeline-instance-v1','hmk-ta-ledger-v1','hmk-in-close-pairs-v1','hmk-keepers-ledger-encounter-draft-v1','hmk-initiative-sequence-v1','hmk-combat-draft-history-v1'];
-const LOCAL_WORK=[STORAGE+':travel-skill-work-v1',STORAGE+':skill-accident-agility-stage-v1'];
-function cloudDocument(raw=localStorage.getItem(STORAGE)||JSON.stringify(data)){
- const w=observedWork&&JSON.parse(observedWork);
- return w&&w.base===baselineToken(raw)?JSON.stringify({format:'hmk-gm-transfer-v1',campaign:raw,work:w}):raw;
-}
-function validateTransfer(doc){
- if(doc.format!=='hmk-gm-transfer-v1')return validate(doc);
- if(typeof doc.campaign!=='string'||doc.work?.base!==baselineToken(doc.campaign)||!doc.work.stores)throw Error('Poškozený pracovní stav GM.');
- for(const [key,value] of Object.entries(doc.work.stores))if(![...SESSION_WORK,...LOCAL_WORK].includes(key)||typeof value!=='string')throw Error('Neznámé pracovní pole GM.');
- return validate(JSON.parse(doc.campaign));
-}
-function applyWorkStores(work){
- for(const key of [...SESSION_WORK,...LOCAL_WORK]){
-  const storage=LOCAL_WORK.includes(key)?localStorage:sessionStorage;
-  if(work?.stores[key]!==undefined)storage.setItem(key,work.stores[key]);else storage.removeItem(key);
- }
-}
-function assertWorkCurrent(){
- if(receivingWork||localStorage.getItem(WORK_KEY)!==observedWork)throw Error('Pracovní krok změnila jiná karta. Obnovte aplikaci.');
-}
 function acceptCloudSnapshot(raw,{allowClearedStorage=false}={}){
  if(localStorage.getItem(STORAGE)!==storageBaseline&&!(allowClearedStorage&&localStorage.getItem(STORAGE)===null))throw Error('Místní kampaň se mezitím změnila v jiné záložce.');
- const packet=JSON.parse(raw);
- validateTransfer(packet);
- const work=packet.format==='hmk-gm-transfer-v1'?packet.work:null;
- if(work)raw=packet.campaign;
  const incoming=normalizeLegacyCustomPrices(validate(JSON.parse(raw)));
- if(!allowClearedStorage)assertWorkCurrent();
- const next=work?JSON.stringify(work):null;
- const oldWork=observedWork,backup=[...SESSION_WORK,...LOCAL_WORK].map(k=>[k,(LOCAL_WORK.includes(k)?localStorage:sessionStorage).getItem(k)]);
- try{
-  if(next)localStorage.setItem(WORK_KEY,next);else localStorage.removeItem(WORK_KEY);
-  applyWorkStores(work);
-  localStorage.setItem(STORAGE,raw);
- }catch(error){
-  if(oldWork)localStorage.setItem(WORK_KEY,oldWork);else localStorage.removeItem(WORK_KEY);
-  for(const [k,v] of backup){const st=LOCAL_WORK.includes(k)?localStorage:sessionStorage;if(v===null)st.removeItem(k);else st.setItem(k,v)}
-  throw error;
- }
- observedWork=next;receivingWork=true;
- storageBaseline=raw;data=incoming;
+ localStorage.setItem(STORAGE,raw);storageBaseline=raw;data=incoming;
  selected=null;view='characters';encounterSelection=new Set();
  // Reload after the connected credentials have been stored by the caller.
  setTimeout(()=>window.location.reload(),1200);
@@ -588,7 +546,6 @@ function acceptCloudSnapshot(raw,{allowClearedStorage=false}={}){
 const cloudStorage={
  getItem(key){return localStorage.getItem(key)},
  setItem(key,value){
-  if(key===STORAGE)assertWorkCurrent();
   if(key===STORAGE&&window.__hmkOutdatedBuild)throw Error('Byla vydána nová verze aplikace. Obnovte stránku, než uložíte další herní akci.');
   if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('Nejprve připojte GitHub Cloud; tento prohlížeč nesmí zapsat starší stav.');
   // Defence in depth: even a legacy direct storage writer may not publish
@@ -597,13 +554,13 @@ const cloudStorage={
    throw Error('Nelze uložit rozpracované výsledky Cestování mimo dokončení celé epizody.');
   const previous=key===STORAGE?localStorage.getItem(key):null;
   localStorage.setItem(key,value);
-  if(key===STORAGE&&cloudSync&&previous!==value)cloudSync.onLocalWrite(cloudDocument(value));
+  if(key===STORAGE&&cloudSync&&previous!==value)cloudSync.onLocalWrite(value);
  },
  removeItem(key){if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('GitHub Cloud není připojen.');localStorage.removeItem(key)}
 };
 cloudSync=createGitHubCloudSync({localStorage,sessionStorage,storageKey:STORAGE,
- validate:validateTransfer,
- readLocal:()=>cloudDocument(),
+ validate:incoming=>validate(incoming),
+ readLocal:()=>localStorage.getItem(STORAGE)||JSON.stringify(data),
  applyRemote:acceptCloudSnapshot,
  approveReplace:()=>true,
  onStatus:()=>{const node=document.querySelector('[data-cloud-status]');if(node)node.textContent=cloudStatusLabel()+(cloudSync?.issue?' · '+cloudSync.issue:'');const side=document.querySelector('[data-cloud-sidebar]');if(side)side.textContent=cloudStatusLabel();const block=document.querySelector('[data-cloud-block-banner]');if(block)block.hidden=cloudSync?.canWrite()??true;}
@@ -628,11 +585,6 @@ function normalizeLegacyCustomPrices(doc){
  return doc;
 }
 try{const saved=localStorage.getItem(STORAGE);if(saved)data=normalizeLegacyCustomPrices(validate(JSON.parse(saved)));storageBaseline=saved;}catch(e){storageReadOnly=true;notice='POZOR: Původní data se nepodařilo načíst. Zápisy jsou zablokovány, aby se nepřepsala. Zálohujte data prohlížeče a opravte úložiště.';console.error(e)}
-let bootWork=null;
-try{bootWork=observedWork&&JSON.parse(observedWork);if(bootWork&&(!bootWork.stores||typeof bootWork.stores!=='object'))throw Error('Chybí pracovní data.')}
-catch(e){storageReadOnly=true;notice='Poškozený místní pracovní záznam GM. Původní data kampaně jsou uchována.'}
-const resumeWork=bootWork?.base===baselineToken(storageBaseline)?bootWork:null;
-if(resumeWork)applyWorkStores(resumeWork);
 // Restore the encounter draft only after character IDs are available.
 // On unreadable database data, do not rehydrate potentially stale selections.
 if(!storageReadOnly){
@@ -1313,10 +1265,6 @@ function activeVisualScene(){
 function activeSceneLabel(scene){
  return ({hall:'Velký sál postav',study:'Písařská pracovna',armory:'Zbrojnice a sklady',warroom:'Válečná komnata',valley:'Strategický výhled'})[scene]||'Keeper\'s Ledger';
 }
-function chatAddress(){
- try{const u=new URL(window.HMK_CHAT_ROOMS?.[campaignKey(data.campaignClock)]||window.HMK_CHAT_URL);if(u.protocol==='https:'||u.hostname==='127.0.0.1'&&u.protocol==='http:')return u.href}catch{}
- return './chat/setup.html';
-}
 function main(){
  let body='';
  if(view==='characters')body=journalChapterShell('Postavy','',charactersView(),'journal-book--characters');
@@ -1340,7 +1288,6 @@ function main(){
   <div class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></div>
   <div class="nav-section-label">HLAVNÍ MENU</div>
   ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
-  <a class="castle-nav-link" href="${esc(chatAddress())}" target="_blank" rel="noopener noreferrer"><span class="castle-nav-icon">✉</span><span class="castle-nav-label">Chat</span></a>
   <div class="nav-section-label castle-character-section">POSTAVY <span>${registryPeople.length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
@@ -2588,9 +2535,8 @@ function rebaseEpisodeWorkingCopy(committed,working){
  return next;
 }
 /** Token only detects a changed authoritative baseline; it never replaces CAS. */
-function sharedCommittedBaselineToken93769(){return baselineToken(storageBaseline)}
-function baselineToken(value){
- const raw=String(value||'');let a=2166136261,b=5381;
+function sharedCommittedBaselineToken93769(){
+ const raw=String(storageBaseline||'');let a=2166136261,b=5381;
  for(let i=0;i<raw.length;i++){const x=raw.charCodeAt(i);a=Math.imul(a^x,16777619);b=Math.imul(b,33)^x;}
  return raw.length+':'+(a>>>0).toString(16)+':'+(b>>>0).toString(16);
 }
@@ -2651,8 +2597,7 @@ function sharedValidateWitnessQueue93769(list){
  }finally{data=original;}
 }
 function persistEpisodeDraftSidecar({snapshotForm=false}={}){
- assertWorkCurrent();
- if(!episodeStageBaseline&&!sharedTimeWindowDraft&&!episodeEvaluationRequested)return;
+ if(!episodeStageBaseline&&!sharedTimeWindowDraft)return;
  const form=snapshotForm?document.querySelector('#hmk-time-episode-form'):null;
  if(form)timeEpisodeDraft=episodeFormSnapshot(form);
  const body={format:'hmk-episode-sidecar-v1',campaignId:campaignKey(data.campaignClock),minute:sharedTimeWindowDraft?.startMinute??data.campaignClock.minute,
@@ -2660,7 +2605,7 @@ function persistEpisodeDraftSidecar({snapshotForm=false}={}){
   request:episodePendingSkillRequest,activeRequestId:episodeActiveSkillRequestId,
   evaluationRequested:episodeEvaluationRequested,identity:episodeEvaluatedIdentity,
   pinned:[...episodePinnedSkillFields],tasks:episodeOutstandingSkillTasks,
-  skillReturn:episodeSkillReturnPending,remainder:episodePendingRemainderMinutes,focused:episodeFocusedTaskField,previewValid:episodeEvaluationCheckpoint===storageBaseline,currentStep:episodeCurrentGuidedStep,
+  currentStep:episodeCurrentGuidedStep,
   // A shared window contains ephemeral activity executors (functions) that
   // cannot be serialized. Its Skill receipts are only working data. A reload
   // must FAIL CLOSED and discard those receipts rather than restoring an
@@ -2677,7 +2622,7 @@ function persistEpisodeDraftSidecar({snapshotForm=false}={}){
   diagnostic93859:form?episodeDiagnosticGate93859(form):null};
  localStorage.setItem(EPISODE_SIDECAR_KEY,JSON.stringify(body));
 }
-function discardEpisodeDraftSidecar(){assertWorkCurrent();localStorage.removeItem(EPISODE_SIDECAR_KEY);}
+function discardEpisodeDraftSidecar(){localStorage.removeItem(EPISODE_SIDECAR_KEY);}
 // Used only after the caller has safely kept or replaced the committed campaign.
 function clearTimeEpisodeDraft(){
  sharedTimeWindowDraft=null;sharedTimeWindowQueue=[];sharedTimeWindowSelectedGroupId=null;
@@ -2692,7 +2637,6 @@ function clearTimeEpisodeDraft(){
 function restoreEpisodeDraftSidecar(){
  const raw=localStorage.getItem(EPISODE_SIDECAR_KEY);if(!raw)return;
  let side;try{side=JSON.parse(raw);}catch{return;}
- if(side?.previewValid&&side.baselineToken===sharedCommittedBaselineToken93769())episodeEvaluationCheckpoint=storageBaseline;
  if(side?.sharedWindowId){
   // Only fully serialized verified receipts may survive a reload. v93.768
   // closure-only markers are deliberately discarded without touching campaign.
@@ -2721,7 +2665,7 @@ function restoreEpisodeDraftSidecar(){
     activeWeatherAreas(committed.journal,campaignKey(committed.campaignClock),Math.floor(side.sharedWindow.startMinute/1440)).map(w=>w.id)):
     planSharedWindow93771(side.sharedWindow,side.sharedPlans);
    const done=side.sharedPlans.filter(p=>p.done);
-   if((planned.errors.length&&(done.length||side.sharedActivePlanId))||done.length!==side.sharedQueue.length||
+   if(planned.errors.length||done.length!==side.sharedQueue.length||
     done.some(p=>{const q=side.sharedQueue.find(q=>q.groupId===p.groupId&&q.sourceId===p.sourceId),slot=planned.scheduled.find(x=>x.id===p.id);
      return !q||!slot||q.patch?.startMinute!==slot.startMinute||q.patch?.endMinute!==slot.endMinute||
       q.kind!==p.kind||JSON.stringify([...p.memberIds].sort())!==JSON.stringify([...q.patch.journal.find(j=>j.id===q.sourceId)?.calendarTimeEpisode?.memberIds||[]].sort());
@@ -2740,7 +2684,7 @@ function restoreEpisodeDraftSidecar(){
    sharedEpisodeAutoRun93772=side.sharedAutoRun===true&&!(side.sharedQueuedCount>0&&!side.sharedActivePlanId);
    episodeDraftEpoch=side.epoch;timeEpisodeDraft=side.draft||{};
    episodePendingSkillRequest=side.request??null;episodeActiveSkillRequestId=side.activeRequestId??null;
-   episodeSkillReturnPending=!!side.skillReturn;episodePendingRemainderMinutes=side.remainder??null;episodeFocusedTaskField=side.focused||'';episodeEvaluationRequested=!!side.evaluationRequested;episodeEvaluatedIdentity=side.identity??null;
+   episodeEvaluationRequested=!!side.evaluationRequested;episodeEvaluatedIdentity=side.identity??null;
    episodePinnedSkillFields.clear();for(const [k,v] of side.pinned||[])episodePinnedSkillFields.set(k,v);
    episodeOutstandingSkillTasks=side.tasks||[];episodeCurrentGuidedStep=side.currentStep??null;
    timeEpisodeDraftCampaign=side.campaignId;
@@ -2754,9 +2698,9 @@ function restoreEpisodeDraftSidecar(){
    return;
   }
  }
- if(side?.format!=='hmk-episode-sidecar-v1'||!Array.isArray(side.rows)||side.baselineToken&&side.baselineToken!==sharedCommittedBaselineToken93769()||
+ if(side?.format!=='hmk-episode-sidecar-v1'||!Array.isArray(side.rows)||!side.rows.length||
   side.campaignId!==campaignKey(data.campaignClock)||side.minute!==data.campaignClock.minute||
-  (side.rows.length?!side.rows.some(j=>j?.calendarEpisodeSkillLink?.episodeEpoch===side.epoch):!side.evaluationRequested||!side.previewValid)||
+  !side.rows.some(j=>j?.calendarEpisodeSkillLink?.episodeEpoch===side.epoch)||
   !side.rows.every(j=>!j.calendarEpisodeSkillLink||
    j.calendarEpisodeSkillLink.episodeEpoch===side.epoch&&
    j.calendarEpisodeSkillLink.campaignId===side.campaignId&&j.calendarEpisodeSkillLink.minute===side.minute))return;
@@ -2764,10 +2708,10 @@ function restoreEpisodeDraftSidecar(){
  if(side.rows.some(j=>ids.has(j.id)))return;
  const working=structuredClone(data);working.journal.push(...structuredClone(side.rows));
  try{validate(working);}catch{return;}
- data=working;episodeStageBaseline=side.rows.length?committed:null;
+ data=working;episodeStageBaseline=committed;
  episodeDraftEpoch=side.epoch;timeEpisodeDraft=side.draft||{};
  episodePendingSkillRequest=side.request??null;episodeActiveSkillRequestId=side.activeRequestId??null;
- episodeSkillReturnPending=!!side.skillReturn;episodePendingRemainderMinutes=side.remainder??null;episodeFocusedTaskField=side.focused||'';episodeEvaluationRequested=!!side.evaluationRequested;episodeEvaluatedIdentity=side.identity??null;
+ episodeEvaluationRequested=!!side.evaluationRequested;episodeEvaluatedIdentity=side.identity??null;
  episodePinnedSkillFields.clear();for(const [k,v] of side.pinned||[])episodePinnedSkillFields.set(k,v);
  episodeOutstandingSkillTasks=side.tasks||[];episodeCurrentGuidedStep=side.currentStep??null;
  timeEpisodeDraftCampaign=side.campaignId;
@@ -11263,7 +11207,6 @@ function downloadUnfinishedHMKState93859(){
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
   committedCampaign:read(localStorage,STORAGE),
-  gmCheckpoint:read(localStorage,WORK_KEY),
   travelSidecar:read(localStorage,EPISODE_SIDECAR_KEY),
   agilityConfirmationDraft:read(localStorage,HSK_AGILITY_STAGE_KEY_93864),
   combat:{previewHistory:read(sessionStorage,COMBAT_DRAFT_HISTORY_KEY),
@@ -14594,9 +14537,6 @@ document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-hmk-followup-open-598]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
  if(view!=='skills'||activeSkillTab!=='followups')return;
- showFollowup598();
-},true);
-function showFollowup598(){
  const root=document.getElementById('hmk-skill-workbench'),choice=root?.querySelector('[data-hmk-followup-choice-598]'),source=root?.querySelector('[data-hmk-followup-source-598]'),display=root?.querySelector('[data-hmk-followup-display-598]');
  if(!choice?.value||!source||!display)return;
  const before=display.querySelector('form[data-hmk-followup-entry-598]');if(before)source.append(before);
@@ -14607,7 +14547,7 @@ function showFollowup598(){
  const info=document.createElement('p');info.className='tiny muted';info.textContent='Pouhý výběr a otevření nic neukládá. Proveďte skutečný hod a potvrďte příslušné tlačítko ve formuláři.';
  display.append(caption,info,form);
  form.hidden=false;
-}
+},true);
 
 let npcShelterBootstrapAttempt93802=null;
 function ensureNPCShelterDefaultsOnCalendar93802(){
@@ -15547,7 +15487,6 @@ function hskSaveAgilityStage93864(stage){
  const current=raw?JSON.parse(raw):null;
  if(current&&current.format!=='hmk-skill-accident-stage-store-v1')throw Error('Neznámý starší formát rozpracovaných Agility hodů.');
  const entries={...(current?.entries||{})};
- assertWorkCurrent();
  const key=stage.campaignId+'|'+stage.sourceId;
  if(entries[key])throw Error('Tento Agility hod už GM potvrdil; nelze jej přepsat.');
  entries[key]=stage;
@@ -28904,6 +28843,29 @@ document.addEventListener('click',e=>{
  e.preventDefault();pendingCombatActionHandoff=null;clearGuidedAttack();guidedMountedSession=null;guidedMountedWitness=null;guidedTurnSession=null;guidedTurnWitness=null;guidedDeclaredSession=null;guidedDeclaredWitness=null;guidedSpatialSession=null;guidedSpatialWitness=null;guidedTraumaSession=null;guidedBloodSession=null;guidedRecoverySession=null;guidedChargeContext=null;guidedAttackLastOutcome='Rozpracovaná bojová událost zrušena – žádný zápis neproběhl.';render();
 },true);
 
+restoreEpisodeDraftSidecar();
+// v93.723: Older campaigns may already contain a proven S/CS Weather
+// Hazard with no health consequence. After loading a writable, current
+// campaign, append its purely administrative proof once, without needing a
+// GM click or advancing time. Do not write during an episode skill draft or
+// before cloud authority permits it; in that case the next normal mutation
+// completes the same deterministic proof.
+if(!storageReadOnly&&!episodeStageBaseline&&(!cloudSync||cloudSync.canWrite())&&
+   pendingWeatherNoEffectAftercare().length)mutate(()=>{});
+else render();
+// If a valid wizard was recovered at its automatic terminal step, resume the
+// deterministic continuation; no physical die is invented or re-rolled.
+try{
+ if(guidedRecoverySession&&guidedMishapRecoveryRequirement(guidedRecoverySession).kind==='complete')continueGuidedRecovery();
+ else if(guidedBloodSession&&guidedBloodStoppageRequirement(guidedBloodSession).kind==='automatic')continueGuidedBlood();
+ else if(guidedTraumaSession&&guidedTraumaCourseRequirement(guidedTraumaSession).kind==='automatic')continueGuidedTrauma();
+ else if(guidedDeclaredSession&&guidedDeclaredRequirement(guidedDeclaredSession).kind==='complete')continueGuidedDeclared();
+ else if(guidedSpatialSession&&guidedSpatialRequirement(guidedSpatialSession).kind==='complete')continueGuidedSpatial();
+ else if(guidedMountedSession&&guidedMountedRequirement(guidedMountedSession).kind==='complete')continueGuidedMounted();
+ else if(guidedTurnSession&&guidedTurnRequirement(guidedTurnSession).kind==='complete')continueGuidedTurn();
+ else if(guidedAttackSession&&guidedAttackNextRequirement().kind==='complete')continueGuidedAttack();
+}catch(e){guidedAttackLastOutcome='Bezpečné obnovení průvodce vyžaduje další krok: '+e.message;render();}
+
 // Show the deterministic result immediately as the GM types physical dice.
 // The same resolver runs AGAIN during the persistent mutation: UI updates
 // alone are never trusted as evidence and no die is generated by the app.
@@ -35923,159 +35885,3 @@ document.addEventListener('submit',e=>{
   if(!explainAndOpenBlockedCalendarTerm(err,target))alert('Epizoda nebyla uložena: '+err.message);
  }
 },true);
-
-function followupIdentity(f){
- return JSON.stringify([f.id,[...f.attributes].map(a=>a.name).filter(n=>n.startsWith('data-')&&!/hmk-|stage|confirmed|evaluated|initialized|pending|coverage-complete/i.test(n)).sort(),
-  [...f.elements].filter(x=>['sourceId','kind','targetId','woundId','actorId'].includes(x.name)&&x.type==='hidden').map(x=>[x.name,x.value])]);
-}
-function followupWork(){
- const f=document.querySelector('[data-hmk-followup-display-598] form');if(!f)return null;
- const values=[...f.elements].filter(x=>x.name&&x.type!=='hidden'&&x.type!=='password'&&x.type!=='file').map(x=>({
-  name:x.name,type:x.type,value:x.value,checked:x.checked,auto:x.dataset.hmkAutoDice,skin:x.dataset.skinAcceptedValue,fall:fallConfirmed982.get(x)
- }));
- return {identity:followupIdentity(f),index:f.dataset.hmkFollowupEntry598,values,
-  skinRows:[...f.querySelectorAll('[data-weather-skin-row]')].map(r=>r.dataset.skinRowId),
-  fallRows:[...f.querySelectorAll('[data-climb-fall-row]')].map(r=>confirmedPassiveImpact.has(r)),
-  skinEvaluated:f.dataset.skinEvaluated,swimming:[...(swimmingAccepted93929.get(f)||[])]};
-}
-function resumeFollowup(saved){
- if(!saved)return;
- const candidates=[...document.querySelectorAll('[data-hmk-followup-source-598] form')].filter(f=>followupIdentity(f)===saved.identity);
- const f=candidates.find(f=>f.dataset.hmkFollowupEntry598===saved.index)||(candidates.length===1?candidates[0]:null);
- if(!f)return;
- const select=document.querySelector('[data-hmk-followup-choice-598]');select.value=f.dataset.hmkFollowupEntry598;
- showFollowup598();
- if(f.matches('[data-skill-weather-skin]')){
-  f.querySelector('[data-weather-skin-rows]').replaceChildren();
-  for(const id of saved.skinRows){const [loc,side]=id.split(':');hskSkinAddLocation(f,loc,side==='-'?null:side)}
-  for(const pick of f.querySelectorAll('[data-weather-skin-select]'))pick.checked=saved.skinRows.includes(pick.dataset.skinLocation+':'+(pick.dataset.skinSide||'-'));
-  if(saved.skinEvaluated==='yes')f.dataset.skinEvaluated='yes';
- }
- if(f.matches('[data-climbing-fall-form]')&&saved.fallRows.length<=20){
-  const rows=f.querySelector('[data-climb-fall-rows]');rows.innerHTML=saved.fallRows.map((_,i)=>hskClimbingFallRow(i)).join('');
-  [...rows.children].forEach((row,i)=>{if(saved.fallRows[i])confirmedPassiveImpact.add(row)});
- }
- const fields=[...f.elements].filter(x=>x.name&&x.type!=='hidden'&&x.type!=='password'&&x.type!=='file');
- if(fields.length!==saved.values.length||fields.some((x,i)=>x.name!==saved.values[i].name||x.type!==saved.values[i].type))return;
- fields.forEach((x,i)=>{const v=saved.values[i];
-  if(x.type==='checkbox'||x.type==='radio')x.checked=v.checked;else x.value=v.value;
-  if(v.auto===x.value)x.dataset.hmkAutoDice=v.auto;
-  if(v.skin===x.value&&x.value&&x.validity.valid)x.dataset.skinAcceptedValue=v.skin;
-  if(v.fall&&v.fall.value===Number(x.value)&&x.name in fallDice982&&x.validity.valid)fallConfirmed982.set(x,v.fall);
- });
- if(f.matches('[data-skill-weather-skin]'))hskSkinRefresh(f);
- if(f.matches('[data-climbing-fall-form]'))hskClimbingFallGuide(f);
- if(f.matches('[data-skill-physical-impact]'))hskHydrateAccidentAgility93864(f.parentElement);
- if(f.querySelector('[data-swimming-required-guide]')){
-  const state=swimmingDiceState93929(f);for(const [name,v] of saved.swimming)if(['willD100','deathD10','enduranceD100'].includes(name)&&f.elements.namedItem(name)?.value===v)state.set(name,v);
-  hmkGuideSwimmingAftermath(f);
- }
-}
-
-// Capture after the original event and all its rule handlers have finished.
-const medicalForms='#hmk-treatment-form,#hmk-healing-roll-form,#hmk-infection-course-form,#hmk-grim-shock-form,#hmk-blood-regeneration-form';
-let medicalDraft=resumeWork?.medical||null,chainDraft=resumeWork?.chain||null;
-function readMedicalForm(f){
- return {id:f.id,fields:[...f.elements].filter(x=>x.name).map(x=>({name:x.name,type:x.type,value:x.value,checked:x.checked,origin:x.dataset.hmkAutoDice}))};
-}
-function restoreMedicalForm(record){
- if(!record)return;const f=document.getElementById(record.id);if(!f||!f.matches(medicalForms))return;
- const fields=[...f.elements].filter(x=>x.name);
- if(fields.length!==record.fields.length||fields.some((x,i)=>x.name!==record.fields[i].name||x.type!==record.fields[i].type||x.type==='hidden'&&x.value!==record.fields[i].value))return;
- fields.forEach((x,i)=>{const v=record.fields[i];if(x.type==='checkbox'||x.type==='radio')x.checked=v.checked;else if(x.type!=='hidden')x.value=v.value;if(v.origin===x.value)x.dataset.hmkAutoDice=v.origin});
- refreshCalendarHealingFields(f);syncWeatherHealerFields(f);
- for(const block of f.querySelectorAll('[data-infection-source]')){const active=block.dataset.infectionSource===f.elements.namedItem('wound')?.value;block.hidden=block.disabled=!active;for(const x of block.querySelectorAll('input'))x.disabled=!active}
- for(let el=f.parentElement;el;el=el.parentElement)if(el.tagName==='DETAILS')el.open=true;
-}
-function checkpointWork(){
- if(receivingWork||storageReadOnly||!storageBaseline||window.__hmkOutdatedBuild||!cloudSync.canWrite())return;
- assertWorkCurrent();
- if(localStorage.getItem(STORAGE)!==storageBaseline)throw Error('Kampaň změnila jiná karta.');
- const form=document.querySelector('#hmk-time-episode-form');
- if(episodeStageBaseline||sharedTimeWindowDraft||episodeEvaluationRequested)persistEpisodeDraftSidecar({snapshotForm:!!form});
- const stores={};
- for(const k of LOCAL_WORK){const v=localStorage.getItem(k);if(v)stores[k]=v}
- const combat=view==='encounter'||sessionStorage.getItem(GUIDED_DRAFT_KEY)||data.combatRuntime?.sequence;
- if(combat)for(const k of SESSION_WORK){const v=sessionStorage.getItem(k);if(v)stores[k]=v}
- const active=Object.keys(stores).length||medicalDraft||chainDraft||formWork||view==='skills'||pendingCalendarGMTest;
- const old=observedWork&&JSON.parse(observedWork);
- const route=['calendar','sheet','encounter','skills'].includes(view)?currentUiRoute():old?.route||
-  (stores[EPISODE_SIDECAR_KEY]?{view:'calendar',calendarSection:'travel',calendarKey:campaignKey(data.campaignClock)}:null);
- const next=active?JSON.stringify({base:baselineToken(storageBaseline),stores,route,medical:medicalDraft,chain:chainDraft,formWork,skillCompletion:skillCompletion93928,followup:followupWork(),trekHandoff:pendingTrekHandoff,trackingId:pendingTrackingAwarenessId,
-  pendingDice:form?[...form.querySelectorAll('[data-episode-roll-field]')].filter(x=>!x.disabled&&x.value&&x.value!==episodeDiceAccepted93849.get(x.name)).map(x=>[x.name,x.value]):[],
-  skillDice:view==='skills'?readSkillDice():[],skillChoice:skillSVChoice595,calendarTest:pendingCalendarGMTest,project:characterProjectReturn,hazard:hazardComposer}):null;
- if(next===observedWork)return;
- if(next)localStorage.setItem(WORK_KEY,next);else localStorage.removeItem(WORK_KEY);
- observedWork=next;cloudSync.onLocalWrite(cloudDocument());
-}
-let formWork=resumeWork?.formWork||null;
-let workTimer=null,pendingCapture=null;
-function finishCapture(){if(workTimer!==null)clearTimeout(workTimer);workTimer=null;const fn=pendingCapture;pendingCapture=null;fn?.()}
-window.addEventListener('pagehide',()=>{finishCapture();if(cloudSync.pending)void cloudSync.flush()});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){finishCapture();if(cloudSync.pending)void cloudSync.flush()}});
-function saveWorkSoon(e){
- const target=e.target;
- if(!target?.closest?.('#app')||target.closest('.hmk-cloud-panel,[data-cloud-action],a[target="_blank"]'))return;
- if((receivingWork||localStorage.getItem(WORK_KEY)!==observedWork||cloudSync.enabled&&!cloudSync.canWrite())&&
-    (target.closest('form')||target.closest('[data-shared-plan-add],[data-shared-window-create],[data-episode-window-stage],[data-episode-window-commit]'))){
-  if(e.cancelable)e.preventDefault();e.stopImmediatePropagation();return;
- }
- const form=target.closest('form');
- const prior=storageBaseline;
- clearTimeout(workTimer);pendingCapture=()=>{
-  try{
-   if(form?.isConnected){const current=readFormWork(form);if(current)formWork=current}
-   if(storageBaseline!==prior)formWork=null;
-   if(form?.isConnected&&form.dataset.hmkConfirmedChain93918)chainDraft=readChainDraft(form);
-   if(storageBaseline!==prior||chainDraft&&!document.querySelector('form[data-hmk-confirmed-chain93918]'))chainDraft=null;
-   if(form?.matches(medicalForms)&&form.isConnected)medicalDraft=readMedicalForm(form);
-   if(storageBaseline!==prior||medicalDraft&&!document.getElementById(medicalDraft.id))medicalDraft=null;
-   checkpointWork()
-  }catch(e){storageReadOnly=true;notice='Pracovní zápis selhal. '+e.message;const label=document.querySelector('[data-cloud-sidebar]');if(label)label.textContent='Pracovní krok neuložen · '+e.message}
- };workTimer=setTimeout(finishCapture,0);
-}
-for(const name of ['click','change','input','submit'])window.addEventListener(name,saveWorkSoon,true);
-restoreEpisodeDraftSidecar();
-const expectedEpisode=resumeWork?.stores?.[EPISODE_SIDECAR_KEY];
-if(expectedEpisode){
- const expected=JSON.parse(expectedEpisode);
- if((expected.sharedWindowId&&sharedTimeWindowDraft?.windowId!==expected.sharedWindowId)||
-    (expected.evaluationRequested&&!episodeEvaluationRequested)){
-  storageReadOnly=true;data=validate(JSON.parse(storageBaseline));episodeStageBaseline=null;
-  localStorage.setItem(EPISODE_SIDECAR_KEY,expectedEpisode);
-  notice='Pracovní interval neprošel ověřením. Zápis je zablokován. V Cloud a zálohy stáhněte rozpracovaný stav pro kontrolu.';
- }
-}
-if(!storageReadOnly&&resumeWork?.route){
- restoreUiRoute(resumeWork.route);
- pendingTrekHandoff=resumeWork.trekHandoff??null;pendingTrackingAwarenessId=resumeWork.trackingId??null;skillCompletion93928=resumeWork.skillCompletion??null;skillSVChoice595=resumeWork.skillChoice;pendingCalendarGMTest=resumeWork.calendarTest;
- characterProjectReturn=resumeWork.project;hazardComposer=resumeWork.hazard||hazardComposer;
-}
-// v93.723: Older campaigns may already contain a proven S/CS Weather
-// Hazard with no health consequence. After loading a writable, current
-// campaign, append its purely administrative proof once, without needing a
-// GM click or advancing time. Do not write during an episode skill draft or
-// before cloud authority permits it; in that case the next normal mutation
-// completes the same deterministic proof.
-if(!storageReadOnly&&!episodeStageBaseline&&(!cloudSync||cloudSync.canWrite())&&
-   pendingWeatherNoEffectAftercare().length)mutate(()=>{});
-else render();
-// If a valid wizard was recovered at its automatic terminal step, resume the
-// deterministic continuation; no physical die is invented or re-rolled.
-try{
- if(guidedRecoverySession&&guidedMishapRecoveryRequirement(guidedRecoverySession).kind==='complete')continueGuidedRecovery();
- else if(guidedBloodSession&&guidedBloodStoppageRequirement(guidedBloodSession).kind==='automatic')continueGuidedBlood();
- else if(guidedTraumaSession&&guidedTraumaCourseRequirement(guidedTraumaSession).kind==='automatic')continueGuidedTrauma();
- else if(guidedDeclaredSession&&guidedDeclaredRequirement(guidedDeclaredSession).kind==='complete')continueGuidedDeclared();
- else if(guidedSpatialSession&&guidedSpatialRequirement(guidedSpatialSession).kind==='complete')continueGuidedSpatial();
- else if(guidedMountedSession&&guidedMountedRequirement(guidedMountedSession).kind==='complete')continueGuidedMounted();
- else if(guidedTurnSession&&guidedTurnRequirement(guidedTurnSession).kind==='complete')continueGuidedTurn();
- else if(guidedAttackSession&&guidedAttackNextRequirement().kind==='complete')continueGuidedAttack();
-}catch(e){guidedAttackLastOutcome='Bezpečné obnovení průvodce vyžaduje další krok: '+e.message;render();}
-
-
-if(!storageReadOnly&&resumeWork?.route){resumeFollowup(resumeWork.followup);restoreMedicalForm(resumeWork.medical);restoreSkillDice(resumeWork.skillDice);restoreChainDraft(resumeWork.chain);restoreFormWork(resumeWork.formWork);
- const form=document.querySelector('#hmk-time-episode-form');
- if(form)for(const [name,value] of resumeWork.pendingDice||[]){const x=form.elements.namedItem(name);if(x?.dataset.episodeRollField&&!x.disabled&&!x.readOnly)x.value=value}
- if(form)episodeUpdateDiceGuides93849(form);
-}
