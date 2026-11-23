@@ -1,5 +1,5 @@
 /**
- * Hârn Atlas v94.062 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.063 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -22,7 +22,7 @@ const DETAIL_K5=Object.freeze({
  key:'./assets/atlas/k5-detail-legend.webp',
  title:'Atlas Hârnica · K5',
  subtitle:'Detailní mapa sektoru K5 · originální kresba a všechny místní názvy',
- legendTitle:'Legenda sektoru K5',legendNote:'Značky, vrstevnice, sídla, cesty a hranice z K5.pdf',
+ legendTitle:'Legenda sektoru K5',legendNote:'',
  legendWidth:814,legendHeight:2981,
  legendAlt:'Legenda mapy K5: vegetace, sněhové oblasti, reliéf, brody, cesty, sídla, oblasti a grafické měřítko v ligách',
  scaleNote:'0–5 lig na původní mapě ≈ 0–20 km',
@@ -52,17 +52,16 @@ const measurementsByMap={overview:{active:false,points:[]},K5:{active:false,poin
 // The persisted coordinates are source-map pixels; this data does not affect travel,
 // time, health, or any other rules module.
 const MARKER_TYPES=Object.freeze({party:{label:'Pozice družiny',symbol:'♟'},village:{label:'Vesnice',symbol:'⌂'},camp:{label:'Tábor',symbol:'⚑'},discovery:{label:'Nález',symbol:'✦'},danger:{label:'Nebezpečí',symbol:'!'},other:{label:'Jiné',symbol:'●'}});
-const markerDisplayName=item=>item.type==='party'?MARKER_TYPES.party.label:item.name;
+const markerDisplayName=item=>item.name||MARKER_TYPES[item.type]?.label||'Značka';
 const markersByMap={overview:[],K5:[]};
 let markerStoreLoaded=false,markerSequence=0,markerPersistence=null;
 const cleanMarker=(item,map)=>{
  if(!item||typeof item!=='object'||typeof item.id!=='string'||item.id.length>90)return null;
  if(!Number.isFinite(item.x)||!Number.isFinite(item.y)||item.x<0||item.y<0||item.x>=map.width||item.y>=map.height)return null;
  const type=Object.hasOwn(MARKER_TYPES,item.type)?item.type:'other';
- // Party is only an icon: old locally stored party labels/descriptions are ignored.
- const name=type==='party'?'':(typeof item.name==='string'?item.name.trim().slice(0,90):'');
- if(type!=='party'&&!name)return null;
- const description=type==='party'?'':(typeof item.description==='string'?item.description.slice(0,1000):'');
+ // Names and notes are optional for ALL types, including the party position.
+ const name=typeof item.name==='string'?item.name.trim().slice(0,90):'';
+ const description=typeof item.description==='string'?item.description.slice(0,1000):'';
  return {id:item.id,x:item.x,y:item.y,name,description,type};
 };
 const atlasEmptyMarkers=()=>({overview:[],K5:[]});
@@ -156,7 +155,7 @@ export function atlasView(){
   ${overview?'':'<button type="button" class="atlas-back" data-atlas-back>← Zpět na hlavní mapu</button>'}
   </header>
   <div class="atlas-body">
-   <aside class="atlas-legend" aria-label="${map.legendTitle}"><h2>${map.legendTitle}</h2><p class="atlas-legend-note">${map.legendNote}</p>
+   <aside class="atlas-legend" aria-label="${map.legendTitle}"><h2>${map.legendTitle}</h2>${map.legendNote?`<p class="atlas-legend-note">${map.legendNote}</p>`:''}
     <div class="atlas-legend-scroll"><img src="${map.key}" alt="${map.legendAlt}" width="${map.legendWidth}" height="${map.legendHeight}" draggable="false"></div>
     <div class="atlas-legend-scale"><strong>Originální měřítko</strong><span>${map.scaleNote}</span></div>
    </aside>
@@ -166,7 +165,7 @@ export function atlasView(){
      <output class="atlas-zoom-label" data-atlas-zoom aria-live="off">100 %</output>
      <button type="button" data-atlas-control="plus" aria-label="Přiblížit mapu" title="Přiblížit">+</button>
      <button type="button" data-atlas-control="fit" class="atlas-fit" title="Zobrazit celou mapu">Celá mapa</button>
-     <div class="atlas-toolbar-help">Kolečko myši: přiblížení · podržet levé tlačítko: posun</div>
+     <div class="atlas-toolbar-help">Kolečko myši nebo dva prsty: přiblížení · tažení: posun</div>
     </div>
     <div class="atlas-viewport" data-atlas-viewport tabindex="0" role="region" aria-label="${overview?'Mapa I4–L7, K5 je klikací sektor':'Mapa K5'}, kolečko myši přibližuje, tažení posouvá, klávesy se šipkami posouvají">
      <div class="atlas-stage" data-atlas-stage style="width:${stageW}px;height:${stageH}px">
@@ -218,7 +217,7 @@ export function atlasView(){
       <form data-atlas-marker-form>
        <h4 data-atlas-marker-form-title>Nová značka</h4>
        <label>Typ značky <select data-atlas-marker-type><option value="party">♟ Pozice družiny</option><option value="village">⌂ Vesnice</option><option value="camp">⚑ Tábor</option><option value="discovery">✦ Nález</option><option value="danger">! Nebezpečí</option><option value="other">● Jiné</option></select></label>
-       <label data-atlas-marker-name-wrap>Název značky <input data-atlas-marker-name type="text" maxlength="90" required autocomplete="off" placeholder="Např. Opuštěná vesnice"></label>
+       <label data-atlas-marker-name-wrap>Název značky (volitelné) <input data-atlas-marker-name type="text" maxlength="90" autocomplete="off" placeholder="Např. Opuštěná vesnice"></label>
        <label data-atlas-marker-description-wrap>Popisek <textarea data-atlas-marker-description maxlength="1000" rows="4" placeholder="Co družina na tomto místě objevila…"></textarea></label>
        <div class="atlas-marker-form-actions"><button type="submit">Uložit značku</button><button type="button" data-atlas-marker-cancel>Zrušit</button></div>
       </form>
@@ -285,6 +284,8 @@ export function mountAtlasView(root,persistence=null){
  let fitZoom=1;
  let drag=null;
  let ignoreClick=false;
+ const activeTouches=new Map();
+ let pinch=null;
  const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
  const size=()=>({w:viewport.clientWidth,h:viewport.clientHeight});
  const bounds=()=>{
@@ -380,10 +381,9 @@ export function mountAtlasView(root,persistence=null){
   }else status.textContent='Bod A je označen. Klikněte na další místo B.';
   return true;
  };
- // Use ABSOLUTE map zoom, not zoom relative to the initial fit. Previously a
- // 29% map showed ~22px symbols; 29% now means ~7px, 175% ~18px.
- // The invisible click target remains usable even when the marker is tiny.
- const markerScale=()=>clamp(.50*Math.sqrt(state.zoom),.28,.95);
+ // Slightly larger at all zoom levels while remaining proportional to the map.
+ // Keep a generously sized invisible touch target even for tiny visual pins.
+ const markerScale=()=>clamp(.565*Math.sqrt(state.zoom),.31,1.05);
  const refreshMarkerAdd=()=>{
   const partyActive=markerPlacement&&markerPlacementType==='party';
   const genericActive=markerPlacement&&!partyActive;
@@ -398,10 +398,9 @@ export function mountAtlasView(root,persistence=null){
   paintCustomMarkers(); // Remove an unsaved preview immediately on cancel/save.
  };
  const syncMarkerFormType=()=>{
-  const isParty=markerType.value==='party';
-  markerNameWrap.hidden=isParty;markerDescriptionWrap.hidden=isParty;
-  markerName.required=!isParty;
-  if(isParty){markerName.value='';markerDescription.value='';}
+  // Name and description are always optional, even for the party icon.
+  markerNameWrap.hidden=false;markerDescriptionWrap.hidden=false;
+  markerName.required=false;
   paintCustomMarkers(); // The preview icon changes instantly when its type changes.
  };
  markerType.addEventListener('change',syncMarkerFormType);
@@ -423,6 +422,8 @@ export function mountAtlasView(root,persistence=null){
    }
    const pos=screenPoint(item);
    node.style.left=`${pos.x}px`;node.style.top=`${pos.y}px`;
+   // When relocating a party icon, show the draft in the new location until Save.
+   node.style.visibility=editingMarkerId===item.id&&markerDraft?'hidden':'';
    const selected=item.id===selectedMarkerId;
    const iconZoom=markerScale();
    node.style.setProperty('--atlas-pin-scale',String(iconZoom));
@@ -433,7 +434,7 @@ export function mountAtlasView(root,persistence=null){
    node.classList.toggle('is-dragging',markerDrag?.id===item.id&&markerDrag.moved);
    node.setAttribute('aria-expanded',String(selected));
    node.setAttribute('aria-pressed',String(selected));
-   node.setAttribute('aria-label',item.type==='party'?MARKER_TYPES.party.label:`${MARKER_TYPES[item.type].label}: ${item.name}${item.description?' – '+item.description:''}`);
+   node.setAttribute('aria-label',`${MARKER_TYPES[item.type].label}: ${markerDisplayName(item)}${item.description?' – '+item.description:''}`);
    node.querySelector('.atlas-custom-symbol').textContent=MARKER_TYPES[item.type].symbol;
    node.querySelector('.atlas-marker-tooltip-title').textContent=markerDisplayName(item);
    node.querySelector('.atlas-marker-tooltip-description').textContent=item.description;
@@ -444,7 +445,7 @@ export function mountAtlasView(root,persistence=null){
   // An unsubmitted marker has its own temporary visual pin. It is NOT stored
   // or listed until Save; cancelling removes it without a trace.
   let draftNode=customMarkerOverlay.querySelector('[data-atlas-marker-draft]');
-  if(markerDraft&&!editingMarkerId){
+  if(markerDraft){
    if(!draftNode){
     draftNode=document.createElement('div');
     draftNode.className='atlas-custom-marker atlas-custom-marker--draft';
@@ -488,9 +489,11 @@ export function mountAtlasView(root,persistence=null){
  };
  const selectMarker=(id,centerOnMarker=true)=>{
   const item=mapMarkers.find(entry=>entry.id===id);if(!item)return;
-  // Clicking the same marker again closes both the highlight and description.
-  selectedMarkerId=(selectedMarkerId===id)?null:id;
+  // The list action ALWAYS navigates to the icon at exactly 107% absolute zoom.
+  // Clicking an icon on the map still toggles its highlight/description.
+  selectedMarkerId=centerOnMarker?id:(selectedMarkerId===id?null:id);
   if(selectedMarkerId&&centerOnMarker){
+   state.zoom=1.07;
    state.x=viewport.clientWidth/2-(map.margin+item.x)*state.zoom;
    state.y=viewport.clientHeight/2-(map.margin+item.y)*state.zoom;
   }
@@ -506,7 +509,7 @@ export function mountAtlasView(root,persistence=null){
   markerDescription.value=item?.description||'';
   markerEditor.hidden=false;
   syncMarkerFormType();
-  (markerType.value==='party'?markerType:markerName).focus({preventScroll:true});
+  markerType.focus({preventScroll:true});
  };
  const toggleMarkerPlacement=type=>{
   if(markerPlacement&&markerPlacementType===type){
@@ -520,22 +523,13 @@ export function mountAtlasView(root,persistence=null){
  };
  markerAdd.addEventListener('click',()=>toggleMarkerPlacement('village'));
  markerParty.addEventListener('click',()=>toggleMarkerPlacement('party'));
- const savePartyPosition=position=>{
+ const placePartyPosition=position=>{
   if(!position)return;
-  // A map has one party position: clicking again relocates the existing one.
-  let existing=mapMarkers.find(item=>item.type==='party');
-  if(!existing&&mapMarkers.length>=250){status.textContent='Na jednu mapu lze uložit nejvýše 250 značek.';return;}
-  if(existing){existing.x=position.x;existing.y=position.y;}
-  else{
-   const id=`m-${Date.now().toString(36)}-${(++markerSequence).toString(36)}`;
-   existing=cleanMarker({id,...position,type:'party',name:'',description:''},map);
-   if(!existing)return;
-   mapMarkers.push(existing);
-  }
-  selectedMarkerId=null;
-  markerPlacement=false;refreshMarkerAdd();closeMarkerEditor();
-  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();
-  status.textContent=`Pozice družiny ${existing?'je vyznačena na mapě.':''}${saved?'':' Uložení do sdílené kampaně selhalo.'}`;
+  // One party marker per map. While editing, the existing one is untouched.
+  const previous=mapMarkers.find(item=>item.type==='party')||null;
+  if(!previous&&mapMarkers.length>=250){status.textContent='Na jednu mapu lze uložit nejvýše 250 značek.';return;}
+  openMarkerEditor(previous,position);
+  status.textContent='Pozice družiny je připravena. Název i popisek můžete nechat prázdné; dokončete tlačítkem Uložit značku.';
  };
  workspace.querySelector('[data-atlas-marker-cancel]').addEventListener('click',()=>{
   closeMarkerEditor();markerPlacement=false;refreshMarkerAdd();
@@ -543,15 +537,17 @@ export function mountAtlasView(root,persistence=null){
  markerForm.addEventListener('submit',e=>{
   e.preventDefault();
   const type=markerType.value;
-  const name=type==='party'?'':markerName.value.trim();
-  if(type!=='party'&&!name){markerName.focus();return;}
+  const name=markerName.value.trim();
   if(!editingMarkerId&&!markerDraft){status.textContent='Nejprve vyberte místo značky na mapě.';return;}
   if(!editingMarkerId&&mapMarkers.length>=250){status.textContent='Na jednu mapu lze uložit nejvýše 250 značek.';return;}
   const existing=editingMarkerId?mapMarkers.find(item=>item.id===editingMarkerId):null;
   if(editingMarkerId&&!existing)return;
-  const position=existing||markerDraft;
+  if(type==='party'&&mapMarkers.some(item=>item.type==='party'&&item.id!==existing?.id)){
+   status.textContent='Na mapě už je pozice družiny. Zvolte její tlačítko pro úpravu nebo přemístění.';return;
+  }
+  const position=markerDraft||existing;
   const id=existing?.id||`m-${Date.now().toString(36)}-${(++markerSequence).toString(36)}`;
-  const marker=cleanMarker({id,x:position.x,y:position.y,name,description:type==='party'?'':markerDescription.value,type},map);
+  const marker=cleanMarker({id,x:position.x,y:position.y,name,description:markerDescription.value,type},map);
   if(!marker)return;
   if(existing)Object.assign(existing,marker);else mapMarkers.push(marker);
   // Creating or editing never auto-opens a tooltip or leaves a yellow halo.
@@ -580,7 +576,7 @@ export function mountAtlasView(root,persistence=null){
  // Drag directly: no 'move' mode, no confirmation, save at pointer release.
  customMarkerOverlay.addEventListener('pointerdown',e=>{
   const node=e.target.closest('[data-atlas-marker]');
-  if(!node||e.button!==0||measurement.active||markerPlacement)return;
+  if(pinch||activeTouches.size>1||!node||e.button!==0||measurement.active||markerPlacement)return;
   const item=mapMarkers.find(entry=>entry.id===node.dataset.atlasMarker);if(!item)return;
   e.stopPropagation();e.preventDefault();
   markerDrag={id:item.id,pointerId:e.pointerId,node,startX:e.clientX,startY:e.clientY,
@@ -588,7 +584,7 @@ export function mountAtlasView(root,persistence=null){
   node.setPointerCapture(e.pointerId);
  });
  customMarkerOverlay.addEventListener('pointermove',e=>{
-  if(!markerDrag||markerDrag.pointerId!==e.pointerId)return;
+  if(pinch||!markerDrag||markerDrag.pointerId!==e.pointerId)return;
   e.stopPropagation();
   const dx=e.clientX-markerDrag.startX,dy=e.clientY-markerDrag.startY;
   if(!markerDrag.moved&&Math.hypot(dx,dy)<4)return;
@@ -755,10 +751,11 @@ export function mountAtlasView(root,persistence=null){
   state.y=(h-frameH*fitZoom)/2;
   repaint();
  };
+ const zoomLimits=()=>[Math.max(.06,fitZoom*.7),Math.max(4,fitZoom*8)];
  const zoomAt=(next,cx,cy)=>{
   const rect=viewport.getBoundingClientRect(),px=cx-rect.left,py=cy-rect.top;
   const old=state.zoom;
-  state.zoom=clamp(next,Math.max(.06,fitZoom*.7),Math.max(4,fitZoom*8));
+  state.zoom=clamp(next,...zoomLimits());
   const ratio=state.zoom/old;
   state.x=px-(px-state.x)*ratio;
   state.y=py-(py-state.y)*ratio;
@@ -795,21 +792,76 @@ export function mountAtlasView(root,persistence=null){
   zoomAt(state.zoom*Math.exp(-clamp(e.deltaY,-350,350)*.00165),e.clientX,e.clientY);
  },{passive:false});
  viewport.addEventListener('dblclick',e=>{e.preventDefault();zoomAt(state.zoom*1.6,e.clientX,e.clientY);});
+ // Real two-finger pinch-to-zoom and simultaneous pan around the gesture midpoint.
+ // Capture phase also observes touches beginning on a marker. No touch may be
+ // interpreted as adding a point/marking a sector after a pinch gesture.
+ const startPinch=()=>{
+  const [a,b]=[...activeTouches.values()].slice(0,2);
+  if(!a||!b)return;
+  const rect=viewport.getBoundingClientRect();
+  const midX=(a.x+b.x)/2-rect.left,midY=(a.y+b.y)/2-rect.top;
+  // Revert a tentative one-finger marker drag before switching to pinch.
+  if(markerDrag){
+   const item=mapMarkers.find(entry=>entry.id===markerDrag.id);
+   if(item){item.x=markerDrag.x;item.y=markerDrag.y;}
+   try{if(markerDrag.node.hasPointerCapture(markerDrag.pointerId))markerDrag.node.releasePointerCapture(markerDrag.pointerId);}catch(_){}
+   markerDrag=null;paintCustomMarkers();
+  }
+  if(drag){
+   try{if(viewport.hasPointerCapture(drag.id))viewport.releasePointerCapture(drag.id);}catch(_){}
+   drag=null;viewport.classList.remove('is-dragging');
+  }
+  pinch={ids:[...activeTouches.keys()].slice(0,2),
+   distance:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),zoom:state.zoom,
+   anchorX:(midX-state.x)/state.zoom,anchorY:(midY-state.y)/state.zoom};
+  for(const id of pinch.ids){try{viewport.setPointerCapture(id);}catch(_){}}
+  ignoreClick=true;
+ };
  viewport.addEventListener('pointerdown',e=>{
-  if(e.button!==0||e.target.closest?.('[data-atlas-marker]'))return;
+  if(e.pointerType!=='touch')return;
+  activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(activeTouches.size===2){startPinch();e.preventDefault();}
+ },true);
+ viewport.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='touch'||!activeTouches.has(e.pointerId))return;
+  activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(!pinch)return;
+  const a=activeTouches.get(pinch.ids[0]),b=activeTouches.get(pinch.ids[1]);
+  if(!a||!b)return;
+  const rect=viewport.getBoundingClientRect();
+  const midX=(a.x+b.x)/2-rect.left,midY=(a.y+b.y)/2-rect.top;
+  const distance=Math.max(1,Math.hypot(b.x-a.x,b.y-a.y));
+  state.zoom=clamp(pinch.zoom*distance/pinch.distance,...zoomLimits());
+  state.x=midX-pinch.anchorX*state.zoom;
+  state.y=midY-pinch.anchorY*state.zoom;
+  repaint();e.stopPropagation();e.preventDefault();
+ },true);
+ const finishTouch=e=>{
+  if(e.pointerType!=='touch')return;
+  if(pinch){ignoreClick=true;e.stopPropagation();}
+  activeTouches.delete(e.pointerId);
+  if(pinch&&(pinch.ids.includes(e.pointerId)||activeTouches.size<2)){
+   pinch=null;
+   if(pdfLayer)schedulePdf(30);
+  }
+ };
+ viewport.addEventListener('pointerup',finishTouch,true);
+ viewport.addEventListener('pointercancel',finishTouch,true);
+ viewport.addEventListener('pointerdown',e=>{
+  if(pinch||e.button!==0||e.target.closest?.('[data-atlas-marker]'))return;
   drag={id:e.pointerId,startX:e.clientX,startY:e.clientY,initialX:state.x,initialY:state.y,moved:false};
   viewport.setPointerCapture(e.pointerId);
   viewport.classList.add('is-dragging');
  });
  viewport.addEventListener('pointermove',e=>{
-  if(!drag||drag.id!==e.pointerId)return;
+  if(pinch||!drag||drag.id!==e.pointerId)return;
   const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
   if(Math.hypot(dx,dy)>5)drag.moved=true;
   if(!drag.moved)return;
   state.x=drag.initialX+dx;state.y=drag.initialY+dy;repaint();
  });
  const endDrag=e=>{
-  if(!drag||drag.id!==e.pointerId)return;
+  if(pinch||!drag||drag.id!==e.pointerId)return;
   const didMove=drag.moved;
   drag=null;
   viewport.classList.remove('is-dragging');
@@ -819,7 +871,7 @@ export function mountAtlasView(root,persistence=null){
   clearMarkerSelection();
   if(markerPlacement){
    const pt=inMap(e.clientX,e.clientY);
-   if(pt){if(markerPlacementType==='party')savePartyPosition(pt);else{openMarkerEditor(null,pt);status.textContent='Vyplňte typ, název a případný popisek nové značky.';}}
+   if(pt){if(markerPlacementType==='party')placePartyPosition(pt);else{openMarkerEditor(null,pt);status.textContent='Značka je připravena; název i popisek jsou volitelné.';}}
    else status.textContent='Vyberte místo uvnitř mapy.';
    return;
   }
@@ -836,9 +888,10 @@ export function mountAtlasView(root,persistence=null){
  viewport.addEventListener('pointerup',endDrag);
  viewport.addEventListener('pointercancel',e=>{if(drag&&drag.id===e.pointerId){drag=null;viewport.classList.remove('is-dragging');}});
  viewport.addEventListener('click',e=>{
-  // Keyboard-triggered button click. Pointer clicks are handled above.
-  if(ignoreClick){ignoreClick=false;return;}
-  if(e.detail!==0)return;
+  // Only keyboard/programmatic sector activation is handled here. Pointer
+  // taps are resolved on pointerup; pinch must never block a later Enter.
+  if(e.detail!==0){ignoreClick=false;return;}
+  ignoreClick=false;
   const button=e.target.closest?.('[data-atlas-sector]');
   if(button)clickSector(button.dataset.atlasSector);
  });
@@ -849,7 +902,7 @@ export function mountAtlasView(root,persistence=null){
   }
   if(markerPlacement&&(e.key==='Enter'||e.key===' ')&&e.target===viewport){
    e.preventDefault();const [x,y]=center();const pt=inMap(x,y);
-   if(pt){if(markerPlacementType==='party')savePartyPosition(pt);else{openMarkerEditor(null,pt);status.textContent='Vyplňte typ, název a případný popisek nové značky.';}}
+   if(pt){if(markerPlacementType==='party')placePartyPosition(pt);else{openMarkerEditor(null,pt);status.textContent='Značka je připravena; název i popisek jsou volitelné.';}}
    return;
   }
   const arrows={ArrowLeft:[75,0],ArrowRight:[-75,0],ArrowUp:[0,75],ArrowDown:[0,-75]};

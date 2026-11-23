@@ -263,5 +263,5 @@ body #app main.content-atlas .atlas-custom-marker--draft{
  pointer-events:none!important;cursor:default!important;opacity:0.88!important;
 }
 .atlas-marker-editor label[hidden]{display:none!important}
-.atlas-custom-marker.is-party .atlas-marker-tooltip{display:none!important}
+/* v94.063: Party markers can also have optional title and description. */
 
