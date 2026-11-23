@@ -1,4 +1,5 @@
-import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.063';
+import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.064';
+import {validateAtlasCartography} from './src/ui/atlas-cartography.js?v=94.064';
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.007';
 import {armourWorkItem} from './src/integration/hmk-making-armour.js?v=94.012';
@@ -408,7 +409,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.063';
+const APP_VERSION='94.064';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -713,6 +714,7 @@ function assertAnimalTrainingCalendarAppendOnly590(before,after){
 }
 function validate(d){
  validateAtlasMarkers(d?.atlasMarkers);
+ validateAtlasCartography(d?.atlasCartography,{overview:{width:2449,height:2363},K5:{width:4172,height:4031}});
  assertFiniteState93897(d);
  validateGMHealthOverrideEvidence(d?.characters||[],d?.journal||[],d?.trash||[]);
  validateGlobalActionLedger(d);
@@ -866,6 +868,15 @@ function validate(d){
 // load/backup routines. Never write directly to the private repository here.
 const atlasPersistence={
  read:()=>data.atlasMarkers,
+ readCartography:()=>data.atlasCartography,
+ writeCartography:next=>{
+  try{validateAtlasCartography(next,{overview:{width:2449,height:2363},K5:{width:4172,height:4031}})}catch(err){notice='Atlas: '+String(err.message||err);return false;}
+  const before=data.atlasCartography;
+  data.atlasCartography=structuredClone(next);
+  const ok=save();
+  if(!ok){data.atlasCartography=before;return false;}
+  return true;
+ },
  write:next=>{
   try{validateAtlasMarkers(next)}catch(err){notice='Atlas: '+String(err.message||err);return false;}
   const before=data.atlasMarkers;

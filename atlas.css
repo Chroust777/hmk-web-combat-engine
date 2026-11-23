@@ -265,3 +265,43 @@ body #app main.content-atlas .atlas-custom-marker--draft{
 .atlas-marker-editor label[hidden]{display:none!important}
 /* v94.063: Party markers can also have optional title and description. */
 
+
+/* v94.064 — Atlas-only cartographic overlays and parchment tools. */
+.atlas-cartography-overlay,.atlas-fog-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;user-select:none}
+.atlas-cartography-overlay{z-index:7}
+.atlas-fog-overlay{z-index:8}
+.atlas-scale{z-index:10}
+.atlas-viewport.is-cartographing{cursor:crosshair}
+.atlas-viewport.is-cartographing .atlas-sector-grid{pointer-events:none}
+.atlas-viewport.is-cartographing .atlas-custom-marker,
+.atlas-viewport.atlas-hide-own-markers .atlas-custom-marker{pointer-events:none!important}
+.atlas-viewport.atlas-hide-own-markers .atlas-custom-marker-overlay{display:none}
+.atlas-cartography{display:block!important;margin-top:14px}
+.atlas-cartography details{border:1px solid #ae8f62;border-radius:5px;background:#f7e7c36b;margin:7px 0;padding:7px 9px;min-width:0}
+.atlas-cartography details[open]{background:#f8edda88}
+.atlas-cartography summary{cursor:pointer;font:700 13px/1.5 Georgia,serif;color:#4b3020;user-select:none}
+.atlas-cartography label{display:block;color:#4b3423;font:700 12px/1.4 Georgia,serif;margin-top:8px}
+#app .atlas-cartography input:not([type=checkbox]),#app .atlas-cartography textarea,#app .atlas-cartography select{
+ width:100%;box-sizing:border-box;margin-top:3px;max-width:none!important;min-width:0;padding:7px 8px;border:1px solid #a78758;
+ background:#fff6e5;color:#382a20;font:12px/1.4 Georgia,serif;border-radius:4px
+}
+.atlas-cartography textarea{resize:vertical}
+.atlas-cartography .atlas-carto-top,.atlas-cartography .atlas-carto-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.atlas-cartography .atlas-carto-top button,.atlas-cartography .atlas-carto-actions button{flex:1 1 auto}
+.atlas-carto-hint{font:11px/1.45 Georgia,serif;color:#70543a;margin:7px 0!important}
+.atlas-carto-layers{display:grid;grid-template-columns:1fr 1fr;gap:6px 9px;margin:8px 0}
+.atlas-carto-layers label{display:flex;align-items:center;gap:5px;margin:0!important;font-weight:400;white-space:normal}
+.atlas-carto-layers input{accent-color:#785331;width:auto!important;min-width:15px!important;min-height:15px!important;margin:0!important}
+.atlas-carto-list{display:flex;flex-direction:column;gap:6px;max-height:330px;overflow-y:auto;margin:8px 0}
+.atlas-carto-row{border:1px solid #baa47f;border-radius:4px;padding:6px;background:#f7e8cc;min-width:0;overflow-wrap:anywhere}
+.atlas-carto-row-title{font:700 12px/1.4 Georgia,serif;color:#48311f}
+.atlas-carto-row small{display:block;font:11px/1.35 Georgia,serif;color:#756047;margin-top:3px}
+.atlas-carto-row-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+body #app main.content-atlas .atlas-tools .atlas-carto-row-actions button{font-size:11px!important;padding:5px 7px!important;flex:1 1 auto}
+@media(max-width:1050px){.atlas-cartography{display:block!important}}
+.atlas-marker-events{border:1px solid #b09a73;border-radius:5px;margin:10px 0 6px;padding:7px}
+.atlas-marker-events legend{color:#5b3c25;font:bold 12px Georgia,serif;padding:0 5px}
+.atlas-marker-event-list{max-height:190px;overflow:auto;margin-top:7px}
+.atlas-marker-event-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px dotted #c2aa84;font:11px/1.4 Georgia,serif;color:#533621}
+.atlas-marker-event-row span{flex:1;min-width:0;overflow-wrap:anywhere}
+.atlas-marker-tooltip-description{white-space:pre-line}
