@@ -517,3 +517,7 @@ body #app main.content-atlas .atlas-custom-marker.is-party{transition:none!impor
    original depth; the opaque fog still covers the map itself. */
 .atlas-viewport.atlas-fog-visible .atlas-feature-overlay{z-index:9}
 .atlas-viewport.atlas-fog-visible .atlas-measure-overlay{z-index:10}
+
+/* v94.088 — compact independent history-note deletion. */
+.atlas-party-point-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px}
+body #app main.content-atlas .atlas-tools .atlas-party-point-row [data-party-note-delete]{color:#902f22!important}

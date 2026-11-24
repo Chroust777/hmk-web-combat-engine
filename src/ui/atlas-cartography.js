@@ -452,7 +452,10 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     centerAt(p);
     if(activeParty){openPartyNote(i);}
     else{const sp=screenPoint(p),r=viewport.getBoundingClientRect();selectedHit={kind:'history',id:undefined,index:i};hovered=null;suppressHover=false;showHover('history',undefined,i,r.left+sp.x,r.top+sp.y);paintSvg();}
-   });row.append(pointButton);
+   });
+   const controls=document.createElement('div');controls.className='atlas-party-point-actions';controls.append(pointButton);
+   const erase=document.createElement('button');erase.type='button';erase.textContent='Smazat text';erase.dataset.partyNoteDelete=p.id;erase.title='Smazat pouze poznámku, nikoli bod trasy';erase.setAttribute('aria-label',`Smazat text bodu ${i+1}`);
+   erase.addEventListener('click',()=>removePartyNote(p.id));controls.append(erase);row.append(controls);
    if(noteOpen){
     const input=document.createElement('textarea');input.rows=2;input.maxLength=500;input.placeholder='Poznámka k bodu';input.value=p.note;input.setAttribute('aria-label',`Poznámka k bodu ${i+1}`);let recorded=false;
     input.addEventListener('focus',()=>{recorded=false;partySelected=i;paintSvg();});
@@ -498,6 +501,18 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   partyUndo.push(structuredClone(partyDraft));partyRedo=[];partyDraft=next;partySelected=partyDraft.findIndex(p=>p.id===partyNoteId);if(partySelected<0)partyNoteId=null;hideHover();redraw();
  };
  const partyStep=(from,to)=>{if(!from.length)return;to.push(structuredClone(partyDraft));partyDraft=from.pop();partySelected=-1;if(!partyDraft.some(p=>p.id===partyNoteId))partyNoteId=null;hideHover();redraw();};
+ // Notes are independent of the path geometry. A saved note can be erased
+ // directly; in an existing history edit it participates in its undo/Esc flow.
+ const removePartyNote=id=>{
+  if(partyMode()){
+   const index=partyDraft.findIndex(p=>p.id===id);if(index<0)return;
+   if(partyNoteId===id){partyNoteId=null;partySelected=-1;}
+   if(!partyDraft[index].note){hideHover();redraw();return;}
+   partyChange(partyDraft.map(p=>p.id===id?{...p,note:''}:p));return;
+  }
+  const point=local.partyHistory.find(p=>p.id===id);if(!point?.note)return;
+  hideHover();commit(()=>{point.note='';},'Poznámka družiny');
+ };
  const removePartyPoint=i=>{if(partyDraft.length<=1){showStatus('Výchozí bod družiny musí zůstat zachován.');return;}if(!Number.isInteger(i)||i<0||i>=partyDraft.length)return;partyExtend=true;partyAppendDrag=true;partyChange(partyDraft.slice(0,Math.max(1,i)));};
  const finishParty=()=>{if(!partyMode())return true;if((JSON.stringify(partyDraft)!==JSON.stringify(partyBefore)||partyDraft.at(-1)?.x!==partyMarker()?.x||partyDraft.at(-1)?.y!==partyMarker()?.y)&&!savePartyPoints(partyDraft,'Historie družiny')){showStatus('Atlas: zápis historie se nezdařil. Úpravy zůstávají rozpracované; Esc zkusí uložení znovu.');return false;}clearMode();return true;};
  const openPartyNote=i=>{
