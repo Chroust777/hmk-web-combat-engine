@@ -1,4 +1,4 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.085';
+import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.086';
 /**
  * Hârn Atlas v94.083 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
@@ -203,7 +203,8 @@ export function atlasView(){
       <g data-atlas-measure-markers></g>
      </svg>
      <div class="atlas-custom-marker-overlay" data-atlas-custom-marker-overlay aria-label="Vlastní značky na mapě"></div>
-     <svg class="atlas-cartography-overlay" data-atlas-carto-overlay aria-label="Mapové objekty a body trasy družiny"></svg>
+     <svg class="atlas-cartography-overlay atlas-feature-overlay" data-atlas-carto-overlay aria-label="Mapové objekty"></svg>
+     <svg class="atlas-cartography-overlay atlas-party-history-overlay" data-atlas-party-history-overlay aria-label="Body trasy družiny"></svg>
      <canvas class="atlas-fog-overlay" data-atlas-fog aria-hidden="true"></canvas>
      <div class="atlas-carto-hover-delete" data-carto-hover-delete hidden><div class="atlas-carto-hover-tip" data-carto-hover-tip hidden></div><div class="atlas-carto-hover-actions"><button type="button" data-carto-hover-edit aria-label="Upravit poznámku nebo body objektu" title="Upravit objekt">✎</button><button type="button" data-carto-hover-remove aria-label="Smazat objekt nebo navazující trasu" title="Smazat">×</button></div></div>
      <div class="atlas-fog-brush-cursor" data-carto-fog-cursor hidden aria-hidden="true"></div>

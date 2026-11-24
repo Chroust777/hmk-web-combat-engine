@@ -130,10 +130,11 @@ export function atlasCartographyPanel(){
 export function mountAtlasCartography({workspace,viewport,map,read,write,screenPoint,inMap,getCamera,setCamera,zoomTo,markers,selectMarker,openSector,status,onModeStart,onLayersChange,restoreMarkers,readMarkers,writeBundle,onPartyPreview}){
  const area=workspace.querySelector('[data-atlas-carto]');
  const svg=workspace.querySelector('[data-atlas-carto-overlay]');
+ const partySvg=workspace.querySelector('[data-atlas-party-history-overlay]');
  const fogCanvas=workspace.querySelector('[data-atlas-fog]');
  const hoverDelete=workspace.querySelector('[data-carto-hover-delete]');
  const brushCursor=workspace.querySelector('[data-carto-fog-cursor]');
- if(!area||!svg||!fogCanvas)return null;
+ if(!area||!svg||!partySvg||!fogCanvas)return null;
  let snapshot,corrupt=false;try{snapshot=normalizeAtlasCartography(read?.(),{overview:{width:2449,height:2363},K5:{width:4172,height:4031}});}catch(e){console.error('Atlas cartography:',e);snapshot=atlasCartographyEmpty();corrupt=true;status.textContent='Atlas: uložená kartografie je neplatná. Zápisy jsou zablokovány, aby se nepřepsala původní data.';}
  const local=snapshot.maps[map.id],undo=[],redo=[];
  const loadSnapshot=source=>{const copy=structuredClone(source);Object.assign(local,copy.maps[map.id]);snapshot=copy;snapshot.maps[map.id]=local;};
@@ -270,8 +271,8 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   redraw();
  };
  const paintSvg=()=>{
-  svg.replaceChildren();const ns='http://www.w3.org/2000/svg';
-  const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(text!==undefined)el.textContent=text;svg.appendChild(el);return el;};
+  svg.replaceChildren();partySvg.replaceChildren();let target=svg;const ns='http://www.w3.org/2000/svg';
+  const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(text!==undefined)el.textContent=text;target.appendChild(el);return el;};
   const path=(points,close=false)=>points.map((p,i)=>`${i?'L':'M'}${screenPoint(p).x.toFixed(1)},${screenPoint(p).y.toFixed(1)}`).join(' ')+(close?' Z':'');
   const draw=(f,temporary=false)=>{
    const pts=f.points||[];if(!pts.length)return;
@@ -343,6 +344,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     if(f.type==='radius'){const center=screenPoint(points[0]);add('circle',{cx:center.x+draftRadiusKm*map.pixelsPerKm*getCamera().zoom,cy:center.y,r:9,fill:'#fff8e4',stroke:'#1c5e78','stroke-width':3,'pointer-events':'all',cursor:'ew-resize'});}
    }
   }
+  target=partySvg;
   if((local.layers.partyHistory||partyMode())&&(partyMode()?partyDraft.length:local.partyHistory.length)){
    const pts=partyMode()?partyDraft:local.partyHistory;
    add('path',{d:path(pts),stroke:'#33694e','stroke-width':'2.5','stroke-dasharray':partyMode()?'3 3':'5 5',fill:'none'});
@@ -364,6 +366,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    });
 
   }
+  target=svg;
   if(draft.length&&mode!=='edit-points')draw({type:mode==='fog-reveal'||mode==='fog-cover'?'draw':mode,points:draft,color:color.value,title:'',radiusKm:draftRadiusKm,opacity:Number(opacity.value)},true);
  };
  // An opaque fog texture is rendered once per viewport size. A single binary
@@ -378,6 +381,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   if(fogCanvas.width!==bw||fogCanvas.height!==bh){fogCanvas.width=bw;fogCanvas.height=bh;}
   fogCanvas.style.width=`${w}px`;fogCanvas.style.height=`${h}px`;
   ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,bw,bh);
+  viewport.classList.toggle('atlas-fog-visible',local.fog.enabled);
   if(!local.fog.enabled){refreshBrushCursor(null,null);return;}
   if(fogTextureWidth!==bw||fogTextureHeight!==bh){
    fogTextureWidth=bw;fogTextureHeight=bh;fogTexture.width=bw;fogTexture.height=bh;
@@ -769,20 +773,21 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  hoverDelete?.addEventListener('pointerenter',()=>clearTimeout(hoverTimer));
  hoverDelete?.addEventListener('pointerleave',()=>{hoverTimer=setTimeout(hideHover,600);});
  hoverDelete?.addEventListener('pointerdown',e=>e.stopPropagation());
- svg.addEventListener('pointerover',e=>{
+ for(const overlay of [svg,partySvg]){
+ overlay.addEventListener('pointerover',e=>{
   const hit=e.target.closest?.('[data-carto-hit]');if(!hit||(mode&&mode!=='edit-points'))return;
   showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex??-1),e.clientX,e.clientY);
  });
- svg.addEventListener('pointermove',e=>{
+ overlay.addEventListener('pointermove',e=>{
   suppressHover=false; // A real new pointer movement can show a note again after Esc.
   const hit=e.target.closest?.('[data-carto-hit]');if(!hit||(mode&&mode!=='edit-points'))return;
   showHover(hit.dataset.cartoHit,hit.dataset.cartoId,Number(hit.dataset.cartoIndex??-1),e.clientX,e.clientY);
  });
- svg.addEventListener('pointerout',e=>{
+ overlay.addEventListener('pointerout',e=>{
   if(selectedHit||!e.target.closest?.('[data-carto-hit]'))return;
   clearTimeout(hoverTimer);hoverTimer=setTimeout(hideHover,350);
  });
- svg.addEventListener('pointerdown',e=>{
+ overlay.addEventListener('pointerdown',e=>{
   const hit=e.target.closest?.('[data-carto-hit]');if(!hit||(mode&&mode!=='edit-points'))return;
   if(mode==='edit-points'&&hit.dataset.cartoHit==='vertex')return; // keep draggable vertices
   e.preventDefault();e.stopPropagation();
@@ -792,6 +797,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   else{selectedHit={kind,id,index};hovered=null;showHover(kind,id,index,e.clientX,e.clientY);}
   paintSvg(); // The clicked party-history dot grows slightly until dismissed.
  });
+ }
  viewport.addEventListener('pointerdown',e=>{
   if(selectedHit&&!e.target.closest?.('[data-carto-hit],[data-atlas-marker],.atlas-carto-hover-delete')){hideHover();paintSvg();}
  },true);
