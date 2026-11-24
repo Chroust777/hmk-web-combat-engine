@@ -1,4 +1,4 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.088';
+import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.089';
 /**
  * Hârn Atlas v94.083 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
@@ -230,7 +230,7 @@ export function atlasView(){
      </div>
      <p class="atlas-tool-footnote">1 hârnická liga ≈ 4 km.</p>
     </section></details>
-    <details class="atlas-tool-fold"><summary>⌖ Vlastní značky</summary><section class="atlas-tool-card atlas-custom-section" aria-label="Vlastní značky mapy">
+    <details class="atlas-tool-fold" data-hmk-gm-only><summary>⌖ Vlastní značky</summary><section class="atlas-tool-card atlas-custom-section" aria-label="Vlastní značky mapy">
      <div class="atlas-marker-placement-controls">
       <button type="button" class="atlas-tool-action" data-atlas-marker-add aria-pressed="false">Přidat značku</button>
      </div>
@@ -432,6 +432,10 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
   paintCustomMarkers(); // The preview icon changes instantly when its type changes.
  };
  markerType.addEventListener('change',syncMarkerFormType);
+ workspace.addEventListener('hmk-gm-mode-change',event=>{
+  if(event.detail.active)return;
+  if(markerPlacement){markerPlacement=false;refreshMarkerAdd();}
+ });
  const paintCustomMarkers=(partyPreview=undefined)=>{
   const present=new Set(mapMarkers.map(item=>item.id));
   for(const [id,node] of markerNodes){if(!present.has(id)){node.remove();markerNodes.delete(id);for(const btn of markerButtons.get(id)||[])btn.remove();markerButtons.delete(id);}}
@@ -447,8 +451,8 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
     const details=document.createElement('span');details.className='atlas-marker-tooltip-description';
     bubble.append(title,details);node.append(pin,bubble);
     customMarkerOverlay.appendChild(node);markerNodes.set(item.id,node);
-    const modify=document.createElement('button');modify.type='button';modify.className='atlas-marker-map-action atlas-marker-map-edit';modify.textContent='✎';modify.title='Upravit značku';modify.setAttribute('aria-label','Upravit značku');modify.dataset.atlasMarkerEditId=item.id;
-    const deleteBtn=document.createElement('button');deleteBtn.type='button';deleteBtn.className='atlas-marker-map-action atlas-marker-map-delete';deleteBtn.textContent='×';deleteBtn.title='Smazat značku';deleteBtn.setAttribute('aria-label','Smazat značku');deleteBtn.dataset.atlasMarkerDeleteId=item.id;
+    const modify=document.createElement('button');modify.type='button';modify.className='atlas-marker-map-action atlas-marker-map-edit';modify.textContent='✎';modify.title='Upravit značku';modify.setAttribute('aria-label','Upravit značku');modify.dataset.atlasMarkerEditId=item.id;modify.dataset.hmkGmOnly="";
+    const deleteBtn=document.createElement('button');deleteBtn.type='button';deleteBtn.className='atlas-marker-map-action atlas-marker-map-delete';deleteBtn.textContent='×';deleteBtn.title='Smazat značku';deleteBtn.setAttribute('aria-label','Smazat značku');deleteBtn.dataset.atlasMarkerDeleteId=item.id;deleteBtn.dataset.hmkGmOnly="";
     customMarkerOverlay.append(modify,deleteBtn);markerButtons.set(item.id,[modify,deleteBtn]);
    }
    const pos=screenPoint(item.type==='party'?((partyPreview===undefined?atlasCarto?.partyPreview():partyPreview)||item):item);
@@ -1044,7 +1048,7 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
  };
  const escapeListener=new AbortController();
  window.addEventListener('keydown',e=>{
-  if(e.key!=='Escape'||!workspace.isConnected)return;
+  if(e.key!=='Escape'||!workspace.isConnected||e.target?.closest?.('[data-hmk-gm-dialog]'))return;
   if(escapeAtlas()){e.preventDefault();e.stopImmediatePropagation();}
  },{capture:true,signal:escapeListener.signal});
  viewport.addEventListener('keydown',e=>{

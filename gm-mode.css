@@ -1,0 +1,21 @@
+/* v94.089 – visual GM role; all internal application data remains present. */
+html:not([data-hmk-gm="true"]) :is([data-hmk-gm-only],[data-nav="calendar"],[data-nav="encounter"],[data-nav="gmhistory"],[data-nav="backup"],[data-nav="trash"],[data-hmk-gm-status],[data-hmk-gm-logout]){display:none!important}
+html[data-hmk-gm="true"] [data-hmk-gm-login]{display:none!important}
+html:not([data-hmk-gm="true"]) main[data-hmk-gm-page]>:not([data-hmk-gm-page-notice]){display:none!important}
+html[data-hmk-gm="true"] [data-hmk-gm-page-notice]{display:none!important}
+.nav .hmk-gm-navigation{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;margin:0 auto 7px;grid-column:1/-1;z-index:2}
+.nav .hmk-gm-navigation button{box-sizing:border-box;display:flex;justify-content:center;align-items:center;width:50%;max-width:110px;min-width:88px;height:20px;min-height:20px;padding:0 5px;border:1px solid #ad8952;border-radius:5px;background:linear-gradient(180deg,#f4e5c8,#d9b980);color:#402b18;font:600 11px/1 Georgia,serif;cursor:pointer;white-space:nowrap}
+.nav .hmk-gm-status{color:#ead5a9;text-shadow:0 1px 3px #201810;font:600 11px/1.2 Georgia,serif;text-align:center}
+.nav .hmk-global-history button{display:flex!important;align-items:center!important;justify-content:center!important;width:34px;min-width:34px;height:29px;min-height:29px;padding:0!important;text-align:center;font:700 19px/1 Georgia,serif!important}
+.hmk-gm-dialog{box-sizing:border-box;width:min(340px,calc(100vw - 32px));padding:18px;border:2px solid #917047;border-radius:9px;background:#f7ead0;color:#382818;box-shadow:0 10px 40px #0008;font:15px/1.4 Georgia,serif}
+.hmk-gm-dialog::backdrop{background:rgba(16,13,10,.56)}
+.hmk-gm-dialog form{display:grid;gap:12px;margin:0}
+.hmk-gm-dialog h2{margin:0;font:700 21px/1.15 Georgia,serif;color:#503723}
+.hmk-gm-dialog label:not(.hmk-gm-remember){display:grid;gap:4px}
+.hmk-gm-dialog input[type=password]{box-sizing:border-box;width:100%;padding:7px;border:1px solid #9d8058;border-radius:4px;background:#fff8ea;color:#382818}
+.hmk-gm-dialog .hmk-gm-remember{display:flex;align-items:center;gap:7px;cursor:pointer}
+.hmk-gm-dialog .hmk-gm-remember input{width:16px;height:16px;margin:0;flex:none}
+.hmk-gm-dialog [data-hmk-gm-error]{margin:0;color:#a32222;font-size:13px}
+.hmk-gm-dialog [data-hmk-gm-error]:empty{display:none}
+.hmk-gm-dialog-actions{display:flex;justify-content:flex-end;gap:8px}
+.hmk-gm-dialog-actions button{padding:5px 12px;min-height:27px;border:1px solid #9a7547;border-radius:5px;background:#e6d0a6;color:#382818;font:600 13px/1.2 Georgia,serif;cursor:pointer}

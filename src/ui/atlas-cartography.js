@@ -106,7 +106,7 @@ export function atlasCartographyPanel(){
   <p class="atlas-carto-hint" data-carto-hint>Vyberte nástroj. Kružnici vytvoříte přímo tažením od středu k okraji; její dosah se při kreslení zobrazuje na mapě.</p>
   <div class="atlas-carto-actions"><button type="button" data-carto-save-meta hidden>Uložit změny</button><button type="button" data-carto-delete-route hidden>Odebrat celou trasu</button><button data-carto-finish type="button" hidden disabled>Dokončit objekt</button><button data-carto-point-undo type="button" hidden disabled>Odebrat bod</button></div>
  </details>
- <details class="atlas-tool-fold" data-carto-fog-section><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě. Tahy se promítají i do odpovídající části druhé mapy.</p>
+ <details class="atlas-tool-fold" data-carto-fog-section data-hmk-gm-only><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě. Tahy se promítají i do odpovídající části druhé mapy.</p>
   <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.1" value="5"></label>
   <label class="atlas-fog-transparency">Průsvitnost mlhy (GM): <span data-carto-fog-transparency-value>0 %</span><input type="range" data-carto-fog-transparency min="0" max="100" step="1" value="0" aria-label="Průsvitnost mlhy (GM)" aria-valuetext="0 %"></label>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
@@ -115,14 +115,6 @@ export function atlasCartographyPanel(){
    <div class="atlas-carto-actions"><button type="button" data-carto-fog-reset>Úplně zahalit</button><button type="button" data-carto-fog-clear>Odstranit mlhu</button></div>
   </details>
  </details>
- <div class="atlas-fog-gate" data-carto-fog-gate hidden role="dialog" aria-modal="true" aria-labelledby="atlas-fog-gate-title">
-  <form data-carto-fog-gate-form class="atlas-fog-gate-box" autocomplete="off">
-   <h3 id="atlas-fog-gate-title">Zakrytí mapy – přístupové heslo</h3>
-   <label>Heslo <input type="password" data-carto-fog-password autocomplete="off" spellcheck="false" required></label>
-   <p data-carto-fog-gate-error class="atlas-fog-gate-error" role="status" aria-live="polite"></p>
-   <div class="atlas-carto-actions"><button type="submit">Odemknout</button><button type="button" data-carto-fog-gate-cancel>Zrušit</button></div>
-  </form>
- </div>
  </section>`;
 }
 
@@ -152,7 +144,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  // Per-map default brush size (km); the user can still change it during this view.
  const defaultFogRadius=map.id==='K5'?0.2:5;
  fogRadius.value=String(defaultFogRadius);
- const fogSection=$('[data-carto-fog-section]'),fogGate=$('[data-carto-fog-gate]');
+ const fogSection=$('[data-carto-fog-section]');
  const fogAdvanced=$('[data-carto-fog-advanced]');
  const fogTransparency=$('[data-carto-fog-transparency]'),fogTransparencyValue=$('[data-carto-fog-transparency-value]');
  // Local GM preview only: fade the final composited canvas, never the coverage mask or campaign data.
@@ -164,24 +156,15 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  };
  const resetFogTransparency=()=>{fogTransparency.value='0';updateFogTransparency();};
  fogTransparency.addEventListener('input',updateFogTransparency);
- const fogPassword=$('[data-carto-fog-password]'),fogError=$('[data-carto-fog-gate-error]');
- const dismissFogGate=()=>{fogGate.hidden=true;fogPassword.value='';fogError.textContent='';};
- // Every attempted expansion requires the password again. This is an interface
- // gate, not authentication: all browser-side source code is public.
- fogSection.querySelector('summary').addEventListener('click',event=>{
-  if(fogSection.open){resetFogTransparency();return;}
-  event.preventDefault();fogPassword.value='';fogError.textContent='';fogGate.hidden=false;
-  fogPassword.focus({preventScroll:true});
- });
  fogSection.addEventListener('toggle',()=>{
   if(!fogSection.open){resetFogTransparency();fogAdvanced.open=false;if(mode.startsWith('fog-'))clearMode();}
  });
- $('[data-carto-fog-gate-form]').addEventListener('submit',event=>{
-  event.preventDefault();
-  if(fogPassword.value==='anakin'){dismissFogGate();resetFogTransparency();fogSection.open=true;}
-  else{fogError.textContent='Nesprávné heslo.';fogPassword.value='';fogPassword.focus({preventScroll:true});}
+ // Only the interface role changes; the saved fog mask remains intact.
+ workspace.addEventListener('hmk-gm-mode-change',event=>{
+  if(event.detail.active)return;
+  fogSection.open=false;fogAdvanced.open=false;resetFogTransparency();
+  if(mode.startsWith('fog-'))clearMode();
  });
- $('[data-carto-fog-gate-cancel]').addEventListener('click',dismissFogGate);
  const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||defaultFogRadius));
  let draftRadiusKm=0;
  let hovered=null,selectedHit=null,hoverTimer=null,suppressHover=false;
@@ -836,7 +819,6 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   stop(){if(partyMode())return finishParty();clearMode();return true;},
   escape(){
    let handled=false;
-   if(!fogGate.hidden){dismissFogGate();handled=true;}
    if(partyMode()){painting=false;partyGesture=null;finishParty();handled=true;}
    else if(mode||painting||editingFeatureId){
     painting=false;currentBrush=null;editVertex=null;clearMode();handled=true;

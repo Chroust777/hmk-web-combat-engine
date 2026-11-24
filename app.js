@@ -1,5 +1,6 @@
-import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.088';
-import {validateAtlasCartography} from './src/ui/atlas-cartography.js?v=94.088';
+import {gmNavigationMarkup,gmPageAttribute} from './src/ui/gm-mode.js?v=94.089';
+import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.089';
+import {validateAtlasCartography} from './src/ui/atlas-cartography.js?v=94.089';
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
 import {CONSTRUCTION_STRUCTURES,formatConstructionWork,constructionPlan,constructionDesignModifier,resolveConstruction,validateConstruction,assertConstructionAppendOnly} from './src/integration/hmk-construction.js?v=94.007';
 import {armourWorkItem} from './src/integration/hmk-making-armour.js?v=94.012';
@@ -409,7 +410,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.088';
+const APP_VERSION='94.089';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -1309,6 +1310,7 @@ function main(){
  return `<div class="shell shell-${view}" data-scene="${scene}">
  <div class="layout"><nav class="nav" aria-label="Hlavní navigace">
   <div class="castle-campaign-card"><strong>HârnMaster World of Kèthîra</strong></div>
+  ${gmNavigationMarkup()}
   <div class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></div>
   <div class="nav-section-label">HLAVNÍ MENU</div>
   ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
@@ -1316,7 +1318,7 @@ function main(){
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
   <div class="castle-sidebar-footer"><button type="button" data-nav="backup" class="hmk-cloud-sidebar" data-cloud-sidebar title="Stav synchronizace">${esc(cloudStatusLabel())}</button><br>⚜ &nbsp; THE KEEPER’S LEDGER <span>v${APP_VERSION}</span></div>
- </nav><main class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter','backup','trash','gmhistory'].includes(view)?' content-sheet':''}">${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}</main></div>
+ </nav><main ${gmPageAttribute(view)} class="content content-${view}${['characters','sheet','creation','calendar','skills','library','encounter','backup','trash','gmhistory'].includes(view)?' content-sheet':''}">${cloudSync?.enabled&&!cloudSync.canWrite()?`<div class="notice error" data-cloud-block-banner>⚠ ${esc(cloudStatusLabel())}: herní zápisy jsou do připojení zablokované. <button type="button" data-nav="backup">Přejít k připojení</button></div>`:''}${notice?`<div class="notice error">${esc(notice)}</div>`:''}${body}${gmPageAttribute(view)?'<p class="notice hmk-gm-page-notice" data-hmk-gm-page-notice>Pro zobrazení této části se přihlaste jako GameMaster.</p>':''}</main></div>
  <footer class="footer">HârnMaster Keeper’s Ledger · v${APP_VERSION} · aplikace pro GitHub Pages · volitelná GitHub cloud synchronizace</footer></div>`;
 }
 
