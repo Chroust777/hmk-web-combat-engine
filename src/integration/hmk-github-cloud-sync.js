@@ -321,7 +321,24 @@ export function createGitHubCloudSync({localStorage,sessionStorage,storageKey,va
   await vault.save({owner:config.owner,repo:config.repo,token});notify();
  }
  function forgetDeviceToken(){vault.clear();notify();}
+ // Independent chat transport. No campaign SHA, queue, validation, status or reset changes.
+ function chatConnection(){
+  const configured=!!config,scope=configured?pendingKey():'local';
+  const allowed=()=>!!config&&!!token&&['ready','pending','syncing','error-pending','conflict'].includes(status);
+  const capturedToken=token;
+  const guard=()=>{if(!allowed()||pendingKey()!==scope||token!==capturedToken)throw Error('Připojení chatu se změnilo.');};
+  const path='/contents/campaigns/hmk-ledger-chat.json';
+  return {configured,scope,ready:allowed(),async read(){
+   guard();await verifyPrivateRepository();guard();
+   try{const r=await request('GET',api(path));guard();if(!r.sha||typeof r.content!=='string'||r.encoding!=='base64')throw Error('Neplatný nebo příliš velký chatový soubor.');return {sha:r.sha,raw:new TextDecoder().decode(fromBase64(r.content))};}
+   catch(e){guard();if(e.httpStatus===404)return null;throw e;}
+  },async write(raw,reference){
+   guard();if(globalThis.window?.__hmkOutdatedBuild)throw Error('Obnovte novou verzi aplikace.');
+   const bytes=new TextEncoder().encode(raw);if(bytes.length>MAX_FILE_SIZE)throw Error('Chatový soubor je příliš velký.');
+   const r=await request('PUT',api(path),{message:'HMK: shared chat update',content:toBase64(bytes),...(reference?{sha:reference}:{})});guard();if(!r.content?.sha)throw Error('GitHub nepotvrdil zápis chatu.');return r.content.sha;
+  }};
+ }
  function configView(){return {...config};}
  notify();
- return {get localStorageCleared(){return liveStorageWasCleared()},get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},get remembered(){return vault.has()},canWrite,onLocalWrite,connect,flush,refresh,replaceWithCloud,resetSharedCampaign,resetDevelopmentCampaign,disconnect,rememberCurrentDevice,forgetDeviceToken,startup};
+ return {get localStorageCleared(){return liveStorageWasCleared()},get status(){return status},get issue(){return error},get config(){return configView()},get pending(){return pending||isPending()},get enabled(){return !!config},get remembered(){return vault.has()},canWrite,onLocalWrite,chatConnection,connect,flush,refresh,replaceWithCloud,resetSharedCampaign,resetDevelopmentCampaign,disconnect,rememberCurrentDevice,forgetDeviceToken,startup};
 }

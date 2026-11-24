@@ -1,3 +1,4 @@
+import {installChat} from './src/ui/chat.js?v=94.099';
 import {gmNavigationMarkup,gmPageAttribute} from './src/ui/gm-mode.js?v=94.090';
 import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.098';
 import {validateAtlasCartography} from './src/ui/atlas-cartography.js?v=94.098';
@@ -30,7 +31,7 @@ import {randomEpisodeMinute93868,deferredEpisodeEvent93868,validateDeferredEpiso
 import {UNIVERSAL_STOP_REASONS_93869,confirmUniversalStop93869,validateUniversalStop93869,effectiveActivityMinutes93869,UNIVERSAL_STOP_RESOLUTION_FORMAT_93869} from './src/integration/hmk-universal-window-interruption-93869.js';
 import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
-import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js';
+import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js?v=94.099';
 import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
 import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-archery-choice.js';
 import {prepareSleeplessDay,prepareSleeplessNight,prepareSleeplessFourHourRest} from './src/integration/hmk-sleep-deprivation.js';
@@ -410,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.098';
+const APP_VERSION='94.099';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -567,6 +568,7 @@ cloudSync=createGitHubCloudSync({localStorage,sessionStorage,storageKey:STORAGE,
  approveReplace:()=>true,
  onStatus:()=>{const node=document.querySelector('[data-cloud-status]');if(node)node.textContent=cloudStatusLabel()+(cloudSync?.issue?' · '+cloudSync.issue:'');const side=document.querySelector('[data-cloud-sidebar]');if(side)side.textContent=cloudStatusLabel();const block=document.querySelector('[data-cloud-block-banner]');if(block)block.hidden=cloudSync?.canWrite()??true;}
 });
+installChat({characters:()=>registryCharacters93813(data.characters).filter(c=>c.kind!=='NPC').map(c=>({id:c.id,name:c.name})),connection:()=>cloudSync.chatConnection()});
 let catalogStatus='all'; // presentation-only; never persisted
 let libraryTab='melee',libraryPage=0,libraryRecipientId=null,libraryOtherFilter='all'; // presentation-only, not stored
 let libraryArmourMaterial='all',libraryArmourLocation='all'; // presentation-only, combined material + anatomical coverage filters
@@ -1306,7 +1308,7 @@ function main(){
  const scene=activeVisualScene();
  const gmPage=gmPageAttribute(view)||(['sheet','creation'].includes(view)&&character(selected)?.kind==='NPC'?'data-hmk-gm-page':'');
  const gmChapter=(view==='sheet'&&['status','hazards','provisions'].includes(activeSheetSection))||(view==='library'&&['bestiary','rules'].includes(libraryTab));
- const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['atlas','▧','Atlas'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
+ const navLinks=[['characters','◈','Postavy'],['calendar','◷','Kalendář'],['atlas','▧','Atlas'],['chat','✉','Chat'],['library','⚔','Knihovna vybavení'],['skills','⚄','Skill Tests'],['encounter','♜','Combat'],['gmhistory','▤','GM · Historie činností'],['backup','☁','Cloud a zálohy'],['trash','♧','Archiv']];
  const registryPeople=registryCharacters93813(data.characters);
  const characterButtons=registryPeople.map(c=>{const ready=characterJournalReadiness(c).ready;return `<button type="button" ${c.kind==='NPC'?'data-hmk-gm-only':''} class="castle-character ${c.id===selected?'active':''} ${ready?'':'castle-character--draft'}" ${ready?'data-open':'data-resume-creation'}="${esc(c.id)}" title="${ready?'Otevřít deník':'Pokračovat v pravidlové tvorbě'}"><span class="castle-char-portrait">${typeof c.portrait==='string'&&c.portrait?`<img src="${esc(c.portrait)}" alt="">`:esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="castle-char-name">${esc(c.name)}</span><span class="castle-char-spacer" aria-hidden="true"></span></button>`;}).join('');
  return `<div class="shell shell-${view}" data-scene="${scene}">
@@ -1315,7 +1317,7 @@ function main(){
   ${gmNavigationMarkup()}
   <div class="hmk-global-history" aria-label="Historie navigace v HMK" role="navigation"><button type="button" data-ui-history="back" title="Zpět na předchozí obrazovku" aria-label="Přejít zpět" ${uiNavigation.canBack()?'':'disabled'}>←</button><button type="button" data-ui-history="forward" title="Vpřed na následující obrazovku" aria-label="Přejít vpřed" ${uiNavigation.canForward()?'':'disabled'}>→</button></div>
   <div class="nav-section-label">HLAVNÍ MENU</div>
-  ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" data-nav="${id}"><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
+  ${navLinks.map(([id,icon,label])=>`<button type="button" class="castle-nav-link ${view===id?'active':''}" ${id==='chat'?'data-hmk-chat-open':`data-nav="${id}"`}><span class="castle-nav-icon" aria-hidden="true">${icon}</span><span class="castle-nav-label">${esc(label)}</span><span class="castle-nav-spacer" aria-hidden="true"></span></button>`).join('')}
   <div class="nav-section-label castle-character-section">POSTAVY <span data-hmk-gm-only>${registryPeople.length}</span><span data-hmk-player-only>${registryPeople.filter(c=>c.kind!=='NPC').length}</span></div>
   <div class="castle-character-list">${characterButtons||'<p class="nav-empty">Nejsou vytvořeny žádné postavy.</p>'}</div>
   <button type="button" class="castle-create" data-action="new-character"><span class="castle-create-symbol" aria-hidden="true">✣</span><span class="castle-create-label">Vytvořit postavu</span><span class="castle-create-plus" aria-hidden="true">＋</span></button>
