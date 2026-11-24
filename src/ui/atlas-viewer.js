@@ -1,4 +1,4 @@
-import {atlasCartographyPanel,mountAtlasCartography} from './atlas-cartography.js?v=94.083';
+import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.084';
 /**
  * Hârn Atlas v94.083 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
@@ -254,7 +254,7 @@ export function atlasView(){
 }
 
 /** Bind per-view ephemeral controls; only Atlas DOM is replaced when K5 opens. */
-export function mountAtlasView(root,persistence=null){
+export function mountAtlasView(root,persistence=null,partyTarget=null){
  // The application owns persistence. Atlas never receives the GitHub token and
  // cannot write its own unguarded JSON; it uses the existing CAS/cloud writer.
  if(persistence&&typeof persistence.read==='function'&&typeof persistence.write==='function')markerPersistence=persistence;
@@ -414,7 +414,7 @@ export function mountAtlasView(root,persistence=null){
   markerAdd.textContent=genericActive?'Zrušit umístění':'Přidat značku';
   // This button always identifies/navigates to the party; it is not a 'delete position' toggle.
   markerParty.textContent='Pozice družiny';
-  markerParty.disabled=!mapMarkers.some(item=>item.type==='party');
+  markerParty.disabled=!mapMarkers.some(item=>item.type==='party')&&!(overview&&markersByMap.K5.some(item=>item.type==='party'));
   markerParty.title=markerParty.disabled?'Nejdříve vytvořte značku typu Pozice družiny přes Přidat značku.':'Zobrazit pozici družiny';
   markerAdd.setAttribute('aria-pressed',String(genericActive));
   markerParty.setAttribute('aria-pressed',String(partyActive));
@@ -577,11 +577,16 @@ export function mountAtlasView(root,persistence=null){
  markerParty.addEventListener('click',()=>{
   if(atlasCarto?.mode==='party-edit'){workspace.querySelector('[data-carto-party-section]').open=true;return;}
   const party=mapMarkers.find(item=>item.type==='party');
+  if(overview){
+   const detailed=markersByMap.K5.find(item=>item.type==='party');
+   if(detailed){switchTo('K5',{id:detailed.id,point:detailed});return;}
+   if(party&&atlasSectorAt(party)==='K5'){switchTo('K5',{point:atlasProjectPoint(party,'overview','K5')});return;}
+  }
   if(party){
    if(atlasCarto?.stop()===false)return;measurement.active=false;measurement.points=[];paintMeasurement();
    markerPlacement=false;closeMarkerEditor();refreshMarkerAdd();
    selectMarker(party.id,true);
-   status.textContent='Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě a změny uložte klávesou Esc.';
+   status.textContent=overview?`Pozice družiny – sektor ${atlasSectorAt(party)}. Detailní mapa tohoto sektoru zatím není připojena.`:'Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě a změny uložte klávesou Esc.';
   }
  });
  const placePartyPosition=position=>{
@@ -838,7 +843,7 @@ export function mountAtlasView(root,persistence=null){
   repaint();
  };
  const center=()=>{const r=viewport.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2];};
- const switchTo=(nextMap)=>{
+ const switchTo=(nextMap,partyTarget=null)=>{
   if(!MAPS[nextMap]||nextMap===currentMapId)return;
   if(atlasCarto?.mode==='party-edit'&&atlasCarto.stop()===false)return;
   // Switching maps ends measurement everywhere and removes all route graphics.
@@ -848,7 +853,7 @@ export function mountAtlasView(root,persistence=null){
   if(pdfLayer)releasePdf();
   currentMapId=nextMap;
   workspace.outerHTML=atlasView();
-  mountAtlasView(root);
+  mountAtlasView(root,null,partyTarget);
   root.querySelector('[data-atlas-viewport]')?.focus({preventScroll:true});
  };
  const clickSector=id=>{
@@ -1112,6 +1117,14 @@ export function mountAtlasView(root,persistence=null){
  atlasPartySave=(before,after)=>atlasCarto?.savePartyMarkerChange(before,after);
  atlasMarkerChanged=(before,after)=>{if(!restoringMarkerUndo)atlasCarto?.recordMarkerChange(before,after);};
  viewport.classList.toggle('atlas-hide-own-markers',atlasCarto?.markersVisible()===false);
+ if(partyTarget){
+  const pin=mapMarkers.find(item=>item.type==='party'&&item.id===partyTarget.id);
+  if(pin){selectMarker(pin.id,true);status.textContent='Pozice družiny – sektor '+map.id+'.';}
+  else if(partyTarget.point){
+   const p=partyTarget.point;state.zoom=clamp(1.07,...zoomLimits());state.x=viewport.clientWidth/2-(map.margin+p.x)*state.zoom;state.y=viewport.clientHeight/2-(map.margin+p.y)*state.zoom;repaint();
+   status.textContent='Pozice družiny z hlavní mapy – sektor '+map.id+'. V detailu zatím není samostatná značka.';
+  }
+ }
  if(typeof ResizeObserver==='function'){
   const observer=new ResizeObserver(()=>{
    const {w,h}=size();if(!w||!h)return;

@@ -1,5 +1,39 @@
-/** Hârn Atlas cartography v94.083. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.084. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
+// One registration for navigation and fog. K5 occupies column 3, row 2
+// of the overview's 4 x 4 image grid; margins are not map coordinates.
+const GEO={overview:{width:2449,height:2363,pixelsPerKm:300/2.54/20},K5:{width:4172,height:4031,pixelsPerKm:141.28*(400/72)/20}};
+const K5_RECT={x:GEO.overview.width/2,y:GEO.overview.height/4,width:GEO.overview.width/4,height:GEO.overview.height/4};
+function mapTransform(from,to){
+ if(from===to)return {x:0,y:0,sx:1,sy:1};
+ const sx=K5_RECT.width/GEO.K5.width,sy=K5_RECT.height/GEO.K5.height;
+ return from==='K5'?{x:K5_RECT.x,y:K5_RECT.y,sx,sy}:{x:-K5_RECT.x/sx,y:-K5_RECT.y/sy,sx:1/sx,sy:1/sy};
+}
+export function atlasProjectPoint(point,from,to){const t=mapTransform(from,to);return {x:t.x+point.x*t.sx,y:t.y+point.y*t.sy};}
+export function atlasSectorAt(point){
+ if(!point||point.x<0||point.y<0||point.x>=GEO.overview.width||point.y>=GEO.overview.height)return null;
+ return 'IJKL'[Math.floor(point.x/K5_RECT.width)]+(4+Math.floor(point.y/K5_RECT.height));
+}
+// Clip a stroke to its source map, then project it. Test segment intersection
+// with the expanded sector bounds even when both brush samples lie outside.
+function intersectsK5(stroke){
+ if(stroke.wholeMap)return true;
+ const radius=stroke.radiusKm*GEO.overview.pixelsPerKm;
+ const x0=K5_RECT.x-radius,y0=K5_RECT.y-radius,x1=K5_RECT.x+K5_RECT.width+radius,y1=K5_RECT.y+K5_RECT.height+radius;
+ const points=stroke.points;
+ for(let i=0;i<points.length;i++){
+  const a=points[i],b=points[i+1]||a;let lo=0,hi=1;
+  for(const [p,d,min,max] of [[a.x,b.x-a.x,x0,x1],[a.y,b.y-a.y,y0,y1]]){
+   if(!d){if(p<min||p>max){lo=1;hi=0;}continue;}
+   const u=(min-p)/d,v=(max-p)/d;lo=Math.max(lo,Math.min(u,v));hi=Math.min(hi,Math.max(u,v));
+  }
+  if(lo<=hi)return true;
+ }
+ return false;
+}
+function nextFogOrder(snapshot){return 1+Math.max(0,...MAP_IDS.flatMap(id=>snapshot.maps[id].fog.strokes.map(s=>s.syncOrder||0)));}
+function linkedFogStrokes(snapshot){return MAP_IDS.flatMap(id=>snapshot.maps[id].fog.strokes.filter(s=>s.syncOrder!==undefined).map(stroke=>({id,stroke}))).sort((a,b)=>a.stroke.syncOrder-b.stroke.syncOrder);}
+
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
 const VISIBLE_LAYER_TOGGLES=LAYERS.filter(key=>key!=='fog');
@@ -17,6 +51,7 @@ export const atlasCartographyEmpty=()=>({version:1,maps:{overview:blankMap(),K5:
 export function validateAtlasCartography(value,maps){
  if(value===undefined)return true;
  if(!value||value.version!==1||!value.maps||typeof value.maps!=='object')throw Error('Atlas: neplatné kartografické údaje.');
+ const fogOrders=new Set();
  for(const [id,mapData] of Object.entries(value.maps)){
   const map=maps[id];if(!map||!mapData||typeof mapData!=='object')throw Error('Atlas: neplatná mapa kartografie.');
   const {features,bookmarks,partyHistory,fog,layers}=mapData;
@@ -30,7 +65,12 @@ export function validateAtlasCartography(value,maps){
   }
   for(const b of bookmarks)if(typeof b.id!=='string'||typeof b.title!=='string'||b.title.length>120||!finite(b.x)||!finite(b.y)||!finite(b.zoom)||b.zoom<=0||!validPoint({x:b.x,y:b.y},map))throw Error('Atlas: neplatná záložka.');
   for(const h of partyHistory)if(typeof h.id!=='string'||!validPoint(h,map)||typeof h.date!=='string'||h.date.length>80||typeof h.note!=='string'||h.note.length>500)throw Error('Atlas: neplatná historie družiny.');
-  for(const s of fog.strokes)if(!s||!['reveal','cover'].includes(s.action)||!finite(s.radiusKm)||s.radiusKm<=0||s.radiusKm>10000||!Array.isArray(s.points)||s.points.length>MAX_POINTS||s.points.some(p=>!validPoint(p,map)))throw Error('Atlas: neplatná mlha války.');
+  if(fog.baseK5Only!==undefined&&(id!=='overview'||typeof fog.baseK5Only!=='boolean'))throw Error('Atlas: neplatný základ mlhy.');
+  for(const s of fog.strokes){
+   if(!s||!['reveal','cover'].includes(s.action)||!finite(s.radiusKm)||s.radiusKm<=0||s.radiusKm>10000||!Array.isArray(s.points)||s.points.length>MAX_POINTS||s.points.some(p=>!validPoint(p,map)))throw Error('Atlas: neplatná mlha války.');
+   if(s.syncOrder!==undefined){if(!Number.isSafeInteger(s.syncOrder)||s.syncOrder<1||fogOrders.has(s.syncOrder))throw Error('Atlas: neplatné pořadí mlhy.');fogOrders.add(s.syncOrder);}
+   if(s.wholeMap!==undefined&&(s.wholeMap!==true||s.syncOrder===undefined||s.points.length!==0))throw Error('Atlas: neplatná celoplošná mlha.');
+  }
   for(const arr of [features,bookmarks,partyHistory])if(new Set(arr.map(x=>x.id)).size!==arr.length)throw Error('Atlas: duplicitní identifikátory.');
  }
  return true;
@@ -66,7 +106,7 @@ export function atlasCartographyPanel(){
   <p class="atlas-carto-hint" data-carto-hint>Vyberte nástroj. Kružnici vytvoříte přímo tažením od středu k okraji; její dosah se při kreslení zobrazuje na mapě.</p>
   <div class="atlas-carto-actions"><button type="button" data-carto-save-meta hidden>Uložit změny</button><button type="button" data-carto-delete-route hidden>Odebrat celou trasu</button><button data-carto-finish type="button" hidden disabled>Dokončit objekt</button><button data-carto-point-undo type="button" hidden disabled>Odebrat bod</button></div>
  </details>
- <details class="atlas-tool-fold" data-carto-fog-section><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
+ <details class="atlas-tool-fold" data-carto-fog-section><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě. Tahy se promítají i do odpovídající části druhé mapy.</p>
   <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.1" value="5"></label>
   <label class="atlas-fog-transparency">Průsvitnost mlhy (GM): <span data-carto-fog-transparency-value>0 %</span><input type="range" data-carto-fog-transparency min="0" max="100" step="1" value="0" aria-label="Průsvitnost mlhy (GM)" aria-valuetext="0 %"></label>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
@@ -380,20 +420,29 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   // to the map image's projected rectangle in viewport coordinates.
   const camera=getCamera(),mapOrigin=screenPoint({x:0,y:0});
   m.save();m.beginPath();m.rect(mapOrigin.x,mapOrigin.y,map.width*camera.zoom,map.height*camera.zoom);m.clip();
-  m.fillStyle='#000';m.fillRect(0,0,w,h);
-  const applyStroke=stroke=>{
-   const r=stroke.radiusKm*map.pixelsPerKm*getCamera().zoom;
+  m.fillStyle='#000';
+  if(local.fog.baseK5Only){const start=screenPoint(K5_RECT);m.fillRect(start.x,start.y,K5_RECT.width*camera.zoom,K5_RECT.height*camera.zoom);}
+  else m.fillRect(0,0,w,h);
+  const applyStroke=(stroke,sourceId=map.id)=>{
+   const source=GEO[sourceId],t=mapTransform(sourceId,map.id),origin=screenPoint(t);
+   const r=stroke.radiusKm*source.pixelsPerKm;
+   m.save();m.translate(origin.x,origin.y);m.scale(t.sx*camera.zoom,t.sy*camera.zoom);
+   m.beginPath();m.rect(0,0,source.width,source.height);m.clip();
    m.globalCompositeOperation=stroke.action==='reveal'?'destination-out':'source-over';
    m.strokeStyle='#000';m.fillStyle='#000';m.lineWidth=2*r;m.lineJoin='round';m.lineCap='round';
-   if(!stroke.points.length)return;
-   const path=stroke.points.map(screenPoint);
+   if(stroke.wholeMap){m.fillRect(0,0,source.width,source.height);m.restore();return;}
+   if(!stroke.points.length){m.restore();return;}
+   const path=stroke.points;
    m.beginPath();m.moveTo(path[0].x,path[0].y);
    for(let i=1;i<path.length;i++)m.lineTo(path[i].x,path[i].y);
    if(path.length>1)m.stroke();
    // Single-click stroke must erase/fill one complete circular brush footprint.
    for(const pt of [path[0],...(path.length>1?[path[path.length-1]]:[])]){m.beginPath();m.arc(pt.x,pt.y,r,0,Math.PI*2);m.fill();}
+   m.restore();
   };
-  for(const stroke of local.fog.strokes)applyStroke(stroke);
+  // Legacy per-map masks stay intact; ordered new strokes override them in both views.
+  for(const stroke of local.fog.strokes)if(stroke.syncOrder===undefined)applyStroke(stroke);
+  for(const {id,stroke} of linkedFogStrokes(snapshot))applyStroke(stroke,id);
   if(painting&&currentBrush)applyStroke(currentBrush);
   m.restore(); // End map-only clip before composing the texture with the mask.
   ctx.drawImage(fogTexture,0,0);
@@ -446,6 +495,16 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  };
  const redraw=()=>{onPartyPreview?.();paintSvg();paintFog();redrawList();onLayersChange?.();};
  const clearMode=()=>{partyDraft=[];partyBefore=[];partyUndo=[];partyRedo=[];partySelected=-1;partyGesture=null;partyExtend=false;partyNoteId=null;mode='';routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;editingFeatureId=null;highlightId=null;editVertex=null;editOriginal=null;editStartClient=null;modeField.value='';viewport.classList.remove('is-cartographing');hideHover();refreshBrushCursor(null,null);redraw();};
+ const enableLinkedTarget=stroke=>{
+  if(map.id==='overview'&&!intersectsK5(stroke))return;
+  const other=snapshot.maps[map.id==='overview'?'K5':'overview'].fog;
+  if(!other.enabled&&map.id==='K5'&&!other.strokes.length&&other.baseK5Only===undefined)other.baseK5Only=true;
+  other.enabled=true;
+ };
+ const appendLinkedFog=stroke=>{
+  const linked={...stroke,syncOrder:nextFogOrder(snapshot)};
+  enableLinkedTarget(linked);local.fog.enabled=true;local.fog.strokes.push(linked);
+ };
  const setMode=value=>{if(partyMode()&&!finishParty()){modeField.value='';return;}if(value)onModeStart?.();mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Zakrytí mapy');}refreshBrushCursor(null,null);redraw();};
  const partyChange=next=>{
   if(JSON.stringify(next)===JSON.stringify(partyDraft))return;
@@ -607,7 +666,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   if(mode==='radius'){if(draftRadiusKm>=.01)finishFeature();else{paintSvg();}return true;}
   if(mode.startsWith('fog-')){
    const brush=currentBrush;currentBrush=null;
-   if(brush?.points.length)commit(()=>{local.fog.strokes.push(brush);},'Tah mlhy');
+   if(brush?.points.length)commit(()=>appendLinkedFog(brush),'Tah mlhy');
   }else if(['draw','arrow'].includes(mode))finishFeature();
   return true;
  };
@@ -647,8 +706,24 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  $('[data-carto-fog-toggle]').addEventListener('click',()=>{if(mode.startsWith('fog-'))clearMode();commit(()=>{local.fog.enabled=!local.fog.enabled;},'Viditelnost mlhy');});
  area.querySelectorAll('[data-carto-fog-brush]').forEach(btn=>btn.addEventListener('click',()=>{const next=mode===btn.dataset.cartoFogBrush?'':btn.dataset.cartoFogBrush;setMode(next);}));
  fogRadius.addEventListener('input',()=>refreshBrushCursor(null,null));
- $('[data-carto-fog-reset]').addEventListener('click',()=>{if(window.confirm('Znovu zakrýt celou mapu a odstranit předchozí odhalení?'))commit(()=>{local.fog.enabled=true;local.fog.strokes=[];},'Zakrytí mapy');});
- $('[data-carto-fog-clear]').addEventListener('click',()=>{if(window.confirm('Odstranit všechno odhalování a vypnout mlhu?'))commit(()=>{local.fog.enabled=false;local.fog.strokes=[];},'Zakrytí mapy');});
+ const wholeFog=action=>{
+  if(mode.startsWith('fog-'))clearMode();
+  commit(()=>{
+   if(map.id==='overview'){
+    // The overview contains the entire detail; a confirmed whole-map reset
+    // supersedes every previous stroke on both maps.
+    for(const id of MAP_IDS){const f=snapshot.maps[id].fog;f.strokes=[];f.enabled=action==='cover';delete f.baseK5Only;}
+   }else{
+    // Old K5 strokes cannot affect the overview outside K5. Compact them
+    // into a single later rectangle; retain all overview strokes.
+    const order=nextFogOrder(snapshot);local.fog.strokes=[];
+    const stroke={action,radiusKm:1,points:[],wholeMap:true,syncOrder:order};
+    enableLinkedTarget(stroke);local.fog.strokes.push(stroke);local.fog.enabled=action==='cover';
+   }
+  },'Zakrytí mapy');
+ };
+ $('[data-carto-fog-reset]').addEventListener('click',()=>{if(window.confirm(map.id==='overview'?'Znovu zakrýt celou hlavní mapu včetně detailu K5 a odstranit předchozí odhalení?':'Znovu zakrýt celý sektor K5 na obou mapách?'))wholeFog('cover');});
+ $('[data-carto-fog-clear]').addEventListener('click',()=>{if(window.confirm(map.id==='overview'?'Odstranit mlhu z hlavní mapy i detailu K5?':'Odstranit mlhu v sektoru K5 na obou mapách?'))wholeFog('reveal');});
  const openFeatureEditor=(f,argumentsVertex=null)=>{
   if(!f)return;
   if(partyMode()&&!finishParty())return;
