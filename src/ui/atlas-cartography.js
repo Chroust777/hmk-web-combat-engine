@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.077. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.078. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -64,6 +64,7 @@ export function atlasCartographyPanel(){
  </details>
  <details class="atlas-tool-fold" data-carto-fog-section><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě.</p>
   <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.1" value="5"></label>
+  <label class="atlas-fog-transparency">Průsvitnost mlhy (GM): <span data-carto-fog-transparency-value>0 %</span><input type="range" data-carto-fog-transparency min="0" max="100" step="1" value="0" aria-label="Průsvitnost mlhy (GM)" aria-valuetext="0 %"></label>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-toggle>Zapnout mlhu</button></div>
   <details class="atlas-fog-advanced" data-carto-fog-advanced><summary>Další možnosti zakrytí</summary>
@@ -103,21 +104,31 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  fogRadius.value=String(defaultFogRadius);
  const fogSection=$('[data-carto-fog-section]'),fogGate=$('[data-carto-fog-gate]');
  const fogAdvanced=$('[data-carto-fog-advanced]');
+ const fogTransparency=$('[data-carto-fog-transparency]'),fogTransparencyValue=$('[data-carto-fog-transparency-value]');
+ // Local GM preview only: fade the final composited canvas, never the coverage mask or campaign data.
+ const updateFogTransparency=()=>{
+  const percent=fogSection.open?Number(fogTransparency.value):0;
+  fogCanvas.style.opacity=String(1-percent/100);
+  fogTransparencyValue.textContent=`${percent} %`;
+  fogTransparency.setAttribute('aria-valuetext',`${percent} %`);
+ };
+ const resetFogTransparency=()=>{fogTransparency.value='0';updateFogTransparency();};
+ fogTransparency.addEventListener('input',updateFogTransparency);
  const fogPassword=$('[data-carto-fog-password]'),fogError=$('[data-carto-fog-gate-error]');
  const dismissFogGate=()=>{fogGate.hidden=true;fogPassword.value='';fogError.textContent='';};
  // Every attempted expansion requires the password again. This is an interface
  // gate, not authentication: all browser-side source code is public.
  fogSection.querySelector('summary').addEventListener('click',event=>{
-  if(fogSection.open){return;}
+  if(fogSection.open){resetFogTransparency();return;}
   event.preventDefault();fogPassword.value='';fogError.textContent='';fogGate.hidden=false;
   fogPassword.focus({preventScroll:true});
  });
  fogSection.addEventListener('toggle',()=>{
-  if(!fogSection.open){fogAdvanced.open=false;if(mode.startsWith('fog-'))clearMode();}
+  if(!fogSection.open){resetFogTransparency();fogAdvanced.open=false;if(mode.startsWith('fog-'))clearMode();}
  });
  $('[data-carto-fog-gate-form]').addEventListener('submit',event=>{
   event.preventDefault();
-  if(fogPassword.value==='anakin'){dismissFogGate();fogSection.open=true;}
+  if(fogPassword.value==='anakin'){dismissFogGate();resetFogTransparency();fogSection.open=true;}
   else{fogError.textContent='Nesprávné heslo.';fogPassword.value='';fogPassword.focus({preventScroll:true});}
  });
  $('[data-carto-fog-gate-cancel]').addEventListener('click',dismissFogGate);
@@ -596,7 +607,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     painting=false;currentBrush=null;editVertex=null;clearMode();handled=true;
    }
    if(hovered||!hoverDelete.hidden){suppressHover=true;hideHover();clearTimeout(hoverTimer);paintSvg();handled=true;}
-   if(fogSection.open){fogSection.open=false;handled=true;}
+   if(fogSection.open){fogSection.open=false;resetFogTransparency();handled=true;}
    return handled;
   },
   // Atlas markers are stored separately; layers hide them without touching the record.

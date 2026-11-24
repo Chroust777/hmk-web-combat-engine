@@ -477,3 +477,9 @@ body #app main.content-atlas .atlas-cartography .atlas-fog-advanced{
 body #app main.content-atlas .atlas-cartography .atlas-fog-advanced>summary{
  font:700 12px/1.45 Georgia,serif; color:#5c4330; cursor:pointer;
 }
+
+/* v94.078 — Local GM fog preview slider. */
+body #app main.content-atlas .atlas-cartography input[data-carto-fog-transparency]{
+ display:block; width:100%; min-height:24px; padding:0; margin:3px 0 0;
+ accent-color:#785331; cursor:pointer; background:transparent; border:0;
+}
