@@ -503,3 +503,8 @@ body #app main.content-atlas [data-carto-party-controls][hidden]{display:none!im
 .atlas-cartography-overlay [data-party-cross]{cursor:pointer}
 .atlas-cartography-overlay [data-party-cross]:focus-visible circle{stroke:#28546d;stroke-width:3}
 .atlas-carto-hover-delete.is-party-history{max-width:240px!important}
+
+/* v94.083 – history note controls and instant party endpoint preview. */
+.atlas-cartography-overlay [data-party-note]{cursor:pointer}
+.atlas-cartography-overlay [data-party-note]:focus-visible circle{stroke:#28546d;stroke-width:3}
+body #app main.content-atlas .atlas-custom-marker.is-party{transition:none!important;animation:none!important}
