@@ -1,4 +1,4 @@
-import {installChat} from './src/ui/chat.js?v=94.104';
+import {installChat} from './src/ui/chat.js?v=94.105';
 import {gmNavigationMarkup,gmPageAttribute} from './src/ui/gm-mode.js?v=94.090';
 import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.098';
 import {validateAtlasCartography} from './src/ui/atlas-cartography.js?v=94.098';
