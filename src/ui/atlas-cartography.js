@@ -491,10 +491,11 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   if(!local.features.length){const empty=document.createElement('p');empty.className='atlas-carto-hint';empty.textContent='Na této mapě zatím nejsou žádné uložené objekty.';container.append(empty);return;}
   const counts={};
   local.features.forEach(f=>{
-   const n=counts[f.type]=(counts[f.type]||0)+1;
    const row=document.createElement('div');row.className='atlas-feature-history-row';row.dataset.cartoFeatureId=f.id;row.classList.toggle('is-selected',highlightId===f.id);
    const typeLabel=f.type==='radius'?'Kružnice dosahu':names[f.type];
-   const label=f.title.trim()?`${typeLabel} - ${f.title.trim()}`:`${typeLabel} ${n}`;
+   const objectTitle=f.title.trim();
+   // Number only unnamed objects, independently for each type.
+   const label=objectTitle?`${typeLabel} - ${objectTitle}`:`${typeLabel} ${counts[f.type]=(counts[f.type]||0)+1}`;
    const locate=button(label,'locate-feature',f.id);locate.title='Zobrazit celý objekt na mapě';locate.addEventListener('click',()=>locateFeature(f.id));
    const erase=button('Smazat','delete-feature',f.id);erase.title='Smazat celý objekt včetně všech bodů';erase.setAttribute('aria-label',`Smazat ${label}`);erase.addEventListener('click',()=>deleteFeatureFromHistory(f.id));
    row.append(locate,erase);container.append(row);
@@ -557,7 +558,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const linked={...stroke,syncOrder:nextFogOrder(snapshot)};
   enableLinkedTarget(linked);local.fog.enabled=true;local.fog.strokes.push(linked);
  };
- const setMode=value=>{if(partyMode()&&!finishParty()){modeField.value='';return;}if(value)onModeStart?.();if(value==='text'){title.value='';note.value='';}mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Zakrytí mapy');}refreshBrushCursor(null,null);redraw();};
+ const setMode=value=>{if(partyMode()&&!finishParty()){modeField.value='';return;}if(value)onModeStart?.();if(FEATURE_TYPES.includes(value)){title.value='';note.value='';}mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Zakrytí mapy');}refreshBrushCursor(null,null);redraw();};
  const partyChange=next=>{
   if(JSON.stringify(next)===JSON.stringify(partyDraft))return;
   partyUndo.push(structuredClone(partyDraft));partyRedo=[];partyDraft=next;partySelected=partyDraft.findIndex(p=>p.id===partyNoteId);if(partySelected<0)partyNoteId=null;hideHover();redraw();
