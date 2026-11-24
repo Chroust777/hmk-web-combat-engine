@@ -1,4 +1,4 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.084';
+import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.085';
 /**
  * Hârn Atlas v94.083 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
@@ -431,7 +431,7 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
   paintCustomMarkers(); // The preview icon changes instantly when its type changes.
  };
  markerType.addEventListener('change',syncMarkerFormType);
- const paintCustomMarkers=()=>{
+ const paintCustomMarkers=(partyPreview=undefined)=>{
   const present=new Set(mapMarkers.map(item=>item.id));
   for(const [id,node] of markerNodes){if(!present.has(id)){node.remove();markerNodes.delete(id);for(const btn of markerButtons.get(id)||[])btn.remove();markerButtons.delete(id);}}
   for(const item of mapMarkers){
@@ -450,7 +450,7 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
     const deleteBtn=document.createElement('button');deleteBtn.type='button';deleteBtn.className='atlas-marker-map-action atlas-marker-map-delete';deleteBtn.textContent='×';deleteBtn.title='Smazat značku';deleteBtn.setAttribute('aria-label','Smazat značku');deleteBtn.dataset.atlasMarkerDeleteId=item.id;
     customMarkerOverlay.append(modify,deleteBtn);markerButtons.set(item.id,[modify,deleteBtn]);
    }
-   const pos=screenPoint(item.type==='party'?(atlasCarto?.partyPreview()||item):item);
+   const pos=screenPoint(item.type==='party'?((partyPreview===undefined?atlasCarto?.partyPreview():partyPreview)||item):item);
    node.style.left=`${pos.x}px`;node.style.top=`${pos.y}px`;
    // Actions are BELOW the pin, never above it where the text balloon opens.
    const controls=markerButtons.get(item.id);if(controls){controls[0].style.left=`${pos.x-17}px`;controls[0].style.top=`${pos.y+27}px`;controls[1].style.left=`${pos.x+17}px`;controls[1].style.top=`${pos.y+27}px`;}
@@ -700,7 +700,10 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
   if(suppressMarkerClick?.id===pin.dataset.atlasMarker&&Date.now()-suppressMarkerClick.at<500){
    suppressMarkerClick=null;return;
   }
-  suppressMarkerClick=null;selectMarker(pin.dataset.atlasMarker,false);
+  suppressMarkerClick=null;
+  const item=mapMarkers.find(entry=>entry.id===pin.dataset.atlasMarker);
+  if(item?.type==='party'&&atlasCarto?.selectPartyEndpoint()){clearMarkerSelection();return;}
+  selectMarker(pin.dataset.atlasMarker,false);
  });
  renderMarkerList();refreshMarkerAdd();
  measureToggle.addEventListener('click',()=>{
@@ -1080,7 +1083,7 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
    if(ok){lastCommittedMarkers=parseMarkers(nextMarkers);replaceMarkersInPlace(nextMarkers);paintCustomMarkers();renderMarkerList();refreshMarkerAdd();}
    return ok;
   },
-  onPartyPreview:()=>paintCustomMarkers(),
+  onPartyPreview:point=>paintCustomMarkers(point),
   screenPoint,inMap,markers:()=>mapMarkers,selectMarker,openSector:clickSector,
   getCamera:()=>({zoom:state.zoom,centerX:(viewport.clientWidth/2-state.x)/state.zoom-map.margin,centerY:(viewport.clientHeight/2-state.y)/state.zoom-map.margin}),
   setCamera:cam=>{
