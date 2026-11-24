@@ -1,4 +1,4 @@
-import {installChat} from './src/ui/chat.js?v=94.100';
+import {installChat} from './src/ui/chat.js?v=94.101';
 import {gmNavigationMarkup,gmPageAttribute} from './src/ui/gm-mode.js?v=94.090';
 import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.098';
 import {validateAtlasCartography} from './src/ui/atlas-cartography.js?v=94.098';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.100';
+const APP_VERSION='94.101';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -568,7 +568,7 @@ cloudSync=createGitHubCloudSync({localStorage,sessionStorage,storageKey:STORAGE,
  approveReplace:()=>true,
  onStatus:()=>{const node=document.querySelector('[data-cloud-status]');if(node)node.textContent=cloudStatusLabel()+(cloudSync?.issue?' · '+cloudSync.issue:'');const side=document.querySelector('[data-cloud-sidebar]');if(side)side.textContent=cloudStatusLabel();const block=document.querySelector('[data-cloud-block-banner]');if(block)block.hidden=cloudSync?.canWrite()??true;}
 });
-installChat({gameDate:()=>{const c=data.campaignClock;if(!c||!Number.isSafeInteger(c.minute))return null;try{if(c.trOrigin)return formatTRDate(campaignTRDate(c,c.minute));}catch{}return 'Den kampaně '+(Math.floor(c.minute/1440)+1);},bookShell:inner=>journalShell(inner,'journal-book--chat',false),connection:()=>cloudSync.chatConnection()});
+const chatUI=installChat({gameDate:()=>{const c=data.campaignClock;if(!c||!Number.isSafeInteger(c.minute)||c.minute<0)return null;const time=String(Math.floor(c.minute%1440/60)).padStart(2,'0')+':'+String(c.minute%60).padStart(2,'0');let date='Den kampaně '+(Math.floor(c.minute/1440)+1);try{const tr=campaignTRDate(c,c.minute);if(tr)date=formatTRDate(tr);}catch{}return date+' · '+time;},bookShell:inner=>journalShell(inner,'journal-book--chapter journal-book--chat',false),connection:()=>cloudSync.chatConnection()});
 let catalogStatus='all'; // presentation-only; never persisted
 let libraryTab='melee',libraryPage=0,libraryRecipientId=null,libraryOtherFilter='all'; // presentation-only, not stored
 let libraryArmourMaterial='all',libraryArmourLocation='all'; // presentation-only, combined material + anatomical coverage filters
@@ -14759,6 +14759,7 @@ function render(){
  initializeTimeEpisodeForm(app.querySelector('#hmk-time-episode-form'));
  scheduleStableAutoMigration93861();
  decorateTimeEpisodeExclusiveLock(app);
+ chatUI.remount();
 }
 // Follow-up panels may appear after a skill proof is appended without a full render.
 // Observe only added DOM nodes; attribute edits from help decoration do not loop.

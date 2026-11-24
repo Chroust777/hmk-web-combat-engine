@@ -1,12 +1,14 @@
 /** Independent shared chat document. Never writes the campaign or its pending queue. */
 export const CHAT_PATH='campaigns/hmk-ledger-chat.json';
 export const CHAT_LOCAL_KEY='hmk-ledger-chat-v1';
-export const CHAT_PALETTE=[['#ffffff','Bílá'],['#e7cfa9','Písková'],['#f7d9d6','Růžová'],['#dbe9cf','Zelená'],['#d8e9f7','Modrá'],['#e7ddf5','Fialová'],['#fff0ba','Žlutá'],['#f6ddc7','Broskvová'],['#d7e9e5','Tyrkysová'],['#e5e5e5','Šedá']];
+export const CHAT_PALETTE=[['#ffffff','Bílá'],['#f6b9b9','Světle červená'],['#f4c1dc','Růžová'],['#ffd0a1','Oranžová'],['#fff39a','Žlutá'],['#cce8a1','Jarní zelená'],['#a8e0b8','Mátová'],['#a6e4df','Tyrkysová'],['#b4d8fa','Nebeská modrá'],['#c6c6f7','Levandulová'],['#e3c4f5','Fialová'],['#d4dce5','Stříbrná']];
+// Read existing snapshots without changing their colors; the old sand is no longer offered.
+const LEGACY_COLORS=['#e7cfa9','#f7d9d6','#dbe9cf','#d8e9f7','#e7ddf5','#fff0ba','#f6ddc7','#d7e9e5','#e5e5e5'];
 export const GM_COLOR='#e7cfa9', PC_COLOR='#ffffff';
 const FORMAT='hmk-ledger-chat-v1';
 export const chatId=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+'-'+Math.random().toString(36).slice(2);
 export const emptyChat=()=>({format:FORMAT,nextSequence:1,messages:[],speakers:[],chronicle:{entries:[],generatedAt:null,revision:0,manual:null,proseVersion:2}});
-const colors=new Set([...CHAT_PALETTE.map(c=>c[0]),PC_COLOR]);
+const colors=new Set([...CHAT_PALETTE.map(c=>c[0]),...LEGACY_COLORS,GM_COLOR,PC_COLOR]);
 const str=(v,n)=>typeof v==='string'&&v.length<=n;
 const id=v=>str(v,180)&&!!v;
 const rev=v=>Number.isSafeInteger(v)&&v>=1;
@@ -16,7 +18,7 @@ const validAuthor=a=>a&&['gm','pc','custom'].includes(a.kind)&&id(a.id)&&str(a.n
 export function validateChat(d){
  if(!d||d.format!==FORMAT||!rev(d.nextSequence)||!Array.isArray(d.messages)||!Array.isArray(d.speakers)||!Array.isArray(d.chronicle?.entries))throw Error('Neplatný formát chatového JSONu. Nic nebylo přepsáno.');
  if(!d.messages.every(m=>m&&id(m.id)&&rev(m.sequence)&&m.sequence<d.nextSequence&&rev(m.revision)&&validAuthor(m.author)&&str(m.text,12000)&&m.text.trim()&&date(m.createdAt)&&date(m.updatedAt)&&id(m.lastOp)&&(m.gameDate===undefined||m.gameDate===null||str(m.gameDate,120)))||!unique(d.messages.map(m=>m.id))||!unique(d.messages.map(m=>m.sequence)))throw Error('Neplatné zprávy v chatovém JSONu.');
- if(!d.speakers.every(s=>s&&id(s.id)&&rev(s.revision)&&str(s.name,120)&&s.name.trim()&&CHAT_PALETTE.some(c=>c[0]===s.color)&&id(s.lastOp))||!unique(d.speakers.map(s=>s.id)))throw Error('Neplatná jména v chatovém JSONu.');
+ if(!d.speakers.every(s=>s&&id(s.id)&&rev(s.revision)&&str(s.name,120)&&s.name.trim()&&colors.has(s.color)&&id(s.lastOp))||!unique(d.speakers.map(s=>s.id)))throw Error('Neplatná jména v chatovém JSONu.');
  if(!d.chronicle.entries.every(e=>e&&id(e.sourceId)&&rev(e.revision)&&rev(e.sequence)&&str(e.text,16000))||!unique(d.chronicle.entries.map(e=>e.sourceId))||(d.chronicle.generatedAt!==null&&!date(d.chronicle.generatedAt)))throw Error('Neplatná kronika v chatovém JSONu.');
  const c=d.chronicle;
  if(c.revision!==undefined&&(!Number.isSafeInteger(c.revision)||c.revision<0))throw Error('Neplatná revize kroniky.');
@@ -87,7 +89,7 @@ export function applyChatOperation(doc,op){
  case 'delete-message':{
   const m=d.messages.find(m=>m.id===op.id);if(!m)return {doc:d,result,changed:false};check(m);if(!op.gm&&m.author.kind==='gm')throw Error('Zprávu GameMastera může odstranit jen GameMaster.');d.messages=d.messages.filter(x=>x.id!==op.id);break;}
  case 'save-speaker':{
-  if(!op.gm)throw Error('Jména spravuje pouze GameMaster.');const name=textValue(op.name,120),color=op.color;if(!CHAT_PALETTE.some(c=>c[0]===color))throw Error('Vyberte barvu z palety.');if(name.toLocaleLowerCase('cs')==='gamemaster')throw Error('Toto jméno je vyhrazené GameMasterovi.');
+  if(!op.gm)throw Error('Jména spravuje pouze GameMaster.');const name=textValue(op.name,120),color=op.color;if(!CHAT_PALETTE.some(c=>c[0]===color)&&!d.speakers.some(s=>s.id===op.id&&s.color===color))throw Error('Vyberte barvu z palety.');if(name.toLocaleLowerCase('cs')==='gamemaster')throw Error('Toto jméno je vyhrazené GameMasterovi.');
   const s=d.speakers.find(s=>s.id===op.id);if(s?.lastOp===op.opId)return {doc:d,result,changed:false};
   if(d.speakers.some(x=>x.id!==op.id&&x.name.toLocaleLowerCase('cs')===name.toLocaleLowerCase('cs')))throw Error('Toto jméno již existuje.');
   if(op.revision){check(s);Object.assign(s,{name,color,revision:s.revision+1,lastOp:op.opId});}else{if(s)throw Error('Duplicitní jméno.');d.speakers.push({id:op.id,name,color,revision:1,lastOp:op.opId});}break;}
