@@ -106,7 +106,7 @@ export function atlasCartographyPanel(){
   <p class="atlas-carto-hint" data-carto-hint>Vyberte nástroj. Kružnici vytvoříte přímo tažením od středu k okraji; její dosah se při kreslení zobrazuje na mapě.</p>
   <div class="atlas-carto-actions"><button type="button" data-carto-save-meta hidden>Uložit změny</button><button type="button" data-carto-delete-route hidden>Odebrat celou trasu</button><button data-carto-finish type="button" hidden disabled>Dokončit objekt</button><button data-carto-point-undo type="button" hidden disabled>Odebrat bod</button></div>
  </details>
- <details class="atlas-tool-fold" data-carto-fog-section data-hmk-gm-only><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě. Tahy se promítají i do odpovídající části druhé mapy.</p>
+ <details class="atlas-tool-fold" data-carto-fog-section data-hmk-gm-only><summary>Zakrytí mapy</summary><p class="atlas-carto-hint">Držte tlačítko myši a přejíždějte štětcem po mapě. Velikost kruhu štětce je při pohybu vidět na mapě. Tahy se promítají i do odpovídající části druhé mapy. Vypnutí mlhy a průsvitnost mění pouze náhled GM; hráči vidí jen odhalené území.</p>
   <label>Poloměr štětce mlhy (km)<input type="number" data-carto-fog-radius min="0.01" max="500" step="0.1" value="5"></label>
   <label class="atlas-fog-transparency">Průsvitnost mlhy (GM): <span data-carto-fog-transparency-value>0 %</span><input type="range" data-carto-fog-transparency min="0" max="100" step="1" value="0" aria-label="Průsvitnost mlhy (GM)" aria-valuetext="0 %"></label>
   <div class="atlas-carto-actions"><button type="button" data-carto-fog-brush="fog-reveal">Odhalovat</button><button type="button" data-carto-fog-brush="fog-cover">Vrátit mlhu</button></div>
@@ -140,7 +140,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const snapshotAllowed=(entry,redoAction=false)=>{
   if(!entry)return false;if(isGM())return true;
   const next=entry.kind==='bundle'?(redoAction?entry.after:entry.before):entry.kind==='carto'?entry.snapshot:null;
-  if(next&&MAP_IDS.some(id=>geometry(next.maps[id].partyHistory)!==geometry(snapshot.maps[id].partyHistory)))return false;
+  if(next&&MAP_IDS.some(id=>geometry(next.maps[id].partyHistory)!==geometry(snapshot.maps[id].partyHistory)||JSON.stringify(next.maps[id].fog)!==JSON.stringify(snapshot.maps[id].fog)))return false;
   if(entry.kind==='bundle'||entry.kind==='markers'){const pins=entry.kind==='bundle'?(redoAction?entry.afterMarkers:entry.beforeMarkers):(redoAction?entry.after:entry.before);if(partyPositions(pins)!==partyPositions(readMarkers?.()))return false;}
   return true;
  };
@@ -160,7 +160,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const fogTransparency=$('[data-carto-fog-transparency]'),fogTransparencyValue=$('[data-carto-fog-transparency-value]');
  // Local GM preview only: fade the final composited canvas, never the coverage mask or campaign data.
  const updateFogTransparency=()=>{
-  const percent=fogSection.open?Number(fogTransparency.value):0;
+  const percent=isGM()&&fogSection.open?Number(fogTransparency.value):0;
   fogCanvas.style.opacity=String(1-percent/100);
   fogTransparencyValue.textContent=`${percent} %`;
   fogTransparency.setAttribute('aria-valuetext',`${percent} %`);
@@ -387,8 +387,11 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   if(fogCanvas.width!==bw||fogCanvas.height!==bh){fogCanvas.width=bw;fogCanvas.height=bh;}
   fogCanvas.style.width=`${w}px`;fogCanvas.style.height=`${h}px`;
   ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,bw,bh);
-  viewport.classList.toggle('atlas-fog-visible',local.fog.enabled);
-  if(!local.fog.enabled){refreshBrushCursor(null,null);return;}
+  // Players always see the discovery mask, independent of the GM display toggle.
+  const gm=isGM(),visible=!gm||local.fog.enabled;
+  if(!gm)fogCanvas.style.opacity='1';
+  viewport.classList.toggle('atlas-fog-visible',visible);
+  if(!visible){refreshBrushCursor(null,null);return;}
   if(fogTextureWidth!==bw||fogTextureHeight!==bh){
    fogTextureWidth=bw;fogTextureHeight=bh;fogTexture.width=bw;fogTexture.height=bh;
    const t=fogTexture.getContext('2d');t.setTransform(dpr,0,0,dpr,0,0);
@@ -413,7 +416,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const camera=getCamera(),mapOrigin=screenPoint({x:0,y:0});
   m.save();m.beginPath();m.rect(mapOrigin.x,mapOrigin.y,map.width*camera.zoom,map.height*camera.zoom);m.clip();
   m.fillStyle='#000';
-  if(local.fog.baseK5Only){const start=screenPoint(K5_RECT);m.fillRect(start.x,start.y,K5_RECT.width*camera.zoom,K5_RECT.height*camera.zoom);}
+  if(gm&&local.fog.baseK5Only){const start=screenPoint(K5_RECT);m.fillRect(start.x,start.y,K5_RECT.width*camera.zoom,K5_RECT.height*camera.zoom);}
   else m.fillRect(0,0,w,h);
   const applyStroke=(stroke,sourceId=map.id)=>{
    const source=GEO[sourceId],t=mapTransform(sourceId,map.id),origin=screenPoint(t);
@@ -435,7 +438,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   // Legacy per-map masks stay intact; ordered new strokes override them in both views.
   for(const stroke of local.fog.strokes)if(stroke.syncOrder===undefined)applyStroke(stroke);
   for(const {id,stroke} of linkedFogStrokes(snapshot))applyStroke(stroke,id);
-  if(painting&&currentBrush)applyStroke(currentBrush);
+  if(gm&&painting&&currentBrush)applyStroke(currentBrush);
   m.restore(); // End map-only clip before composing the texture with the mask.
   ctx.drawImage(fogTexture,0,0);
   ctx.globalCompositeOperation='destination-in';ctx.drawImage(fogMask,0,0);ctx.globalCompositeOperation='source-over';
@@ -481,7 +484,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const pointUndo=$('[data-carto-point-undo]');pointUndo.hidden=!(['route','area'].includes(mode));pointUndo.disabled=!draft.length;
   const hint=$('[data-carto-hint]');
   hint.textContent=editing?(editing.type==='route'?(routeExtendEndpoint!==null?`Prodlužování trasy: dalším kliknutím do mapy přidáte nový bod ${routeExtendEndpoint==='start'?'na začátek':'na konec'}. Body lze i přetahovat; Esc zachová uložené změny.`:'Body trasy lze pouze přemisťovat tažením. Nový úsek připojíte tužkou na prvním nebo posledním bodu. Kliknutí do prázdné mapy zde nový bod nevytvoří.'):'Vybraný objekt: tažením změňte polohu jeho bodů, kliknutím na mapu můžete přidat další bod. Změnu popisu uložte tlačítkem. Esc ukončí úpravy.'):mode==='radius'?'Stiskněte na mapě střed kružnice, táhněte k okraji a pusťte. Velikost i vzdálenost kruhu jsou vidět během tažení.':mode==='route'||mode==='area'?'Klikáním označte body. Nakonec stiskněte „Dokončit objekt“.':mode==='draw'||mode==='arrow'?'Držte tlačítko myši, nakreslete objekt a pusťte.':'Vyberte typ objektu. Jeho poznámku můžete kdykoliv upravit tužkou přímo na mapě.';
-  $('[data-carto-fog-toggle]').textContent=local.fog.enabled?'Vypnout mlhu':'Zapnout mlhu';
+  $('[data-carto-fog-toggle]').textContent=local.fog.enabled?'Vypnout mlhu (GM)':'Zapnout mlhu (GM)';
   area.querySelectorAll('[data-carto-fog-brush]').forEach(btn=>btn.setAttribute('aria-pressed',String(mode===btn.dataset.cartoFogBrush)));
   if(layerArea){layerArea.replaceChildren();for(const key of VISIBLE_LAYER_TOGGLES){
    const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=local.layers[key];input.dataset.cartoLayer=key;
@@ -740,6 +743,9 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
     // The overview contains the entire detail; a confirmed whole-map reset
     // supersedes every previous stroke on both maps.
     for(const id of MAP_IDS){const f=snapshot.maps[id].fog;f.strokes=[];f.enabled=action==='cover';delete f.baseK5Only;}
+    // Unlike the display toggle, a confirmed full reveal is an actual discovery.
+    // Record it explicitly so player masks can distinguish it from untouched maps.
+    if(action==='reveal')local.fog.strokes.push({action,radiusKm:1,points:[],wholeMap:true,syncOrder:1});
    }else{
     // Old K5 strokes cannot affect the overview outside K5. Compact them
     // into a single later rectangle; retain all overview strokes.
