@@ -4,7 +4,8 @@ export const CHAT_LOCAL_KEY='hmk-ledger-chat-v1';
 export const CHAT_PALETTE=[['#ffffff','Bílá'],['#f6b9b9','Světle červená'],['#f4c1dc','Růžová'],['#ffd0a1','Oranžová'],['#fff39a','Žlutá'],['#cce8a1','Jarní zelená'],['#a8e0b8','Mátová'],['#a6e4df','Tyrkysová'],['#b4d8fa','Nebeská modrá'],['#c6c6f7','Levandulová'],['#e3c4f5','Fialová'],['#d4dce5','Stříbrná']];
 // Read existing snapshots without changing their colors; the old sand is no longer offered.
 const LEGACY_COLORS=['#e7cfa9','#f7d9d6','#dbe9cf','#d8e9f7','#e7ddf5','#fff0ba','#f6ddc7','#d7e9e5','#e5e5e5'];
-export const GM_COLOR='#e7cfa9', PC_COLOR='#ffffff';
+export const GM_COLOR='#dbc08f', PC_COLOR='#ffffff';
+const GM_LEGACY_COLORS=['#e7cfa9'];
 const FORMAT='hmk-ledger-chat-v1';
 export const chatId=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+'-'+Math.random().toString(36).slice(2);
 export const emptyChat=()=>({format:FORMAT,nextSequence:1,messages:[],speakers:[],chronicle:{entries:[],generatedAt:null,revision:0,manual:null,proseVersion:2}});
@@ -14,7 +15,7 @@ const id=v=>str(v,180)&&!!v;
 const rev=v=>Number.isSafeInteger(v)&&v>=1;
 const date=v=>str(v,40)&&Number.isFinite(Date.parse(v));
 const unique=arr=>new Set(arr).size===arr.length;
-const validAuthor=a=>a&&['gm','pc','custom'].includes(a.kind)&&id(a.id)&&str(a.name,120)&&a.name.trim()&&colors.has(a.color)&&(a.kind!=='gm'||(a.id==='gm'&&a.name==='GameMaster'&&a.color===GM_COLOR))&&(a.kind!=='pc'||a.color===PC_COLOR);
+const validAuthor=a=>a&&['gm','pc','custom'].includes(a.kind)&&id(a.id)&&str(a.name,120)&&a.name.trim()&&colors.has(a.color)&&(a.kind!=='gm'||(a.id==='gm'&&a.name==='GameMaster'&&[GM_COLOR,...GM_LEGACY_COLORS].includes(a.color)))&&(a.kind!=='pc'||a.color===PC_COLOR);
 export function validateChat(d){
  if(!d||d.format!==FORMAT||!rev(d.nextSequence)||!Array.isArray(d.messages)||!Array.isArray(d.speakers)||!Array.isArray(d.chronicle?.entries))throw Error('Neplatný formát chatového JSONu. Nic nebylo přepsáno.');
  if(!d.messages.every(m=>m&&id(m.id)&&rev(m.sequence)&&m.sequence<d.nextSequence&&rev(m.revision)&&validAuthor(m.author)&&str(m.text,12000)&&m.text.trim()&&date(m.createdAt)&&date(m.updatedAt)&&id(m.lastOp)&&(m.gameDate===undefined||m.gameDate===null||str(m.gameDate,120)))||!unique(d.messages.map(m=>m.id))||!unique(d.messages.map(m=>m.sequence)))throw Error('Neplatné zprávy v chatovém JSONu.');

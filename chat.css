@@ -28,3 +28,8 @@
 .hmk-chat-view .hmk-chat-chronicle p[data-chat-prose]{white-space:pre-wrap;overflow-wrap:anywhere}
 .hmk-chat-chronicle-actions{flex-wrap:wrap;align-items:center}
 .hmk-chat-chronicle-actions select[data-chat-chronicle-day]{width:auto;max-width:100%;min-width:0;font-size:12px;padding:3px 6px}
+
+
+/* v94.104: slightly darker GM parchment and no extra outer brown backing panel. */
+.hmk-chat-view .journal-book{padding:0!important;background:none!important;border:0!important;box-shadow:none!important;border-radius:0!important}
+.hmk-chat-view .journal-book-frame{margin:0!important}

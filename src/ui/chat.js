@@ -1,4 +1,4 @@
-import {CHAT_PALETTE,GM_COLOR,PC_COLOR,chatId,emptyChat,chatPages,chatGameDay,chronicleDays,LEGACY_CHRONICLE_DAY,createChatRepository} from '../integration/hmk-chat-store.js?v=94.103';
+import {CHAT_PALETTE,GM_COLOR,PC_COLOR,chatId,emptyChat,chatPages,chatGameDay,chronicleDays,LEGACY_CHRONICLE_DAY,createChatRepository} from '../integration/hmk-chat-store.js?v=94.104';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const gm=()=>document.documentElement.dataset.hmkGm==='true';
 const gmAuthor={kind:'gm',id:'gm',name:'GameMaster',color:GM_COLOR};
