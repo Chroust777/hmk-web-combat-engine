@@ -492,3 +492,14 @@ body #app main.content-atlas [data-carto-party-controls][hidden]{display:none!im
 
 /* v94.080 – map pan during party-history editing. */
 .atlas-viewport.is-cartographing.is-dragging{cursor:grabbing}
+
+/* v94.081 – history is a point list, with local inline notes and map crosses. */
+.atlas-party-points{display:flex;flex-direction:column;gap:5px;margin:7px 0}
+.atlas-party-point-row{display:flex;flex-direction:column;gap:4px;padding:5px;border:1px solid #c6ae85;border-radius:4px;background:#faefd9;min-width:0}
+.atlas-party-point-row.is-selected{border-color:#9b722e;background:#f4e2b9}
+.atlas-party-point-row button{text-align:left!important}
+.atlas-party-point-row small{white-space:pre-wrap;overflow-wrap:anywhere;color:#503723}
+.atlas-party-point-row textarea{width:100%;box-sizing:border-box;resize:vertical}
+.atlas-cartography-overlay [data-party-cross]{cursor:pointer}
+.atlas-cartography-overlay [data-party-cross]:focus-visible circle{stroke:#28546d;stroke-width:3}
+.atlas-carto-hover-delete.is-party-history{max-width:240px!important}

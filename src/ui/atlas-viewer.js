@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography} from './atlas-cartography.js?v=94.080';
+import {atlasCartographyPanel,mountAtlasCartography} from './atlas-cartography.js?v=94.081';
 /**
- * Hârn Atlas v94.080 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.081 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -472,8 +472,10 @@ export function mountAtlasView(root,persistence=null){
    // Legacy event entries are preserved in stored JSON; only their freeform notes
    // remain visible. The event/date editor has been removed from the Atlas UI.
    const oldNotes=(item.events||[]).map(ev=>ev.note||'').filter(Boolean);
-   node.querySelector('.atlas-marker-tooltip-description').textContent=[item.description,...oldNotes].filter(Boolean).join('\n');
-   node.querySelector('.atlas-marker-tooltip-description').hidden=!item.description&&!oldNotes.length;
+   const pointNote=item.type==='party'?atlasCarto?.partyLastNote():'';
+   const tooltipText=[item.description,...oldNotes,pointNote].filter(Boolean).join('\n');
+   node.querySelector('.atlas-marker-tooltip-description').textContent=tooltipText;
+   node.querySelector('.atlas-marker-tooltip-description').hidden=!tooltipText;
    const tipShift=pos.x<125?125-pos.x:pos.x>viewport.clientWidth-125?viewport.clientWidth-125-pos.x:0;
    node.style.setProperty('--atlas-tip-shift',`${tipShift}px`);
   }
@@ -565,7 +567,7 @@ export function mountAtlasView(root,persistence=null){
   if(markerPlacement&&markerPlacementType===type){
    markerPlacement=false;closeMarkerEditor();status.textContent='Umísťování značky bylo zrušeno.';
   }else{
-   atlasCarto?.stop();measurement.active=false;measurement.points=[];paintMeasurement();closeMarkerEditor();
+   if(atlasCarto?.stop()===false)return;measurement.active=false;measurement.points=[];paintMeasurement();closeMarkerEditor();
    clearMarkerSelection();markerPlacement=true;markerPlacementType=type;
    status.textContent=type==='party'?'Klikněte do mapy a umístěte pozici družiny.':'Klikněte do mapy, kam chcete přidat značku.';
   }
@@ -576,10 +578,10 @@ export function mountAtlasView(root,persistence=null){
   if(atlasCarto?.mode==='party-edit'){workspace.querySelector('[data-carto-party-section]').open=true;return;}
   const party=mapMarkers.find(item=>item.type==='party');
   if(party){
-   atlasCarto?.stop();measurement.active=false;measurement.points=[];paintMeasurement();
+   if(atlasCarto?.stop()===false)return;measurement.active=false;measurement.points=[];paintMeasurement();
    markerPlacement=false;closeMarkerEditor();refreshMarkerAdd();
    selectMarker(party.id,true);
-   status.textContent='Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě a dokončete tlačítkem Uložit pohyb.';
+   status.textContent='Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě a změny uložte klávesou Esc.';
   }
  });
  const placePartyPosition=position=>{
@@ -688,7 +690,7 @@ export function mountAtlasView(root,persistence=null){
  customMarkerOverlay.addEventListener('pointerup',e=>finishMarkerDrag(e));
  customMarkerOverlay.addEventListener('pointercancel',e=>finishMarkerDrag(e,true));
  customMarkerOverlay.addEventListener('click',e=>{
-  const pin=e.target.closest('[data-atlas-marker]');if(!pin||measurement.active||markerPlacement)return;
+  const pin=e.target.closest('[data-atlas-marker]');if(!pin||measurement.active||markerPlacement||atlasCarto?.active)return;
   e.stopPropagation();
   if(suppressMarkerClick?.id===pin.dataset.atlasMarker&&Date.now()-suppressMarkerClick.at<500){
    suppressMarkerClick=null;return;
@@ -701,7 +703,7 @@ export function mountAtlasView(root,persistence=null){
    measurement.active=false;measurement.points=[];paintMeasurement();
    status.textContent='Měření ukončeno. Body, spojnice i vzdálenosti byly odstraněny.';
   }else{
-   atlasCarto?.stop();closeMarkerEditor();markerPlacement=false;refreshMarkerAdd();
+   if(atlasCarto?.stop()===false)return;closeMarkerEditor();markerPlacement=false;refreshMarkerAdd();
    measurement.points=[];measurement.active=true;paintMeasurement();
    status.textContent='Měření trasy: kliknutím do mapy označte bod A.';
   }
@@ -838,6 +840,7 @@ export function mountAtlasView(root,persistence=null){
  const center=()=>{const r=viewport.getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2];};
  const switchTo=(nextMap)=>{
   if(!MAPS[nextMap]||nextMap===currentMapId)return;
+  if(atlasCarto?.mode==='party-edit'&&atlasCarto.stop()===false)return;
   // Switching maps ends measurement everywhere and removes all route graphics.
   // Permanent custom markers on each individual map are unaffected.
   for(const entry of Object.values(measurementsByMap)){entry.active=false;entry.points=[];}
@@ -1027,7 +1030,7 @@ export function mountAtlasView(root,persistence=null){
   }
   if(drag){try{if(viewport.hasPointerCapture(drag.id))viewport.releasePointerCapture(drag.id);}catch(_){}
    drag=null;viewport.classList.remove('is-dragging');handled=true;}
-  if(handled)status.textContent='Aktivní ovládání bylo ukončeno. Již uložené změny zůstávají zachované.';
+  if(handled&&atlasCarto?.mode!=='party-edit')status.textContent='Aktivní ovládání bylo ukončeno. Již uložené změny zůstávají zachované.';
   return handled;
  };
  const escapeListener=new AbortController();
@@ -1105,6 +1108,7 @@ export function mountAtlasView(root,persistence=null){
   },
   status
  });
+ paintCustomMarkers();
  atlasPartySave=(before,after)=>atlasCarto?.savePartyMarkerChange(before,after);
  atlasMarkerChanged=(before,after)=>{if(!restoringMarkerUndo)atlasCarto?.recordMarkerChange(before,after);};
  viewport.classList.toggle('atlas-hide-own-markers',atlasCarto?.markersVisible()===false);
