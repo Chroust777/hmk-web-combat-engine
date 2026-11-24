@@ -1,11 +1,11 @@
 /** Independent shared chat document. Never writes the campaign or its pending queue. */
 export const CHAT_PATH='campaigns/hmk-ledger-chat.json';
 export const CHAT_LOCAL_KEY='hmk-ledger-chat-v1';
-export const CHAT_PALETTE=[['#e7cfa9','Písková'],['#f7d9d6','Růžová'],['#dbe9cf','Zelená'],['#d8e9f7','Modrá'],['#e7ddf5','Fialová'],['#fff0ba','Žlutá'],['#f6ddc7','Broskvová'],['#d7e9e5','Tyrkysová'],['#e5e5e5','Šedá']];
+export const CHAT_PALETTE=[['#ffffff','Bílá'],['#e7cfa9','Písková'],['#f7d9d6','Růžová'],['#dbe9cf','Zelená'],['#d8e9f7','Modrá'],['#e7ddf5','Fialová'],['#fff0ba','Žlutá'],['#f6ddc7','Broskvová'],['#d7e9e5','Tyrkysová'],['#e5e5e5','Šedá']];
 export const GM_COLOR='#e7cfa9', PC_COLOR='#ffffff';
 const FORMAT='hmk-ledger-chat-v1';
 export const chatId=()=>globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+'-'+Math.random().toString(36).slice(2);
-export const emptyChat=()=>({format:FORMAT,nextSequence:1,messages:[],speakers:[],chronicle:{entries:[],generatedAt:null}});
+export const emptyChat=()=>({format:FORMAT,nextSequence:1,messages:[],speakers:[],chronicle:{entries:[],generatedAt:null,revision:0,manual:null,proseVersion:2}});
 const colors=new Set([...CHAT_PALETTE.map(c=>c[0]),PC_COLOR]);
 const str=(v,n)=>typeof v==='string'&&v.length<=n;
 const id=v=>str(v,180)&&!!v;
@@ -15,37 +15,60 @@ const unique=arr=>new Set(arr).size===arr.length;
 const validAuthor=a=>a&&['gm','pc','custom'].includes(a.kind)&&id(a.id)&&str(a.name,120)&&a.name.trim()&&colors.has(a.color)&&(a.kind!=='gm'||(a.id==='gm'&&a.name==='GameMaster'&&a.color===GM_COLOR))&&(a.kind!=='pc'||a.color===PC_COLOR);
 export function validateChat(d){
  if(!d||d.format!==FORMAT||!rev(d.nextSequence)||!Array.isArray(d.messages)||!Array.isArray(d.speakers)||!Array.isArray(d.chronicle?.entries))throw Error('Neplatný formát chatového JSONu. Nic nebylo přepsáno.');
- if(!d.messages.every(m=>m&&id(m.id)&&rev(m.sequence)&&m.sequence<d.nextSequence&&rev(m.revision)&&validAuthor(m.author)&&str(m.text,12000)&&m.text.trim()&&date(m.createdAt)&&date(m.updatedAt)&&id(m.lastOp))||!unique(d.messages.map(m=>m.id))||!unique(d.messages.map(m=>m.sequence)))throw Error('Neplatné zprávy v chatovém JSONu.');
+ if(!d.messages.every(m=>m&&id(m.id)&&rev(m.sequence)&&m.sequence<d.nextSequence&&rev(m.revision)&&validAuthor(m.author)&&str(m.text,12000)&&m.text.trim()&&date(m.createdAt)&&date(m.updatedAt)&&id(m.lastOp)&&(m.gameDate===undefined||m.gameDate===null||str(m.gameDate,120)))||!unique(d.messages.map(m=>m.id))||!unique(d.messages.map(m=>m.sequence)))throw Error('Neplatné zprávy v chatovém JSONu.');
  if(!d.speakers.every(s=>s&&id(s.id)&&rev(s.revision)&&str(s.name,120)&&s.name.trim()&&CHAT_PALETTE.some(c=>c[0]===s.color)&&id(s.lastOp))||!unique(d.speakers.map(s=>s.id)))throw Error('Neplatná jména v chatovém JSONu.');
  if(!d.chronicle.entries.every(e=>e&&id(e.sourceId)&&rev(e.revision)&&rev(e.sequence)&&str(e.text,16000))||!unique(d.chronicle.entries.map(e=>e.sourceId))||(d.chronicle.generatedAt!==null&&!date(d.chronicle.generatedAt)))throw Error('Neplatná kronika v chatovém JSONu.');
+ const c=d.chronicle;
+ if(c.revision!==undefined&&(!Number.isSafeInteger(c.revision)||c.revision<0))throw Error('Neplatná revize kroniky.');
+ if(c.manual!=null&&(!str(c.manual.text,400000)||!Number.isSafeInteger(c.manual.throughSequence)||c.manual.throughSequence<0))throw Error('Neplatná ruční úprava kroniky.');
  return d;
 }
 const textValue=(v,max)=>{const s=String(v??'').trim();if(!s||s.length>max)throw Error('Vyplňte text (nejvýše '+max+' znaků).');return s;};
 const copy=x=>structuredClone(x);
 export const orderedMessages=d=>[...d.messages].sort((a,b)=>a.sequence-b.sequence);
 export function chatPages(d){const all=orderedMessages(d);return {latest:all.slice(-50),archive:all.slice(0,Math.max(0,all.length-50))};}
-// Conservative local prose: don't invent actions, places, motives or outcomes.
-// Common first-person action openings can be converted to third person, otherwise
-// retain the precise account in a quoted literary attribution. GM narration is verbatim.
-const verbs={'jdu':'jde','vcházím':'vchází','vstupuji':'vstupuje','vstoupím':'vstoupí','otevírám':'otevírá','otevřu':'otevře','zavírám':'zavírá','zavřu':'zavře','beru':'bere','vezmu':'vezme','hledám':'hledá','prohlížím':'prohlíží','čekám':'čeká','sedám':'sedá','vstávám':'vstává','odcházím':'odchází','vracím':'vrací','přicházím':'přichází','poslouchám':'poslouchá','zvedám':'zvedá','pokračuji':'pokračuje','sleduji':'sleduje','ptám':'ptá','říkám':'říká','odpovídám':'odpovídá'};
-const finish=s=>/[.!?…»”]$/.test(s)?s:s+'.';
-export function composeChatPassage(message){
- const raw=message.text.trim().replace(/\r\n/g,'\n');
- if(message.author.kind==='gm')return finish(raw);
- const name=message.author.name;
- const match=/^([\p{L}]+)(\s+[^\n]+)$/u.exec(raw);
- // Only uncomplicated, single-clause present/future statements can be rewritten.
- // A second clause, first-person pronoun, or quotation must stay exactly as written.
- if(match&&verbs[match[1].toLocaleLowerCase('cs')]&&!/[,;:„“".!?].+|\b(?:já|mě|mne|mně|mi|můj|moje|mé|mým|svůj|svoje|své|jsem|budu|chci)\b/iu.test(match[2])&&!/\b(?:a|ale|potom|pak|nebo|aby|protože|když)\b/iu.test(match[2]))return finish(name+' '+verbs[match[1].toLocaleLowerCase('cs')]+match[2]);
+// Local Czech prose, no invented outcomes or external requests. Preserve dialogue if
+// it cannot be safely converted. Roll prompts/results use adjacent chat context.
+const verbs={'jdu':'jde','vcházím':'vchází','vstupuji':'vstupuje','vstoupím':'vstoupí','otevírám':'otevírá','otevřu':'otevře','zavírám':'zavírá','zavřu':'zavře','beru':'bere','vezmu':'vezme','hledám':'hledá','prohlížím':'prohlíží','čekám':'čeká','sedám':'sedá','vstávám':'vstává','odcházím':'odchází','vracím':'vrací','přicházím':'přichází','poslouchám':'poslouchá','zvedám':'zvedá','pokračuji':'pokračuje','sleduji':'sleduje','ptám':'ptá','říkám':'říká','odpovídám':'odpovídá','chci':'chce','zkouším':'zkouší','snažím':'snaží','mám':'má','vidím':'vidí','slyším':'slyší','kupuji':'kupuje','platím':'platí','podávám':'podává','dávám':'dává','prosím':'prosí','volám':'volá','rozhlížím':'rozhlíží','vytahuji':'vytahuje','tasím':'tasí','útočím':'útočí','běžím':'běží','utíkám':'utíká','pomáhám':'pomáhá','házím':'hází','hodím':'hodí','ptám se':'ptá se'};
+const finish=s=>!s||/[.!?…»”]$/.test(s)?s:s+'.';
+const upper=s=>s.charAt(0).toLocaleUpperCase('cs')+s.slice(1);
+const lower=s=>s.charAt(0).toLocaleLowerCase('cs')+s.slice(1);
+const promptRoll=s=>/^\s*(?:([^,!.?\n]+),?\s+)?(?:hoď|hod|hoďte|hodte|házej|hazej|proveď|proved)\s+(?:si\s+)?(?:test\s+)?(?:na\s+)?([\p{L}][\p{L} &'\-]{0,60}?)(?:\s+(?:test|d100))?[.!?]?\s*$/iu.exec(s);
+const rollValue=s=>/^\s*(?:hozeno|hodil(?:a)? jsem|hodil(?:a)?|padlo(?: mi)?|hod|výsledek|vysledek|d100)\s*[:=]?\s*(\d{1,3})\s*[.!]?\s*$/iu.exec(s)||/^\s*(\d{1,3})\s*$/.exec(s);
+const fold=s=>s.normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('cs').trim();
+function targetMatches(target,name){if(!target)return true;const a=fold(target),b=fold(name);return a===b||(a.length>=3&&b.length>=3&&a.slice(0,-1)===b.slice(0,-1))||a===b+'e'||a===b+'i'||a===b+'u';}
+function cleanIntro(raw,name){const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');return raw.replace(new RegExp('^(?:Ahoj[,.! ]*|Dobrý den[,.! ]*)?(?:já\\s+)?(?:jak\\s+)?jsem\\s+'+escaped+'[.!?,\\s]+','iu'),'').trim();}
+export function composeChatPassage(message,context={}){
+ let raw=message.text.trim().replace(/\r\n/g,'\n');const name=message.author.name;
+ if(message.author.kind==='gm'){
+  if(context.skipPrompt)return '';
+  // A direct second-person outcome immediately after a roll is narration about
+  // that roller. Only rewrite clear Czech constructions, not uncertain claims.
+  if(context.outcomeName){const past=/^([\p{L}]+)\s+jsi\s+([\s\S]+)$/iu.exec(raw);if(past&&/l[ao]?$/iu.test(past[1]))return finish(context.outcomeName+' '+lower(past[1])+' '+past[2]);const forms={'uspěl jsi':'uspěl','uspěla jsi':'uspěla','neuspěl jsi':'neuspěl','neuspěla jsi':'neuspěla','ztrácíš':'ztrácí','padáš':'padá','narážíš':'naráží','získáváš':'získává','nacházíš':'nachází','vidíš':'vidí','slyšíš':'slyší','daří se ti':'se daří','podařilo se ti':'se podařilo'};for(const [from,to] of Object.entries(forms))if(raw.toLocaleLowerCase('cs').startsWith(from+' '))return finish(context.outcomeName+' '+to+raw.slice(from.length));}
+  return finish(raw);
+ }
+ const rolled=rollValue(raw);if(context.roll&&rolled&&Number(rolled[1])<=100)return `${name} si hází na ${context.roll[2]} a na d100 mu padlo (${Number(rolled[1])===0?100:Number(rolled[1])}).`;
+ raw=cleanIntro(raw,name)||raw;
+ const query=/^(?:chci se zeptat|rád bych se zeptal|ráda bych se zeptala|ptám se|zeptám se)\s+([\s\S]+)$/iu.exec(raw);
+ if(query){let rest=query[1].replace(/,?\s+zda\s+nemá\s+(?:nějaké|nejake|něco|neco)\s+jídlo\s+na\s+prodej[.!?]?$/iu,', co má za jídlo na prodej').replace(/,?\s+zda\s+nemá\s+něco\s+na\s+prodej[.!?]?$/iu,', co má na prodej');return finish(name+' se ptá '+rest);}
  if(raw.startsWith(name+' '))return finish(raw);
- return `V zápisu postavy ${name} stojí: „${raw.replace(/^„|“$/g,'')}“`;
+ // Convert straightforward action openings, including common intentions. Preserve
+ // direct speech verbatim for uncertain grammar, rather than assert a new action.
+ const match=/^([\p{L}]+)(\s+[\s\S]+)$/u.exec(raw);
+ if(match&&verbs[match[1].toLocaleLowerCase('cs')]&&!/\b(?:já|jsem|budu|můj|moje|mně)\b/iu.test(match[2])&&!/[,;:„“"].+|[.!?]\s+\S/u.test(match[2]))return finish(name+' '+verbs[match[1].toLocaleLowerCase('cs')]+match[2]);
+ return `${name} říká: „${finish(raw.replace(/^„|“$/g,''))}“`;
 }
+// A stored manual edit is a protected prefix; subsequent generations append new
+// passages. Source revisions remain tracked even for edited text.
+export function chronicleText(c){const manual=c.manual;return [manual?.text,...c.entries.filter(e=>!manual||e.sequence>manual.throughSequence).map(e=>e.text)].filter(Boolean).join('\n\n');}
 export function buildChatChronicle(d,at){
- const previous=new Map(d.chronicle.entries.map(e=>[e.sourceId,e]));let changed=0;
- const entries=orderedMessages(d).map(m=>{const old=previous.get(m.id);if(old&&old.revision===m.revision&&old.sequence===m.sequence)return old;changed++;return {sourceId:m.id,revision:m.revision,sequence:m.sequence,text:composeChatPassage(m)};});
- const live=new Set(d.messages.map(m=>m.id));const removed=d.chronicle.entries.filter(e=>!live.has(e.sourceId)).length;
- if(!changed&&!removed)return {changed,removed};
- d.chronicle={entries,generatedAt:at};return {changed,removed};
+ const c=d.chronicle,previous=new Map(c.entries.map(e=>[e.sourceId,e])),all=orderedMessages(d),contexts=new Map(),pending=[];
+ for(let i=0;i<all.length;i++){const m=all[i];if(m.author.kind==='gm'){const p=promptRoll(m.text);if(p)pending.push({m,p,i});else {const prior=all[i-1],ctx=prior&&contexts.get(prior.id);if(ctx?.roll)contexts.set(m.id,{outcomeName:prior.author.name,key:`${prior.id}:${prior.revision}:${ctx.key}`});}continue;}
+  const r=rollValue(m.text);if(!r||Number(r[1])>100)continue;
+  const idx=pending.findLastIndex(x=>i-x.i<=12&&targetMatches(x.p[1],m.author.name));if(idx<0)continue;const {m:request,p}=pending.splice(idx,1)[0];contexts.set(request.id,{skipPrompt:true,key:`${m.id}:${m.revision}`});contexts.set(m.id,{roll:p,key:`${request.id}:${request.revision}`});}
+ let changed=0;const entries=all.map(m=>{const old=previous.get(m.id),ctx=contexts.get(m.id)||{},contextKey=ctx.key||'';if(c.proseVersion===2&&old&&old.revision===m.revision&&old.sequence===m.sequence&&(old.contextKey||'')===contextKey)return old;changed++;return {sourceId:m.id,revision:m.revision,sequence:m.sequence,contextKey,text:composeChatPassage(m,ctx)};});
+ const live=new Set(all.map(m=>m.id)),removed=c.entries.filter(e=>!live.has(e.sourceId)).length;if(!changed&&!removed)return {changed,removed};
+ d.chronicle={...c,entries,generatedAt:at,proseVersion:2,revision:(c.revision||0)+1};return {changed,removed};
 }
 export function applyChatOperation(doc,op){
  const d=copy(validateChat(doc));
@@ -54,11 +77,11 @@ export function applyChatOperation(doc,op){
  const check=(item)=>{if(!item)throw Error('Položka již neexistuje. Obnovte chat.');if(item.revision!==op.revision)throw Error('Položku mezitím změnilo jiné zařízení. Načtěte aktuální stav a upravte ji znovu.');};
  switch(op.type){
  case 'send':{
-  if(!validAuthor(op.author))throw Error('Nejdříve vyberte jméno.');
+  if(!validAuthor(op.author)||op.author.kind==='pc'||(op.gm?op.author.kind!=='gm':op.author.kind!=='custom'))throw Error('Nejdříve vyberte jméno.');
   const existing=d.messages.find(m=>m.id===op.id);if(existing){if(existing.lastOp===op.opId)return {doc:d,result,changed:false};throw Error('Duplicitní identifikátor zprávy.');}
   // A removed custom identity cannot be used to send a new message.
   if(op.author.kind==='custom'){const s=d.speakers.find(s=>s.id===op.author.id);if(!s)throw Error('Toto jméno již není dostupné. Vyberte jiné.');op={...op,author:{kind:'custom',id:s.id,name:s.name,color:s.color}};}
-  d.messages.push({id:op.id,sequence:d.nextSequence++,revision:1,author:copy(op.author),text:textValue(op.text,12000),createdAt:op.at,updatedAt:op.at,lastOp:op.opId});break;}
+  d.messages.push({id:op.id,sequence:d.nextSequence++,revision:1,author:copy(op.author),text:textValue(op.text,12000),createdAt:op.at,updatedAt:op.at,gameDate:str(op.gameDate,120)?op.gameDate:null,lastOp:op.opId});break;}
  case 'edit-message':{
   const m=d.messages.find(m=>m.id===op.id);if(m?.lastOp===op.opId)return {doc:d,result,changed:false};check(m);if(!op.gm&&m.author.kind==='gm')throw Error('Zprávu GameMastera může upravit jen GameMaster.');m.text=textValue(op.text,12000);m.revision++;m.updatedAt=op.at;m.lastOp=op.opId;break;}
  case 'delete-message':{
@@ -72,6 +95,10 @@ export function applyChatOperation(doc,op){
   if(!op.gm)throw Error('Jména spravuje pouze GameMaster.');const s=d.speakers.find(s=>s.id===op.id);if(!s)return {doc:d,result,changed:false};check(s);d.speakers=d.speakers.filter(x=>x.id!==op.id);break;}
  case 'chronicle':
   if(!op.gm)throw Error('Kroniku vytváří pouze GameMaster.');result=buildChatChronicle(d,op.at);if(!result.changed&&!result.removed)return {doc:d,result,changed:false};break;
+ case 'edit-chronicle': case 'clear-chronicle':{
+  if(!op.gm)throw Error('Kroniku upravuje pouze GameMaster.');const c=d.chronicle;if(c.lastOp===op.opId)return {doc:d,result,changed:false};if((c.revision||0)!==op.revision)throw Error('Kroniku mezitím změnilo jiné zařízení.');
+  if(op.type==='clear-chronicle'){d.chronicle={entries:[],generatedAt:null,manual:null,proseVersion:2,revision:(c.revision||0)+1,lastOp:op.opId};}
+  else{if(!str(op.text,400000))throw Error('Kronika je příliš dlouhá.');c.manual={text:op.text.trim(),throughSequence:Math.max(c.manual?.throughSequence||0,...c.entries.map(e=>e.sequence),0)};c.revision=(c.revision||0)+1;c.lastOp=op.opId;}break;}
  default:throw Error('Neznámá operace chatu.');
  }
  return {doc:validateChat(d),result,changed:true};
