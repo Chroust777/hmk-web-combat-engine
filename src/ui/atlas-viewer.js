@@ -1,4 +1,4 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.092';
+import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.093';
 /**
  * Hârn Atlas v94.083 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
