@@ -505,7 +505,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const linked={...stroke,syncOrder:nextFogOrder(snapshot)};
   enableLinkedTarget(linked);local.fog.enabled=true;local.fog.strokes.push(linked);
  };
- const setMode=value=>{if(partyMode()&&!finishParty()){modeField.value='';return;}if(value)onModeStart?.();mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Zakrytí mapy');}refreshBrushCursor(null,null);redraw();};
+ const setMode=value=>{if(partyMode()&&!finishParty()){modeField.value='';return;}if(value)onModeStart?.();if(value==='text'){title.value='';note.value='';}mode=value;routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;hideHover();editingFeatureId=null;highlightId=null;modeField.value=mode.startsWith('fog-')?'':value;viewport.classList.toggle('is-cartographing',!!mode);if(mode.startsWith('fog-')&&!local.fog.enabled){commit(()=>{local.fog.enabled=true;},'Zakrytí mapy');}refreshBrushCursor(null,null);redraw();};
  const partyChange=next=>{
   if(JSON.stringify(next)===JSON.stringify(partyDraft))return;
   partyUndo.push(structuredClone(partyDraft));partyRedo=[];partyDraft=next;partySelected=partyDraft.findIndex(p=>p.id===partyNoteId);if(partySelected<0)partyNoteId=null;hideHover();redraw();
