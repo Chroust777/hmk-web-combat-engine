@@ -409,7 +409,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.081';
+const APP_VERSION='94.082';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3718,7 +3718,7 @@ function chronicleLanguagePanel961(ownerId,name,profile={},animalId=''){
   `<option value="${value}" ${(profile.sex||'')===value?'selected':''}>${label}</option>`).join('')}</select></label>
  ${chronicleCases.map(key=>`<label>${labels[key]}<input name="${key}" maxlength="120" value="${esc(profile[key]||'')}"
   placeholder="${esc(knownChronicleCase(name,key)||'volitelné')}"></label>`).join('')}
- <button class="secondary" type="submit">Uložit jazyk kroniky</button></form></details>`;
+ <button class="secondary" type="button" data-chronicle-language-save>Uložit jazyk kroniky</button><p class="hc-hint" data-chronicle-language-status role="status" aria-live="polite"></p></form></details>`;
 }
 function chronicleEvidence951(clock){
  const evidence=new Map(data.journal.map(j=>[j.id,j]));
@@ -27695,28 +27695,56 @@ document.addEventListener('click',e=>{
  if(action==='hide'&&!ask('Smazat tento zápis z osobní kroniky i GM historie? Potvrzené herní události, hody a zdravotní následky zůstanou nezměněné a zápis lze obnovit.'))return;
  if(mutate(()=>recordChroniclePresentation93889(data,action,{id:uuid(),actorId,episodeId,campaignId:campaignKey(data.campaignClock),createdAt:stamp()})))revealChronicleAfterMutation93889(episodeId,{restoring:action==='hide'});
 },true);
+// v94.082: explicit Notebook/Stable language save; never bypass mutate/CAS.
+function saveChronicleLanguage082(form){
+ const values=Object.fromEntries(new FormData(form));
+ const ownerId=String(values.ownerId||''),animal=String(values.animalId||'');
+ const owner=character(ownerId);
+ const setStatus=(panel,message)=>{
+  if(!panel)return;
+  const details=panel.closest('details');if(details)details.open=true;
+  const status=panel.querySelector('[data-chronicle-language-status]');if(status)status.textContent=message;
+ };
+ if(!owner||(animal&&!(owner.hmk?.livestock||[]).some(row=>row.id===animal))){
+  setStatus(form,'Jazyk nebyl uložen: postava nebo zvíře již není dostupné.');return;
+ }
+ const language=chronicleLanguage(values);
+ const existing=animal?owner.hmk?.chronicleAnimalLanguage?.[animal]:owner.hmk?.chronicleLanguage;
+ if(JSON.stringify(chronicleLanguage(existing))===JSON.stringify(language)){
+  setStatus(form,'Jazyk kroniky je již uložen.');return;
+ }
+ const ok=mutate(()=>{
+  const current=character(ownerId);
+  if(!current||(animal&&!(current.hmk?.livestock||[]).some(row=>row.id===animal)))throw Error('Postava nebo zvíře již není dostupné.');
+  current.hmk??={};
+  if(animal)current.hmk.chronicleAnimalLanguage={...current.hmk.chronicleAnimalLanguage,[animal]:language};
+  else current.hmk.chronicleLanguage=language;
+ });
+ // mutate() may replace all DOM nodes even when persistence is rejected.
+ // Resolve the new form by BOTH immutable owner and animal IDs, not selected.
+ const panel=[...document.querySelectorAll('[data-chronicle-language-form]')].find(p=>
+  p.elements.namedItem('ownerId')?.value===ownerId&&p.elements.namedItem('animalId')?.value===animal);
+ if(!panel)return;
+ if(!ok){
+  for(const key of ['sex',...chronicleCases]){
+   const field=panel.elements.namedItem(key);if(field)field.value=String(values[key]??'');
+  }
+  setStatus(panel,'Jazyk nebyl uložen. Zadané hodnoty zůstaly zachovány; po odstranění příčiny zkuste Uložit jazyk kroniky znovu.');
+ }else setStatus(panel,'Jazyk kroniky uložen.');
+}
+document.addEventListener('input',e=>{
+ const panel=e.target.closest?.('[data-chronicle-language-form]');
+ const status=panel?.querySelector('[data-chronicle-language-status]');if(status)status.textContent='';
+},true);
+document.addEventListener('click',e=>{
+ const button=e.target.closest?.('[data-chronicle-language-save]');
+ const form=button?.closest('[data-chronicle-language-form]');if(!form)return;
+ e.preventDefault();e.stopImmediatePropagation();saveChronicleLanguage082(form);
+},true);
 document.addEventListener('submit',e=>{
  const form=e.target;
  if(form?.matches?.('[data-chronicle-language-form]')){
-  e.preventDefault();e.stopImmediatePropagation();
-  const values=Object.fromEntries(new FormData(form));
-  const owner=character(values.ownerId),animal=values.animalId;
-  if(!owner||(animal&&!(owner.hmk?.livestock||[]).some(row=>row.id===animal)))return;
-  if(mutate(()=>{
-   const current=character(values.ownerId);
-   current.hmk??={};
-   const language=chronicleLanguage(values);
-   if(animal){
-    current.hmk.chronicleAnimalLanguage={...current.hmk.chronicleAnimalLanguage,[animal]:language};
-   }else current.hmk.chronicleLanguage=language;
-  })){
-   for(const panel of document.querySelectorAll('[data-chronicle-language-form]')){
-    if(panel.elements.ownerId.value===values.ownerId&&panel.elements.animalId.value===animal){
-     panel.closest('details').open=true;break;
-    }
-   }
-  }
-  return;
+  e.preventDefault();e.stopImmediatePropagation();saveChronicleLanguage082(form);return;
  }
  if(form?.id!=='hmk-chronicle-edit-form')return;
  e.preventDefault();e.stopImmediatePropagation();
