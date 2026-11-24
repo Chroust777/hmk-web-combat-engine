@@ -1,4 +1,4 @@
-/** Hârn Atlas cartography v94.079. Independent annotations only, no rules engine linkage. */
+/** Hârn Atlas cartography v94.080. Independent annotations only, no rules engine linkage. */
 const MAP_IDS=['overview','K5'];
 const FEATURE_TYPES=['route','area','radius','draw','arrow','text'];
 const LAYERS=['route','area','radius','draw','arrow','text','markers','partyHistory','fog'];
@@ -383,7 +383,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   $('[data-carto-party-edit]').setAttribute('aria-pressed',String(activeParty&&!partyExtend));
   $('[data-carto-party-controls]').hidden=!activeParty;
   $('[data-carto-party-count]').textContent=`${partyDraft.length} bodů · ${formatKm(routeLength(partyDraft,map))} km · ${JSON.stringify(partyDraft)===JSON.stringify(partyBefore)?'beze změny':'neuložené změny'}`;
-  $('[data-carto-party-hint]').textContent=activeParty?(partyExtend?'Kliknutím do mapy nebo tažením ikonky přidáte další bod. Starší body lze přetahovat.':'Přetahujte body, včetně koncového. Kliknutím vyberete bod k odstranění.'):hasParty?'Přetáhněte ikonku družiny nebo začněte pohyb zde. Uložené body upravíte tužkou na mapě.':'Nejdříve vytvořte značku Pozice družiny.';
+  $('[data-carto-party-hint]').textContent=activeParty?(partyExtend?'Kliknutím do mapy nebo tažením ikonky přidáte další bod. Starší body lze přetahovat. Tažením za volnou mapu ji posunete.':'Přetahujte body, včetně koncového. Kliknutím vyberete bod k odstranění. Tažením za volnou mapu ji posunete.'):hasParty?'Přetáhněte ikonku družiny nebo začněte pohyb zde. Uložené body upravíte tužkou na mapě.':'Nejdříve vytvořte značku Pozice družiny.';
   $('[data-carto-party-undo]').disabled=!partyUndo.length;$('[data-carto-party-redo]').disabled=!partyRedo.length;
   $('[data-carto-party-remove]').disabled=partySelected<0||partyDraft.length<2;
   $('[data-carto-party-save]').disabled=!activeParty||JSON.stringify(partyDraft)===JSON.stringify(partyBefore);
@@ -494,7 +494,8 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   if(partyMode()){
    const rect=viewport.getBoundingClientRect();let nearest=-1,d=Infinity;
    partyDraft.forEach((p,i)=>{const v=screenPoint(p),dd=Math.hypot(v.x-e.clientX+rect.left,v.y-e.clientY+rect.top);if(dd<=d){d=dd;nearest=i;}});
-   if(d<=19){partyGesture={index:nearest,before:structuredClone(partyDraft),x:e.clientX,y:e.clientY,moved:false,append:partyExtend&&nearest===partyDraft.length-1};painting=true;hideHover();}
+   if(d>19)return false; // Empty space belongs to the viewer's pan gesture.
+   partyGesture={index:nearest,before:structuredClone(partyDraft),x:e.clientX,y:e.clientY,moved:false,append:partyExtend&&nearest===partyDraft.length-1};painting=true;hideHover();
    return true;
   }
   if(mode==='edit-points'){

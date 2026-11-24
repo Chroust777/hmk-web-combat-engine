@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography} from './atlas-cartography.js?v=94.079';
+import {atlasCartographyPanel,mountAtlasCartography} from './atlas-cartography.js?v=94.080';
 /**
- * Hârn Atlas v94.079 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.080 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -921,15 +921,21 @@ export function mountAtlasView(root,persistence=null){
  viewport.addEventListener('pointercancel',finishTouch,true);
  viewport.addEventListener('pointerdown',e=>{
   if(pinch||e.button!==0)return;
+  let partyPan=false;
   if(atlasCarto?.active){
    if(e.pointerType==='touch'&&activeTouches.size>1)return;
-   cartoPointer=e.pointerId;
-   atlasCarto.pointerStart(e);
-   try{viewport.setPointerCapture(e.pointerId);}catch(_){}
-   return;
+   const claimed=atlasCarto.pointerStart(e);
+   if(atlasCarto.mode==='party-edit'&&!claimed){
+    // A tap may append a point; a drag pans instead, without changing the draft.
+    partyPan=true;
+   }else{
+    cartoPointer=e.pointerId;
+    try{viewport.setPointerCapture(e.pointerId);}catch(_){}
+    return;
+   }
   }
-  if(e.target.closest?.('[data-atlas-marker]'))return;
-  drag={id:e.pointerId,startX:e.clientX,startY:e.clientY,initialX:state.x,initialY:state.y,moved:false};
+  if(!partyPan&&e.target.closest?.('[data-atlas-marker]'))return;
+  drag={id:e.pointerId,startX:e.clientX,startY:e.clientY,initialX:state.x,initialY:state.y,moved:false,partyPan};
   viewport.setPointerCapture(e.pointerId);
   viewport.classList.add('is-dragging');
  });
@@ -953,11 +959,12 @@ export function mountAtlasView(root,persistence=null){
    return;
   }
   if(!drag||drag.id!==e.pointerId)return;
-  const didMove=drag.moved;
+  const {moved:didMove,partyPan}=drag;
   drag=null;
   viewport.classList.remove('is-dragging');
   if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
   if(didMove){ignoreClick=true;if(pdfLayer)schedulePdf(25);return;}
+  if(partyPan){if(atlasCarto?.mode==='party-edit')atlasCarto.handleClick(e.clientX,e.clientY);return;}
   if(measurement.active){recordPoint(e.clientX,e.clientY);return;}
   clearMarkerSelection();
   if(markerPlacement){

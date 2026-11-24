@@ -489,3 +489,6 @@ body #app main.content-atlas .atlas-cartography input[data-carto-fog-transparenc
 body #app main.content-atlas .atlas-carto-hover-delete.is-party-history .atlas-carto-hover-actions button{width:25px!important;height:25px!important;min-width:25px!important;min-height:25px!important;font:700 16px/20px Georgia,serif!important;padding:0!important}
 .atlas-carto-hover-delete.is-party-history .atlas-carto-hover-actions{gap:3px}
 body #app main.content-atlas [data-carto-party-controls][hidden]{display:none!important}
+
+/* v94.080 – map pan during party-history editing. */
+.atlas-viewport.is-cartographing.is-dragging{cursor:grabbing}
