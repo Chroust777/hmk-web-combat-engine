@@ -19,3 +19,23 @@ html[data-hmk-gm="true"] [data-hmk-gm-page-notice]{display:none!important}
 .hmk-gm-dialog [data-hmk-gm-error]:empty{display:none}
 .hmk-gm-dialog-actions{display:flex;justify-content:flex-end;gap:8px}
 .hmk-gm-dialog-actions button{padding:5px 12px;min-height:27px;border:1px solid #9a7547;border-radius:5px;background:#e6d0a6;color:#382818;font:600 13px/1.2 Georgia,serif;cursor:pointer}
+
+/* v94.090 – only UI controls; no character or inventory filtering in rules. */
+html[data-hmk-gm="true"] [data-hmk-player-only]{display:none!important}
+html:not([data-hmk-gm="true"]) :is(
+ .nav .castle-nav-link[data-nav="skills"],
+ .registry-actions [data-action="auto-random-character"],
+ .registry-actions [data-action="open-generator-config"],
+ .journal-book-subnav [data-sheet-edit],
+ .journal-book-subnav [data-action="creation-open"],
+ .journal-book-subnav [data-sheet-section="status"],
+ .journal-book-subnav [data-sheet-section="hazards"],
+ .journal-book-subnav [data-sheet-section="provisions"],
+ .content-library [data-action="new-item"],
+ .library-navigation [data-library-tab="bestiary"],
+ .library-navigation [data-library-tab="rules"],
+ form[data-library-form] button[name="acquisition"][value="free"],
+ form[data-hmk-livestock-acquire] button[name="acquisition"][value="free"]
+){display:none!important}
+/* Preserve the open chapter and its inputs, but keep the allowed tabs usable. */
+html:not([data-hmk-gm="true"]) main[data-hmk-gm-chapter] .journal-book-frame>:not(.journal-book-subnav){display:none!important}
