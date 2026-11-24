@@ -23,6 +23,9 @@ export function validateChat(d){
  const c=d.chronicle;
  if(c.revision!==undefined&&(!Number.isSafeInteger(c.revision)||c.revision<0))throw Error('Neplatná revize kroniky.');
  if(c.manual!=null&&(!str(c.manual.text,400000)||!Number.isSafeInteger(c.manual.throughSequence)||c.manual.throughSequence<0))throw Error('Neplatná ruční úprava kroniky.');
+ if(c.manualDays!==undefined&&(!Array.isArray(c.manualDays)||!c.manualDays.every(m=>m&&str(m.day,120)&&m.day.length>0&&str(m.text,400000)&&Number.isSafeInteger(m.throughSequence)&&m.throughSequence>=0)||!unique(c.manualDays.map(m=>m.day))))throw Error('Neplatné denní úpravy kroniky.');
+ if(c.manual?.day!==undefined&&(!str(c.manual.day,120)||!c.manual.day))throw Error('Neplatné datum ruční úpravy kroniky.');
+ if(!c.entries.every(e=>e.gameDay===undefined||str(e.gameDay,120)&&e.gameDay.length>0))throw Error('Neplatné datum zápisu kroniky.');
  return d;
 }
 const textValue=(v,max)=>{const s=String(v??'').trim();if(!s||s.length>max)throw Error('Vyplňte text (nejvýše '+max+' znaků).');return s;};
@@ -63,17 +66,32 @@ export function composeChatPassage(message,context={}){
 // A stored manual edit is a protected prefix; subsequent generations append new
 // passages. Source revisions remain tracked even for edited text.
 export function chronicleText(c){const manual=c.manual;return [manual?.text,...c.entries.filter(e=>!manual||e.sequence>manual.throughSequence).map(e=>e.text)].filter(Boolean).join(' ');}
+// Day keys come exclusively from the message's saved game-clock snapshot.
+export const UNKNOWN_CHRONICLE_DAY='Herní datum nedoloženo';
+export const LEGACY_CHRONICLE_DAY='Starší ruční kronika (více dnů)';
+export const chatGameDay=value=>String(value??'').replace(/\s*·\s*\d{1,2}:\d{2}\s*$/u,'').trim()||UNKNOWN_CHRONICLE_DAY;
+function datedEntries(d){const dates=new Map(d.messages.map(m=>[m.id,chatGameDay(m.gameDate)]));return d.chronicle.entries.map(e=>({...e,gameDay:e.gameDay||dates.get(e.sourceId)||UNKNOWN_CHRONICLE_DAY}));}
+function legacyDay(c,entries){if(!c.manual)return null;if(c.manual.day)return c.manual.day;const days=[...new Set(entries.filter(e=>e.sequence<=c.manual.throughSequence).map(e=>e.gameDay))];return days.length===1?days[0]:LEGACY_CHRONICLE_DAY;}
+function hydrateChronicle(d){const c=d.chronicle;c.entries=datedEntries(d);if(c.manual&&!c.manual.day)c.manual.day=legacyDay(c,c.entries);}
+// A multi-day legacy manual text cannot safely be split. Keep it as a separate
+// readable/editable item, alongside the original generated daily passages.
+export function chronicleDays(d){const c=d.chronicle,entries=datedEntries(d),groups=new Map();
+ for(const e of [...entries].sort((a,b)=>a.sequence-b.sequence)){if(!groups.has(e.gameDay))groups.set(e.gameDay,[]);groups.get(e.gameDay).push(e);}
+ const edits=new Map((c.manualDays||[]).map(m=>[m.day,m]));const legacy=legacyDay(c,entries);if(legacy&&!edits.has(legacy))edits.set(legacy,c.manual);
+ for(const day of edits.keys())if(!groups.has(day))groups.set(day,[]);
+ return [...groups].map(([day,items])=>{const manual=edits.get(day),tail=items.filter(e=>!manual||e.sequence>manual.throughSequence).map(e=>e.text.replace(/\s+/gu,' ').trim()).filter(Boolean).join(' ');return {day,text:manual?manual.text+(manual.text&&tail&&!/\s$/u.test(manual.text)?' ':'')+tail:tail,count:items.length,throughSequence:Math.max(manual?.throughSequence||0,...items.map(e=>e.sequence),0)};});
+}
 export function buildChatChronicle(d,at){
- const c=d.chronicle,previous=new Map(c.entries.map(e=>[e.sourceId,e])),all=orderedMessages(d),contexts=new Map(),pending=[];
+ hydrateChronicle(d);const c=d.chronicle,previous=new Map(c.entries.map(e=>[e.sourceId,e])),all=orderedMessages(d),contexts=new Map(),pending=[];
  for(let i=0;i<all.length;i++){const m=all[i];if(m.author.kind==='gm'){const p=promptRoll(m.text);if(p)pending.push({m,p,i});else {const prior=all[i-1],ctx=prior&&contexts.get(prior.id);if(ctx?.roll)contexts.set(m.id,{outcomeName:prior.author.name,key:`${prior.id}:${prior.revision}:${ctx.key}`});}continue;}
   const r=rollValue(m.text);if(!r||Number(r[1])>100)continue;
   const idx=pending.findLastIndex(x=>i-x.i<=12&&targetMatches(x.p[1],m.author.name));if(idx<0)continue;const {m:request,p}=pending.splice(idx,1)[0];contexts.set(request.id,{skipPrompt:true,key:`${m.id}:${m.revision}`});contexts.set(m.id,{roll:p,key:`${request.id}:${request.revision}`});}
- let changed=0;const entries=all.map(m=>{const old=previous.get(m.id),ctx=contexts.get(m.id)||{},contextKey=ctx.key||'';if(c.proseVersion===2&&old&&old.revision===m.revision&&old.sequence===m.sequence&&(old.contextKey||'')===contextKey)return old;changed++;return {sourceId:m.id,revision:m.revision,sequence:m.sequence,contextKey,text:composeChatPassage(m,ctx)};});
+ let changed=0;const entries=all.map(m=>{const old=previous.get(m.id),ctx=contexts.get(m.id)||{},contextKey=ctx.key||'';if(c.proseVersion===2&&old&&old.revision===m.revision&&old.sequence===m.sequence&&(old.contextKey||'')===contextKey)return old;changed++;return {sourceId:m.id,revision:m.revision,sequence:m.sequence,contextKey,gameDay:chatGameDay(m.gameDate),text:composeChatPassage(m,ctx)};});
  const live=new Set(all.map(m=>m.id)),removed=c.entries.filter(e=>!live.has(e.sourceId)).length;if(!changed&&!removed)return {changed,removed};
  d.chronicle={...c,entries,generatedAt:at,proseVersion:2,revision:(c.revision||0)+1};return {changed,removed};
 }
 export function applyChatOperation(doc,op){
- const d=copy(validateChat(doc));
+ const d=copy(validateChat(doc));hydrateChronicle(d);
  if(!id(op?.opId)||!date(op.at))throw Error('Neplatná operace chatu.');
  let result={};
  const check=(item)=>{if(!item)throw Error('Položka již neexistuje. Obnovte chat.');if(item.revision!==op.revision)throw Error('Položku mezitím změnilo jiné zařízení. Načtěte aktuální stav a upravte ji znovu.');};
@@ -100,7 +118,7 @@ export function applyChatOperation(doc,op){
  case 'edit-chronicle': case 'clear-chronicle':{
   if(!op.gm)throw Error('Kroniku upravuje pouze GameMaster.');const c=d.chronicle;if(c.lastOp===op.opId)return {doc:d,result,changed:false};if((c.revision||0)!==op.revision)throw Error('Kroniku mezitím změnilo jiné zařízení.');
   if(op.type==='clear-chronicle'){d.chronicle={entries:[],generatedAt:null,manual:null,proseVersion:2,revision:(c.revision||0)+1,lastOp:op.opId};}
-  else{if(!str(op.text,400000))throw Error('Kronika je příliš dlouhá.');c.manual={text:op.text.trim(),throughSequence:Math.max(c.manual?.throughSequence||0,...c.entries.map(e=>e.sequence),0)};c.revision=(c.revision||0)+1;c.lastOp=op.opId;}break;}
+  else{if(!str(op.text,400000))throw Error('Kronika je příliš dlouhá.');if(op.day!==undefined){const day=chronicleDays(d).find(x=>x.day===op.day);if(!day)throw Error('Vybraný den již v kronice neexistuje.');c.manualDays=[...(c.manualDays||[]).filter(m=>m.day!==op.day),{day:op.day,text:op.text,throughSequence:day.throughSequence}];}else{c.manual={text:op.text,throughSequence:Math.max(c.manual?.throughSequence||0,...c.entries.map(e=>e.sequence),0)};}c.revision=(c.revision||0)+1;c.lastOp=op.opId;}break;}
  default:throw Error('Neznámá operace chatu.');
  }
  return {doc:validateChat(d),result,changed:true};

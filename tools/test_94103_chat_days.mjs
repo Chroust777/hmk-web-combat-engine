@@ -1,0 +1,16 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const C=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync(new URL('../src/integration/hmk-chat-store.js',import.meta.url))).toString('base64'));
+const at='2026-11-24T22:00:00Z',gm={kind:'gm',id:'gm',name:'GameMaster',color:C.GM_COLOR};let serial=0,d=C.emptyChat();const A='15. Kelén TR 720',B='16. Kelén TR 720';
+function apply(type,props={}){const r=C.applyChatOperation(d,{type,opId:'op'+(++serial),at,gm:true,...props});d=r.doc;return r;}
+function send(id,text,gameDate){apply('send',{id,author:gm,text,gameDate});}
+function day(k){return C.chronicleDays(d).find(x=>x.day===k);}
+send('a','První věta.\n\nDruhá věta.',A+' · 08:00');send('b','Třetí věta.',A+' · 23:59');send('c','Další den.',B+' · 00:00');send('unknown','Bez data.',null);assert.equal(C.chronicleDays(d).length,0);apply('chronicle');assert.equal(C.chronicleDays(d).length,3);assert.equal(day(A).text,'První věta. Druhá věta. Třetí věta.');assert.equal(day(B).text,'Další den.');assert.equal(day(C.UNKNOWN_CHRONICLE_DAY).text,'Bez data.');
+const manual='První odstavec.\n\nDruhý odstavec.\nDalší řádek.\n\n';const revision=d.chronicle.revision;assert.throws(()=>apply('edit-chronicle',{day:A,text:manual,revision,gm:false}),/GameMaster/);apply('edit-chronicle',{day:A,text:manual,revision});assert.equal(day(A).text,manual);assert.equal(day(B).text,'Další den.');assert.throws(()=>apply('edit-chronicle',{day:B,text:'konflikt',revision}),/mezitím/);
+// Late entry for an earlier day must append to that day, not the most recent day.
+send('late','Pozdní událost.',A+' · 12:00');send('next','Další událost.',B+' · 12:00');apply('chronicle');assert.equal(day(A).text,manual+'Pozdní událost.');assert.equal(day(B).text,'Další den. Další událost.');assert.equal(apply('chronicle').changed,false);assert.equal(day(A).text,manual+'Pozdní událost.');
+// Legacy un-dated entries derive from original snapshots; old multi-day manual is preserved separately.
+const original=structuredClone(d);d=structuredClone(original);delete d.chronicle.manualDays;for(const e of d.chronicle.entries)delete e.gameDay;d.chronicle.manual={text:'Starší odstavec.\n\nDruhý odstavec.',throughSequence:3};assert.equal(day(C.LEGACY_CHRONICLE_DAY).text,d.chronicle.manual.text);assert.match(day(A).text,/První věta/);apply('delete-message',{id:'a',revision:1});apply('chronicle');assert.equal(day(C.LEGACY_CHRONICLE_DAY).text,'Starší odstavec.\n\nDruhý odstavec.');
+// Legacy one-day manual becomes available under the actual day.
+d=structuredClone(original);delete d.chronicle.manualDays;d.chronicle.manual={text:'Starý denní text.\n\n',throughSequence:2};assert.equal(day(A).text,'Starý denní text.\n\nPozdní událost.');assert.equal(day(B).text,'Další den. Další událost.');
+// Clearing all days leaves every source message intact and allows regeneration.
+const count=d.messages.length;apply('clear-chronicle',{revision:d.chronicle.revision});assert.equal(C.chronicleDays(d).length,0);assert.equal(d.messages.length,count);apply('chronicle');assert.equal(C.chronicleDays(d).length,3);assert.match(day(A).text,/První věta/);console.log('PASS daily grouping, unknown date, exact manual paragraphs, late additions, legacy migration, revision and permissions, clear/regenerate');

@@ -23,3 +23,8 @@
 .hmk-chat-view textarea[data-chat-chronicle-edit]{max-height:480px!important;overflow-y:auto;field-sizing:fixed}
 .hmk-chat-chronicle-pager{display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;color:#503723}
 .hmk-chat-chronicle-pager button{font-size:17px;line-height:1;min-width:35px}
+
+/* v94.103: day filter for both roles and preserve manual paragraph breaks. */
+.hmk-chat-view .hmk-chat-chronicle p[data-chat-prose]{white-space:pre-wrap;overflow-wrap:anywhere}
+.hmk-chat-chronicle-actions{flex-wrap:wrap;align-items:center}
+.hmk-chat-chronicle-actions select[data-chat-chronicle-day]{width:auto;max-width:100%;min-width:0;font-size:12px;padding:3px 6px}
