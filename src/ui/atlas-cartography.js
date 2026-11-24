@@ -214,8 +214,9 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   hoverDelete.classList.toggle('atlas-carto-tip-only',!chosen);
   const tip=hoverDelete.querySelector('[data-carto-hover-tip]');
   const historyNote=kind==='history'?local.partyHistory[index]?.note:'';
-  // A text object needs no duplicate tooltip. Other objects retain their hover note.
-  if(tip){const hasTip=!!historyNote||!!f?.note&&f.type!=='text';tip.textContent=historyNote|| (hasTip?`${f.title||names[f.type]}: ${f.note}`:'');tip.hidden=!hasTip;}
+  // A text label is already visible on the map, but its separate note must
+  // remain available in the same popup as the notes of other map objects.
+  if(tip){const hasTip=!!historyNote||!!f?.note;tip.textContent=historyNote|| (hasTip?`${f.title||names[f.type]}: ${f.note}`:'');tip.hidden=!hasTip;}
   // On a saved route vertex, offer BOTH editing (pencil) and shortening (cross).
   const edit=hoverDelete.querySelector('[data-carto-hover-edit]');if(edit)edit.hidden=!chosen||!(kind==='history'||kind==='feature'||kind==='vertex'&&f?.type==='route');
   const del=hoverDelete.querySelector('[data-carto-hover-remove]');if(del){
