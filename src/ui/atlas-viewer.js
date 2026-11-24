@@ -1,6 +1,6 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasCartographyEmpty} from './atlas-cartography.js?v=94.078';
+import {atlasCartographyPanel,mountAtlasCartography} from './atlas-cartography.js?v=94.079';
 /**
- * Hârn Atlas v94.078 — custom markers persist in the existing private GitHub campaign snapshot.
+ * Hârn Atlas v94.079 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
  * Detail: K5 from the user's untouched, vector K5.pdf, rendered on demand using PDF.js.
  * Measurement stays ephemeral. Markers share the existing guarded campaign JSON / GitHub Cloud pipeline.
@@ -56,7 +56,7 @@ const MARKER_TYPES=Object.freeze({party:{label:'Pozice družiny',symbol:'♟'},v
 const markerDisplayName=item=>item.name||MARKER_TYPES[item.type]?.label||'Značka';
 const MARKER_EVENTS=Object.freeze({discovery:'Objeveno',visit:'Navštíveno',departure:'Opuštěno',other:'Poznámka'});
 const markersByMap={overview:[],K5:[]};
-let markerStoreLoaded=false,markerSequence=0,markerPersistence=null,atlasPartyMoved=null,atlasPartyRemoved=null,atlasMarkerChanged=null;
+let markerStoreLoaded=false,markerSequence=0,markerPersistence=null,atlasPartySave=null,atlasMarkerChanged=null;
 const cleanMarker=(item,map)=>{
  if(!item||typeof item!=='object'||typeof item.id!=='string'||item.id.length>90)return null;
  if(!Number.isFinite(item.x)||!Number.isFinite(item.y)||item.x<0||item.y<0||item.x>=map.width||item.y>=map.height)return null;
@@ -122,23 +122,16 @@ function saveAtlasMarkers(){
  try{
   const oldParty=lastCommittedMarkers[currentMapId]?.find(m=>m.type==='party');
   const newParty=next[currentMapId]?.find(m=>m.type==='party');
-  const removedParty=!!oldParty&&!newParty;
-  let ok;
-  if(removedParty&&typeof markerPersistence.writeBundle==='function'){
-   const carto=structuredClone(markerPersistence.readCartography?.()||atlasCartographyEmpty());
-   if(carto.maps?.[currentMapId])carto.maps[currentMapId].partyHistory=[];
-   ok=markerPersistence.writeBundle(next,carto)===true;
-  }else if(removedParty){
-   // Do not allow an orphaned path when cloud storage lacks an atomic writer.
-   throw Error('Atlas: bezpečné smazání trasy vyžaduje společný zápis značky a kartografie.');
-  }else ok=markerPersistence.write(next)===true;
+  const partyChanged=!!oldParty!==!!newParty||!!newParty&&(!oldParty||oldParty.x!==newParty.x||oldParty.y!==newParty.y);
+  if(partyChanged){
+   if(atlasPartySave?.(parseMarkers(lastCommittedMarkers),next))return true;
+   replaceMarkersInPlace(lastCommittedMarkers);return false;
+  }
+  const ok=markerPersistence.write(next)===true;
   if(ok){
    const previous=parseMarkers(lastCommittedMarkers);
    lastCommittedMarkers=parseMarkers(next);
    atlasMarkerChanged?.(previous,next);
-   if(removedParty)atlasPartyRemoved?.();
-   if(newParty&&(!oldParty||oldParty.x!==newParty.x||oldParty.y!==newParty.y))
-    atlasPartyMoved?.(newParty);
    return true;
   }
  }catch(err){console.error('Atlas cloud save:',err)}
@@ -457,7 +450,7 @@ export function mountAtlasView(root,persistence=null){
     const deleteBtn=document.createElement('button');deleteBtn.type='button';deleteBtn.className='atlas-marker-map-action atlas-marker-map-delete';deleteBtn.textContent='×';deleteBtn.title='Smazat značku';deleteBtn.setAttribute('aria-label','Smazat značku');deleteBtn.dataset.atlasMarkerDeleteId=item.id;
     customMarkerOverlay.append(modify,deleteBtn);markerButtons.set(item.id,[modify,deleteBtn]);
    }
-   const pos=screenPoint(item);
+   const pos=screenPoint(item.type==='party'?(atlasCarto?.partyPreview()||item):item);
    node.style.left=`${pos.x}px`;node.style.top=`${pos.y}px`;
    // Actions are BELOW the pin, never above it where the text balloon opens.
    const controls=markerButtons.get(item.id);if(controls){controls[0].style.left=`${pos.x-17}px`;controls[0].style.top=`${pos.y+27}px`;controls[1].style.left=`${pos.x+17}px`;controls[1].style.top=`${pos.y+27}px`;}
@@ -580,12 +573,13 @@ export function mountAtlasView(root,persistence=null){
  };
  markerAdd.addEventListener('click',()=>toggleMarkerPlacement('village'));
  markerParty.addEventListener('click',()=>{
+  if(atlasCarto?.mode==='party-edit'){workspace.querySelector('[data-carto-party-section]').open=true;return;}
   const party=mapMarkers.find(item=>item.type==='party');
   if(party){
    atlasCarto?.stop();measurement.active=false;measurement.points=[];paintMeasurement();
    markerPlacement=false;closeMarkerEditor();refreshMarkerAdd();
    selectMarker(party.id,true);
-   status.textContent='Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě.';
+   status.textContent='Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě a dokončete tlačítkem Uložit pohyb.';
   }
  });
  const placePartyPosition=position=>{
@@ -619,7 +613,7 @@ export function mountAtlasView(root,persistence=null){
   selectedMarkerId=null;
   closeMarkerEditor();
   markerNodes.get(marker.id)?.remove();markerNodes.delete(marker.id);for(const btn of markerButtons.get(marker.id)||[])btn.remove();markerButtons.delete(marker.id);
-  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();refreshMarkerAdd();
+  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();refreshMarkerAdd();atlasCarto?.refreshParty();
   status.textContent=`Značka „${markerDisplayName(marker)}“ ${existing?'byla upravena':'byla přidána'}.${saved?'':' Zápis do společné kampaně se nezdařil; změna byla vrácena.'}`;
  });
  const removeMarker=id=>{
@@ -627,7 +621,7 @@ export function mountAtlasView(root,persistence=null){
   const item=mapMarkers[index];mapMarkers.splice(index,1);
   if(selectedMarkerId===id)selectedMarkerId=null;
   if(editingMarkerId===id)closeMarkerEditor();
-  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();refreshMarkerAdd();
+  const saved=saveAtlasMarkers();paintCustomMarkers();renderMarkerList();refreshMarkerAdd();atlasCarto?.refreshParty();
   status.textContent=`Značka „${markerDisplayName(item)}“ ${saved?'byla odstraněna.':'nebyla odstraněna; cloudový zápis byl odmítnut.'}`;
  };
  markerList.addEventListener('click',e=>{
@@ -680,6 +674,10 @@ export function mountAtlasView(root,persistence=null){
     if(cancel){item.x=gesture.x;item.y=gesture.y;}
     else{
      suppressMarkerClick={id:gesture.id,at:Date.now()};
+     if(item.type==='party'){
+      const point={x:item.x,y:item.y};item.x=gesture.x;item.y=gesture.y;
+      atlasCarto?.startPartyMove(point);paintCustomMarkers();renderMarkerList();return;
+     }
      const saved=saveAtlasMarkers();
      status.textContent=`Značka „${markerDisplayName(item)}“ byla přemístěna.${saved?'':' Zápis do společné kampaně se nezdařil; původní poloha byla obnovena.'}`;
     }
@@ -949,7 +947,7 @@ export function mountAtlasView(root,persistence=null){
   if(cartoPointer===e.pointerId){
    cartoPointer=null;
    if(['draw','arrow','radius','fog-reveal','fog-cover'].includes(atlasCarto?.mode))atlasCarto?.pointerEnd();
-   else if(atlasCarto?.mode==='edit-points'){if(!atlasCarto.pointerEnd())atlasCarto.handleClick(e.clientX,e.clientY);}
+   else if(['edit-points','party-edit'].includes(atlasCarto?.mode)){if(!atlasCarto.pointerEnd())atlasCarto.handleClick(e.clientX,e.clientY);}
    else atlasCarto?.handleClick(e.clientX,e.clientY);
    if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
    return;
@@ -1061,6 +1059,13 @@ export function mountAtlasView(root,persistence=null){
   workspace,viewport,map,
   read:()=>markerPersistence?.readCartography?.(),
   write:next=>markerPersistence?.writeCartography?.(next),
+  readMarkers:()=>parseMarkers(lastCommittedMarkers),
+  writeBundle:(nextMarkers,nextCartography)=>{
+   const ok=markerPersistence?.writeBundle?.(nextMarkers,nextCartography)===true;
+   if(ok){lastCommittedMarkers=parseMarkers(nextMarkers);replaceMarkersInPlace(nextMarkers);paintCustomMarkers();renderMarkerList();refreshMarkerAdd();}
+   return ok;
+  },
+  onPartyPreview:()=>paintCustomMarkers(),
   screenPoint,inMap,markers:()=>mapMarkers,selectMarker,openSector:clickSector,
   getCamera:()=>({zoom:state.zoom,centerX:(viewport.clientWidth/2-state.x)/state.zoom-map.margin,centerY:(viewport.clientHeight/2-state.y)/state.zoom-map.margin}),
   setCamera:cam=>{
@@ -1093,8 +1098,7 @@ export function mountAtlasView(root,persistence=null){
   },
   status
  });
- atlasPartyMoved=item=>{if(!restoringMarkerUndo)atlasCarto?.recordPartyMove(item);};
- atlasPartyRemoved=()=>atlasCarto?.discardPartyHistory();
+ atlasPartySave=(before,after)=>atlasCarto?.savePartyMarkerChange(before,after);
  atlasMarkerChanged=(before,after)=>{if(!restoringMarkerUndo)atlasCarto?.recordMarkerChange(before,after);};
  viewport.classList.toggle('atlas-hide-own-markers',atlasCarto?.markersVisible()===false);
  if(typeof ResizeObserver==='function'){

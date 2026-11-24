@@ -483,3 +483,9 @@ body #app main.content-atlas .atlas-cartography input[data-carto-fog-transparenc
  display:block; width:100%; min-height:24px; padding:0; margin:3px 0 0;
  accent-color:#785331; cursor:pointer; background:transparent; border:0;
 }
+
+/* v94.079 – party history edit and truncate controls. */
+.atlas-carto-hover-delete.is-party-history{min-width:58px!important;width:auto!important}
+body #app main.content-atlas .atlas-carto-hover-delete.is-party-history .atlas-carto-hover-actions button{width:25px!important;height:25px!important;min-width:25px!important;min-height:25px!important;font:700 16px/20px Georgia,serif!important;padding:0!important}
+.atlas-carto-hover-delete.is-party-history .atlas-carto-hover-actions{gap:3px}
+body #app main.content-atlas [data-carto-party-controls][hidden]{display:none!important}
