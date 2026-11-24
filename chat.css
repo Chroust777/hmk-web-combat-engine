@@ -8,3 +8,18 @@
 .hmk-chat-message .hmk-chat-game-date{font-weight:400;font-size:12px}.hmk-chat-view textarea[data-chat-text],.hmk-chat-view textarea[data-chat-edit-text],.hmk-chat-view textarea[data-chat-chronicle-edit]{min-height:0!important;max-height:none!important;height:auto;overflow:hidden;field-sizing:content;line-height:1.4}.hmk-chat-chronicle-actions{justify-content:center}.hmk-chat-message{min-height:0!important;height:auto!important}.hmk-chat-chronicle [data-chat-chronicle-edit]{font:inherit}.hmk-chat-view .hmk-chat-message header strong{overflow-wrap:anywhere}.hmk-chat-view .hmk-chat-message header time{flex:none}
 
 @media(max-width:800px){.hmk-chat-view>.hmk-chat-toolbar h2{font-size:12px}.hmk-chat-toolbar [data-chat-status]{flex-basis:100%;order:3}.hmk-chat-message header{flex-wrap:wrap}.hmk-chat-view .hmk-chat-messages{max-height:55vh}}
+
+/* v94.102: bounded chat list and measured, independently paged book prose. */
+.hmk-chat-toolbar [data-chat-status]{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.hmk-chat-heading{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-bottom:1px solid #b18b53;padding-bottom:7px}
+.hmk-chat-heading h3{flex:1;text-align:left;border:0;padding:0;margin:0}
+.hmk-chat-heading button{min-height:24px;font-size:11px;padding:3px 8px}
+.hmk-chat-view .hmk-chat-messages{max-height:min(460px,48vh,var(--chat-seven-limit,460px));min-height:0;overflow-y:auto;overflow-anchor:none;overscroll-behavior:contain}
+.hmk-chat-view [data-chat-speakers]{max-height:180px;overflow:auto;overscroll-behavior:contain}
+.hmk-chat-view textarea[data-chat-text],.hmk-chat-view textarea[data-chat-edit-text]{max-height:150px!important;overflow-y:auto;field-sizing:fixed}
+.hmk-chat-view .hmk-chat-chronicle{box-sizing:border-box;flex:none;height:clamp(300px,54vh,610px);min-height:0;overflow:hidden;white-space:normal}
+.hmk-chat-view .hmk-chat-chronicle p[data-chat-prose]{margin:0;white-space:normal;text-indent:0;overflow-wrap:anywhere}
+.hmk-chat-view .hmk-chat-chronicle:has([data-chat-chronicle-edit]){overflow-y:auto;overscroll-behavior:contain}
+.hmk-chat-view textarea[data-chat-chronicle-edit]{max-height:480px!important;overflow-y:auto;field-sizing:fixed}
+.hmk-chat-chronicle-pager{display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;color:#503723}
+.hmk-chat-chronicle-pager button{font-size:17px;line-height:1;min-width:35px}

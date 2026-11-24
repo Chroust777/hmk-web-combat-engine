@@ -62,7 +62,7 @@ export function composeChatPassage(message,context={}){
 }
 // A stored manual edit is a protected prefix; subsequent generations append new
 // passages. Source revisions remain tracked even for edited text.
-export function chronicleText(c){const manual=c.manual;return [manual?.text,...c.entries.filter(e=>!manual||e.sequence>manual.throughSequence).map(e=>e.text)].filter(Boolean).join('\n\n');}
+export function chronicleText(c){const manual=c.manual;return [manual?.text,...c.entries.filter(e=>!manual||e.sequence>manual.throughSequence).map(e=>e.text)].filter(Boolean).join(' ');}
 export function buildChatChronicle(d,at){
  const c=d.chronicle,previous=new Map(c.entries.map(e=>[e.sourceId,e])),all=orderedMessages(d),contexts=new Map(),pending=[];
  for(let i=0;i<all.length;i++){const m=all[i];if(m.author.kind==='gm'){const p=promptRoll(m.text);if(p)pending.push({m,p,i});else {const prior=all[i-1],ctx=prior&&contexts.get(prior.id);if(ctx?.roll)contexts.set(m.id,{outcomeName:prior.author.name,key:`${prior.id}:${prior.revision}:${ctx.key}`});}continue;}
