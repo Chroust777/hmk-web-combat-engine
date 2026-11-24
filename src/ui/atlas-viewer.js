@@ -1,4 +1,4 @@
-import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.089';
+import {atlasCartographyPanel,mountAtlasCartography,atlasProjectPoint,atlasSectorAt} from './atlas-cartography.js?v=94.091';
 /**
  * Hârn Atlas v94.083 — custom markers persist in the existing private GitHub campaign snapshot.
  * Overview: I4–L7 and 16 selectable sectors.
@@ -435,7 +435,9 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
  workspace.addEventListener('hmk-gm-mode-change',event=>{
   if(event.detail.active)return;
   if(markerPlacement){markerPlacement=false;refreshMarkerAdd();}
+  if(markerDrag){const item=mapMarkers.find(p=>p.id===markerDrag.id);if(item?.type==='party'){item.x=markerDrag.x;item.y=markerDrag.y;if(markerDrag.node.hasPointerCapture(markerDrag.pointerId))markerDrag.node.releasePointerCapture(markerDrag.pointerId);markerDrag=null;paintCustomMarkers();}}
  });
+ const canMoveParty=()=>document.documentElement.dataset.hmkGm==='true';
  const paintCustomMarkers=(partyPreview=undefined)=>{
   const present=new Set(mapMarkers.map(item=>item.id));
   for(const [id,node] of markerNodes){if(!present.has(id)){node.remove();markerNodes.delete(id);for(const btn of markerButtons.get(id)||[])btn.remove();markerButtons.delete(id);}}
@@ -591,7 +593,7 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
    if(atlasCarto?.stop()===false)return;measurement.active=false;measurement.points=[];paintMeasurement();
    markerPlacement=false;closeMarkerEditor();refreshMarkerAdd();
    selectMarker(party.id,true);
-   status.textContent=overview?`Pozice družiny – sektor ${atlasSectorAt(party)}. Detailní mapa tohoto sektoru zatím není připojena.`:'Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě a změny uložte klávesou Esc.';
+   status.textContent=overview?`Pozice družiny – sektor ${atlasSectorAt(party)}. Detailní mapa tohoto sektoru zatím není připojena.`:(canMoveParty()?'Pozice družiny je zobrazena. Chcete-li ji přesunout, přetáhněte značku na mapě a změny uložte klávesou Esc.':'Pozice družiny je zobrazena. Kliknutím na bod můžete upravit jeho poznámku.');
   }
  });
  const placePartyPosition=position=>{
@@ -658,7 +660,7 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
  customMarkerOverlay.addEventListener('pointerdown',e=>{
   const node=e.target.closest('[data-atlas-marker]');
   if(pinch||activeTouches.size>1||!node||e.button!==0||measurement.active||markerPlacement||atlasCarto?.active)return;
-  const item=mapMarkers.find(entry=>entry.id===node.dataset.atlasMarker);if(!item)return;
+  const item=mapMarkers.find(entry=>entry.id===node.dataset.atlasMarker);if(!item||item.type==='party'&&!canMoveParty())return;
   e.stopPropagation();e.preventDefault();
   markerDrag={id:item.id,pointerId:e.pointerId,node,startX:e.clientX,startY:e.clientY,
    x:item.x,y:item.y,moved:false};
@@ -684,6 +686,7 @@ export function mountAtlasView(root,persistence=null,partyTarget=null){
    const item=mapMarkers.find(entry=>entry.id===gesture.id);
    if(item){
     if(cancel){item.x=gesture.x;item.y=gesture.y;}
+    else if(item.type==='party'&&!canMoveParty()){item.x=gesture.x;item.y=gesture.y;}
     else{
      suppressMarkerClick={id:gesture.id,at:Date.now()};
      if(item.type==='party'){

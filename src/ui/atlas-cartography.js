@@ -131,8 +131,19 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const local=snapshot.maps[map.id],undo=[],redo=[];
  const loadSnapshot=source=>{const copy=structuredClone(source);Object.assign(local,copy.maps[map.id]);snapshot=copy;snapshot.maps[map.id]=local;};
  let mode='',draft=[],painting=false,currentBrush=null,highlightId=null,editingFeatureId=null,editVertex=null,editOriginal=null,editStartClient=null,routeExtendEndpoint=null;
- let partyDraft=[],partyBefore=[],partyUndo=[],partyRedo=[],partySelected=-1,partyGesture=null,partyExtend=false,partyAppendDrag=false,partyNoteId=null;
+ let partyDraft=[],partyBefore=[],partyUndo=[],partyRedo=[],partySelected=-1,partyGesture=null,partyExtend=false,partyAppendDrag=false,partyNoteId=null,partyNotesOnly=false;
  const partyMode=()=>mode==='party-edit';
+ const isGM=()=>document.documentElement.dataset.hmkGm==='true';
+ const canMoveParty=()=>isGM()&&!partyNotesOnly;
+ const geometry=points=>JSON.stringify(points.map(({note,...p})=>p));
+ const partyPositions=maps=>JSON.stringify(MAP_IDS.map(id=>maps?.[id]?.filter(p=>p.type==='party').map(({id,x,y})=>({id,x,y}))||[]));
+ const snapshotAllowed=(entry,redoAction=false)=>{
+  if(!entry)return false;if(isGM())return true;
+  const next=entry.kind==='bundle'?(redoAction?entry.after:entry.before):entry.kind==='carto'?entry.snapshot:null;
+  if(next&&MAP_IDS.some(id=>geometry(next.maps[id].partyHistory)!==geometry(snapshot.maps[id].partyHistory)))return false;
+  if(entry.kind==='bundle'||entry.kind==='markers'){const pins=entry.kind==='bundle'?(redoAction?entry.afterMarkers:entry.beforeMarkers):(redoAction?entry.after:entry.before);if(partyPositions(pins)!==partyPositions(readMarkers?.()))return false;}
+  return true;
+ };
  const partyMarker=()=>markers?.().find(p=>p.type==='party');
  const partyPoint=p=>({x:Math.max(0,Math.min(map.width-.01,p.x)),y:Math.max(0,Math.min(map.height-.01,p.y))});
  const newPartyPoint=p=>({id:makeId(),...partyPoint(p),date:'',note:''});
@@ -161,9 +172,20 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  });
  // Only the interface role changes; the saved fog mask remains intact.
  workspace.addEventListener('hmk-gm-mode-change',event=>{
-  if(event.detail.active)return;
-  fogSection.open=false;fogAdvanced.open=false;resetFogTransparency();
-  if(mode.startsWith('fog-'))clearMode();
+  if(!event.detail.active){
+   fogSection.open=false;fogAdvanced.open=false;resetFogTransparency();
+   if(mode.startsWith('fog-'))clearMode();
+   if(partyMode()&&!partyNotesOnly){
+    const notes=new Map(partyDraft.map(p=>[p.id,p.note]));
+    const next=local.partyHistory.map(p=>({...p,note:notes.get(p.id)??p.note}));
+    const changed=geometry(partyDraft)!==geometry(local.partyHistory);
+    partyDraft=structuredClone(next);partyBefore=structuredClone(local.partyHistory);partyUndo=[];partyRedo=[];partyGesture=null;painting=false;partyExtend=false;partyAppendDrag=false;partyNotesOnly=true;
+    partySelected=partyDraft.findIndex(p=>p.id===partyNoteId);if(partySelected<0)partyNoteId=null;
+    if(!partyDraft.length)clearMode();
+    if(changed)showStatus('Neuložené změny polohy družiny byly při odhlášení zrušeny. Poznámky existujících bodů lze uložit klávesou Esc.');
+   }
+  }
+  hideHover();redraw();
  });
  const getFogRadius=()=>Math.max(.01,Math.min(500,Number(fogRadius.value)||defaultFogRadius));
  let draftRadiusKm=0;
@@ -198,7 +220,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const edit=hoverDelete.querySelector('[data-carto-hover-edit]');if(edit)edit.hidden=!chosen||!(kind==='history'||kind==='feature'||kind==='vertex'&&f?.type==='route');
   const del=hoverDelete.querySelector('[data-carto-hover-remove]');if(del){
    const isWholeRoute=kind==='feature'&&f?.type==='route';
-   del.hidden=!chosen||isWholeRoute;
+   del.hidden=!chosen||isWholeRoute||kind==='history'&&!isGM();
    del.title=kind==='history'?'Odstranit bod a všechny následující body historie družiny':kind==='vertex'?'Zkrátit trasu k tomuto bodu':'Odstranit mapový objekt';
   }
   hoverDelete.hidden=!chosen&&!tip?.textContent;
@@ -234,6 +256,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   Object.assign(pin,partyPoint(pts.at(-1)));return commitBundle(nextMarkers,next,label);
  };
  const applySnapshot=(target,to,redoAction=false)=>{
+  if(!snapshotAllowed(target.at(-1),redoAction))return;
   const entry=target.pop();if(!entry)return;
   if(entry.kind==='bundle'){
    const next=redoAction?entry.after:entry.before, pins=redoAction?entry.afterMarkers:entry.beforeMarkers;
@@ -333,9 +356,9 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    add('path',{d:path(pts),stroke:'#33694e','stroke-width':'2.5','stroke-dasharray':partyMode()?'3 3':'5 5',fill:'none'});
    pts.forEach((p,i)=>{const s=screenPoint(p),chosen=partyMode()?partySelected===i:selectedHit?.kind==='history'&&selectedHit.index===i;
     add('circle',{cx:s.x,cy:s.y,r:chosen?7.2:4.5,fill:chosen?'#e5c766':partyMode()?'#fff4db':'#33694e',stroke:'#fff4db','stroke-width':chosen?2.4:1.5});
-    add('circle',{cx:s.x,cy:s.y,r:12,fill:'transparent',stroke:'none','pointer-events':'all','class':'atlas-carto-hit','data-carto-hit':'history','data-carto-index':i,cursor:partyMode()?'grab':'pointer'});
+    add('circle',{cx:s.x,cy:s.y,r:12,fill:'transparent',stroke:'none','pointer-events':'all','class':'atlas-carto-hit','data-carto-hit':'history','data-carto-index':i,cursor:partyMode()&&canMoveParty()?'grab':'pointer'});
    });
-   if(partyMode()&&pts.length>1)pts.forEach((p,i)=>{
+   if(partyMode()&&canMoveParty()&&pts.length>1)pts.forEach((p,i)=>{
     const sp=screenPoint(p),x=sp.x+16,y=sp.y-16;
     const control=add('g',{'data-party-cross':i,role:'button',tabindex:0,'aria-label':i===0?'Zkrátit historii na výchozí bod':`Odstranit bod ${i+1} a všechny následující`,cursor:'pointer','pointer-events':'all'});
     const addChild=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(text)el.textContent=text;control.append(el);};
@@ -423,7 +446,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  const centerAt=p=>zoomTo(p,1.07);
  const objectPoint=f=>f.points[Math.floor(f.points.length/2)];
  const redrawList=()=>{
-  undoBtn.disabled=partyMode()?partyUndo.length===0:undo.length===0;redoBtn.disabled=partyMode()?partyRedo.length===0:redo.length===0;
+  undoBtn.disabled=partyMode()?partyUndo.length===0:!snapshotAllowed(undo.at(-1));redoBtn.disabled=partyMode()?partyRedo.length===0:!snapshotAllowed(redo.at(-1),true);
   const hasParty=!!partyMarker(),activeParty=partyMode(),pts=activeParty?partyDraft:local.partyHistory;
   const partyList=$('[data-carto-party-list]');partyList.replaceChildren();
   pts.forEach((p,i)=>{
@@ -447,7 +470,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    }else if(p.note.trim()){const text=document.createElement('small');text.textContent=p.note;row.append(text);}
    partyList.append(row);
   });
-  $('[data-carto-party-hint]').textContent=activeParty?`Přetahujte starší body, křížkem zkrátíte trasu včetně všech následujících bodů.${partyAppendDrag?' Přetažením družiny přidáte další bod.':' Tužka umožňuje přesun existujících bodů.'}${partyExtend?' Kliknutím do mapy přidáte další bod.':''} Kliknutím na tečku otevřete její poznámku vpravo. Esc uloží změny.`:hasParty?'Zobrazují se pouze body s poznámkou. Body upravíte tužkou na mapě; přetažením ikonky družiny přidáte nový bod.':'Nejdříve vytvořte značku Pozice družiny.';
+  $('[data-carto-party-hint]').textContent=!canMoveParty()?(activeParty?'Upravte poznámku bodu vpravo. Esc uloží změny. Poloha družiny a trasa jsou beze změny.':'Kliknutím na bod a tužku otevřete jeho poznámku.'):activeParty?`Přetahujte starší body, křížkem zkrátíte trasu včetně všech následujících bodů.${partyAppendDrag?' Přetažením družiny přidáte další bod.':' Tužka umožňuje přesun existujících bodů.'}${partyExtend?' Kliknutím do mapy přidáte další bod.':''} Kliknutím na tečku otevřete její poznámku vpravo. Esc uloží změny.`:hasParty?'Zobrazují se pouze body s poznámkou. Body upravíte tužkou na mapě; přetažením ikonky družiny přidáte nový bod.':'Nejdříve vytvořte značku Pozice družiny.';
   const editing=editingFeatureId?local.features.find(f=>f.id===editingFeatureId):null;
   const kind=editing?.type||mode;
   const fields=$('[data-carto-fields]');fields.hidden=!FEATURE_TYPES.includes(kind);
@@ -465,9 +488,9 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    label.append(input,document.createTextNode(' '+({route:'Trasy',area:'Oblasti',radius:'Kružnice dosahu',draw:'Volné kreslení',arrow:'Šipky',text:'Texty',markers:'Vlastní značky',partyHistory:'Historie družiny',fog:'Mlha války'}[key])));layerArea.appendChild(label);
   }}
  };
- const previewParty=()=>onPartyPreview?.(partyMode()?partyDraft.at(-1):null);
+ const previewParty=()=>onPartyPreview?.(partyMode()&&canMoveParty()?partyDraft.at(-1):null);
  const redraw=()=>{paintSvg();previewParty();paintFog();redrawList();onLayersChange?.();};
- const clearMode=()=>{partyDraft=[];partyBefore=[];partyUndo=[];partyRedo=[];partySelected=-1;partyGesture=null;partyExtend=false;partyAppendDrag=false;partyNoteId=null;mode='';routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;editingFeatureId=null;highlightId=null;editVertex=null;editOriginal=null;editStartClient=null;modeField.value='';viewport.classList.remove('is-cartographing');hideHover();refreshBrushCursor(null,null);redraw();};
+ const clearMode=()=>{partyDraft=[];partyBefore=[];partyUndo=[];partyRedo=[];partySelected=-1;partyGesture=null;partyExtend=false;partyAppendDrag=false;partyNoteId=null;partyNotesOnly=false;mode='';routeExtendEndpoint=null;draft=[];draftRadiusKm=0;painting=false;currentBrush=null;editingFeatureId=null;highlightId=null;editVertex=null;editOriginal=null;editStartClient=null;modeField.value='';viewport.classList.remove('is-cartographing');hideHover();refreshBrushCursor(null,null);redraw();};
  const enableLinkedTarget=stroke=>{
   if(map.id==='overview'&&!intersectsK5(stroke))return;
   const other=snapshot.maps[map.id==='overview'?'K5':'overview'].fog;
@@ -496,8 +519,14 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const point=local.partyHistory.find(p=>p.id===id);if(!point?.note)return;
   hideHover();commit(()=>{point.note='';},'Poznámka družiny');
  };
- const removePartyPoint=i=>{if(partyDraft.length<=1){showStatus('Výchozí bod družiny musí zůstat zachován.');return;}if(!Number.isInteger(i)||i<0||i>=partyDraft.length)return;partyExtend=true;partyAppendDrag=true;partyChange(partyDraft.slice(0,Math.max(1,i)));};
- const finishParty=()=>{if(!partyMode())return true;if((JSON.stringify(partyDraft)!==JSON.stringify(partyBefore)||partyDraft.at(-1)?.x!==partyMarker()?.x||partyDraft.at(-1)?.y!==partyMarker()?.y)&&!savePartyPoints(partyDraft,'Historie družiny')){showStatus('Atlas: zápis historie se nezdařil. Úpravy zůstávají rozpracované; Esc zkusí uložení znovu.');return false;}clearMode();return true;};
+ const removePartyPoint=i=>{if(!canMoveParty())return;if(partyDraft.length<=1){showStatus('Výchozí bod družiny musí zůstat zachován.');return;}if(!Number.isInteger(i)||i<0||i>=partyDraft.length)return;partyExtend=true;partyAppendDrag=true;partyChange(partyDraft.slice(0,Math.max(1,i)));};
+ const finishParty=()=>{if(!partyMode())return true;
+  if(partyNotesOnly||!isGM()){
+   const notes=new Map(partyDraft.map(p=>[p.id,p.note]));const next=local.partyHistory.map(p=>({...p,note:notes.get(p.id)??p.note}));
+   if(JSON.stringify(next)!==JSON.stringify(local.partyHistory)&&!commit(()=>{local.partyHistory=next;},'Poznámka družiny')){showStatus('Atlas: zápis poznámky se nezdařil. Esc zkusí uložení znovu.');return false;}
+   clearMode();return true;
+  }
+  if((JSON.stringify(partyDraft)!==JSON.stringify(partyBefore)||partyDraft.at(-1)?.x!==partyMarker()?.x||partyDraft.at(-1)?.y!==partyMarker()?.y)&&!savePartyPoints(partyDraft,'Historie družiny')){showStatus('Atlas: zápis historie se nezdařil. Úpravy zůstávají rozpracované; Esc zkusí uložení znovu.');return false;}clearMode();return true;};
  const openPartyNote=i=>{
   if(!partyMode()&&!startParty(false,null,i))return;
   const p=partyDraft[i];if(!p)return;
@@ -506,14 +535,16 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   field?.focus({preventScroll:true});field?.scrollIntoView({block:'nearest',inline:'nearest'});
  };
  const appendParty=pt=>{
+  if(!canMoveParty())return;
   if(partyDraft.length>=1000){showStatus('Atlas: dosažen limit 1000 bodů historie družiny.');return;}
   const p=partyPoint(pt),last=partyDraft.at(-1);if(last&&last.x===p.x&&last.y===p.y)return;
   partyChange([...partyDraft,newPartyPoint(p)]);
  };
  const startParty=(extend=true,point=null,index=-1)=>{
-  const pin=partyMarker();if(!pin)return false;
+  const pin=partyMarker();if(!pin||point&&!isGM())return false;
+  if(!isGM()){extend=false;point=null;if(!local.partyHistory.length)return false;}
   if(partyMode()){partyExtend=extend;partyAppendDrag=!!point;if(point)appendParty(point);else redraw();return true;}
-  clearMode();onModeStart?.();mode='party-edit';partyExtend=extend;partyAppendDrag=!!point;
+  clearMode();onModeStart?.();mode='party-edit';partyNotesOnly=!isGM();partyExtend=extend;partyAppendDrag=!!point;
   partyDraft=structuredClone(local.partyHistory);
   // Existing history is authoritative while editing. Never append a hidden
   // legacy marker position: deleting the endpoint must expose the preceding point.
@@ -521,7 +552,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   partyBefore=structuredClone(partyDraft);partySelected=index;
   $('[data-carto-party-section]').open=true;viewport.classList.add('is-cartographing');
   if(point)appendParty(point);else redraw();
-  showStatus('Historie družiny: body lze přetahovat, křížkem odstranit; Esc uloží změny.');return true;
+  showStatus(canMoveParty()?'Historie družiny: body lze přetahovat, křížkem odstranit; Esc uloží změny.':'Historie družiny: upravte poznámku; Esc uloží změny.');return true;
  };
  modeField.addEventListener('change',()=>setMode(modeField.value));
  const featureFromDraft=()=>({id:makeId(),type:mode,title:safeText(title.value,120),note:safeText(note.value,1500),date:'',color:color.value,opacity:Number(opacity.value),points:structuredClone(draft),...(mode==='radius'?{radiusKm:draftRadiusKm}:{})});
@@ -535,7 +566,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  };
  const addPoint=pt=>{
   if(!mode||!pt)return false;
-  if(partyMode()){if(partyExtend)appendParty(pt);return true;}
+  if(partyMode()){if(canMoveParty()&&partyExtend)appendParty(pt);return true;}
   if(mode==='edit-points'){
    const f=local.features.find(x=>x.id===editingFeatureId);if(!f||f.points.length>=MAX_POINTS)return true;
    const pts=structuredClone(f.points);
@@ -615,6 +646,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
   const pt=inMap(e.clientX,e.clientY);if(!pt)return true;
   if(partyMode()&&partyGesture){
    const g=partyGesture;if(!g.moved&&Math.hypot(e.clientX-g.x,e.clientY-g.y)<4)return true;
+   if(!canMoveParty()){g.blocked=true;return true;}
    if(g.append&&g.before.length>=1000){g.blocked=true;showStatus('Atlas: dosažen limit 1000 bodů historie družiny.');return true;}
    g.moved=true;partyDraft=structuredClone(g.before);
    if(g.append){
@@ -687,6 +719,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
  redoBtn.addEventListener('click',()=>partyMode()?partyStep(partyRedo,partyUndo):applySnapshot(redo,undo,true));
  layerArea?.addEventListener('change',e=>{const key=e.target.dataset.cartoLayer;if(LAYERS.includes(key)){commit(()=>{local.layers[key]=e.target.checked;},'Viditelnost vrstvy');paintSvg();paintFog();onLayersChange?.();}});
  const savePartyMarkerChange=(before,after)=>{
+  if(!isGM())return false;
   const old=before[map.id]?.find(p=>p.type==='party'),pin=after[map.id]?.find(p=>p.type==='party');
   const next=structuredClone(snapshot),pts=next.maps[map.id].partyHistory;
   if(!pin)next.maps[map.id].partyHistory=[];
@@ -758,6 +791,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    hideHover();
    if(f)commit(()=>{local.features.splice(local.features.indexOf(f),1);if(highlightId===f.id)highlightId=null;if(editingFeatureId===f.id){editingFeatureId=null;clearMode();}},'Odstranění objektu');
   }else if(h.kind==='history'){
+   if(!isGM())return;
    const pts=local.partyHistory;
    if(!Number.isInteger(h.index)||h.index<0||h.index>=pts.length||!partyMarker())return;
    if(pts.length<=1){showStatus('Výchozí bod družiny musí zůstat zachován.');return;}
@@ -838,7 +872,7 @@ export function mountAtlasCartography({workspace,viewport,map,read,write,screenP
    else{selectedHit={kind:'history',id:undefined,index};hovered=null;showHover('history',undefined,index,r.left+sp.x,r.top+sp.y);}
    paintSvg();return true;
   },
-  partyPreview(){return partyMode()?partyDraft.at(-1):null;},
+  partyPreview(){return partyMode()&&canMoveParty()?partyDraft.at(-1):null;},
   partyLastNote(){return (partyMode()?partyDraft:local.partyHistory).at(-1)?.note||'';},
   savePartyMarkerChange,
   refreshParty(){redrawList();},
