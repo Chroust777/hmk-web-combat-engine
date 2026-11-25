@@ -120,7 +120,7 @@ import {creationPsycheCount,psycheIntensity,CREATION_PSYCHE_TRAITS} from './src/
 import {fieldRuleNote} from './src/integration/hmk-creation-rule-help.js';
 import {auditArmourLibraryConsistency} from './src/integration/armour-library-consistency.js';
 import {assertLegacyMutationDoesNotChangeCombat} from './src/integration/active-combat-write-boundary.js';
-import {resolveParallelColdReroll,resolveParallelColdCourse,assertParallelColdShocksAppendOnly} from './src/integration/hmk-parallel-cold-shock.js';
+import {resolveParallelColdReroll,resolveParallelColdCourse} from './src/integration/hmk-parallel-cold-shock.js';
 import {assertAlternateManeuverWriteAllowed} from './src/integration/hmk-alternate-maneuver-write-gate.js';
 import {persistVerifiedCombatSnapshot} from './src/integration/verified-combat-storage.js';
 import {prepareNeutralAlchemySpellstart,persistNeutralAlchemySpellstart} from './src/integration/hmk-alchemy-neutral-spellstart.js';
@@ -255,7 +255,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=93.957';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.116';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js?v=93.957';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -325,14 +325,14 @@ import {provenCarriedRations,assertExclusiveForagingProven} from './src/integrat
 import {characterProvisionsOverview,partyProvisionsOverview} from './src/integration/hmk-character-provisions-overview.js';
 import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,logbookRestoreEntry,validateLogbookVisibility} from './src/integration/hmk-logbook-visibility.js?v=94.019';
 import {isRoutineInventoryHistory} from './src/integration/hmk-routine-history-filter-549.js';
-import {createFreshRationStocks,recordPhysicalRationHandoff,recordPhysicalRationLoss,availableRationLots,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js';
+import {createFreshRationStocks,recordPhysicalRationHandoff,recordPhysicalRationLoss,availableRationLots,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js?v=94.116';
 import {characterCarryProjection,partyCarryProjection,supplyDurationText} from './src/integration/hmk-provisions-simple-view.js';
 import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
 import {malnutritionPrognosis,malnutritionStateLabel} from './src/integration/hmk-malnutrition-prognosis.js';
 import {nutritionAnimals,createAnimalAccess,animalLoadedItemAt,validateNutritionAnimalAccess,assertNutritionAnimalAppendOnly} from './src/integration/hmk-nutrition-animal-access.js';
 import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAppendOnly} from './src/integration/hmk-nutrition-assisted-intake.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
-import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
+import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation,assertCampaignColdShockHistory} from './src/integration/hmk-calendar-multi-campaign.js?v=94.116';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.110';
 import {operationalProjectJournal,projectKind,projectEnded,validateProjectCancellations,assertProjectCancellationsAppendOnly} from './src/integration/hmk-project-cancellation-94017.js';
@@ -379,7 +379,7 @@ import {applyConfirmedWeaponWQ,applyConfirmedAreaStrike,applyConfirmedMountedCon
 import {qualityImpactPenalty} from './src/rules/weapon-damage.js';
 import {riderImpactAtRound} from './src/rules/mounted.js';
 import {medicalOriginOfWound,medicalWounds,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock,projectLegacyAlchemyShock,verifiedAlchemyComa} from './src/integration/hmk-medical-origin.js?v=93.988';
-import {prepareGMHealthOverride,gmWoundConsequenceAssessment,validateGMHealthOverrideEvidence} from './src/integration/hmk-gm-health-override.js';
+import {prepareGMHealthOverride,gmWoundConsequenceAssessment,validateGMHealthOverrideEvidence} from './src/integration/hmk-gm-health-override.js?v=94.116';
 import {extendedShockAidEpisode,extendedShockAids,bestExtendedShockAid,validateExtendedShockAidJournal} from './src/integration/hmk-extended-shock-aid-93965.js?v=93.965';
 import {weatherPhysicianCandidates} from './src/integration/hmk-weather-healer.js';
 import {activeFearSources} from './src/integration/hmk-concurrent-fear.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.115';
+const APP_VERSION='94.116';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -719,7 +719,10 @@ function validate(d){
  validateAtlasMarkers(d?.atlasMarkers);
  validateAtlasCartography(d?.atlasCartography,{overview:{width:2449,height:2363},K5:{width:4172,height:4031}});
  assertFiniteState93897(d);
- validateGMHealthOverrideEvidence(d?.characters||[],d?.journal||[],d?.trash||[]);
+ validateGMHealthOverrideEvidence(d?.characters||[],d?.journal||[],d?.trash||[],{
+  activeCampaignId:d?.campaignClock?campaignKey(d.campaignClock):null,
+  campaignActorBranches:d?.campaignActorBranches||{},
+ });
  validateGlobalActionLedger(d);
  validateExtendedShockAidJournal(d?.journal||[]);
  validateAlchemyExaminations(d?.journal||[]);
@@ -919,7 +922,7 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
   // authorized disaster-recovery operation for an attempted event overwrite.
   if(storageBaseline!==null&&!restoreBackup&&!characterDeletionId)linkNewMoralePsycheAccrual(committedBefore,data);
   if(!restoreBackup&&!characterDeletionId)assertGlobalActionLedgerAppendOnly(committedBefore,data);
-  if(!restoreBackup)for(const former of committedBefore.characters??[]){const current=(data.characters??[]).find(x=>x.id===former.id);if(current)assertParallelColdShocksAppendOnly(former.hmk?.healthState??initialCombatState(),current.hmk?.healthState??initialCombatState());}
+  if(!restoreBackup)assertCampaignColdShockHistory(committedBefore,data);
   if(!restoreBackup&&!characterDeletionId&&JSON.stringify(committedBefore)!==JSON.stringify(data)){
    recordGlobalActionReceipt(data,{before:committedBefore,id:uuid(),createdAt:stamp(),
     mode:episodeCommit?'episode-commit':'normal'});

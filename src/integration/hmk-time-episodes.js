@@ -934,8 +934,15 @@ export function validateTimeEpisodes(journal=[]){
      lightMinutes:e.encounter.lightMinutes??null});
     must(original.count===e.encounter.originalEncounterCount&&original.found,
      'Pozastavené setkání neodpovídá původnímu doloženému d100.');
-   }else must(JSON.stringify(expected)===JSON.stringify(e.encounter),
-    'Minutové riziko setkání musí odpovídat doloženému d100, prostředí a délce epizody.');
+   }else {
+    const {chance:storedChance,...stored}=e.encounter;
+    const {chance:expectedChance,...recomputed}=expected;
+    // Math.pow can round a few units differently in different JS engines.
+    // Keep every input and decision exact and tolerate only that rounding.
+    must(Number.isFinite(storedChance)&&Math.abs(storedChance-expectedChance)<=8*Number.EPSILON&&
+     JSON.stringify(recomputed)===JSON.stringify(stored),
+     'Minutové riziko setkání musí odpovídat doloženému d100, prostředí a délce epizody.');
+   }
   }
   if(e.trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904){
    must(e.kind==='travel'&&e.orientation?.modes?.bearing===e.bearing&&

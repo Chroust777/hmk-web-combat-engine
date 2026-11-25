@@ -212,8 +212,11 @@ export function prepareGMHealthOverride({state,action,eventId,reason,gmConfirmed
 /** Recheck journal -> original health event -> same wound on every save/load.
  * The receipt cannot be repurposed as a fabricated Physician or Healing roll.
  */
-export function validateGMHealthOverrideEvidence(characters=[],journal=[],archived=[]){
+export function validateGMHealthOverrideEvidence(characters=[],journal=[],archived=[],
+ {activeCampaignId=null,campaignActorBranches={}}={}){
  const actors=new Map([...characters,...archived].map(a=>[a.id,a])),seen=new Set();
+ const snapshots=Object.entries(campaignActorBranches)
+  .filter(([campaignId])=>campaignId!==activeCampaignId).map(([,branch])=>branch);
  for(const j of journal){
   const p=j.calendarGMHealthOverride;if(!p)continue;
   assert(p.format==='hmk-gm-health-override-v1'&&['add','resolve'].includes(p.action)&&
@@ -221,7 +224,14 @@ export function validateGMHealthOverrideEvidence(characters=[],journal=[],archiv
    typeof p.reason==='string'&&p.reason.trim().length>=10&&p.actualRoll===null,
    'GM zdravotní zásah: neplatný auditní záznam');
   assert(!seen.has(p.sourceEventId),'GM zdravotní zásah: duplicitní zdroj');seen.add(p.sourceEventId);
-  const actor=actors.get(j.characterId),s=actor?.hmk?.healthState;
+  const actor=actors.get(j.characterId);
+  const branch=j.calendarCampaignId&&j.calendarCampaignId!==activeCampaignId?
+   campaignActorBranches[j.calendarCampaignId]?.[j.characterId]:null;
+  const live=actor?.hmk?.healthState;
+  const legacyState=!j.calendarCampaignId&&!live?.events?.some(e=>e.id===p.sourceEventId)?
+   snapshots.map(snapshot=>snapshot[j.characterId]?.hmk?.healthState)
+    .find(state=>state?.events?.some(e=>e.id===p.sourceEventId)):null;
+  const s=branch?branch.hmk?.healthState:legacyState??live;
   assert(s&&Array.isArray(s.events)&&Array.isArray(s.wounds),'GM zdravotní zásah: chybí původní postava či zdravotní stav');
   const ev=s.events.find(e=>e.id===p.sourceEventId),w=s.wounds.find(w=>w.id===p.woundId);
   assert(ev?.type===(p.action==='add'?'gm-health-wound-create':'gm-health-wound-resolve')&&
@@ -235,7 +245,8 @@ export function validateGMHealthOverrideEvidence(characters=[],journal=[],archiv
    JSON.stringify(p.globalConsequences)===JSON.stringify(ev.details?.globalConsequences),
    'GM zdravotní zásah: změna atribuce Shock / Coma / Blood Loss postrádá auditní doklad');
  }
- for(const actor of actors.values())for(const event of actor.hmk?.healthState?.events??[])
+ const states=[...actors.values(),...snapshots.flatMap(branch=>Object.values(branch))];
+ for(const actor of states)for(const event of actor.hmk?.healthState?.events??[])
   if(['gm-health-wound-create','gm-health-wound-resolve'].includes(event.type))
    assert(seen.has(event.id),'GM zdravotní zásah: z původního zdravotního stavu zmizel odpovídající doklad v deníku');
  return true;

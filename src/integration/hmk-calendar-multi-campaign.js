@@ -7,6 +7,7 @@
  */
 import {validateCampaignCalendar,assertCampaignCalendarAppendOnly} from './hmk-campaign-calendar.js';
 import {initialCombatState} from './persistent-combat-state.js';
+import {assertParallelColdShocksAppendOnly} from './hmk-parallel-cold-shock.js';
 import {coinBalance,ensureCampaignCashAccount} from './hmk-library-economy.js';
 const fail=(msg)=>{throw Error(msg)};
 const clone=v=>structuredClone(v);
@@ -130,6 +131,27 @@ export function assertCampaignPortfolioAppendOnly(before,after){
   if(current){assertCampaignCalendarAppendOnly({campaignClock:clock},{campaignClock:current});continue;}
   assertCampaignCalendarAppendOnly({campaignClock:clock,calendarEvidenceArchives:before.calendarEvidenceArchives},
    {calendarEvidenceArchives:after.calendarEvidenceArchives});
+ }
+ return true;
+}
+/** Switching restores the target health branch and archives the outgoing one.
+ * Check both against their own prior histories, including ordinary same-campaign saves. */
+export function assertCampaignColdShockHistory(before,after){
+ const from=campaignKey(before.campaignClock),to=campaignKey(after.campaignClock);
+ const switching=!!before.campaignClock&&!!after.campaignClock&&from!==to;
+ const priorTarget=switching?before.campaignActorBranches?.[to]:null;
+ const archivedSource=switching?after.campaignActorBranches?.[from]:null;
+ const targetMembers=new Set(after.campaignClock?.characterIds??(after.characters||[]).map(c=>c.id));
+ const sourceMembers=new Set(before.campaignClock?.characterIds??(before.characters||[]).map(c=>c.id));
+ const current=new Map((after.characters||[]).map(c=>[c.id,c]));
+ const health=actor=>actor?.hmk?.healthState??initialCombatState();
+ for(const previous of before.characters||[]){
+  const actor=current.get(previous.id);
+  if(!actor)continue;
+  const previousTarget=targetMembers.has(actor.id)?priorTarget?.[actor.id]:null;
+  if(switching&&sourceMembers.has(actor.id))
+   assertParallelColdShocksAppendOnly(health(previous),health(archivedSource?.[actor.id]));
+  assertParallelColdShocksAppendOnly(health(previousTarget??previous),health(actor));
  }
  return true;
 }

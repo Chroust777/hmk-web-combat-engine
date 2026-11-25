@@ -265,11 +265,19 @@ function isApprovedStableRelocation575(before,after,id,a,b){
 }
 
 export function assertPhysicalRationBacking(before,after){
- const active=after.campaignClock?.campaignId||
-  (after.campaignClock?`legacy:${after.campaignClock.events?.[0]?.id||''}`:null);
+ const campaignId=clock=>clock?(clock.campaignId||('legacy:'+(clock.events?.[0]?.id||''))):null;
+ const active=campaignId(after.campaignClock);
  const ids=new Set((after.journal||[]).filter(x=>x.calendarInventoryRationStock&&(active===null||x.calendarCampaignId===active))
   .map(x=>x.calendarInventoryRationStock.itemId));
- const prev=new Map((before.inventory||[]).map(x=>[x.id,x]));
+ const previousCampaign=campaignId(before.campaignClock);
+ const archived=active!==previousCampaign?before.campaignActorBranches?.[active]:null;
+ const members=after.campaignClock?.characterIds??(after.characters||[]).map(c=>c.id);
+ const restoredOwners=new Set(members.filter(id=>Array.isArray(archived?.[id]?.inventory)));
+ // On a switch, the target branch owns its inventory baseline. Keep the
+ // active baseline for uninvolved actors and members without a stored branch.
+ const priorInventory=(before.inventory||[]).filter(item=>!restoredOwners.has(item.characterId));
+ for(const id of restoredOwners)priorInventory.push(...archived[id].inventory);
+ const prev=new Map(priorInventory.map(x=>[x.id,x]));
  const next=new Map((after.inventory||[]).map(x=>[x.id,x]));
  for(const id of ids){
   const a=prev.get(id),b=next.get(id);
