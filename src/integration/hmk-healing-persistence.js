@@ -12,7 +12,7 @@ import {hmkHumanLocationSymbols,hmkAmputationAssessment,hmkInjuryMishaps} from '
 import {calculateShockState,applyShockState,SHOCK_STATE} from '../rules/shock.js';
 import {treatmentDurationMinutes} from '../rules/healing.js';
 import {curativeHealingEvidence} from './hmk-herbal-healing-bridge.js?v=94.031';
-import {medicalOriginOfWound,isNoncombatMedicalOrigin,MEDICAL_ORIGIN} from './hmk-medical-origin.js';
+import {medicalOriginOfWound,isNoncombatMedicalOrigin,MEDICAL_ORIGIN} from './hmk-medical-origin.js?v=94.113';
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const requireRule=(ok,message)=>{if(!ok)throw Error(message);};
 const copy=x=>structuredClone(x);
@@ -219,6 +219,27 @@ export function infectionResumptionRequirements(state,sourceWoundId){
   !x.healing.noMundaneHealing).map(x=>({woundId:x.id,location:x.location,
    label:`${x.location} ${x.severity}${x.level}`}));
 }
+function resumeOtherInjuryHealing(s,woundId,otherWoundDays){
+ const required=infectionResumptionRequirements(s,woundId);
+ const resumed=[];
+ requireRule(otherWoundDays&&typeof otherWoundDays==='object'&&!Array.isArray(otherWoundDays),
+  'Po infekci je nutný doložený počet dní ostatních ran');
+ for(const item of required){
+  requireRule(Object.prototype.hasOwnProperty.call(otherWoundDays,item.woundId)&&int(otherWoundDays[item.woundId],0,100000),
+   'Chybí potvrzený počet dní od vzniku rány '+item.woundId);
+  const other=s.wounds.find(x=>x.id===item.woundId);
+  const elapsed=otherWoundDays[item.woundId];
+  // A past documented healing/course event cannot be moved back in time.
+  const previousDays=s.events.filter(e=>e.details?.woundId===item.woundId&&
+   int(e.details?.daySinceInjury,0,100000)).map(e=>e.details.daySinceInjury);
+  requireRule(previousDays.length===0||elapsed>=Math.max(...previousDays),
+   'Dny od poranění jiné rány nemohou běžet zpět: '+item.woundId);
+  accruePermanentImpairment(other,elapsed);
+  other.healing.nextHealingDay=elapsed+5;
+  resumed.push({woundId:item.woundId,confirmedElapsedDays:elapsed,nextHealingDay:other.healing.nextHealingDay});
+ }
+ return resumed;
+}
 export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,physicianSV=0,otherWoundDays={},herbalContext=null,gmConfirmed=false}={}){
  const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;verifyWoundDay(s,woundId,daySinceInjury);
  requireRule(gmConfirmed===true&&h?.infected,'Neexistuje aktivní infekce této rány');
@@ -236,23 +257,7 @@ export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySi
   // Another active infection continues the patient-wide freeze.
   if(!s.wounds.some(x=>x.healing?.infected)){
    if(!h.noMundaneHealing){h.nextHealingDay=daySinceInjury+5;resumed.push({woundId,confirmedElapsedDays:daySinceInjury,nextHealingDay:h.nextHealingDay});}
-   const required=infectionResumptionRequirements(s,woundId);
-   requireRule(otherWoundDays&&typeof otherWoundDays==='object'&&!Array.isArray(otherWoundDays),
-    'Po infekci je nutný doložený počet dní ostatních ran');
-   for(const item of required){
-    requireRule(Object.prototype.hasOwnProperty.call(otherWoundDays,item.woundId)&&int(otherWoundDays[item.woundId],0,100000),
-     'Chybí potvrzený počet dní od vzniku rány '+item.woundId);
-    const other=s.wounds.find(x=>x.id===item.woundId);
-    const elapsed=otherWoundDays[item.woundId];
-    // A past documented healing/course event cannot be moved back in time.
-    const previousDays=s.events.filter(e=>e.details?.woundId===item.woundId&&
-     int(e.details?.daySinceInjury,0,100000)).map(e=>e.details.daySinceInjury);
-    requireRule(previousDays.length===0||elapsed>=Math.max(...previousDays),
-     'Dny od poranění jiné rány nemohou běžet zpět: '+item.woundId);
-    accruePermanentImpairment(other,elapsed);
-    other.healing.nextHealingDay=elapsed+5;
-    resumed.push({woundId:item.woundId,confirmedElapsedDays:elapsed,nextHealingDay:other.healing.nextHealingDay});
-   }
+   resumed.push(...resumeOtherInjuryHealing(s,woundId,otherWoundDays));
   }
  }else if(result.active){h.nextInfectionDay=daySinceInjury+1;setInfectionWeakness(s,w,result.weaknessFatigue);}
  if(result.dead){s.shockOriginRound=round;s.bloodShockPending=false;}
@@ -318,27 +323,38 @@ export function applyConfirmedGrimWoundShock({state,round,eventId,woundId,daySin
 /** HMK pp178,180: G Frost treatment is AMP and ALWAYS produces a NEW Edge
  * injury of level 2..5. No row can be committed until the complete physical
  * Injury/Shock evidence is supplied. This is not a generic replay of combat. */
-export function applyConfirmedFrostAmputation({state,round,eventId,woundId,daySinceInjury,
+const amputatableLimbSites=new Set(['ua','el','fo','ha','th','kn','ca','ft','upper arm','elbow','forearm','hand','thigh','knee','calf','foot']);
+export function canAmputateInfectedLimb(w){
+ return !!w&&!w.healed&&w.healing?.infected===true&&(w.bodyKind===undefined||w.bodyKind==='human')&&
+  amputatableLimbSites.has(String(w.location).toLowerCase())&&['left','right'].includes(w.side);
+}
+export function applyConfirmedFrostAmputation(args={}){
+ return applyConfirmedAmputation(args,false);
+}
+export function applyConfirmedInfectionAmputation(args={}){
+ return applyConfirmedAmputation(args,true);
+}
+function applyConfirmedAmputation({state,round,eventId,woundId,daySinceInjury,
  physicianML,physicianIndex,physicianRoll,dexSecondaryModifier=0,
  locationShock,shockML,shockRoll,amputationStrengthML=null,amputationRoll=null,
- procedureTime=null,gmConfirmed=false}={}){
+ procedureTime=null,otherWoundDays={},gmConfirmed=false},infection){
  const s=begin(state,{round,eventId,daySinceInjury});const source=wound(s,woundId);
  verifyWoundDay(s,woundId,daySinceInjury);
  const symbols=hmkHumanLocationSymbols(source.location);
- const limb=['ua','el','fo','ha','th','kn','ca','ft','upper arm','elbow','forearm','hand','thigh','knee','calf','foot'];
  const site=String(source.location).toLowerCase();
- requireRule(gmConfirmed===true&&source.bodyKind!=='horse'&&
-  ['frost'].includes(aspectKey(source))&&source.severity==='G'&&source.level>=4&&
-  !!symbols&&(source.bodyKind===undefined||source.bodyKind==='human')&&
-  (limb.includes(site)||['fa','face'].includes(site)),
-  'Frost G Amputation: ověřená lidská končetina nebo obličej (HMK str.178)');
- requireRule(!s.extendedShock&&!s.wounds.some(x=>x.bleeding),
-  'Před zákrokem musí skončit Extended Shock a veškeré krvácení');
- requireRule(!source.healing?.treated&& !s.wounds.some(x=>x.id!==source.id&&!x.healed&&
-  x.location===source.location&&['e','edge'].includes(aspectKey(x))&&
-  (!limb.includes(site)||!x.side||!source.side||x.side===source.side)),
-  'Frost amputace vyžaduje neošetřenou frost ránu; staré Edge zranění ve stejné lokaci vyžaduje samostatné Compound');
- if(limb.includes(site))requireRule(['left','right'].includes(source.side),
+ const limb=amputatableLimbSites.has(site);
+ requireRule(gmConfirmed===true&&!!symbols&&(infection?canAmputateInfectedLimb(source):
+  aspectKey(source)==='frost'&&source.severity==='G'&&source.level>=4&&
+  (source.bodyKind===undefined||source.bodyKind==='human')&&(limb||['fa','face'].includes(site))),
+  infection?'Amputace infekce vyžaduje aktivně infikovanou lidskou končetinu a doloženou stranu (HMK str.181)':
+   'Frost G Amputation: ověřená lidská končetina nebo obličej (HMK str.178)');
+ requireRule(!s.extendedShock&&!s.wounds.some(x=>x.bleeding)&&(!infection||!s.coma?.active&&!s.shockFollowup),
+  'Před zákrokem musí skončit krvácení a povinné vyhodnocení Shock / Coma');
+ requireRule((infection||!source.healing?.treated)&&!s.wounds.some(x=>x.id!==source.id&&!x.healed&&
+  String(x.location).toLowerCase()===site&&['e','edge'].includes(aspectKey(x))&&
+  (!limb||!x.side||!source.side||x.side===source.side)),
+  'Amputace vyžaduje samostatnou způsobilou ránu; další Edge zranění ve stejné lokaci vyžaduje samostatné Compound');
+ if(limb)requireRule(['left','right'].includes(source.side),
   'Amputace končetiny vyžaduje doloženou pravou nebo levou stranu');
  requireRule(int(physicianIndex,0,20)&&int(physicianML,0,200)&&int(physicianRoll,1,100)&&
   int(dexSecondaryModifier,-100,100)&&int(locationShock,0,10)&&
@@ -347,10 +363,11 @@ export function applyConfirmedFrostAmputation({state,round,eventId,woundId,daySi
  if(procedureTime!==null)requireRule(procedureTime.gmConfirmed===true&&
   int(procedureTime.startMinute,0,1000000000)&&int(procedureTime.endMinute,0,1000000000)&&
   procedureTime.endMinute>=procedureTime.startMinute+1,'AMP vyžaduje doloženou minutu zákroku');
- const eml=treatmentRollEMLFromInjury({physicianML,aspect:'frost',injuryLevel:source.level,
+ const treatmentLevel=infection?4:source.level; // HMK p181 uses the Grievous Frost AMP row.
+ const eml=treatmentRollEMLFromInjury({physicianML,aspect:'frost',injuryLevel:treatmentLevel,
   daysSinceInjury:daySinceInjury,dexSecondaryModifier});
  const sl=successLevel(physicianRoll,eml);
- const resolution=resolveTreatmentTable({aspect:'frost',injuryLevel:source.level,sl,physicianIndex});
+ const resolution=resolveTreatmentTable({aspect:'frost',injuryLevel:treatmentLevel,sl,physicianIndex});
  const effect=resolution.result;
  requireRule(effect.kind==='edge-injury'&&int(effect.injuryLevel,2,5),
   'Frost amputace musí vytvořit fyzické Edge zranění dle tabulky s.180');
@@ -374,15 +391,16 @@ export function applyConfirmedFrostAmputation({state,round,eventId,woundId,daySi
   shockSL:Object.keys(SL).find(x=>SL[x]===shockSL),moralePending:severity==='S'||severity==='G',
   // The AMP procedure itself removes the frost-affected limb/feature,
   // irrespective of the new Edge injury's severity or its later healing.
-  amputation:{severed:true,viaTreatment:true,sourceFrostWoundId:source.id,
+  amputation:{severed:true,viaTreatment:true,
+   ...(infection?{sourceInfectedWoundId:source.id}:{sourceFrostWoundId:source.id}),
    triangleModifier:symbols.triangle,sl:amp?.slName??null,
    roll:amp?.roll??null,strengthML:amp?.strengthML??null,
    shockTestModifier:amp?.shockTestModifier??0},
-  fromFrostWoundId:source.id};
+  ...(infection?{fromInfectedWoundId:source.id}:{fromFrostWoundId:source.id})};
  // The excised frost-affected part is no longer treated as a separately
  // healing physical wound; the newly inflicted Edge wound MUST be healed.
  source.healed=true;source.bleeding=false;source.nextAdvanceRound=null;
- source.healing={...(source.healing??{}),treated:true,frostAmputated:true,healedDay:daySinceInjury,
+ source.healing={...(source.healing??{}),treated:true,...(infection?{infectionAmputated:true}:{frostAmputated:true}),healedDay:daySinceInjury,
   amputationResult:edgeWound.id,physicianIndex,physicianRoll,physicianEML:eml,
   amputationProcedureTime:procedureTime?{...procedureTime}:null};
  s.wounds.push(edgeWound);
@@ -400,10 +418,21 @@ export function applyConfirmedFrostAmputation({state,round,eventId,woundId,daySi
  s.mishaps??=[];
  for(const kind of hmkInjuryMishaps(edgeWound.location,edgeWound.severity,'human'))
   s.mishaps.push({id:`mishap:${eventId}:${kind}`,woundId:edgeWound.id,kind,resolved:false});
- track(s,{eventId,round,type:'frost-amputation-treatment',details:{woundId:source.id,newWoundId:edgeWound.id,
+ const resumedInjuries=[];
+ if(infection){
+  source.healing.infected=false;
+  source.healing.nextInfectionDay=null;
+  source.healing.nextHealingDay=null;
+  source.healing.nextGrimShockDay=null;
+  source.healing.grimWound=false;
+  setInfectionWeakness(s,source,0);
+  if(s.shock!=='KIA'&&!s.wounds.some(x=>x.healing?.infected))
+   resumedInjuries.push(...resumeOtherInjuryHealing(s,source.id,otherWoundDays));
+ }
+ track(s,{eventId,round,type:infection?'infection-amputation-treatment':'frost-amputation-treatment',details:{woundId:source.id,newWoundId:edgeWound.id,
   daySinceInjury,physicianML,physicianIndex,physicianRoll,eml,sl:Object.keys(SL).find(x=>SL[x]===sl),
   edgeLevel:edgeWound.level,bleeding:edgeWound.bleeding,locationShock,shockML,shockRoll,shockEML,
   shockSL:edgeWound.shockSL,shock:s.shock,amputation:amp,procedureMinutes:1,
-  procedureTime:procedureTime?{...procedureTime}:null,source:'HMK pp178,180,168–169'}});
- return {state:s,edgeWound,shock:s.shock};
+  procedureTime:procedureTime?{...procedureTime}:null,...(infection?{infectionDefeated:true,resumedInjuries}:{}),source:infection?'HMK pp178,180–181,168–169':'HMK pp178,180,168–169'}});
+ return {state:s,edgeWound,shock:s.shock,resumedInjuries};
 }

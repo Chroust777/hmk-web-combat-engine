@@ -40,6 +40,15 @@ export function medicalOriginOfWound(wound,events=[]){
   original.details?.domain===MEDICAL_ORIGIN.FALL&&original.details?.sourceId===original.id&&
   original.details?.woundId===wound.id)return MEDICAL_ORIGIN.FALL;
  if(wound.originDomain===MEDICAL_ORIGIN.COMBAT&&original?.type==='confirmed-hit')return MEDICAL_ORIGIN.COMBAT;
+ // The linked source event must precede the new wound; this also rejects cycles.
+ if(wound.fromInfectedWoundId&&original?.type==='infection-amputation-treatment'&&
+    original.details?.newWoundId===wound.id&&original.details?.woundId===wound.fromInfectedWoundId){
+  const priorEvents=events.slice(0,events.indexOf(original));
+  const source=priorEvents.find(e=>e.details?.woundId===wound.fromInfectedWoundId&&
+   ['gm-health-wound-create','travel-accident-injury','travel-weather-injury','skill-fall-injury'].includes(e.type));
+  if(source)return medicalOriginOfWound({id:wound.fromInfectedWoundId,originEventId:source.id,originDomain:source.details.domain??
+   (source.type==='gm-health-wound-create'?MEDICAL_ORIGIN.GM:undefined)},priorEvents);
+ }
  // A frost amputation makes a NEW Edge wound. It inherits the medical origin
  // of the original documented frost injury, NOT the name of the executor.
  // Strictly verify both immutable event links; never classify an ordinary

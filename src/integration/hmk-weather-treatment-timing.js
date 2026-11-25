@@ -3,6 +3,7 @@
  * This is a projection only: it cannot advance time or write a wound.
  */
 import {treatmentContract,treatmentDurationMinutes} from '../rules/healing.js';
+import {canAmputateInfectedLimb} from './hmk-healing-persistence.js?v=94.113';
 const nonNegativeInteger=x=>Number.isSafeInteger(x)&&x>=0;
 export function weatherTreatmentTiming({wound,startMinute,onsetMinute,untreated=false,allowAmputation=false}={}){
  if(!wound||wound.healed)throw Error('Treatment: neexistující nebo již zhojená rána.');
@@ -13,9 +14,9 @@ export function weatherTreatmentTiming({wound,startMinute,onsetMinute,untreated=
   daySinceInjury:currentDays,untreated:true};
  const aspect=wound.projectileArrowOrBolt===true||wound.impaled===true?'projectile':
   ({b:'blunt',e:'edge',p:'point',f:'fire'})[String(wound.aspect).toLowerCase()]||String(wound.aspect).toLowerCase();
- const contract=treatmentContract({aspect,injuryLevel:wound.level});
+ const contract=allowAmputation&&canAmputateInfectedLimb(wound)?treatmentContract({aspect:'frost',injuryLevel:4}):treatmentContract({aspect,injuryLevel:wound.level});
  if(contract.treatment==='amp'&&!allowAmputation)throw Error('Grievous Frost vyžaduje samostatný Amputation Treatment; běžný Treatment není možný.');
- if(allowAmputation&&contract.treatment!=='amp')throw Error('Amputation Treatment patří pouze Grievous Frost ráně.');
+ if(allowAmputation&&contract.treatment!=='amp')throw Error('Amputation Treatment patří pouze Grievous Frost ráně nebo infikované končetině.');
  const durationMinutes=treatmentDurationMinutes({treatment:contract.treatment,injuryLevel:wound.level});
  if(!Number.isSafeInteger(durationMinutes)||durationMinutes<1||startMinute+durationMinutes>1e9)
   throw Error('Treatment: nelze určit bezpečný čas zákroku.');
