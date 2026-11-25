@@ -255,7 +255,7 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.116';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.120';
 import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js?v=93.957';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.119';
+const APP_VERSION='94.120';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -3624,7 +3624,7 @@ function timeEpisodePageHTML(clock,participants){
  <div data-episode-tracking-followup hidden><h4>Tracking · výsledek a stopové hvězdy</h4><div class="hmk-trek-grid">
  <label hidden>Awareness při Tracking SV 3–4 ${episodeRuleHelp('Tracking Awareness','HMK 147: pouze skutečný uložený Awareness test postavy v současné minutě může dát 1 Spoor.')}<select name="trackingAwarenessProofId" disabled><option value="">— Vyberte skutečný Awareness test —</option>${skillOptions('Awareness')}</select></label>
  <label>Počet Spoor hvězd věnovaných skrytí vlastní stopy<input name="trackingSpoorSpent" type="number" min="0" max="100" value="0"></label></div>
- <p class="hc-hint">Tracking CF vynutí jeden Bearing při příští cestovní epizodě; není to nový náhodný hod. Pozor: Spoor od různých hodů se nesčítají.</p></div>
+ <p class="hc-hint">Spoor určuje, jak náročnou stopu lze sledovat. Při bezprostředním pokračování téže stopy za stejných podmínek lze převzít původní Tracking SV. Spoor od různých hodů se nesčítají. Po Tracking CF má družina v příští cestovní epizodě jeden bezplatný Bearing.</p></div>
   <div class="hc-episode-navigation" data-episode-navigation><p data-episode-navigation-text class="hc-hint" data-hmk-help="Všechny možné stavy: clear = družina drží správný směr; misdirection = jde odchýleným směrem; lost = ztratila orientaci. Misdirection a lost přetrvávají, dokud GM nepotvrdí skutečné napravení. Samotný další hod je automaticky nemaže.">Dřívější bloudění se nepřestane počítat jen kvůli novému testu nebo uplynutí času.</p>
  <label class="hc-check"><input name="navigationRecovered" type="checkbox"> <span class="hc-help-term" tabindex="0" data-hmk-help="Výslovné rozhodnutí GM. Po Lost nový Orienteering musí doložit zvláštní Bearing Mode. Po starším Misdirection musí navigující postava doložit úspěšný Awareness S/CS v této epizodě. Pouhý checkbox nelze použít místo skutečného hodu.">GM doložil napravení bloudění / návrat na trasu</span></label>
  <label data-episode-navigation-recovery-awareness>Awareness k návratu po dřívějším Misdirection (HMK 148) <select name="navigationRecoveryAwarenessProofId"><option value="">— skutečný test navigující postavy —</option>${skillOptions('Awareness')}</select></label></div>
@@ -34476,8 +34476,10 @@ function updateEpisodePreview(form){
   const modesInfo=form.querySelector('[data-episode-allocated-modes]');
   const budget=form.querySelector('[data-episode-manual-budget]');
   if(budget&&result.orientation){const all=result.orientation.stars||0;
-   const spent=['bearing','progress','foraging','stalking','vigilance'].reduce((n,k)=>n+Math.max(0,Number(form.elements.namedItem('mode_'+k)?.value||0)),0);
-   budget.textContent='Survival upravené SV '+result.orientation.adjustment.adjustedSV+' → '+all+' ★ k rozdělení. Přiděleno: '+spent+' ★, zbývá: '+Math.max(0,all-spent)+' ★.';
+   const modes=result.orientation.modes,free=Number(!!modes.trackingForcedBearingSourceId);
+   const spent=modes.bearing+modes.progress+modes.foraging+modes.stalking+modes.vigilance-free;
+   budget.textContent='Survival upravené SV '+result.orientation.adjustment.adjustedSV+' → '+all+' ★ k rozdělení. Přiděleno: '+spent+' ★, zbývá: '+Math.max(0,all-spent)+' ★.'+
+    (free?' Jeden Bearing po Tracking CF je bezplatný.':'');
   }
   const progressRow=form.querySelector('[data-episode-progress-row]'),directionRow=form.querySelector('[data-episode-direction-row]');
   const spareProgress=Math.max(0,result.progress-result.slow);

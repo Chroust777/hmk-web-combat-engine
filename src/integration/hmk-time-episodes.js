@@ -611,6 +611,12 @@ export function computeEpisodeOrientation({mode='none',currentSkill=null,previou
   allocationMode=witness.allocationMode||allocationMode;
   priority=witness.priority||priority;
   manualModes=witness.manualModes||manualModes;
+  if(allocationMode==='manual'&&manualModes){
+   // Only the paid modes carry forward. The previous free Bearing is
+   // already spent; include any new free Bearing separately.
+   const priorFree=Number(witness.modes?.trackingForcedBearingSourceId===EPISODE_TRACKING_BEARING_MARKER_93904);
+   manualModes={...manualModes,bearing:manualModes.bearing-priorFree+forcedTrackingBearing};
+  }
  }
  must(['auto','manual'].includes(allocationMode)&&['slow','lax'].includes(lowChoice),
   'Neplatné rozhodnutí GM o Advantage Modes.');

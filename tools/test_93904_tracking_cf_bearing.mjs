@@ -1,7 +1,7 @@
 /** HMK printed p.147–148; v93.904 Tracking CF mandatory free Bearing.
  * Only genuine mathematical inputs; no pretense of live browser clicking. */
 import assert from 'node:assert/strict';
-import {calculateTimeEpisode,computeEpisodeOrientation,episodeMovementContext,
+import {calculateTimeEpisode,computeEpisodeOrientation,computeEpisodeTracking,episodeMovementContext,
  EPISODE_TRACKING_BEARING_POLICY_93904 as POLICY} from '../src/integration/hmk-time-episodes.js';
 import {trekMovement,trekHazards} from '../src/integration/hmk-trekking-routine.js';
 import {trackingModifiers,trackingOutcome} from '../src/integration/hmk-trekking-wilderness-tasks.js';
@@ -64,4 +64,28 @@ test('movement rates not changed by free bearing',()=>{
  const a=trekMovement({topography:'flat',terrain:'paved-road',bearing:0,progressD10:[]});
  const b=trekMovement({topography:'flat',terrain:'paved-road',bearing:1,progressD10:[]});
  assert.equal(a.finalLPW,b.finalLPW);});
+test('manual Orienteering carries only paid Bearing and includes any new free Bearing',()=>{
+ const terrain='paved-road';
+ for(const [priorFree,nextFree,paid] of [[1,0,0],[1,0,1],[0,1,1],[1,1,1]]){
+  const first=orientation(terrain,4+paid,0,priorFree,{bearing:paid+priorFree,progress:0,foraging:0,stalking:0,vigilance:0});
+  const previous={id:'prior',calendarTimeEpisode:{kind:'travel',endMinute:510,orientation:first}};
+  const next=computeEpisodeOrientation({mode:'reuse',previous,minute:510,context:context({terrain}),forcedTrackingBearing:nextFree});
+  assert.equal(next.modes.bearing,paid+nextFree);
+  assert.equal(next.stars,paid);
+ }
+});
+test('successful Tracking reuse keeps the same Spoor under unchanged conditions',()=>{
+ const movement=context({terrain:'wilderness-trail'});
+ const first=computeEpisodeTracking({mode:'new',currentSkill:{skillId:'roll',skill:'Tracking',guideId:'guide',sv:7,level:'S'},
+  minute:480,context:movement,trail:'Wolf'});
+ assert.equal(first.score.spoorStars,3);
+ const previous={id:'prior',calendarTimeEpisode:{kind:'tracking',endMinute:510,trackingMemory:first}};
+ const continuation={mode:'reuse',previous,minute:510,context:movement,trail:'Wolf'};
+ const next=computeEpisodeTracking(continuation);
+ assert.deepEqual(next.score,first.score);
+ assert.equal(next.skillId,first.skillId);
+ assert.throws(()=>computeEpisodeTracking({...continuation,trail:'Fox'}),/téže stopy/);
+ assert.throws(()=>computeEpisodeTracking({...continuation,minute:511}),/téže stopy/);
+ assert.throws(()=>computeEpisodeTracking({...continuation,conditions:{...first.conditions,continuousRain:true}}),/změně prostředí/);
+});
 console.log('PASS HMK p147–148 Tracking CF free Bearing / v93.904',n,'assertion groups');
