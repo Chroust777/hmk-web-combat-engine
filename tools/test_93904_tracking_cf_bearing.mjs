@@ -1,7 +1,8 @@
 /** HMK printed p.147–148; v93.904 Tracking CF mandatory free Bearing.
  * Only genuine mathematical inputs; no pretense of live browser clicking. */
 import assert from 'node:assert/strict';
-import {calculateTimeEpisode,computeEpisodeOrientation,computeEpisodeTracking,episodeMovementContext,
+import {episodeTrackingFollowup} from '../src/integration/hmk-episode-travel-detail.js';
+import {calculateTimeEpisode,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingAwareness,episodeMovementContext,
  EPISODE_TRACKING_BEARING_POLICY_93904 as POLICY} from '../src/integration/hmk-time-episodes.js';
 import {trekMovement,trekHazards} from '../src/integration/hmk-trekking-routine.js';
 import {trackingModifiers,trackingOutcome} from '../src/integration/hmk-trekking-wilderness-tasks.js';
@@ -73,6 +74,34 @@ test('manual Orienteering carries only paid Bearing and includes any new free Be
   assert.equal(next.modes.bearing,paid+nextFree);
   assert.equal(next.stars,paid);
  }
+});
+test('same trail carries verified Awareness and its single Spoor',()=>{
+ const movement=context({terrain:'wilderness-trail'});
+ const first=computeEpisodeTracking({mode:'new',currentSkill:{skillId:'tracking',skill:'Tracking',
+  guideId:'guide',sv:4,level:'CS'},minute:480,context:movement,trail:'Wolf'});
+ const witness={id:'observation',characterId:'guide',calendarCampaignId:'qa',campaignMinute:480,
+  skillTestProof:{type:'secondary-mastery-test',skills:['Awareness'],a:{level:'S',roll:11}}};
+ const current=episodeTrackingAwareness({journal:[witness],campaignId:'qa',minute:480,memo:first,skillId:witness.id});
+ assert.equal(current?.level,'S');
+ const initial=episodeTrackingFollowup({adjustedSV:4,awarenessLevel:current.level});
+ assert.deepEqual([initial.spoorStars,initial.trailCapacity,initial.hasOneSpoor],[1,1,true]);
+ assert.equal(episodeTrackingFollowup({adjustedSV:4,awarenessLevel:'CS',spoorSpent:1}).trailCapacity,0);
+ assert.equal(episodeTrackingFollowup({adjustedSV:4,awarenessLevel:'F'}).spoorStars,0);
+ const previous={id:'prior',calendarCampaignId:'qa',calendarTimeEpisode:{kind:'tracking',startMinute:480,endMinute:510,
+  trackingMemory:first,trackingFollowup:{...initial,awarenessSkillId:witness.id}}};
+ const next=computeEpisodeTracking({mode:'reuse',previous,minute:510,context:movement,trail:'Wolf'});
+ const resume={journal:[witness,previous],campaignId:'qa',minute:510,memo:next};
+ assert.deepEqual(episodeTrackingAwareness(resume),current);
+ assert.deepEqual(episodeTrackingAwareness({...resume,skillId:witness.id}),current);
+ assert.equal(episodeTrackingAwareness({...resume,campaignId:'other'}),null);
+ assert.equal(episodeTrackingAwareness({...resume,minute:511}),null);
+ assert.equal(episodeTrackingAwareness({...resume,memo:{...next,trail:'Fox'}}),null);
+ const oldObservation={...previous,calendarTimeEpisode:{...previous.calendarTimeEpisode,
+  trackingFollowup:{...previous.calendarTimeEpisode.trackingFollowup,spoorStars:0,trailCapacity:0}}};
+ assert.deepEqual(episodeTrackingAwareness({...resume,journal:[witness,oldObservation]}),current);
+ const currentWitness={...witness,id:'old-repeat',campaignMinute:510};
+ assert.equal(episodeTrackingAwareness({...resume,journal:[witness,previous,currentWitness],
+  skillId:currentWitness.id})?.skillId,currentWitness.id);
 });
 test('successful Tracking reuse keeps the same Spoor under unchanged conditions',()=>{
  const movement=context({terrain:'wilderness-trail'});
