@@ -223,9 +223,9 @@ import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,travelBloodStoppageEML,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
-import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.033';
+import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.107';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
-import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.033';
+import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.107';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
 import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.018';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.106';
+const APP_VERSION='94.107';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4709,6 +4709,7 @@ function campaignCalendarView(){
  });
  const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))}${isHerbalCalendarCheck(x.kind)?'':' · '+esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button>${x.cancellable===false?'':`<button type="button" class="hc-small danger" data-cal-gm-cancel-due="${esc(x.id)}" data-cal-gm-cancel-actor="${esc(x.characterId)}" title="GM: zrušit povinnost a navázané termíny">×</button>`}</div></div>`;};
  const moraleChecks=agenda.due.filter(x=>x.kind==='morale-reaction');
+ const moraleFuture=agenda.future.filter(x=>x.kind==='morale-reaction');
  const moraleUnknown=agenda.unknown.filter(x=>x.kind==='morale-reaction');
  const moraleWarnings=agenda.moraleWarnings||[];
  const moraleCalendarHTML=`<section class="panel hc-calendar hc-morale-reactions" data-calendar-morale-checks><h3>Morale Reaction · časované kontroly (HMK str. 162)</h3>
@@ -4722,12 +4723,13 @@ function campaignCalendarView(){
  <p class="hc-hint">Při trvajícím ohrožení se bez hodu plánuje jen nejbližší možné nové posouzení (1 minuta pro withdrawing, 5 minut pro routed). Nejde o potvrzení budoucích podmínek.</p>
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje skutečné podmínky a použitý hod</label>
  <button type="submit">${esc(x.name)} · potvrdit Morale</button></form>`).join('')}
+ ${moraleFuture.map(x=>`<p tabindex="-1" data-calendar-morale-next="${esc(x.characterId)}">${esc(x.name)} · ${esc(x.moraleState)} · další Morale Reaction v ${esc(displayCampaignMinute(x.minute))}. <button type="button" class="secondary hc-small" data-medical-next-minute="${x.minute}" data-medical-next-morale="${esc(x.characterId)}">Posunout čas k Morale Reaction</button></p>`).join('')}
  ${moraleUnknown.map(x=>`<form data-calendar-morale-origin="${esc(x.characterId)}"><p class="notice">${esc(x.name)}: ${esc(x.reason)}</p>
  <label>Skutečně uplynulé celé minuty od původního Morale Rollu<input name="elapsed" type="number" min="0" max="${clock.minute}" required></label>
  <label>Důvod a doklad času<input name="reason" minlength="10" maxlength="400" required></label>
  <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený počátek stavu</label>
  <button type="submit">Doložit počátek Morale bez nového hodu</button></form>`).join('')}
- ${!moraleChecks.length&&!moraleUnknown.length?'<p class="hc-hint">Žádná okamžitě splatná Morale Reaction; budoucí termíny jsou v seznamu Kalendáře.</p>':''}</section>`;
+ ${!moraleChecks.length&&!moraleUnknown.length&&!moraleFuture.length?'<p class="hc-hint">Žádná okamžitě splatná Morale Reaction; budoucí termíny jsou v seznamu Kalendáře.</p>':''}</section>`;
  const renderDueGroups=events=>groupConcurrentObligations(events).map(g=>{
   const person=character(g.characterId)?.name||g.items[0]?.name||g.characterId;
   return `<section class="hc-calendar-concurrent" data-calendar-concurrent-minute="${g.minute}" data-calendar-concurrent-actor="${esc(g.characterId)}">
@@ -16364,6 +16366,12 @@ function openHealthPatient952(actor){
  }
  selected=actor.id;view='sheet';activeSheetSection='hazards';render();
 }
+const injuryMoraleAberranceHelp='Aberrance (ABE) je pravidlová hodnota děsivosti zdroje, například tvora nebo ducha. '+
+ 'Zadejte celé číslo podle Bestiáře, popisu zdroje nebo doloženého rozhodnutí GM. Obvyklý rozsah je 1–6, pravidla pevné maximum neurčují a toto pole přijímá 0–200. '+
+ 'U nehody bez relevantního děsivého zdroje GM potvrdí 0. U Injury Morale se od Initiative EML odečítá 5 × ABE, například ABE 2 dává postih −10. HMK str. 162 a 187.';
+document.addEventListener('click',event=>{
+ if(event.target.closest?.('[data-injury-morale-abe-help]'))uiAlert(injuryMoraleAberranceHelp);
+},true);
 function hskWeatherInjuryMandatory(actorId){
  const actor=character(actorId);if(!actor)return '';
  const state=persistentStateOf(actor),isWeather=id=>hskIsEnvironmentalWound(actor,id);
@@ -16386,7 +16394,9 @@ function hskWeatherInjuryMandatory(actorId){
   <p class="hc-hint">Až po úplném Shock zotavení: jediný Morale d100 z vážné rány ${esc(medicalWoundOptionLabel(actor,w,state.wounds.findIndex(x=>x.id===w.id)+1))} (HMK 162, 170). Bez aktivního Combatu; případný skutečný zdroj Aberrance stanoví GM.</p>
   <form data-weather-injury-morale><input type="hidden" name="woundId" value="${esc(w.id)}">
   <p>Initiative ML: ${esc(String(init??'nedoloženo'))}</p>
-  <label><span class="hc-help-term" tabindex="0" data-hmk-help="Aberrance je skutečná, doložená hodnota původce zranění, pokud byl původce relevantní. Prázdná hodnota neznamená 0. Není-li doložena přímo v ráně, hodnotu včetně nuly musí výslovně potvrdit GM.">Skutečná Aberrance zdroje (0 jen po výslovném potvrzení GM)</span><input name="aberrance" type="number" min="0" max="200" ${Number.isSafeInteger(w.moraleThreatABE)?`value="${w.moraleThreatABE}" readonly`:''} required></label>
+  <p class="hc-hint">Aberrance je hodnota zdroje od GM. Samotný Morale hod je d100.</p>
+  <button type="button" class="secondary hc-small" data-injury-morale-abe-help>Co je Aberrance (ABE)?</button>
+  <label><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(injuryMoraleAberranceHelp)}">Aberrance zdroje (0–200)</span><input name="aberrance" type="number" min="0" max="200" step="1" ${Number.isSafeInteger(w.moraleThreatABE)?`value="${w.moraleThreatABE}" readonly`:''} required></label>
   ${Number.isSafeInteger(w.moraleThreatABE)?'':`<label class="hc-check"><input name="gmConfirmedAberrance" type="checkbox" required> GM potvrzuje, že zadaná Aberrance (včetně případné 0) je skutečně doložena; žádná hodnota nebyla odhadnuta.</label>`}
   <label>Skutečný Morale d100<input name="roll" type="number" min="1" max="100" required></label>
   <button type="submit" ${Number.isSafeInteger(init)?'':'disabled'}>Dokončit Injury Morale</button><output role="status"></output></form></section>`;
@@ -18279,8 +18289,10 @@ document.addEventListener('submit',event=>{
     title:'Cestovní Injury · '+kind+' · HMK 162,170',body:'Původní cestovní rána '+sourceWound+' · samostatný zdravotní následek; bez posunu herního času.',createdAt:stamp(),
     skillTestProof:{type:'weather-'+kind,actorId:actor.id,woundId:sourceWound,originEventId:eventId,gmConfirmed:true}});
   }))throw Error('Weather Injury nebyl zapsán');
-  hskWeatherHealthLastReceipt=null;openHealthPatient952(actor);
- }catch(error){if(out)out.textContent='Weather Injury nebyl vyřešen: '+error.message;}
+  hskWeatherHealthLastReceipt=null;
+  if(kind==='injury-morale')openWoundMedicalStep(actor,sourceWound);
+  else openHealthPatient952(actor);
+ }catch(error){if(out)out.textContent='Cestovní zranění nebylo vyřešeno: '+error.message;}
 },true);
 document.addEventListener('submit',event=>{
  const f=event.target;if(!f?.matches?.('[data-weather-trauma-course]'))return;
@@ -22255,11 +22267,43 @@ function openCalendarConcurrentTreatment(actor,startId){
 }
 /** A blocking GM clock check must hand off to its ORIGINAL, source-linked rule executor.
  * This is navigation only: never fabricate dice, facts or time changes. */
-function explainAndOpenBlockedCalendarTerm(err,targetMinute){
+function openCalendarMoraleReaction(actor){
+ selected=actor.id;
+ overlay=null;view='calendar';calendarLanding=false;activeCalendarSection='overview';render();
+ const panel=document.querySelector('[data-calendar-morale-checks]');
+ if(!panel)return false;
+ const matchesActor=(selector,key)=>[...panel.querySelectorAll(selector)].find(el=>el.dataset[key]===actor.id);
+ const reaction=matchesActor('form[data-calendar-morale-reaction]','calendarMoraleReaction');
+ const origin=matchesActor('form[data-calendar-morale-origin]','calendarMoraleOrigin');
+ const upcoming=matchesActor('[data-calendar-morale-next]','calendarMoraleNext');
+ const field=reaction?.elements.namedItem('roll')||origin?.elements.namedItem('elapsed');
+ const target=field||upcoming;
+ if(!target)return false;
+ (field?.closest('label')||target).classList.add('hmk-medical-required-target');
+ target.scrollIntoView({block:'center',behavior:'auto'});
+ target.focus({preventScroll:true});
+ return true;
+}
+function explainAndOpenBlockedCalendarTerm(err,targetMinute,{stopAtMorale=false}={}){
  const message=String(err?.message||err);
  if(!/povinný termín|časový závazek|přeskočit nevyřízenou/.test(message))return false;
  const clock=data.campaignClock;if(!clock)return false;
  const agenda=campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory);
+ const blocked=agenda.unknown[0]||agenda.all.find(x=>x.requiresAction!==false&&x.minute<targetMinute&&
+  message.includes(x.description+' u '+x.name+': '+displayCampaignMinute(x.minute)));
+ if(blocked?.kind==='morale-reaction'){
+  const patient=character(blocked.characterId);
+  if(!patient)return false;
+  if(stopAtMorale&&blocked.minute>clock.minute){
+   const next=advanceCampaignCalendar(clock,{deltaMinutes:blocked.minute-clock.minute,eventId:uuid(),
+    reason:'Posun k nejbližší Morale Reaction před dokončením ošetření',gmConfirmed:true,
+    characters:data.characters,journal:data.journal,inventory:data.inventory});
+   if(!uiConfirm('Nejdřív je splatná Morale Reaction: '+patient.name+' · '+displayCampaignMinute(blocked.minute)+
+    '. Posunout čas pouze k této kontrole? Ošetření zůstane rozpracované.'))return true;
+   if(!mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true}))return true;
+  }
+  return openCalendarMoraleReaction(patient);
+ }
  const due=[...(agenda.unknown||[]),...(agenda.all||[])].filter(x=>x.requiresAction!==false&&x.minute<=clock.minute&&x.minute<targetMinute)
   .sort((a,b)=>a.minute-b.minute)[0];
  if(!due)return false;
@@ -22690,6 +22734,7 @@ document.addEventListener('submit',e=>{
 },true);
 /** A calendar notification points to an actual existing rule executor. */
 function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
+ if(kind==='morale-reaction')return openCalendarMoraleReaction(actor);
  const stableMedical=isStableAnimalProfile93813(actor)&&(
   kind==='weather-shock'||
   (['treatment','healing','infection','grim','bleeding','injury-morale'].includes(kind)&&hskIsEnvironmentalWound(actor,sourceId))||
@@ -23303,6 +23348,13 @@ document.addEventListener('click',e=>{
   const ev=[...currentAgenda.all,...(currentAgenda.prepared||[])].find(x=>x.id===t.dataset.calAgenda);
   if(!ev||ev.characterId!==t.dataset.calLink||ev.kind!==t.dataset.calKind||
     String(ev.sourceId||ev.woundId||'')!==String(t.dataset.calSource||''))return;
+  if(ev.kind==='morale-reaction'||ev.kind==='concurrent-treatment'){
+   const actor=character(ev.characterId);
+   if(!actor)return;
+   if(ev.kind==='morale-reaction')openCalendarMoraleReaction(actor);
+   else try{openCalendarConcurrentTreatment(actor,ev.startId);}catch(failure){uiAlert('Kontrola Treatment: '+failure.message);}
+   return;
+  }
   if(ev.kind!=='herbal-potion'&&!isHerbalCalendarCheck(ev.kind)&&ev.status!=='due'&&ev.status!=='preparation'){
    const target=character(ev.characterId);if(!target)return;
    selected=target.id;activeSheetSection='status';view='sheet';
@@ -23312,8 +23364,14 @@ document.addEventListener('click',e=>{
    return;
   }
  }
+ if(t.dataset.calLink&&t.dataset.calKind==='morale-reaction'){
+  const actor=character(t.dataset.calLink);if(actor)openCalendarMoraleReaction(actor);
+  return;
+ }
  if(t.dataset.calLink&&t.dataset.calKind==='concurrent-treatment'){
-  try{openCalendarConcurrentTreatment(character(t.dataset.calLink),t.dataset.calConcurrentId);}
+  const op=openConcurrentProcedures(data.campaignClock).find(x=>x.characterId===t.dataset.calLink&&
+   (t.dataset.calConcurrentId?x.startId===t.dataset.calConcurrentId:x.woundId===t.dataset.calSource));
+  try{openCalendarConcurrentTreatment(character(t.dataset.calLink),op?.startId);}
   catch(failure){uiAlert('Kontrola Treatment: '+failure.message);}
   return;
  }
@@ -23539,7 +23597,7 @@ document.addEventListener('submit',e=>{
   if(!uiConfirm('Trvale potvrdit počátek '+kind+' před '+elapsedMinutes+' minutami?'))return;
   mutate(()=>{data.campaignClock=next;});
  }catch(err){
-  if(f.id==='campaign-advance-form'&&data.campaignClock&&/povinný termín (Paralytic|Soporific)/.test(err.message)){
+  if(f.id==='campaign-advance-form'&&data.campaignClock&&/povinný termín (Paralytic|Soporific|Morale Reaction)|časový závazek.*Morale/.test(err.message)){
    const target=data.campaignClock.minute+parse(v.days)*DAY_MINUTES+parse(v.hours)*60+parse(v.minutes);
    if(explainAndOpenBlockedCalendarTerm(err,target))return;
   }
@@ -25707,10 +25765,14 @@ document.addEventListener('click',e=>{
   if(!uiConfirm('Posunout čas kampaně na '+displayCampaignMinute(target)+'?'))return;
   if(mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true})){
    if(op)openCalendarConcurrentTreatment(character(op.characterId),op.startId);
+   else if(button.dataset.medicalNextMorale)openCalendarMoraleReaction(character(button.dataset.medicalNextMorale));
    else if(actor)openWoundMedicalStep(actor,woundId);
   }
  }catch(error){
-  if(!explainAndOpenBlockedCalendarTerm(error,target))showMedicalStepMessage(button.parentElement,error.message);
+  try{
+   if(explainAndOpenBlockedCalendarTerm(error,target,{stopAtMorale:!!op}))return;
+  }catch(handoffError){error=handoffError;}
+  showMedicalStepMessage(button.parentElement,error.message);
  }
 },true);
 function showMedicalStepMessage(parent,text){
@@ -25931,9 +25993,10 @@ document.addEventListener('submit',e=>{
      shockRoll:optionalCareInteger('shockRoll'),
      amputationStrengthML:optionalCareInteger('amputationStrengthML'),
      amputationRoll:optionalCareInteger('amputationRoll')}};
-   if(mutate(()=>{data.campaignClock=startConcurrentProcedure(data.campaignClock,{id:uuid(),procedure:operation});if(bandagePlan)commitBandageConsumption(data,bandagePlan,{eventId:args.eventId,patientId:c.id,woundId,kind:'Treatment (zahájení)',minute:clock.minute,campaignId:campaignKey(clock),createdAt:stamp()});}))
+   const startId=uuid();
+   if(mutate(()=>{data.campaignClock=startConcurrentProcedure(data.campaignClock,{id:startId,procedure:operation});if(bandagePlan)commitBandageConsumption(data,bandagePlan,{eventId:args.eventId,patientId:c.id,woundId,kind:'Treatment (zahájení)',minute:clock.minute,campaignId:campaignKey(clock),createdAt:stamp()});}))
     {notice='Zákrok zahájen v '+displayCampaignMinute(clock.minute)+'; dokončení '+displayCampaignMinute(treatmentFinish)+'. Ostatní současné události zůstávají přístupné.';
-     if(stableMedicalContext952(c))openHealthPatient952(c);}
+     openCalendarConcurrentTreatment(c,startId);}
    return;
   }
   let advancedTreatmentClock=null;
@@ -34982,6 +35045,7 @@ document.addEventListener('click',e=>{
  const elapsed=b.dataset.episodeMedicalElapsed||'';
  if(!character(actorId))return;
  timeEpisodeDraft=episodeFormSnapshot(form);selected=actorId;
+ if(type==='morale-reaction'){openCalendarMoraleReaction(character(actorId));return;}
  if(type==='malnutrition-course'){
   calendarLanding=false;activeCalendarSection='provisions';provisionScope='person';
   provisionGuideActorId=actorId;view='calendar';render();
