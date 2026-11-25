@@ -1,3 +1,4 @@
+import {noncombatHealthDestination} from './hmk-calendar-event-routing.js?v=94.110';
 import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock,projectLegacyAlchemyShock} from './hmk-medical-origin.js?v=93.988';
 import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentProceduresAppendOnly,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './hmk-concurrent-procedures.js';
 /**
@@ -204,10 +205,11 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  const all=[],unknown=[],suspended=[];
  const add=(c,kind,description,daysOrHours,woundId=null,unit='days',extra={})=>{
   const anchor=getCampaignAnchor(clock,kind==='healing'||kind==='infection'||kind==='grim'?'wound':kind,c.id,woundId);
-  if(!anchor){unknown.push({characterId:c.id,name:c.name,kind,woundId,description,reason:'Chybí potvrzený okamžik začátku'});return;}
+  const route=noncombatHealthDestination({kind,woundId,...extra},c.hmk?.healthState)?{route:'hazards'}:{};
+  if(!anchor){unknown.push({characterId:c.id,name:c.name,kind,woundId,description,reason:'Chybí potvrzený okamžik začátku',...extra,...route});return;}
   const minute=anchor.minute+daysOrHours*(unit==='hours'?60:DAY_MINUTES);
   all.push({id:KEY(kind,c.id,woundId),characterId:c.id,name:c.name,kind,woundId,
-   description,minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future',...extra});
+   description,minute,anchorMinute:anchor.minute,status:minute<=clock.minute?'due':'future',...extra,...route});
  };
  for(const c of characters){
   const s=c?.hmk?.healthState;if(!s||s.shock==='KIA')continue;
