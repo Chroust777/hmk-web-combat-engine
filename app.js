@@ -223,7 +223,7 @@ import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,travelBloodStoppageEML,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
-import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.107';
+import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.109';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.107';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.108';
+const APP_VERSION='94.109';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7895,11 +7895,9 @@ function folioChapterParts(body,kind=''){
     const gmAdvance=detached.filter(x=>x.querySelector(':scope > h3')?.textContent?.trim()==='Posun času GM');
     const before=nodes.slice(0,location).map(x=>x.outerHTML).join('');
     const after=detached.filter(x=>!rightExtras.includes(x)&&!gmAdvance.includes(x)).map(x=>x.outerHTML).join('');
-    const week=queue.querySelector(':scope > .hc-weekly');
-    const queueContent=week?week.outerHTML+[...queue.children].filter(x=>x!==week).map(x=>x.outerHTML).join(''):queue.innerHTML;
     const timeControls=rightExtras.filter(x=>x.matches?.('.hc-time-control'));
     const planner=rightExtras.filter(x=>x.matches?.('.hc-planner'));
-    return [queueContent+before+after,dated.innerHTML+timeControls.map(x=>x.outerHTML).join('')+planner.map(x=>x.outerHTML).join('')+gmAdvance.map(x=>x.outerHTML).join('')];
+    return [queue.innerHTML+before+after,dated.innerHTML+timeControls.map(x=>x.outerHTML).join('')+planner.map(x=>x.outerHTML).join('')+gmAdvance.map(x=>x.outerHTML).join('')];
    }
   }
   const episode=nodes.find(el=>el.classList.contains('hc-episode-shell'));
@@ -8494,12 +8492,15 @@ function characterSkillHistory950(c,logs,{latest=10,gm=false}={}){
     level:proof.winnerId===c.id?'Vítěz rozstřelu':'Prohra v rozstřelu'};
   }
   if(!result?.level)return [];
-  return [{entry,result,name:proof.skills?.[other?1:0]??proof.skill??entry.title}];
+  // The shared resolver calculates an SV for several test modes. Only an
+  // explicit Success Value test uses it as a result in the character journal.
+  const sv=['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(proof.type)?result.sv:null;
+  return [{entry,result,sv,name:proof.skills?.[other?1:0]??proof.skill??entry.title}];
  });
  const hidden=gm?new Set():hiddenLogbookIds(data,c.id);
  const visible=rows.filter(row=>!hidden.has(row.entry.id)),removed=rows.filter(row=>hidden.has(row.entry.id));
- const table=items=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Datum a čas</th><th>Test</th><th>EML</th><th>Hod</th><th>Výsledek</th>${gm?'':'<th>Akce</th>'}</tr></thead><tbody>${items.map(({entry,result,name})=>
-  `<tr><td>${esc(personalNoteGameMoment(entry))}</td><td>${journalTerm(name,chronicleSkillHelp953(name))}</td><td>${esc(result.eml??result.finalEML??'—')}</td><td>${esc(result.roll??'—')}</td><td>${esc(result.level)}${Number.isInteger(result.sv)?' · SV '+esc(result.sv):''}</td>${gm?'':`<td><button type="button" class="secondary hc-small" data-${hidden.has(entry.id)?'restore':'hide'}-log="${esc(entry.id)}">${hidden.has(entry.id)?'Obnovit':'Smazat ze zápisníku'}</button></td>`}</tr>`).join('')}</tbody></table></div>`;
+ const table=items=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Datum a čas</th><th>Test</th><th>EML</th><th>Hod</th><th>Výsledek</th>${gm?'':'<th>Akce</th>'}</tr></thead><tbody>${items.map(({entry,result,sv,name})=>
+  `<tr><td>${esc(personalNoteGameMoment(entry))}</td><td>${journalTerm(name,chronicleSkillHelp953(name))}</td><td>${esc(result.eml??result.finalEML??'—')}</td><td>${esc(result.roll??'—')}</td><td>${esc(result.level)}${Number.isInteger(sv)?' · SV '+esc(sv):''}</td>${gm?'':`<td><button type="button" class="secondary hc-small" data-${hidden.has(entry.id)?'restore':'hide'}-log="${esc(entry.id)}">${hidden.has(entry.id)?'Obnovit':'Smazat ze zápisníku'}</button></td>`}</tr>`).join('')}</tbody></table></div>`;
  return `<details class="hc-personal-archive" data-personal-skill-history ${gm?'open':''}><summary>Historie Skill Checků</summary>${visible.length?table(visible.slice(0,latest)):'<p>Žádné doložené testy.</p>'}
  ${visible.length>latest?`<details><summary>Příloha · starší Skill Checky</summary>${table(visible.slice(latest))}</details>`:''}
  ${removed.length?`<details><summary>Smazané ze zápisníku · obnovit</summary>${table(removed)}</details>`:''}</details>`;
