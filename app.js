@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.116';
+const APP_VERSION='94.117';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2524,13 +2524,11 @@ let episodeQueueAction=false;
 let episodeIndependentMutationInFlight=false;
 let episodeFinalCommitInFlight=false;
 let timeEpisodeDraftCampaign=null;
-/** v93.685: ONE exclusive time-episode transaction. The prior guard covered
- * only the phase after the first staged Skill Test, leaving a gap after
- * Evaluate and before any dice were staged. Navigation is never a mutation.
- * Keep this lock in memory; no speculative evidence enters durable storage.
- */
+// Reserve the active campaign from the first shared interval or episode
+// evaluation until final confirmation or an explicit cancellation.
 function timeEpisodeMutationLocked(){
- return !!(episodeStageBaseline||episodePendingSkillRequest||
+ return !!(sharedTimeWindowDraft||sharedTimeWindowQueue.length||episodeEvaluationRequested||
+  episodeStageBaseline||episodePendingSkillRequest||
   episodeActiveSkillRequestId||episodePinnedSkillFields.size||episodeOutstandingSkillTasks.length);
 }
 function timeEpisodeLockExplanation(){
@@ -23285,11 +23283,13 @@ document.addEventListener('click',e=>{
  }catch(error){alert('Kalendářová událost nebyla změněna: '+error.message);}
 },true);
 // Calendar lifecycle is explicitly separate from ordinary append-only changes.
+const TRAVEL_CAMPAIGN_LOCK_MESSAGE='Nejdříve dokončete nebo nouzově zrušte rozpracovanou cestovní epizodu. Otevření aktuálního kalendáře a ostatní prohlížení zůstává povolené.';
 document.addEventListener('click',e=>{
  const t=e.target.closest?.('[data-calendar-open],[data-calendar-new],[data-calendar-back]');if(!t)return;
  e.preventDefault();e.stopImmediatePropagation();
  if(t.hasAttribute('data-calendar-back')){calendarCreating=false;calendarLanding=true;calendarUI=null;activeCalendarSection='overview';render();return;}
  if(t.hasAttribute('data-calendar-new')){
+  if(timeEpisodeMutationLocked())return alert(TRAVEL_CAMPAIGN_LOCK_MESSAGE);
   if(combatInitiativeSequence)return alert('Během Initiative nelze měnit aktivní časovou osu.');
   if(allCampaignClocks(data).length>=50)return alert('Byl dosažen limit 50 kampaní.');
   calendarCreating=true;calendarLanding=false;calendarUI=null;activeCalendarSection='overview';render();return;
@@ -23303,7 +23303,7 @@ document.addEventListener('click',e=>{
  }
  // Changing to another campaign really does replace active campaign data.
  // Keep that persistent transition blocked until the travel transaction ends.
- if(episodeStageBaseline)return alert('Přepnutí na jinou kampaň mění herní stav. Nejdříve dokončete nebo nouzově zrušte rozpracovanou cestovní epizodu. Otevření aktuálního kalendáře a ostatní prohlížení zůstává povolené.');
+ if(timeEpisodeMutationLocked())return alert(TRAVEL_CAMPAIGN_LOCK_MESSAGE);
  if(combatInitiativeSequence)return alert('Před přepnutím kampaně dokončete aktivní Initiative.');
  try{const next=switchCampaign(data,key);
   if(mutate(()=>{data.campaignClock=next.campaignClock;data.campaignClocks=next.campaignClocks;data.campaignActorBranches=next.campaignActorBranches;data.characters=next.characters;data.inventory=next.inventory;})){
@@ -23681,6 +23681,7 @@ document.addEventListener('submit',e=>{
  try{
   if(f.id!=='campaign-advance-form'&&v.gmConfirmed!=='yes')throw Error('GM musí potvrdit skutečný čas');
   if(f.id==='campaign-start-form'){
+   if(timeEpisodeMutationLocked())throw Error(TRAVEL_CAMPAIGN_LOCK_MESSAGE);
    if(data.campaignClock&&!calendarCreating)throw Error('Kalendář už existuje');
    const memberIds=new FormData(f).getAll('characterId').filter(id=>availableCampaignCharacters(data).some(c=>c.id===id));
    if(data.characters.length&&!memberIds.length)throw Error('Vyberte alespoň jednu postavu kampaně');
@@ -35765,7 +35766,7 @@ document.addEventListener('click',e=>{
  if(episodeUnresolvedGeneralStops93869(data.campaignClock).length){alert('Nejprve dořešte potvrzené přerušení z předchozí epizody.');return;}
  e.preventDefault();
  try{
-  if(sharedTimeWindowDraft||sharedTimeWindowQueue.length||episodeEvaluationRequested||episodeStageBaseline)
+  if(timeEpisodeMutationLocked())
    throw Error('Nejdříve dokončete nebo zrušte rozpracovaný interval.');
   const wanted=Number(document.querySelector('[data-shared-window-minutes]')?.value);
   const cap=episodeMandatoryWindow();
