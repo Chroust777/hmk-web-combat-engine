@@ -6,6 +6,7 @@ import {validateCombatState,applyConfirmedHit,combatFatigueTotals} from './persi
 import {humanLocation} from './hmk-mounted-fall-injury-join.js';
 import {compoundInjury,compoundCompatible} from '../rules/injury.js';
 import {successLevel,SL} from '../rules/tests.js';
+import {fateRoll93866} from './hmk-fate-routine-93866.js';
 import {calculateShockState,shockStateFromIndex,applyShockState,SHOCK_STATE} from '../rules/shock.js';
 import {resolveLiveCombatArmour} from './live-combat-armour.js';
 import {appendParallelColdShock} from './hmk-parallel-cold-shock.js';
@@ -37,7 +38,7 @@ function prepared({state,actor,sourceId,round,gmConfirmed}){
  * The caller must separately initiate the subsequent ongoing Cold Exposure.
  */
 export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6s,enduranceD100,
- gmConfirmed=false,originMinute=null}={}){
+ gmConfirmed=false,originMinute=null,fate=null}={}){
  const s=prepared({state,actor,sourceId,round,gmConfirmed}),id='skill-cold-shock:'+sourceId;
  requireIt(!s.events.some(e=>e.id===id),'Cold Shock tohoto ponoření už byl vyhodnocen');
  requireIt(['coolWater','coldWater','freezingWater'].includes(condition),'Studený šok vyžaduje doložené ponoření do chladné vody');
@@ -50,8 +51,15 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  const end=actor.hmk?.attributes?.end;
  requireIt(integer(end,1,200),'Chybí doložený END atribut');
  const endEML=end*5-combatFatigueTotals(s).total;
- const sl=successLevel(enduranceD100,endEML),base={coolWater:5,coldWater:6,freezingWater:7}[condition];
- const modifier={CF:2,F:1,S:0,CS:-1}[named(sl)],index=base+modifier;
+ const originalSL=named(successLevel(enduranceD100,endEML));
+ let sl=originalSL;
+ if(fate){
+  requireIt(fate.actorId===actor.id&&fate.skill==='Endurance'&&fate.originalLevel===originalSL&&
+   fate.originalD100===enduranceD100,'Fate neodpovídá tomuto Endurance hodu.');
+  sl=fateRoll93866({originalLevel:originalSL,eml:fate.eml,roll:fate.roll,csChoice:fate.csChoice??1}).afterLevel;
+ }
+ const base={coolWater:5,coldWater:6,freezingWater:7}[condition];
+ const modifier={CF:2,F:1,S:0,CS:-1}[sl],index=base+modifier;
  const stateName=reverse[shockStateFromIndex(index)];
  requireIt(stateName,'Neznámý Cold Shock Index');
  const oldShock=s.shock;
@@ -79,7 +87,7 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
   if(carryShock==='KIA'){s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
  }
  const report={condition,immersionRounds:d6s.reduce((a,b)=>a+b,0),d6s,enduranceD100,endEML,
-  sl:named(sl),base,index,modifier,shock:stateName,carryoverShock:carryShock,effectiveShock:s.shock,
+  sl,...(fate?{originalSL,fateProof:fate}:{}),base,index,modifier,shock:stateName,carryoverShock:carryShock,effectiveShock:s.shock,
   previousShock:oldShock,parallelCourseSource:parallel?sourceId:null,previousCoursePreserved:parallel||(!newIsStronger&&!!(s.shockFollowup||s.extendedShock||s.coma)),
   ...(supersededFollowup?{supersededFollowup,reason:'HMK p169: only the most severe current Shock State has a native Shock Reroll'}:{}),rulePage:185};
  s.events.push({id,type:'skill-cold-water-shock',round,details:{sourceId,report,gmConfirmed:true}});

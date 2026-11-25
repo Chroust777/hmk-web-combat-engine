@@ -51,9 +51,9 @@ function issueAction(p,esc){
  const marks=p.cancellable===false?'':p.origin==='gm'&&!p.resolution?
   `<button type="button" class="hc-small hc-event-mark" title="Potvrdit událost GM" aria-label="Potvrdit událost GM" data-cal-resolve="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="Zrušit událost GM" aria-label="Zrušit událost GM" data-cal-cancel="${id}">×</button>`:
   `<button type="button" class="hc-small hc-event-mark" title="${control==='rules'?'Přejít k povinnému pravidlovému vyhodnocení':'Označit událost jako zkontrolovanou – bez změny herních následků'}" aria-label="${control==='rules'?'Otevřít povinné vyhodnocení':'Zkontrolovat událost'}" data-cal-event-check="${id}">✓</button><button type="button" class="hc-small hc-event-mark" title="${control==='activity'||control==='nutrition'?'Přerušit probíhající interval':'GM: zrušit událost a navázané aktivní povinnosti'}" aria-label="Zrušit událost rozhodnutím GM" data-cal-event-remove="${id}">×</button>`;
- const text=p.cancellable===false?(p.status==='due'?'Otevřít Herblore ↗':'Zobrazit termín v Herblore ↗'):p.origin==='history'?'Deník ↗':p.origin==='activity'?'Činnost ↗':
+ const text=p.kind==='stable-healing'?'Otevřít veterinární Healing ve Stáji ↗':p.cancellable===false?(p.status==='due'?'Otevřít Herblore ↗':'Zobrazit termín v Herblore ↗'):p.origin==='history'?'Deník ↗':p.origin==='activity'?'Činnost ↗':
   p.origin==='gm'?'Otevřít ↗':p.origin==='hml'?'Kontrola ↗':'Detail ↗';
- const route=p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(p.cancellable===false?'Dovednosti a projekty · Herblore':eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" data-cal-concurrent-id="${esc(p.startId||'')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='gm'&&p.skill?`data-cal-skill="${esc(p.skill)}" data-cal-plan="${esc(p.id)}"`: ''} ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:'';
+ const route=p.characterId?`<button type="button" class="hc-small hc-event-link" title="${esc(p.kind==='stable-healing'?'Stáj · veterinární Healing':p.cancellable===false?'Dovednosti a projekty · Herblore':eventDestination(p))}" data-cal-link="${esc(p.characterId)}" data-cal-destination="${esc(p.destination||'healing')}" data-cal-kind="${esc(p.kind||'gm')}" ${p.kind==='stable-healing'?'data-cal-stable-healing="'+id+'"':''} data-cal-concurrent-id="${esc(p.startId||'')}" data-cal-source="${esc(p.sourceId||p.woundId||'')}" data-cal-elapsed="${esc(p.elapsedMinutes??'')}" ${p.origin==='gm'&&p.skill?`data-cal-skill="${esc(p.skill)}" data-cal-plan="${esc(p.id)}"`: ''} ${p.origin==='history'?`data-cal-history-id="${esc(p.sourceId)}"`:''}>${esc(text)}</button>`:'';
  return `${route}${marks}`;
 }
 
@@ -109,7 +109,7 @@ function compactNutritionTimelineEvents(events,journal){
  }
  return passthrough;
 }
-export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
+export function calendarBoardEvents({clock,characters=[],journal=[],additionalEvents=[]}={}){
  const agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock);
  // Animal recovery is a real calendar activity, but animals are NOT added
  // to the human party roster or to nutrition / medical due calculations.
@@ -130,16 +130,16 @@ export function calendarBoardEvents({clock,characters=[],journal=[]}={}){
        link.skillTestProof?.type==='critical-followup'&&link.skillTestProof.originId===p.originId))));
   return !unresolvedAccident;
  };
- const all=[...agenda.all.filter(p=>!travelTask(p)).map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal),...travelEpisodeCalendarSegments(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''}))];
+ const all=[...agenda.all.filter(p=>!travelTask(p)).map(p=>({...p,dueMinute:p.minute,origin:'hml',title:p.name+' · '+p.description,destination:calendarEventDestination(p)})),...passiveHMKCalendarMilestones(clock,characters),...calendarVisibleHistory(historicalHMKCalendarEntries(clock,characters,journal),journal),...calendarVisibleActivities([...calendarActorActivities(clock,activitiesCharacters,journal),...calendarNutritionConditionActivities(clock,characters,journal),...travelEpisodeCalendarSegments(clock,characters,journal)]),...custom.map(p=>({...p,origin:'gm',name:characters.find(x=>x.id===p.characterId)?.name||''})),...additionalEvents];
  const receipts=calendarUIReceipts(journal,clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`);
  const visible=compactNutritionTimelineEvents(all.filter(p=>receipts.get(p.id)!=='hide'&&!gmCalendarCancellationMatches(clock,p,journal)).map(p=>({...p,uiAcknowledged:receipts.get(p.id)==='acknowledge'})),journal)
   .filter(p=>receipts.get(p.id)!=='hide'&&!gmCalendarCancellationMatches(clock,p,journal)).map(p=>({...p,uiAcknowledged:p.uiAcknowledged||receipts.get(p.id)==='acknowledge'}));
  visible.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
  return visible;
 }
-export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,escapeHTML}={}){
+export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,escapeHTML,additionalEvents=[]}={}){
  const esc=escapeHTML,agenda=campaignCalendarAgenda(clock,characters,journal);
- const all=calendarBoardEvents({clock,characters,journal});
+ const all=calendarBoardEvents({clock,characters,journal,additionalEvents});
  // Index immutable evidence once. The day/hour/minute views otherwise scan
  // the entire character audit once per cell (30 + 24 + 60 repeated scans).
  const eventsByDay=new Map();

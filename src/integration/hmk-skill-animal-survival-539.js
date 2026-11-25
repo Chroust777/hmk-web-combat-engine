@@ -4,7 +4,7 @@
  */
 import {verifiedMountedShockML} from './hmk-mounted-live-animal-falling.js';
 import {previewStableAnimalAccident93862} from './hmk-animal-accident-anatomy-93862.js';
-import {woundFromFall} from './hmk-mounted-fall-injury-join.js';
+import {woundFromFall} from './hmk-mounted-fall-injury-join.js?v=94.118';
 import {projectLiveInjuries} from './live-injury-impairment.js';
 import {combatFatigueTotals,validateCombatState} from './persistent-combat-state.js';
 import {successLevel} from '../rules/tests.js';

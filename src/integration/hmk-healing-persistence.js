@@ -56,6 +56,11 @@ function accruePermanentImpairment(w,elapsedDays){
 function correctedMountedHealingRate(w,base){
  const penalty=w.mountedLegTreatmentHRModifier;
  if(penalty===undefined)return {rate:base,blocked:false};
+ // Older Survival Accident writers attached the mount-stumble penalty to
+ // any animal limb. Keep those existing wounds treatable at ordinary HR.
+ if(w.bodyKind==='animal'&&w.originDomain==='travel-accident'&&
+  ['flg','hlg','leg','wng'].includes(w.location)&&[-1,-2,-3].includes(penalty))
+  return {rate:base,blocked:false};
  requireRule(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&
   ({M:-1,S:-2,G:-3}[w.severity]===penalty)&&int(base,0,100),
   'Horse leg HR: neověřený druh zranění nebo postih');

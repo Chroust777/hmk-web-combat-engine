@@ -5,7 +5,7 @@
  */
 import {writingPageSpread} from './hmk-scribing-work.js?v=94.006';
 import {successLevel} from '../rules/tests.js';
-import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js';
+import {groupConfirmedDieControls93928} from './hmk-confirmed-dice-ui-93928.js?v=94.118';
 const SELECTOR='form[data-skill-critical-form],form[data-hmk-fishing-catch],form[data-herb-assess],form[data-herb-complete],form[data-weather-blood-start],'+
  'form[data-skill-cold-shock],form[data-weather-shock-followup],form[data-alchemy-finish],form[data-weather-trauma-course],form[data-weather-blood-complete],'+
  'form[data-faerie-roll],form[data-hmk-engineering-design],form[data-shipwright-roll],form[data-construction-roll],form[data-fletching-finish="roll"],form[data-brew-start],form[data-brew-wine],form[data-jewelcraft-work],form[data-writing-spread],form[data-script-reading]:not([data-script-reading="done"]),form[data-script-copy="test"],form[data-hmk-scribing-work],form[data-parallel-cold-reroll],form[data-parallel-cold-course],.hmk-weather-care form#hmk-frost-amputation-form';
@@ -51,7 +51,6 @@ function fieldsOf(form,kind){
  if(kind==='herbShelf')return ['shelfD6'];
  if(kind==='herbs')return [...form.querySelectorAll('input[name^="dice_"]')].map(n=>n.name);
  if(kind==='blood')return ['bandageD6Rolls'];
- if(kind==='immersion')return ['d6_1','d6_2','d6_3','enduranceD100'];
  if(kind==='shock')return ['roll',...(form.elements.namedItem('initialComaD10')?['initialComaD10']:[])];
  if(kind==='trauma')return ['roll',...(value(form,'kind')==='coma'?['periodD10']:[])];
  return ['cfWillD10','dissolutionD100','crucialShockD100',
@@ -168,9 +167,6 @@ function stepsFor(form,kind){
   const bp=Number(form.dataset.hmkBloodBp);
   if(value(form,'method')==='sta'&&Number.isInteger(bp)&&bp>0&&bp<=4)
    for(let i=0;i<bp;i++)add('bandage'+i,6,`Staunch · Blood Loss Point ${i+1}/${bp} · d6`,'bandageD6Rolls',i);
- }else if(kind==='immersion'){
-  for(let n=1;n<=3;n++)add('d6_'+n,6,'Doba ponoření · d6 '+n+'/3');
-  add('enduranceD100',100,'Cold Shock · Endurance d100');
  }else if(kind==='shock'){
   const primary=form.elements.namedItem('roll');
   if(primary&&!primary.disabled){
@@ -215,13 +211,99 @@ function stepsFor(form,kind){
  }
  return result;
 }
+// Immersion has two steps: a 3d6 group, then the independent Endurance test.
+function decorateImmersion(form,rollDie){
+ const duration=[1,2,3].map(i=>form.elements.namedItem('d6_'+i));
+ const endurance=form.elements.namedItem('enduranceD100');
+ const submit=form.querySelector('button[type=submit]');
+ const condition=form.elements.namedItem('condition');
+ const externallyDisabled=submit.disabled;
+ const accepted=new Map();
+ const makeButton=(label)=>{
+  const button=document.createElement('button');button.type='button';button.textContent=label;
+  return button;
+ };
+ const confirmDuration=makeButton('Vložit všechny 3d6');
+ const confirmEndurance=makeButton('Vložit Endurance d100');
+ const reset=makeButton('Změnit potvrzené hody');
+ duration.at(-1).closest('label').after(confirmDuration);
+ endurance.closest('label').after(confirmEndurance,reset);
+ const controls=[...duration,endurance].map(field=>{
+  const faces=Number(field.max);
+  const generate=field.nextElementSibling?.matches('button[data-hmk-general-auto-die]')?
+   field.nextElementSibling:makeButton('⚄ Generovat d'+faces);
+  if(!generate.isConnected){
+   field.after(generate);
+   generate.addEventListener('click',()=>{
+    field.value=String(rollDie(faces));field.dataset.hmkAutoDice=field.value;
+    refresh();field.focus();
+   });
+  }
+  groupConfirmedDieControls93928(field,generate);
+  return {field,generate};
+ });
+ const has=field=>field.value!==''&&field.value===accepted.get(field);
+ const valid=field=>die(field.value,Number(field.max));
+ function refresh(){
+  const durationReady=duration.every(has);
+  const pending=form.dataset.immersionFatePending==='yes';
+  if(condition.type!=='hidden')condition.disabled=pending;
+  for(const {field,generate} of controls){
+   field.disabled=externallyDisabled||(field===endurance&&!durationReady);
+   field.readOnly=pending||field!==endurance&&durationReady;
+   generate.disabled=field.disabled||field.readOnly;
+   field.closest('label').classList.toggle('hmk-simple-current-93915',!field.disabled&&!field.readOnly&&!has(field));
+  }
+  confirmDuration.disabled=externallyDisabled||pending||durationReady||!duration.every(valid);
+  confirmEndurance.disabled=externallyDisabled||pending||!durationReady||has(endurance)||!valid(endurance);
+  submit.disabled=externallyDisabled||pending||!durationReady||!has(endurance);
+  reset.hidden=!accepted.size;reset.disabled=pending;
+ }
+ confirmDuration.addEventListener('click',()=>{
+  if(confirmDuration.disabled)return;
+  for(const field of duration)accepted.set(field,field.value);
+  refresh();endurance.focus();
+ });
+ confirmEndurance.addEventListener('click',()=>{
+  if(confirmEndurance.disabled)return;
+  accepted.set(endurance,endurance.value);
+  refresh();submit.focus();
+ });
+ function clear(){
+  accepted.clear();
+  for(const {field} of controls){field.value='';delete field.dataset.hmkAutoDice;}
+  refresh();
+ }
+ condition.addEventListener('change',clear);
+ reset.addEventListener('click',()=>{clear();duration[0].focus();});
+ form.addEventListener('input',refresh);
+ form.addEventListener('hmk-immersion-refresh',refresh);
+ // A submit triggered by Enter must pass the same gates as the visible button.
+ const guard=event=>{
+  if(event.target!==form||!submit.disabled)return;
+  event.preventDefault();event.stopImmediatePropagation();
+ };
+ window.addEventListener('submit',guard,true);
+ const observer=new MutationObserver(()=>{
+  if(!form.isConnected){window.removeEventListener('submit',guard,true);observer.disconnect();}
+ });
+ observer.observe(form.closest('#app')||document.body,{childList:true,subtree:true});
+ refresh();
+}
 /** Add one UI queue per source form. Returns the number of new queues. */
 export function decorateConfirmedNoncombatChains93918(root,rollDie){
  if(!root||typeof rollDie!=='function')return 0;
  let decorated=0;
  for(const form of root.querySelectorAll(SELECTOR)){
   if(form.dataset.hmkConfirmedChain93918)continue;
-  const kind=kindOf(form),allNames=fieldsOf(form,kind);
+  const kind=kindOf(form);
+  if(kind==='immersion'){
+   form.dataset.hmkConfirmedChain93918=kind;
+   decorateImmersion(form,rollDie);
+   decorated++;
+   continue;
+  }
+  const allNames=fieldsOf(form,kind);
   // Owner's approved UI contract: a lone immediate INC/STN Shock d100 and
   // an Extended Shock Course d100 retain the ORIGINAL field, die button and
   // one final submit. Only UNC can branch into a mandatory Coma d10; only

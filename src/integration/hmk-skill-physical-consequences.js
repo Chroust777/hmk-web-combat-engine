@@ -2,9 +2,9 @@
  * Pure preview: no storage, invented dice or character mutations.
  * The caller commits the returned state and proof in one verified transaction.
  */
-import {prepareAnimalSurvivalAccident} from './hmk-skill-animal-survival-539.js';
+import {prepareAnimalSurvivalAccident} from './hmk-skill-animal-survival-539.js?v=94.118';
 import {fateEligibility93866,fateEML93866,fateRoll93866} from './hmk-fate-routine-93866.js';
-import {humanLocation,woundFromFall} from './hmk-mounted-fall-injury-join.js';
+import {humanLocation,woundFromFall} from './hmk-mounted-fall-injury-join.js?v=94.118';
 import {resolveLiveCombatArmour} from './live-combat-armour.js';
 import {resolveCombatantLoad} from './combatant-load.js';
 import {projectLiveInjuries} from './live-injury-impairment.js';

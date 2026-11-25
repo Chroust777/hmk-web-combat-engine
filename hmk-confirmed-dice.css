@@ -67,3 +67,9 @@
   outline: 1px solid #ac3a32;
   background-color: #fff4ef;
 }
+
+#app [data-accident-injury-dice][hidden],
+#app [data-weather-skin-confirm-group][hidden]{display:none!important;}
+.hmk-fate-dialog-93866 input[name="fateRoll"]:focus{
+  border-color:#b52b29;outline:2px solid #a52c32;outline-offset:1px;
+}

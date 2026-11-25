@@ -118,7 +118,7 @@ export function woundFromFall({state,character,round,timelineId,eventId,bodyKind
  evt.details.physicalDice={format:'hmk-manual-dice-proof-v1',rolls:cpy(physicalDice)};
  evt.details.falling={kind:bodyKind,aspect,AV,impact:strikeImpact,effectiveImpact,shockML,
   shockEML,shockRoll,shockSL:name[shockSL],originalShockSL:name[originalShockSL],fateShockProof:cpy(fateShockProof),compoundD10};
- if(['horse','animal'].includes(bodyKind)&&['flg','hlg','leg','wng'].includes(location)&&newInjury){
+ if(bodyKind==='horse'&&['flg','hlg'].includes(location)&&newInjury){
   const touched=[`wound:${eventId}`,comp?.compoundedExisting?.id].filter(Boolean);
   for(const wid of touched){
    const w=applied.wounds.find(x=>x.id===wid);
