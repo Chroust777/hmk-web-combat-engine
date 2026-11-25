@@ -15,7 +15,7 @@ import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-o
 import {allocateTrekModes} from './hmk-trekking-correction.js';
 import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js?v=93.957';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js?v=94.123';
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 import {incidentMinutes93863} from './hmk-incident-window-93863.js';
@@ -693,6 +693,25 @@ export function computeEpisodeTracking({mode='none',currentSkill=null,previous=n
   trackerId,context,trail:trailName,sv:witness.sv,level:witness.level,stars:witness.stars??null,
   roll:witness.roll??null,conditions:actual,modifier,score,sourceMode:mode,reusedFromEpisodeId:mode==='reuse'?previous.id:null};
 }
+export function episodeTrackingAwareness({journal,campaignId,minute,memo,skillId=null}){
+ const proof=(id,atMinute)=>id?episodeSkillProof(journal.find(row=>row.id===id),
+  'Awareness',memo.trackerId||memo.guideId,campaignId,atMinute):null;
+ if(memo.sourceMode==='reuse'){
+  const prior=journal.find(row=>row.id===memo.reusedFromEpisodeId&&row.calendarCampaignId===campaignId);
+  const episode=prior?.calendarTimeEpisode;
+  if(episode?.endMinute===minute&&episode.trackingMemory?.skillId===memo.skillId&&
+     episode.trackingMemory?.trail===memo.trail){
+   const followup=episode.trackingFollowup;
+   const earlier=journal.find(row=>row.id===followup?.awarenessSkillId);
+   if(earlier?.campaignMinute<=episode.startMinute){
+    const inherited=proof(earlier.id,earlier.campaignMinute);
+    if(inherited&&inherited.level===followup.awarenessLevel&&(!skillId||skillId===inherited.skillId))return inherited;
+   }
+  }
+ }
+ // Older receipts may have rolled Awareness again during a continuation.
+ return proof(skillId,minute);
+}
 export function episodeNavigationState(previous,newDirection=null,{recovered=false,redirected=false,lostPriority=false}={}){
  const p=previous?.calendarTimeEpisode;
  const earlier=p?.navigationState||
@@ -1038,8 +1057,12 @@ export function validateTimeEpisodes(journal=[]){
     awarenessLevel:t.awarenessLevel,spoorSpent:originalV2Overcap?Math.min(t.spoorSpent,5):t.spoorSpent});
    if(originalV2Overcap){expected.spoorStars=t.adjustedSV-4;expected.spoorSpent=t.spoorSpent;
     expected.trailCapacity=expected.spoorStars-t.spoorSpent;}
-   const skill=t.awarenessSkillId?journal.find(x=>x.id===t.awarenessSkillId):null;
-   const aw=skill?episodeSkillProof(skill,'Awareness',m.trackerId||m.guideId,j.calendarCampaignId,e.startMinute):null;
+   // Before v94.123 a successful Observation recorded its flag but displayed zero stars.
+   if(expected.hasOneSpoor&&t.hasOneSpoor&&t.spoorStars===0&&t.spoorSpent===0&&t.trailCapacity===0){
+    expected.spoorStars=0;expected.trailCapacity=0;
+   }
+   const aw=t.awarenessSkillId?episodeTrackingAwareness({journal,campaignId:j.calendarCampaignId,
+    minute:e.startMinute,memo:m,skillId:t.awarenessSkillId}):null;
    must(t.awarenessLevel===(aw?.level||null)&&
     JSON.stringify(t)===JSON.stringify({...expected,awarenessSkillId:t.awarenessSkillId}),
     'Tracking Awareness/Spoor neodpovídá skutečnému Skill Testu.');
