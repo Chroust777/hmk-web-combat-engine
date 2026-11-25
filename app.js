@@ -29,7 +29,7 @@ import {planFixedEpisode93773,fixedAccidentMinute93773} from './src/integration/
 import {incidentMinutes93863} from './src/integration/hmk-incident-window-93863.js';
 import {randomEpisodeMinute93868,deferredEpisodeEvent93868,validateDeferredEpisodeEvent93868,actualGroupMovement93868,splitEpisodeEndDice93868} from './src/integration/hmk-episode-interruption-93868.js';
 import {UNIVERSAL_STOP_REASONS_93869,confirmUniversalStop93869,validateUniversalStop93869,effectiveActivityMinutes93869,UNIVERSAL_STOP_RESOLUTION_FORMAT_93869} from './src/integration/hmk-universal-window-interruption-93869.js';
-import {captureSharedActivityDelta93769,replaySharedActivityDelta93769,verifySharedActivityQueue93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
+import {captureSharedActivityDelta93769,replaySharedActivityDelta93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
 import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js?v=94.099';
 import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.118';
+const APP_VERSION='94.119';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2561,6 +2561,27 @@ function episodeStagedRows(working){
  // automatically generated related proof rows (not only the linked test).
  return (working.journal||[]).filter(j=>!original.has(j.id));
 }
+function applyEpisodeSkillFate(database,rows){
+ for(const row of rows){
+  if(!row.calendarEpisodeSkillLink)continue;
+  for(const fate of [row.skillTestProof?.fate,row.skillTestProof?.fateB]){
+   if(fate)hmkApplyFateReceipt93866(fate,fate.actorId,undefined,
+    database.characters.find(actor=>actor.id===fate.actorId)??null);
+  }
+ }
+}
+function replayEpisodeActivities(database,rows,activities,replay){
+ // Each activity was prepared after its own Skill Tests. A later test
+ // by the same actor must not change the earlier activity's input witness.
+ const reapplied=new Set();
+ for(const entry of activities){
+  const tests=rows.filter(row=>!reapplied.has(row.id)&&row.calendarEpisodeSkillLink?.episodeEpoch===entry.epoch);
+  applyEpisodeSkillFate(database,tests);
+  for(const row of tests)reapplied.add(row.id);
+  replay(database,entry);
+ }
+ applyEpisodeSkillFate(database,rows.filter(row=>!reapplied.has(row.id)));
+}
 function rebaseEpisodeWorkingCopy(committed,working){
  const next=structuredClone(committed),ids=new Set(next.journal.map(j=>j.id));
  // A shared-window scratch may contain full PREPARED episodes (with a
@@ -2568,10 +2589,12 @@ function rebaseEpisodeWorkingCopy(committed,working){
  // may cross an unrelated same-minute mutation. The travel episode patches
  // themselves must remain in the private queue until the ONE final commit.
  const preparedIds=sharedTimeWindowDraft?new Set(sharedTimeWindowQueue.flatMap(q=>(q.patch?.journal||[]).map(j=>j.id))):null;
+ const staged=[];
  for(const row of episodeStagedRows(working)){
   if(preparedIds?.has(row.id))continue;
   if(ids.has(row.id))throw Error('Duplicitní Skill receipt při rebase epizody');
-  next.journal.push(structuredClone(row));ids.add(row.id);
+  const copy=structuredClone(row);
+  next.journal.push(copy);staged.push(copy);ids.add(row.id);
  }
  validate(next);
  if(sharedTimeWindowDraft){
@@ -2580,13 +2603,14 @@ function rebaseEpisodeWorkingCopy(committed,working){
   const preview=structuredClone(next),oldData=data;
   try{
    data=preview;
-   for(const entry of sharedTimeWindowQueue){
+   replayEpisodeActivities(preview,staged,sharedTimeWindowQueue,(database,entry)=>{
     if(sharedTravelInputWitness93768(entry.witnessIds)!==entry.witness)
      throw Error('Nesouvisející zápis změnil účastníka rozpracovaného pochodu. Nejprve přehodnoťte skupinu.');
-    replaySharedActivityDelta93769(preview,entry.patch);
-   }
+    replaySharedActivityDelta93769(database,entry.patch);
+   });
   }finally{data=oldData;}
  }
+ applyEpisodeSkillFate(next,staged);
  return next;
 }
 /** Token only detects a changed authoritative baseline; it never replaces CAS. */
@@ -2617,7 +2641,7 @@ function sharedPrepareGroupScratch93769(groupId=null,{forCommit=false}={}){
  const original=new Set(base.journal.map(j=>j.id));
  for(const row of rows){if(original.has(row.id))throw Error('Duplicitní Skill doklad.');base.journal.push(structuredClone(row));original.add(row.id);}
  const acts=sharedTimeWindowQueue.filter(q=>q.groupId===groupId);
- for(const entry of acts)replaySharedActivityDelta93769(base,entry.patch);
+ if(!forCommit)replayEpisodeActivities(base,rows,acts,(database,entry)=>replaySharedActivityDelta93769(database,entry.patch));
  // Confirmed daily weather is an area/day fact available to other groups;
  // publish it only inside this private working copy. It is still uncommitted.
  for(const entry of sharedTimeWindowQueue)if(!forCommit&&entry.groupId!==groupId)
@@ -2638,16 +2662,16 @@ function sharedValidateWitnessQueue93769(list){
  const original=data;
  try{
   const base=structuredClone(episodeStageBaseline||data);
-  const savedIds=new Set(base.journal.map(j=>j.id));
-  for(const row of sharedUncommittedSkillRows93769())if(!savedIds.has(row.id)){
+  const savedIds=new Set(base.journal.map(j=>j.id)),rows=sharedUncommittedSkillRows93769();
+  for(const row of rows)if(!savedIds.has(row.id)){
    base.journal.push(row);savedIds.add(row.id);
   }
   data=base;
-  for(const entry of list){
+  replayEpisodeActivities(base,rows,list,(database,entry)=>{
    if(sharedTravelInputWitness93768(entry.witnessIds)!==entry.witness)
     throw Error('Změnil se stav nebo vybavení účastníka '+entry.label+'.');
-   replaySharedActivityDelta93769(data,entry.patch);
-  }
+   replaySharedActivityDelta93769(database,entry.patch);
+  });
   return true;
  }finally{data=original;}
 }
@@ -2711,7 +2735,11 @@ function restoreEpisodeDraftSidecar(){
    const committed=structuredClone(data),originalIds=new Set(committed.journal.map(j=>j.id));
    if(side.rows.some(j=>originalIds.has(j.id)))throw Error('Doklad již byl potvrzen.');
    const working=structuredClone(committed);working.journal.push(...structuredClone(side.rows));
-   const replay=side.sharedQueue.length?verifySharedActivityQueue93769(working,side.sharedQueue):working;
+   const replay=structuredClone(working);
+   replayEpisodeActivities(replay,side.rows,side.sharedQueue,(database,entry)=>{
+    if(entry.patch?.activityId!==entry.sourceId)throw Error('Neplatný doklad činnosti.');
+    replaySharedActivityDelta93769(database,entry.patch);
+   });
    if(side.sharedPlans.some(p=>p.episodeRowV===3)&&!side.sharedPlans.every(p=>p.episodeRowV===3))
     throw Error('Neplatná kombinace starého a nového plánovače.');
    const planned=side.sharedPlans.every(p=>p.episodeRowV===3)?planFixedEpisode93773(side.sharedWindow,side.sharedPlans,
@@ -2728,6 +2756,7 @@ function restoreEpisodeDraftSidecar(){
     throw Error('Poškozený nebo neplatný plán skupin.');
    if(replay.journal.filter(j=>j.calendarTimeEpisode?.sharedWindowId===side.sharedWindowId).length!==side.sharedQueue.length)
     throw Error('Chybí nezávislé epizody.');
+   applyEpisodeSkillFate(working,side.rows);
    data=working;episodeStageBaseline=(side.rows.length||side.sharedQueue.length)?committed:null;
    sharedTimeWindowDraft=structuredClone(side.sharedWindow);
    sharedTimeWindowQueue=structuredClone(side.sharedQueue);
@@ -2762,7 +2791,7 @@ function restoreEpisodeDraftSidecar(){
  const committed=structuredClone(data),ids=new Set(data.journal.map(j=>j.id));
  if(side.rows.some(j=>ids.has(j.id)))return;
  const working=structuredClone(data);working.journal.push(...structuredClone(side.rows));
- try{validate(working);}catch{return;}
+ try{applyEpisodeSkillFate(working,side.rows);validate(working);}catch{return;}
  data=working;episodeStageBaseline=committed;
  episodeDraftEpoch=side.epoch;timeEpisodeDraft=side.draft||{};
  episodePendingSkillRequest=side.request??null;episodeActiveSkillRequestId=side.activeRequestId??null;
@@ -20098,9 +20127,8 @@ async function hmkFateModal93866({actor,skill,group,original,attributeTest=false
   });
  })}finally{dlg.close?.();dlg.remove();hmkFateDialogActive93866=false;}
 }
-function hmkApplyFateReceipt93866(fate,actorId,context){
+function hmkApplyFateReceipt93866(fate,actorId,context,actor=character(actorId)){
  if(!fate)return;
- const actor=character(actorId);
  if(!actor||actor.id!==fate.actorId||actor.kind!=='PC'||actor.hmk?.fatePoints!==fate.fpBefore)
   throw Error('Fate nelze uložit: původní FP nebo identita postavy se mezitím změnily.');
  const live=hmkFateSkillContext93866(actor,fate.skill,context);
@@ -31006,6 +31034,14 @@ function episodeConfigureOrienteeringAssist93818(field){
   if(form)refreshSkillAutoPreview(form);
  }
 }
+function focusEpisodeSkillRoll(field){
+ const form=document.getElementById(episodeSkillNeedsSV(field)?'skill-value-form':'skill-secondary-form');
+ const die=form?.elements.namedItem('rollA');
+ if(die&&!die.disabled){
+  die.scrollIntoView({block:'center',behavior:'auto'});
+  die.focus({preventScroll:true});
+ }
+}
 function episodeStartSkillRequest(field,skill,actorId){
  const clock=data.campaignClock,form=document.querySelector('#hmk-time-episode-form');
  if(form&&(/hazard/i.test(field)||/Complication/i.test(field))){try{episodeHazardRequireConfirmed93840(form)}catch(err){alert(err.message);return false;}}
@@ -31080,7 +31116,8 @@ function episodeStartSkillRequest(field,skill,actorId){
    episodeActiveSkillRequestId=previous.id;episodeSkillReturnPending=true;
    skillCompletion93928=null; // this is an explicit travel Skill request, not an automatic repeat
    selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
-   skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;render();episodeSelectRequestedDroverSkill93816(field,skill);episodeConfigureOrienteeringAssist93818(field);return true;
+   skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;
+   render();episodeSelectRequestedDroverSkill93816(field,skill);episodeConfigureOrienteeringAssist93818(field);focusEpisodeSkillRoll(field);return true;
   }
   alert('Nejdříve dokončete již otevřený Skill Test. Další žádost nesmí přepsat rozpracovaný hod.');
   return false;
@@ -31092,7 +31129,7 @@ function episodeStartSkillRequest(field,skill,actorId){
  timeEpisodeDraft={...timeEpisodeDraft,[field]:''};
  selected=actorId;view='skills';activeSkillTab=episodeSkillNeedsSV(field)?'value':'secondary';
  skillSVChoice595=episodeSkillNeedsSV(field)?{actorId,kind:'ordinary',value:skill}:null;
- render();episodeSelectRequestedDroverSkill93816(field,skill);episodeConfigureOrienteeringAssist93818(field);return true;
+ render();episodeSelectRequestedDroverSkill93816(field,skill);episodeConfigureOrienteeringAssist93818(field);focusEpisodeSkillRoll(field);return true;
 }
 function episodeFormRestore(form,draft){
  if(!form||!draft)return;
@@ -35956,6 +35993,7 @@ document.addEventListener('click',e=>{
   if(sharedTimeWindowPlans.length&&(sharedPlanState93771().errors.length||sharedTimeWindowPlans.some(p=>!p.done)||sharedTimeWindowPlans.length!==sharedTimeWindowQueue.length))
    throw Error('Nejsou dokončeny všechny plánované karty skupin.');
   const list=[...sharedTimeWindowQueue];
+  const stagedSkills=sharedUncommittedSkillRows93769();
   if(sharedTimeWindowPlans.every(p=>p.episodeRowV===3)){
    const check=planFixedEpisode93773(sharedTimeWindowDraft,sharedTimeWindowPlans,sharedWeatherSources93772().map(w=>w.id));
    if(check.errors.length||list.length!==check.scheduled.length)throw Error('Pevná epizoda má neplatné nebo neúplné činnosti.');
@@ -35980,11 +36018,11 @@ document.addEventListener('click',e=>{
   const names=list.map(x=>x.memberNames.join(', ')).join(' | ');
   // The explicit 'Potvrdit celé okno' button IS the GM confirmation; no second dialog.
   if(!mutate(()=>{
-   for(const entry of list){
+   replayEpisodeActivities(data,stagedSkills,list,(database,entry)=>{
     if(sharedTravelInputWitness93768(entry.witnessIds)!==entry.witness)
      throw Error('Změna stavu/ENC skupiny mezi přípravou a trvalým potvrzením.');
-    replaySharedActivityDelta93769(data,entry.patch);
-   }
+    replaySharedActivityDelta93769(database,entry.patch);
+   });
    data.journal.push({id:uuid(),characterId:list[0].memberIds?.[0]||sharedTimeWindowDraft.groups[0]?.memberIds[0],calendarCampaignId:authorized.campaignId,campaignMinute:authorized.startMinute,
     createdAt:stamp(),title:'HMK · společné časové okno · '+authorized.minutes+' min',
     body:'GM potvrdil '+list.length+' nezávislých činností: '+names+'.',calendarTimeWindow:authorized});
