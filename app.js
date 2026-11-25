@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.114';
+const APP_VERSION='94.115';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7362,7 +7362,7 @@ const JOURNAL_ANATOMICAL_LOCATIONS=[['sk','Skull',5],['fa','Face',4],['nk','Neck
 const JOURNAL_ZN_GROUPS={sk:['Head','1',3],sh:['Arms','2–3',5],tx:['Torso','4–7',3],th:['Legs','8–10',4]};
 const JOURNAL_LN_RANGES={sk:'1–5',fa:'6–8',nk:'9–10',sh:'1–3',ua:'4–6',el:'7',fo:'8–9',ha:'10',tx:'1–4',ab:'5–7',pv:'8–10',th:'1–4',kn:'5',ca:'6–8',ft:'9–10'};
 function journalWoundCareButton(actor,wound,label){
- if(!wound.id||wound.healed)return '';
+ if(!wound.id||wound.healed||persistentStateOf(actor).shock==='KIA')return '';
  return ` <button type="button" class="secondary journal-wound-care" data-wound-treatment="${esc(wound.id)}"
   data-wound-patient="${esc(actor.id)}" aria-label="${esc('Léčba · '+label)}">Léčba</button>`;
 }
@@ -16665,7 +16665,8 @@ function hskMainNoncombatCourseHTML(actor,clock,state,kind){
 let hskWeatherHealthLastReceipt=null;
 function hskWeatherHealthConsequences(actorId,{stable=false}={}){
  const entries=data.journal.filter(x=>x.characterId===actorId);
- const success=hskWeatherHealthLastReceipt?.actorId===actorId?
+ const success=hskWeatherHealthLastReceipt?.actorId===actorId&&
+  hskWeatherHealthLastReceipt.campaignId===campaignKey(data.campaignClock)?
   `<p class="hc-health-result" role="status" aria-live="polite">${esc(hskWeatherHealthLastReceipt.message)}</p>`:'';
  const weatherShock=hskWeatherShockFollowup(actorId);
  const parallel=hskParallelColdHealthPanel(actorId);
@@ -18531,10 +18532,11 @@ document.addEventListener('submit',event=>{
      sourceEventId:id,woundId,patientId:actor.id,healerId:healer?.id??null,
      dueMinute:start?outcome.dueMinute:clock.minute,bandagesUsed:bandageNeed,bandageD6}});
   }))throw Error('Zdravotní stav nebyl bezpečně uložen');
-  hskWeatherHealthLastReceipt={actorId:actor.id,message:start?
+  hskWeatherHealthLastReceipt={actorId:actor.id,campaignId:campaignKey(data.campaignClock),message:start?
    'Zahájeno 5minutové ošetření. Kalendář posuňte přesně na '+displayCampaignMinute(outcome.dueMinute)+
     '; teprve potom potvrďte skutečný Physician d100 a případný Strength d100.':
-   'Pětiminutový zdravotní interval zapsán: '+(outcome.stopped?'Bleeder zastaven.':'krvácení pokračuje.')+
+   'Pětiminutový zdravotní interval zapsán: '+
+    (outcome.shock==='KIA'?'Postava podlehla ztrátě krve.':outcome.stopped?'Bleeder zastaven.':'krvácení pokračuje.')+
     ' BP '+outcome.bp+'/4, Shock '+outcome.shock+
     (outcome.nextDueMinute?' · další interval '+displayCampaignMinute(outcome.nextDueMinute):'')};
   if(stableRoute){selected=actor.hmk.livestockOwnerId;stableOwnerFocusedId=actor.id;activeSheetSection='stable';}
@@ -18689,7 +18691,7 @@ document.addEventListener('submit',event=>{
   const after=outcome.state,still=isNoncombatMedicalOrigin(after.shockFollowup?.domain);
   const pendingWeatherMishap=unresolvedInjuryMishaps(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,after.events))));
   const pendingWeatherMorale=dueInjuryMorale(after).some(m=>after.wounds.some(w=>w.id===m.woundId&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,after.events))));
-  hskWeatherHealthLastReceipt={actorId:actor.id,message:'Shock d100 '+roll+' → '+sl+' byl zapsán v '+displayCampaignMinute(clock.minute)+'. Aktuální Shock: '+after.shock+'. '+
+  hskWeatherHealthLastReceipt={actorId:actor.id,campaignId:campaignKey(data.campaignClock),message:'Shock d100 '+roll+' → '+sl+' byl zapsán v '+displayCampaignMinute(clock.minute)+'. Aktuální Shock: '+after.shock+'. '+
    (after.coma?.active?'V Kalendáři jsou termíny Coma Course'+(after.extendedShock?' a Extended Shock Course':'')+'. Otevři splatný krok tlačítkem Kontrola.':
     after.extendedShock?'V Kalendáři je další Extended Shock Course za čtyři hodiny. Otevři jej tlačítkem Kontrola.':
     alchemy?(still?'Postava je STN. Po další skutečné akci potvrď nový Shock d100.':'Tělesný Shock skončil. Aural Shock má samostatnou povinnost pro zotavení.'):
@@ -18785,7 +18787,7 @@ document.addEventListener('submit',event=>{
       originalSkillProofId:onsetReceipt.skillTestProof.originalSkillProofId}: {})}});
   }))throw Error('Kožní zranění nelze uložit');
   const after=persistentStateOf(actor),newWounds=outcome.report.wounds.length;
-  hskWeatherHealthLastReceipt={actorId:actor.id,message:'Kožní následky byly uloženy: '+newWounds+' ran'+(newWounds===1?'a':newWounds>1?'y':'')+'. '+
+  hskWeatherHealthLastReceipt={actorId:actor.id,campaignId:campaignKey(data.campaignClock),message:'Kožní následky byly uloženy: '+newWounds+' ran'+(newWounds===1?'a':newWounds>1?'y':'')+'. '+
    (after.shock==='KIA'?'KIA potvrzeno. '+outcome.report.skippedAfterKIA.length+
     ' dalších lokací má zachované doklady hodů, bez dalších zásahů po smrti.':
     isNoncombatMedicalOrigin(after.shockFollowup?.domain)?'Nyní je nutný Shock Reroll; Treatment zatím čeká.':
@@ -22862,7 +22864,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
  }
  if(kind==='treatment'&&isNoncombatMedicalOrigin(persistentStateOf(actor).shockFollowup?.domain)){
   const pending=persistentStateOf(actor).shockFollowup;
-  hskWeatherHealthLastReceipt={actorId:actor.id,message:'Treatment této rány zůstává v Kalendáři správně evidován. Nejprve je však povinný jeden Shock Reroll aktuálního stavu postavy (ne samostatný hod za každou ránu). Po jeho úspěšném zápisu aplikace ukáže následující zdravotní krok.'};
+  hskWeatherHealthLastReceipt={actorId:actor.id,campaignId:campaignKey(data.campaignClock),message:'Treatment této rány zůstává v Kalendáři správně evidován. Nejprve je však povinný jeden Shock Reroll aktuálního stavu postavy (ne samostatný hod za každou ránu). Po jeho úspěšném zápisu aplikace ukáže následující zdravotní krok.'};
   render();
   return focusCalendarRuleAction(actor,'weather-shock',pending.sourceId);
  }
@@ -26883,6 +26885,13 @@ function hmkSheet(c){
  */
 function gmWoundObligationSummary(c,w){
  const state=persistentStateOf(c),h=w.healing||{},details=[];
+ if(state.shock==='KIA'){
+  details.push('KIA · záznam rány');
+  if(w.amputation?.severed===true)details.push('trvalá amputace konkrétní rány');
+  const consequences=gmWoundConsequenceAssessment(state,w.id);
+  if(consequences.bloodPoints>0)details.push('Blood Loss BP '+consequences.bloodPoints+' / '+consequences.blood);
+  return {details,procedures:[],consequences};
+ }
  if(w.bleeding)details.push('Bleeder / Blood Stoppage');
  if(h.infected)details.push('denní Infection Course');
  if(h.grimWound)details.push('denní Grim Wound Shock');
@@ -27007,7 +27016,8 @@ function gmWoundManagementPanel(c,{inlineBlood=false}={}){
  const label=w=>medicalWoundOptionLabel(c,w,live.wounds.findIndex(x=>x.id===w.id)+1).slice(c.name.length+3);
  const options=open.map(w=>`<option value="${esc(w.id)}">${esc(label(w))}</option>`).join('');
  const resumeWound=interruptedTreatmentWound(c),shockAid=extendedShockAidContext965(c);
- const treatmentReady=!concurrentTreatmentBlockerText(concurrentTreatmentBlockers(live))&&
+ const deceased=live.shock==='KIA';
+ const treatmentReady=!deceased&&!concurrentTreatmentBlockerText(concurrentTreatmentBlockers(live))&&
   !unresolvedInjuryMishaps(live).length&&!dueInjuryMorale(live).length&&
   !live.wounds.some(w=>w.healing?.infected);
  const woundRows=open.map(w=>{
@@ -27025,12 +27035,12 @@ function gmWoundManagementPanel(c,{inlineBlood=false}={}){
   const labelText=upcoming?'Otevřít průběh ošetření':w.bleeding?'Přejít k zastavení krvácení':
    mayChoose?(healers.length?'Otevřít Treatment':'Otevřít postup bez dostupného léčitele'):
    live.extendedShock?'Přejít k Extended Shock Course':'Pokračovat ke zdravotnímu kroku';
-  const action=(upcoming||(!blood&&(!w.healing||w.bleeding||w.healing?.nextHealingDay!=null||w.healing?.infected)))?
+  const action=!deceased&&(upcoming||(!blood&&(!w.healing||w.bleeding||w.healing?.nextHealingDay!=null||w.healing?.infected)))?
    `<button type="button" data-wound-treatment="${esc(w.id)}">${labelText}</button>`:'';
   return `<article class="panel" data-gm-wound-row="${esc(w.id)}"><div class="list-row"><div><b>${esc(label(w))}</b>
    <div class="tiny muted">${esc(items.details.join(' · ')||'Bez dalších doložených termínů')}</div><p data-wound-next-message role="status"></p></div>
    <button type="button" class="danger" data-gm-select-wound="${esc(w.id)}" ${allowed?'':'disabled'}>Odstranit ránu (GM)</button></div>
-   ${blood}${extendedShockAidPanel965(c,w,shockAid)}${healerChoice}${action}</article>`;
+   ${blood}${deceased?'':extendedShockAidPanel965(c,w,shockAid)}${healerChoice}${action}</article>`;
  }).join('');
  return `<section class="panel wide" id="hmk-wound-management" data-gm-wound-manager="${esc(c.id)}"><h3>Zranění · společná zdravotní evidence GM</h3>
  <p class="muted">Pro boj, cestování i jinou událost se používá tentýž zdravotní stav a kalendář. <b>Odstranit ránu úplně (GM)</b> znamená ukončit její doložené akutní i trvalé následky včetně Shock, Coma, Blood Loss, trvalé újmy a navázaných povinností; bez dalších polí pro Shock, Coma nebo Blood Loss. Běžné zhojení může trvalé následky ponechat. Historie původních událostí a hodů zůstává zachována.</p>
@@ -27129,6 +27139,7 @@ document.addEventListener('submit',event=>{
 },true);
 function openWoundMedicalStep(actor,woundId,{healerId}={}){
  const clock=data.campaignClock,state=actor&&persistentStateOf(actor);
+ if(state?.shock==='KIA')return;
  const w=state?.wounds.find(x=>x.id===woundId&&!x.healed);
  if(!w)return;
  const operation=clock&&openConcurrentProcedures(clock).find(p=>p.characterId===actor.id&&p.woundId===w.id);
