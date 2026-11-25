@@ -223,9 +223,9 @@ import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,travelBloodStoppageEML,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
-import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.109';
+import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.110';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
-import {calendarEventDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.107';
+import {calendarEventDestination,noncombatHealthDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.110';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
 import {episodeWeatherAftercareId} from './src/integration/hmk-calendar-automatic-followups.js?v=94.018';
 import {mandatoryCalendarWindow,groupConcurrentObligations} from './src/integration/hmk-calendar-chronology.js';
@@ -334,7 +334,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation} from './src/integration/hmk-calendar-multi-campaign.js';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.033';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.110';
 import {operationalProjectJournal,projectKind,projectEnded,validateProjectCancellations,assertProjectCancellationsAppendOnly} from './src/integration/hmk-project-cancellation-94017.js';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.109';
+const APP_VERSION='94.110';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4956,7 +4956,7 @@ function campaignCalendarView(){
   activeCalendarSection==='provisions'?`${provisionScopeTabsHTML()}${provisionScope==='party'?`${partyProvisionWizardHTML(provisionParticipants,clock,{supplyHTML,nutritionHTML,activityNeedsHTML})}`:`${provisionGuideHTML(provisionParticipants)}${personalProvisionRulebookHTML(provisionParticipants.find(c=>c.id===provisionGuideActorId)||provisionParticipants[0],dailyPolicyMap,upcomingConditions,dayPlans,clock)}`}`:
   `${membersHTML}${legacyOriginPanel}<details class="hc-advanced" open><summary>Pokročilé potvrzování počátků HMK procedur, časový audit a původní formulář posunu</summary><h2>Autoritativní evidence HMK</h2><section class="panel"><h3>${esc(clock.label||'Kampaň')} · ${esc(displayCampaignMinute(clock.minute))}</h3><p class="muted">Jediný potvrzený čas v minutách. Kola boje zůstávají oddělená. Čas potvrzuje GM. Podporované hody lze provést kryptografickým generátorem nebo zadat ručně; pravidlové vyhodnocení ukládá původní modul.</p>
  <p class="tiny">Přes nevyřešený doložený termín nelze přeskočit. Neznámé historické počátky jsou označeny a nelze je automaticky dopočítat.</p></section>
- ${deferredHealthHTML}${moraleCalendarHTML}<section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Zdravotní následky cestování vyřešte ve Zdraví & Expozice. Kalendář pouze hlídá čas a nevytváří paralelní zdravotní zápisy; skutečný boj zahajuje GM samostatně.</p>${button('Přejít k léčebným procedurám','calendar-to-encounter')}</section>
+ ${deferredHealthHTML}${moraleCalendarHTML}<section class="panel"><h3>Splatné události · ${agenda.due.length}</h3>${agenda.due.length?renderDueGroups(agenda.due):'<p class="muted">Žádná doložená událost není splatná.</p>'}<p class="tiny">Zdravotní následky cestování vyřešte ve Zdraví & Expozice. Kalendář pouze hlídá čas a nevytváří paralelní zdravotní zápisy; skutečný boj zahajuje GM samostatně.</p></section>
  <section class="panel"><h3>Následující termíny · ${agenda.future.length}</h3>${agenda.future.length?agenda.future.slice(0,100).map(renderItem).join(''):'<p class="muted">Žádná další doložená splatnost.</p>'}</section>
  <section class="panel"><h3>Historické rány – potvrzení počátku · ${unresolved.length}</h3><p>Starší rány nepřevádíme automaticky z čísla bojového kola. Zadejte jejich skutečný věk v celých dnech a zbývajících hodinách/minutách.</p>${anchorOptions?`<form id="campaign-anchor-wound-form"><label>Rána<select name="wound" required>${anchorOptions}</select></label><div class="field-grid">${field('days','Počet uplynulých dní',0,'number')}${field('hours','Další hodiny',0,'number')}${field('minutes','Další minuty',0,'number')}</div><label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený okamžik zranění</label><button type="submit">Ukotvit historickou ránu</button></form>`:'<p>Všechny existující otevřené rány mají doložený počátek.</p>'}</section>
  <section class="panel"><h3>Další historické procedury</h3>${timeOrigins.length?`<form id="campaign-anchor-procedure-form"><label>Procedura<select name="origin" required>${timeOrigins.map(x=>`<option value="${esc(x.kind+'::'+x.characterId+(x.episodeId?'::'+x.episodeId:''))}">${esc(x.label)} (${x.unit})</option>`).join('')}</select></label>${field('days','Skutečně uplynulé dny',0,'number')}${field('hours','Zbývající hodiny',0,'number')}${field('minutes','Zbývající minuty',0,'number')}<label><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje počátek procedury</label><button type="submit">Ukotvit proceduru</button></form>`:'<p>Žádná další aktivní procedura nepotřebuje potvrzení počátku.</p>'}</section>
@@ -16474,7 +16474,7 @@ function hskWeatherBleedingCarePanel(actorId,woundId=null){
 function hskEnvironmentalWoundCarePanel(actor){
  const health=persistentStateOf(actor);
  const pending=health.wounds.some(w=>!w.healed&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,health.events)));
- if(!pending)return '';
+ if(!pending&&!(health.bloodLoss?.bp>0&&noncombatHealthDestination({kind:'blood-loss'},health)))return '';
  if(health.shock==='KIA')return '<p class="notice">Stav KIA. Záznamy ran zůstávají v historii a léčebné hody se již neprovádějí.</p>';
  if(persistentStateOf(actor).wounds.some(w=>w.bleeding&&isNoncombatMedicalOrigin(medicalOriginOfWound(w,persistentStateOf(actor).events))))
   return '<p class="notice">Před dalším Treatment nebo Healing nejprve uzavřete Blood Stoppage v Zdraví & Expozice.</p>';
@@ -16587,9 +16587,11 @@ function hskWeatherTraumaCourseForm(actorId){
  const due=agenda.due.filter(x=>x.characterId===actorId&&['extended-shock','coma'].includes(x.kind)&&
   !x.sourceId&&((x.kind==='extended-shock'&&isNoncombatMedicalOrigin(health.extendedShock?.domain))||
   (x.kind==='coma'&&health.coma?.active&&isNoncombatMedicalOrigin(health.coma.domain)))).sort((a,b)=>a.minute-b.minute||
-  (a.kind==='extended-shock'?-1:1))[0];
- if(!due)return '';
- const kind=due.kind,state=persistentStateOf(actor),course=kind==='extended-shock'?state.extendedShock:state.coma;
+  Number(b.kind==='extended-shock')-Number(a.kind==='extended-shock'));
+ return due.map(item=>hskMainNoncombatCourseHTML(actor,clock,health,item.kind)).join('');
+}
+function hskMainNoncombatCourseHTML(actor,clock,state,kind){
+ const course=kind==='coma'?state.coma:state.extendedShock;
  const anchor=getCampaignAnchor(clock,kind,actor.id);
  if(!anchor)return '<p class="notice error">Weather '+esc(kind)+': chybí původní časová kotva. Nepřesouvejte tuto událost do Combatu.</p>';
  const expected=anchor.minute+(kind==='extended-shock'?(state.extendedShock.elapsedHours+4)*60:
@@ -16618,8 +16620,8 @@ function hskWeatherHealthConsequences(actorId,{stable=false}={}){
  const success=hskWeatherHealthLastReceipt?.actorId===actorId?
   `<p class="hc-health-result" role="status" aria-live="polite">${esc(hskWeatherHealthLastReceipt.message)}</p>`:'';
  const weatherShock=hskWeatherShockFollowup(actorId);
- if(stable)return success+hskWeatherBleedingCarePanel(actorId)+(weatherShock||hskWeatherTraumaCourseForm(actorId)||'')+hskWeatherInjuryMandatory(actorId);
  const parallel=hskParallelColdHealthPanel(actorId);
+ if(stable)return success+parallel+hskWeatherBleedingCarePanel(actorId)+(weatherShock||hskWeatherTraumaCourseForm(actorId)||'')+hskWeatherInjuryMandatory(actorId);
  const patient=character(actorId),health=patient&&persistentStateOf(patient);
  if(data.campaignClock&&health?.wounds.some(w=>activeNoncombatBleeder966(w,health)))
   return success+parallel+(weatherShock||'')+hskWeatherInjuryMandatory(actorId);
@@ -18296,7 +18298,7 @@ document.addEventListener('submit',event=>{
    throw Error('Weather Course musí patřit aktivní zdravotní události mimo Combat');
   if(!calendarMemberIds(clock,data.characters).some(c=>c.id===actor.id))throw Error('Postava nepatří do kampaně');
   const s=persistentStateOf(actor),course=kind==='coma'?s.coma:s.extendedShock;
-  if(course.sourceId!==sourceId)throw Error('Změnil se původní zdroj Course');
+  if(!isNoncombatMedicalOrigin(course?.domain)||course.sourceId!==sourceId)throw Error('Změnil se původní zdroj Course');
   const anchor=getCampaignAnchor(clock,kind,actor.id);
   if(!anchor)throw Error('Course nemá doloženou kalendářovou kotvu');
   const due=anchor.minute+(kind==='extended-shock'?(s.extendedShock.elapsedHours+4)*60:
@@ -18336,7 +18338,7 @@ document.addEventListener('submit',event=>{
   }))throw Error('Course se neuložil');
   const follow=interruptedTreatmentWound(actor);
   if(follow&&result.state.shock!=='KIA')openWoundMedicalStep(actor,follow);
-  else{openHealthPatient952(actor);}
+  else openNextNoncombatHealthTerm(actor);
  }catch(error){if(out)out.textContent='Weather Course nebyl zapsán: '+error.message;}
 },true);
 /** v93.787: validated medical input handoff. A conditional Blood Loss
@@ -18491,7 +18493,7 @@ document.addEventListener('submit',event=>{
   else{selected=actor.id;activeSheetSection='hazards';}
   const follow=!stableRoute&&interruptedTreatmentWound(actor);
   if(follow&&outcome.state.shock!=='KIA')openWoundMedicalStep(actor,follow);
-  else{view='sheet';render();}
+  else openNextNoncombatHealthTerm(actor);
  }catch(error){if(out)out.textContent='Blood Stoppage nebyl zapsán: '+error.message;
   else alert('Blood Stoppage nebyl zapsán: '+error.message);
   focusTravelBloodError93787(form,error.message);}
@@ -18500,7 +18502,7 @@ document.addEventListener('submit',event=>{
  const f=event.target;if(!f?.matches?.('[data-parallel-cold-reroll],[data-parallel-cold-course]'))return;
  event.preventDefault();event.stopImmediatePropagation();const out=f.querySelector('output');
  try{
-  const actor=character(selected),clock=data.campaignClock;
+  const actor=currentMedicalPatient952(f),clock=data.campaignClock;
   if(!actor||!clock||combatInitiativeSequence||!calendarMemberIds(clock,data.characters).some(c=>c.id===actor.id))
    throw Error('Samostatný Cold Shock Course vyžaduje aktuální zdravotní Kalendář mimo Combat');
   const state=persistentStateOf(actor),sourceId=f.elements.namedItem('sourceId')?.value;
@@ -18534,7 +18536,7 @@ document.addEventListener('submit',event=>{
     skillTestProof:{type:'parallel-cold-course',kind,sourceId,originalEventId:id,actorId:actor.id,
      confirmedMinute:minute,report:result.report}});
   }))throw Error('Samostatný Cold Shock Course se neuložil');
-  selected=actor.id;activeSheetSection='hazards';view='sheet';render();
+  openNextNoncombatHealthTerm(actor);
  }catch(error){if(out)out.textContent='Cold Shock Course se neuložil: '+error.message;}
 },true);
 // Only a witnessed UNC+CF unlocks the extra d10. The anatomical fields
@@ -18644,8 +18646,7 @@ document.addEventListener('submit',event=>{
     after.extendedShock?'V Kalendáři je další Extended Shock Course za čtyři hodiny. Otevři jej tlačítkem Kontrola.':
     alchemy?(still?'Postava je STN. Po další skutečné akci potvrď nový Shock d100.':'Tělesný Shock skončil. Aural Shock má samostatnou povinnost pro zotavení.'):
     still?'Shock stále trvá: další test je samostatná následná povinnost. Treatment zůstává pozastaven.':pendingWeatherMishap?'Nyní následuje Injury Mishap.':pendingWeatherMorale?'Nyní následuje Injury Morale.':'Nyní pokračuj vyhodnocením jednotlivých ran a Treatment v této záložce.')};
-  openHealthPatient952(actor);
-  if(alchemy&&still)focusCalendarRuleAction(actor,'weather-shock',sourceId);
+  openNextNoncombatHealthTerm(actor);
  }catch(err){if(out)out.textContent='Weather Shock nelze zapsat: '+err.message;}
 },true);
 document.addEventListener('submit',event=>{
@@ -22276,7 +22277,60 @@ function openCalendarMoraleReaction(actor){
  target.focus({preventScroll:true});
  return true;
 }
-function explainAndOpenBlockedCalendarTerm(err,targetMinute,{stopAtMorale=false}={}){
+function linkedMedicalAgendaEvent(actor,kind,source){
+ if(!data.campaignClock||!noncombatHealthDestination({kind,sourceId:source},persistentStateOf(actor)))return null;
+ const agenda=campaignCalendarAgenda(data.campaignClock,data.characters,data.journal,data.inventory);
+ return [...agenda.all,...agenda.unknown].find(x=>x.characterId===actor.id&&x.kind===kind&&
+  (!source||source===(x.sourceId||x.woundId)))||null;
+}
+function openNoncombatHealthTerm(actor,event,{healerId}={}){
+ const state=persistentStateOf(actor),clock=data.campaignClock;
+ if(!noncombatHealthDestination(event,state))return false;
+ const kind=event.kind,source=event.sourceId||event.woundId||'';
+ overlay=null;
+ const destination=isStableAnimalProfile93813(actor)?'Stáj → Zdraví':'Zdraví & Expozice';
+ const future=Number.isSafeInteger(event.minute)&&event.minute>clock?.minute;
+ const label=event.description||'Navazující zdravotní kontrola';
+ if(kind==='concurrent-treatment'){
+  const op=openConcurrentProcedures(clock).find(x=>x.characterId===actor.id&&
+   (event.startId?x.startId===event.startId:x.woundId===source));
+  if(op){openCalendarConcurrentTreatment(actor,op.startId);return true;}
+ }
+ openHealthPatient952(actor);
+ let formReady=false;
+ // A Bleeder may be prepared five minutes before the check.
+ if(!future||(kind==='bleeding'&&event.minute===clock.minute+5))
+  formReady=focusCalendarRuleAction(actor,kind,source,event.elapsedMinutes,{healerId});
+ const chapter=document.querySelector('[data-stable-health-patient]')||document.querySelector('.journal-book--hazards');
+ if(!chapter)return true;
+ const highlighted=chapter.querySelector('.hmk-medical-required-target');
+ const box=document.createElement('p');box.className='notice';box.setAttribute('role','status');
+ box.textContent=actor.name+' · '+label+' · '+destination+
+  (future&&!formReady?'. Termín '+displayCampaignMinute(event.minute)+'.':
+   formReady?'. Pokračujte ve zvýrazněném kroku.':'. '+(event.reason||'Formulář ještě není dostupný. Zkontrolujte předchozí zdravotní povinnosti a čas v Kalendáři.'));
+ const focusedForm=highlighted?.closest('form');
+ if(focusedForm){focusedForm.prepend(box);return true;}
+ chapter.prepend(box);
+ if(future&&!formReady){
+  const next=document.createElement('button');next.type='button';next.textContent='Posunout čas k této kontrole';
+  next.dataset.medicalNextMinute=String(event.minute);next.dataset.medicalNextActor=actor.id;
+  next.dataset.medicalNextKind=kind;next.dataset.medicalNextSource=source;
+  box.after(next);next.classList.add('hmk-medical-required-target');
+  next.scrollIntoView({block:'center'});next.focus({preventScroll:true});
+ }else{
+  box.tabIndex=-1;box.classList.add('hmk-medical-required-target');
+  box.scrollIntoView({block:'center'});box.focus({preventScroll:true});
+ }
+ return true;
+}
+function openNextNoncombatHealthTerm(actor){
+ const clock=data.campaignClock,state=persistentStateOf(actor);
+ const agenda=clock&&campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory);
+ const next=agenda?.all.find(x=>x.characterId===actor.id&&x.requiresAction!==false&&noncombatHealthDestination(x,state));
+ if(next)openNoncombatHealthTerm(actor,next);
+ else openHealthPatient952(actor);
+}
+function explainAndOpenBlockedCalendarTerm(err,targetMinute,{stopAtMorale=false,medicalOnly=false}={}){
  const message=String(err?.message||err);
  if(!/povinný termín|časový závazek|přeskočit nevyřízenou/.test(message))return false;
  const clock=data.campaignClock;if(!clock)return false;
@@ -22296,6 +22350,15 @@ function explainAndOpenBlockedCalendarTerm(err,targetMinute,{stopAtMorale=false}
   }
   return openCalendarMoraleReaction(patient);
  }
+ if(blocked){
+  const patient=character(blocked.characterId);
+  if(patient&&noncombatHealthDestination(blocked,persistentStateOf(patient))){
+   uiAlert('Čas nebyl změněn. '+patient.name+' · '+blocked.description+
+    (Number.isSafeInteger(blocked.minute)?' · '+displayCampaignMinute(blocked.minute):'')+'. Otevře se příslušný zdravotní krok.');
+   return openNoncombatHealthTerm(patient,blocked);
+  }
+ }
+ if(medicalOnly)return false;
  const due=[...(agenda.unknown||[]),...(agenda.all||[])].filter(x=>x.requiresAction!==false&&x.minute<=clock.minute&&x.minute<targetMinute)
   .sort((a,b)=>a.minute-b.minute)[0];
  if(!due)return false;
@@ -22727,29 +22790,20 @@ document.addEventListener('submit',e=>{
 /** A calendar notification points to an actual existing rule executor. */
 function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
  if(kind==='morale-reaction')return openCalendarMoraleReaction(actor);
- const stableMedical=isStableAnimalProfile93813(actor)&&(
-  kind==='weather-shock'||
-  (['treatment','healing','infection','grim','bleeding','injury-morale'].includes(kind)&&hskIsEnvironmentalWound(actor,sourceId))||
-  (kind==='injury-mishap'&&unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(actor,m.woundId)))||
-  (['coma','extended-shock'].includes(kind)&&hskWeatherTraumaCourseKind(actor,kind)));
- if(stableMedical&&!stableMedicalContext952(actor))openCharacterJournal(actor.id);
- // Weather aftercare is now in the dedicated Health/Exposure chapter, not
- // the Combat Status tab or generic Skill Tests. Keep source-linked IDs.
- if(!stableMedical&&(['weather-onset','weather-course','weather-skin','weather-shock'].includes(kind)||
-   (kind==='bleeding'&&hskIsEnvironmentalWound(actor,sourceId))||
-   (['injury-morale','injury-mishap'].includes(kind)&&
-     (kind==='injury-morale'?hskIsEnvironmentalWound(actor,sourceId):unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(actor,m.woundId))))||
-   (['treatment','healing','infection','grim'].includes(kind)&&hskIsEnvironmentalWound(actor,sourceId))||
-   (['coma','extended-shock'].includes(kind)&&hskWeatherTraumaCourseKind(actor,kind)))&&
-    (view!=='sheet'||activeSheetSection!=='hazards'||selected!==actor.id)){
-  selected=actor.id;view='sheet';activeSheetSection='hazards';render();
+ const health=persistentStateOf(actor);
+ const outsideCombat=noncombatHealthDestination({kind,sourceId},health);
+ const stableMedical=outsideCombat&&isStableAnimalProfile93813(actor);
+ if(outsideCombat&&(stableMedical?!stableMedicalContext952(actor):
+    view!=='sheet'||activeSheetSection!=='hazards'||selected!==actor.id))openHealthPatient952(actor);
+ if(outsideCombat&&['blood-shock','shock-followup'].includes(kind)){
+  kind='weather-shock';
+  sourceId=health.shockFollowup?.sourceId||sourceId;
  }
  if(kind==='treatment'&&isNoncombatMedicalOrigin(persistentStateOf(actor).shockFollowup?.domain)){
   const pending=persistentStateOf(actor).shockFollowup;
   hskWeatherHealthLastReceipt={actorId:actor.id,message:'Treatment této rány zůstává v Kalendáři správně evidován. Nejprve je však povinný jeden Shock Reroll aktuálního stavu postavy (ne samostatný hod za každou ránu). Po jeho úspěšném zápisu aplikace ukáže následující zdravotní krok.'};
   render();
-  focusCalendarRuleAction(actor,'weather-shock',pending.sourceId);
-  return;
+  return focusCalendarRuleAction(actor,'weather-shock',pending.sourceId);
  }
  const q=selector=>[...document.querySelectorAll(selector)];
  const byHidden=(selector)=>q(selector).find(f=>f.querySelector('[name="sourceId"]')?.value===sourceId);
@@ -22760,7 +22814,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
  const s=actor.hmk?.healthState,attrs=actor.hmk?.attributes||{};
  switch(kind){
  case 'injury-morale':{
-  if(hskIsEnvironmentalWound(actor,sourceId)){form=q('form[data-weather-injury-morale]')[0]||null;break;}
+  if(hskIsEnvironmentalWound(actor,sourceId)){form=q('form[data-weather-injury-morale]').find(f=>f.elements.namedItem('woundId')?.value===sourceId)||null;break;}
   // Calendar must open the AUTHORITATIVE sequential Combat executor. The
   // legacy manual form is intentionally blocked by its submit handler.
   // Match the exact wound and character; never focus some other due step.
@@ -22770,7 +22824,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
    guided.elements.namedItem('characterId')?.value===actor.id?guided:null;
   break;
  }
- case 'injury-mishap':if(unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(actor,m.woundId))){form=q('form[data-weather-injury-mishap]')[0]||null;break;}
+ case 'injury-mishap':if(unresolvedInjuryMishaps(persistentStateOf(actor)).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(actor,m.woundId))){form=q('form[data-weather-injury-mishap]').find(f=>f.elements.namedItem('mishapId')?.value===sourceId)||null;break;}
   form=document.getElementById('combat-injury-mishap-form');choose(form,'mishap',actor.id+'::'+sourceId);break;
  case 'bleeding':{
   if(hskIsEnvironmentalWound(actor,sourceId)){
@@ -22803,7 +22857,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   choose(form,'endurance',attrs.end);choose(form,'will',attrs.wil);break;
  }
  case 'coma':case 'extended-shock':{
-  if(hskWeatherTraumaCourseKind(actor,kind)){
+  if(outsideCombat){
    form=[...document.querySelectorAll('form[data-parallel-cold-course]')].find(f=>
     f.elements.namedItem('kind')?.value===kind&&f.elements.namedItem('sourceId')?.value===sourceId)||null;
    if(!form)form=[...document.querySelectorAll('form[data-weather-trauma-course]')].find(f=>
@@ -22984,7 +23038,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   }
   rollInput?.scrollIntoView({block:'center',behavior:'instant'});
   rollInput?.focus({preventScroll:true});
-  return true;
+  return !outsideCombat||!!rollInput&&!rollInput.disabled;
  }else if(['trek-weather-hazard','trek-direction-hazard','trek-encounter','trek-survival','trek-survival-test','trek-drover-test'].includes(kind)){
   const hazard=kind==='trek-weather-hazard'?'weather':kind==='trek-direction-hazard'?'direction':
    kind==='trek-encounter'?'encounter':kind==='trek-drover-test'?'drover':'survival';
@@ -23347,6 +23401,8 @@ document.addEventListener('click',e=>{
    else try{openCalendarConcurrentTreatment(actor,ev.startId);}catch(failure){uiAlert('Kontrola Treatment: '+failure.message);}
    return;
   }
+  const patient=character(ev.characterId);
+  if(patient&&openNoncombatHealthTerm(patient,ev))return;
   if(ev.kind!=='herbal-potion'&&!isHerbalCalendarCheck(ev.kind)&&ev.status!=='due'&&ev.status!=='preparation'){
    const target=character(ev.characterId);if(!target)return;
    selected=target.id;activeSheetSection='status';view='sheet';
@@ -23412,7 +23468,10 @@ document.addEventListener('click',e=>{
  if(t.dataset.calLink){
   pendingTrekHandoff=null;
   const target=character(t.dataset.calLink);if(!target)return alert('Postava již není v registru');
-  selected=target.id;const destination=(t.dataset.calKind==='weather-shock'||(t.dataset.calKind==='bleeding'&&hskIsEnvironmentalWound(target,t.dataset.calSource))||(['treatment','healing','infection','grim'].includes(t.dataset.calKind)&&hskIsEnvironmentalWound(target,t.dataset.calSource))||(['coma','extended-shock'].includes(t.dataset.calKind)&&hskWeatherTraumaCourseKind(target,t.dataset.calKind)))?'hazards':(t.dataset.calDestination||'notes');
+  const kind=t.dataset.calKind,source=t.dataset.calSource||'';
+  const event=linkedMedicalAgendaEvent(target,kind,source)||{kind,sourceId:source,elapsedMinutes:t.dataset.calElapsed};
+  if(openNoncombatHealthTerm(target,event))return;
+  selected=target.id;const destination=t.dataset.calDestination||'notes';
   if(t.dataset.calKind==='skill-fall'){activeSheetSection='status';view='sheet';}
   else if(destination==='combat'||destination==='healing'){if(!combatInitiativeSequence)encounterSelection.add(target.id);view='encounter';}
   else if(destination==='skills'){view='skills';
@@ -23595,9 +23654,10 @@ document.addEventListener('submit',e=>{
   if(!uiConfirm('Trvale potvrdit počátek '+kind+' před '+elapsedMinutes+' minutami?'))return;
   mutate(()=>{data.campaignClock=next;});
  }catch(err){
-  if(f.id==='campaign-advance-form'&&data.campaignClock&&/povinný termín (Paralytic|Soporific|Morale Reaction)|časový závazek.*Morale/.test(err.message)){
+  if(f.id==='campaign-advance-form'&&data.campaignClock){
    const target=data.campaignClock.minute+parse(v.days)*DAY_MINUTES+parse(v.hours)*60+parse(v.minutes);
-   if(explainAndOpenBlockedCalendarTerm(err,target))return;
+   const medicalOnly=!/povinný termín (Paralytic|Soporific)/.test(err.message);
+   if(explainAndOpenBlockedCalendarTerm(err,target,{medicalOnly}))return;
   }
   alert('Kalendář nebyl změněn: '+err.message);
  }
@@ -24738,7 +24798,6 @@ document.addEventListener('click',e=>{
 },true);
 document.addEventListener('click',e=>{const t=e.target.closest('[data-action],[data-nav],[data-open],[data-copy],[data-archive],[data-remove-inv],[data-delete-log],[data-edit-item],[data-copy-item],[data-delete-item],[data-restore],[data-purge],[data-delete-character],[data-export-character]');if(!t)return;
 if(t.dataset.exportCharacter){if(storageReadOnly)return alert('Nečitelná data: použijte nouzovou zálohu.');try{const pkg=characterPackage(t.dataset.exportCharacter);downloadJSON(pkg,'hmk-postava-'+safeFilename(pkg.character.name)+'.json')}catch(err){alert(err.message)}return}
-if(t.dataset.action==='calendar-to-encounter'){view='encounter';render();return;}
 if(t.dataset.action==='skip-auto-free-press'){if(pendingAutomaticFreePress?.ready&&!pendingAutomaticFreePress.used){pendingAutomaticFreePress.used=true;render();}return;}
 if(t.dataset.action==='export-confirmed-combat'){downloadJSON({format:'hmk-confirmed-combat-export-v1',exportedAt:stamp(),participants:selectedEncounterCharacters().map(c=>({characterId:c.id,name:c.name,state:structuredClone(persistentStateOf(c))}))},'hmk-confirmed-combat-state.json');return}
 if(t.dataset.action==='combat-next-round'){if(combatInitiativeSequence)return alert('Nové kolo lze zahájit pouze přes řízené Initiative.');const r=persistCombatClock({round:combatClock.round+1,actorId:''});if(!r.ok)return alert(r.reason);render();return}
@@ -25679,10 +25738,11 @@ document.addEventListener('submit',e=>{
  if(combatInitiativeSequence)return alert('Dlouhodobé léčení vyžaduje doložený čas mimo probíhající Initiative; tento zápis teď není povolen.');
  const v=Object.fromEntries(new FormData(f));
  try{
-  let c,args,r;
+  let c,args,r,environmentalCare;
   if(f.id==='hmk-grim-shock-form'){
    const parts=String(v.wound??'').split('::');c=character(parts[0]);
-   const environmentalCare=view==='sheet'&&activeSheetSection==='hazards'&&c?.id===selected&&hskIsEnvironmentalWound(c,parts.slice(1).join('::'));
+   environmentalCare=view==='sheet'&&currentMedicalPatient952(f)?.id===c?.id&&
+    (activeSheetSection==='hazards'||stableMedicalContext952(c))&&hskIsEnvironmentalWound(c,parts.slice(1).join('::'));
    if(!c||!parts[1]||!(encounterSelection.has(c.id)||environmentalCare))throw Error('Chybí ověřená rána postavy');
    const medicalState=persistentStateOf(c);
    const medicalRound=environmentalCare?Math.max(1,combatClock.round||1,medicalState.lastRound||0):combatClock.round;
@@ -25691,7 +25751,8 @@ document.addEventListener('submit',e=>{
    r=applyConfirmedGrimWoundShock({...args,originMinute:environmentalCare?data.campaignClock?.minute:null});
   }else{
    c=character(v.targetId);
-   const environmentalCare=view==='sheet'&&activeSheetSection==='hazards'&&c?.id===selected;
+   environmentalCare=view==='sheet'&&currentMedicalPatient952(f)?.id===c?.id&&
+    (activeSheetSection==='hazards'||stableMedicalContext952(c));
    if(!c||!(encounterSelection.has(c.id)||environmentalCare))throw Error('Postava není ve střetnutí ani v aktivním Weather Injury Care');
    const medicalState=persistentStateOf(c);
    const medicalRound=environmentalCare?Math.max(1,combatClock.round||1,medicalState.lastRound||0):combatClock.round;
@@ -25705,7 +25766,7 @@ document.addEventListener('submit',e=>{
    r=applyConfirmedBloodLossHealing(args);
   }
   if(!uiConfirm('Uložit doložené dlouhodobé léčení postavy '+c.name+'?'))return;
-  mutate(()=>{synchronizeCombatInjuries(c,r.state);logCalendarCombatResolution(c,r.state,f.id);});
+  if(mutate(()=>{synchronizeCombatInjuries(c,r.state);logCalendarCombatResolution(c,r.state,f.id);})&&environmentalCare)openNextNoncombatHealthTerm(c);
  }catch(err){alert('Léčba nebyla uložena: '+err.message);}
 },true);
 document.addEventListener('change',e=>{
@@ -25764,7 +25825,12 @@ document.addEventListener('click',e=>{
   if(mutate(()=>{data.campaignClock=next;applyDeterministicCalendarOnsets();},{gmClockAdvance:true})){
    if(op)openCalendarConcurrentTreatment(character(op.characterId),op.startId);
    else if(button.dataset.medicalNextMorale)openCalendarMoraleReaction(character(button.dataset.medicalNextMorale));
-   else if(actor)openWoundMedicalStep(actor,woundId);
+   else if(actor&&button.dataset.medicalNextKind){
+    const kind=button.dataset.medicalNextKind,source=button.dataset.medicalNextSource;
+    const event=linkedMedicalAgendaEvent(actor,kind,source);
+    if(event)openNoncombatHealthTerm(actor,event);
+    else openHealthPatient952(actor);
+   }else if(actor)openWoundMedicalStep(actor,woundId);
   }
  }catch(error){
   try{
@@ -26014,10 +26080,10 @@ document.addEventListener('submit',e=>{
   }
   if(!environmentalCare&&!uiConfirm('Trvale zapsat léčení '+c.name+(advancedTreatmentClock?' a posunout Kalendář na '+displayCampaignMinute(treatmentFinish):'')+(bandagePlan?' · odepsat '+bandageCount+' obvazů léčitele':'')+' podle doložených dnů a hodů?'))return;
   weatherCareActiveSection='auto';
-  mutate(()=>{if(advancedTreatmentClock)data.campaignClock=advancedTreatmentClock;
+  if(mutate(()=>{if(advancedTreatmentClock)data.campaignClock=advancedTreatmentClock;
    if(bandagePlan)commitBandageConsumption(data,bandagePlan,{eventId:args.eventId,patientId:c.id,woundId,kind:'Treatment',minute:data.campaignClock?.minute??null,campaignId:data.campaignClock?campaignKey(data.campaignClock):null,createdAt:stamp()});
    synchronizeCombatInjuries(c,t.state);logCalendarCombatResolution(c,t.state,f.id);
-  },{gmClockAdvance:!!advancedTreatmentClock});
+  },{gmClockAdvance:!!advancedTreatmentClock})&&environmentalCare)openNextNoncombatHealthTerm(c);
  }catch(err){alert('Léčení nebylo zapsáno: '+err.message);}
 },true);
 document.addEventListener('submit',e=>{
@@ -26980,18 +27046,31 @@ function openWoundMedicalStep(actor,woundId,{healerId}={}){
  const frost=weather&&w.aspect==='frost'&&w.severity==='G';
  let kind=frost?'frost-amputation':'treatment',source=w.id;
  if(bleed){kind='bleeding';source=bleed.id;}
- else if(state.extendedShock){kind='extended-shock';source='';}
+ else if(state.extendedShock||state.coma?.active){
+  const course=available.filter(x=>!x.sourceId&&['extended-shock','coma'].includes(x.kind))
+   .sort((a,b)=>a.minute-b.minute)[0];
+  kind=course?.kind||(state.extendedShock?'extended-shock':'coma');source='';
+ }
  else if(mishap){kind='injury-mishap';source=mishap.id;}
  else if(weather&&isNoncombatMedicalOrigin(shock?.domain)){kind='weather-shock';source=shock.sourceId;}
  else if(morale){kind='injury-morale';source=morale.woundId;}
  else if(state.wounds.some(x=>x.healing?.infected)){
   const infection=available.find(x=>x.kind==='infection');
   kind='infection';source=infection?.woundId||infection?.sourceId||w.id;
- }else if(w.healing?.treated&&w.healing.nextHealingDay!=null){kind='healing';}
+ }else if(w.healing?.grimWound&&nextOf('grim',w.id)&&
+   (nextOf('grim',w.id).minute<=(nextOf('healing',w.id)?.minute??Infinity))){kind='grim';}
+ else if(w.healing?.treated&&w.healing.nextHealingDay!=null){kind='healing';}
  const scheduled=nextOf(kind,source);
- const courseEnvironmental=kind==='extended-shock'&&hskWeatherTraumaCourseKind(actor,kind);
- const inHealth=kind==='bleeding'?hskIsEnvironmentalWound(actor,source):
-  kind==='extended-shock'?courseEnvironmental:weather||kind==='weather-shock';
+ const event=scheduled||{kind,sourceId:source};
+ const inHealth=noncombatHealthDestination(event,state);
+ if(inHealth&&openNoncombatHealthTerm(actor,event,{healerId}))return;
+ // A travel wound may be blocked by another unresolved wound or course.
+ // Show that blocker without adding the patient to an encounter.
+ if(weather&&!inHealth){
+  openHealthPatient952(actor);
+  uiAlert(actor.name+' · Ošetření čeká na jinou zdravotní povinnost. Zkontrolujte nejbližší termín v Kalendáři.');
+  return;
+ }
  overlay=null;
  const stablePatient=isStableAnimalProfile93813(actor)&&(inHealth||scheduled?.minute>clock?.minute);
  if(stablePatient){
@@ -35053,8 +35132,10 @@ document.addEventListener('click',e=>{
    target.scrollIntoView({block:'center',behavior:'auto'});target.elements.namedItem('roll')?.focus({preventScroll:true});}
   return;
  }
- const weatherCause=type==='weather-shock'||(type==='shock-followup'&&isNoncombatMedicalOrigin(persistentStateOf(character(actorId)).shockFollowup?.domain))||(['injury-morale','treatment','healing','infection','grim'].includes(type)&&hskIsEnvironmentalWound(character(actorId),sourceId))||(type==='injury-mishap'&&unresolvedInjuryMishaps(persistentStateOf(character(actorId))).some(m=>m.id===sourceId&&hskIsEnvironmentalWound(character(actorId),m.woundId)));
- const destination=weatherCause?'hazards':calendarEventDestination({kind:type});
+ const actor=character(actorId);
+ const event=linkedMedicalAgendaEvent(actor,type,sourceId)||{kind:type,sourceId,elapsedMinutes:elapsed};
+ if(openNoncombatHealthTerm(actor,event))return;
+ const destination=calendarEventDestination(event);
  if(destination==='healing'||destination==='combat'){
   if(!combatInitiativeSequence)encounterSelection.add(actorId);
   view='encounter';render();focusCalendarRuleAction(character(actorId),type,sourceId,elapsed);return;
