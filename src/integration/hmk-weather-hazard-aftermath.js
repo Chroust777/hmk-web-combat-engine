@@ -152,3 +152,35 @@ export function advanceTrekkingWeatherExposure({state,actor,sourceId,round=1,
  return {state:s,report:{method,kind:h.kind,hb,eml,sl:slText[sl],
   hr:h.hr,weakness:h.weaknessApplied,shock:s.shock,defeated:!!outcome.defeated,skinPending:h.skinPending}};
 }
+export function resolveBalmExposureRecovery({state,actor,caster,sourceId,round=1,minute,originMinute,
+ spellML,castingEML,castingD100,recoveryD100,range,understanding,gmConfirmed=false}={}){
+ const id='arcane-balm-exposure:'+sourceId;
+ const s=prepared(state,round,sourceId,id,gmConfirmed);
+ const hazard=s.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
+ need(actor?.id&&hazard,'Balm vyžaduje konkrétní aktivní expozici.');
+ need(!hazard.skinPending,'Nejprve vyhodnoťte případný Frostbite nebo Sunburn z téže expozice.');
+ need(caster?.id&&caster.hmk?.arcane?.knownSpells?.includes('Balm'),'Sesilatel musí mít doložené známé kouzlo Balm.');
+ need(int(minute,0,1e9)&&int(originMinute,0,minute),'Seslání vyžaduje skutečnou minutu po vzniku expozice.');
+ need(int(spellML,70,200)&&int(castingEML,-400,400)&&int(castingD100,1,100)&&
+  int(recoveryD100,1,100),'Doložte Spell ML alespoň 70, Casting EML a oba skutečné d100.');
+ const spellIndex=Math.floor(spellML/10);
+ need(range==='touch'||range==='ten-feet-los'&&spellIndex>=9,'Balm vyžaduje dotyk nebo při SI 9+ dosah nejvýše 10 stop v LOS.');
+ need(typeof understanding==='string'&&understanding.trim().length>=5&&understanding.trim().length<=240,
+  'Doložte, jak sesilatel porozuměl této expozici.');
+ const castingSL=successLevel(castingD100,castingEML);
+ need(castingSL===SL.S||castingSL===SL.CS,'Okamžitý Exposure Healing vyžaduje úspěšný Spellfire Balm.');
+ const {end,wil}=actor.hmk?.attributes??{};
+ need(int(end,1,200)&&int(wil,1,200),'Pro Exposure Healing musí být doloženo END a WIL.');
+ const fromHR=hazard.hr,hb=healingBase({endurance:end,will:wil}),bonus=castingSL===SL.CS?10:0;
+ const eml=hb*5+bonus,sl=successLevel(recoveryD100,eml);
+ const outcome=exposureHealing({healingRate:fromHR,sl,arcaneRecovery:true});
+ if(outcome.delta)applyStatus(s,hazard,outcome.healingRate);
+ if(outcome.defeated)hazard.active=false;
+ const report={eventId:id,sourceId,actorId:actor.id,casterId:caster.id,minute,originMinute,spell:'Balm',
+  spellML,spellIndex,castingEML,castingD100,castingSL:slText[castingSL],range,understanding:understanding.trim(),
+  recoveryD100,hb,bonus,eml,sl:slText[sl],fromHR,toHR:hazard.hr,
+  failureIgnored:outcome.arcaneFailureIgnored===true,defeated:!!outcome.defeated,sourcePages:[183,185,213,214]};
+ s.events.push({id,type:'arcane-balm-exposure',round,details:report});
+ s.lastRound=round;validateCombatState(s);
+ return {state:s,report};
+}
