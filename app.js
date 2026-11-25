@@ -20,7 +20,7 @@ import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-r
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
-import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js?v=93.957';
+import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js?v=94.123';
 import {travelOccupancy93956,travelOccupancyContext93956,travelCompanionAssignment93956,travelWheeledOccupants93956} from './src/integration/hmk-mixed-transport-93859.js?v=93.956';
 import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
@@ -255,8 +255,8 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.120';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js?v=93.957';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingAwareness,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.123';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js?v=94.123';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {weatherSkinComplexion} from './src/integration/hmk-weather-skin-coverage.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.122';
+const APP_VERSION='94.123';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -31844,8 +31844,8 @@ function episodePreviewFromForm(form,clock){
  result.daylight=autoLight;
  if(trackingMemory){
   const spent=Number(v.trackingSpoorSpent||0);
-  const awareness=episodeSkillProof(data.journal.find(j=>j.id===v.trackingAwarenessProofId),
-   'Awareness',trackingMemory.trackerId||guideId,campaignKey(clock),clock.minute);
+  const awareness=episodeTrackingAwareness({journal:data.journal,campaignId:campaignKey(clock),
+   minute:clock.minute,memo:trackingMemory,skillId:v.trackingAwarenessProofId||null});
   const aw=awareness?.level||null;
   result.trackingFollowup={...episodeTrackingFollowup({adjustedSV:trackingMemory.score.adjustedSV,
    criticalFailure:trackingMemory.level==='CF',awarenessLevel:aw,spoorSpent:spent}),
@@ -34564,7 +34564,7 @@ function updateEpisodePreview(form){
    'Bez Orienteering: Progress 0, Bearing 0. Dřívější výhody se automaticky nepřičítají.';
   const memoryStatus=form.querySelector('[data-episode-skill-memory-status]');if(memoryStatus)memoryStatus.textContent=
    result.orientation?`Survival ${result.orientation.roll!==null?'(d100: '+result.orientation.roll+') · ':''}SV ${result.orientation.sv} · ${result.orientation.stars??'—'} ★ · ${result.orientation.reusedFromEpisodeId?'platný přenesený hod':'nový doložený hod'}.${result.movementRollSources?.progress?' Progress (d10) převzaty z předchozí epizody.':''}${result.movementRollSources?.direction?' Direction (d10) převzaty.':''} Navigace: ${result.navigationState}.`:
-   result.trackingMemory?`Tracking základ SV ${result.trackingMemory.sv}, modifikace ${result.trackingMemory.modifier?.delta??0}, upravené SV ${result.trackingMemory.score?.adjustedSV??result.trackingMemory.sv}, Spoor ${result.trackingMemory.score?.spoorStars??'—'} ★ · ${result.trackingMemory.trail}.`:
+   result.trackingMemory?`Tracking základ SV ${result.trackingMemory.sv}, modifikace ${result.trackingMemory.modifier?.delta??0}, upravené SV ${result.trackingMemory.score?.adjustedSV??result.trackingMemory.sv}, Spoor ${result.trackingFollowup?.spoorStars??'—'} ★ · ${result.trackingMemory.trail}.`:
    `Bez aktivního výsledku dovednosti. Navigace: ${result.navigationState}.`;
   const travelText=travel?`<p><strong>Rychlost:</strong> ${(result.motion.finalLPW*4000/240).toFixed(1)} m/min (odvozena z tabulky HMK 146).</p>
     <p><strong>Čas pohybu:</strong> ${result.movementMinutes??result.minutes} z ${result.minutes} minut${result.travelDelay?.applied?', zdržení '+result.travelDelay.applied+' minut':''}.</p>
@@ -34590,7 +34590,7 @@ function updateEpisodePreview(form){
     ${result.travelForaging?.length?`<p><b>Foraging při cestě:</b> ${result.travelForaging.map((f,i)=>'č. '+(i+1)+' d10 '+f.roll+' → '+f.results[0].foodDays+' potravních dní, '+f.results[0].waterDays+' vodních dní, '+f.results[0].herbDoses+' dávek bylin').join('; ')}. Nález je po potvrzení zaúčtován do společných zásob; konkrétní postavě se bez doložení příjemce, hmotnosti a způsobu uložení nevytváří smyšlená položka inventáře.</p>`:''}
     ${result.orientation?`<p><b>Orienteering · Survival</b> · ${result.orientation.roll!==null?'(d100: '+result.orientation.roll+') · ':''}SV ${result.orientation.adjustment.adjustedSV}, ${result.orientation.stars??'—'} ★ · ${result.orientation.reusedFromEpisodeId?'původní doložený výsledek':'nový doložený hod'} · Progress ${result.progress}, Bearing ${result.bearing}, Foraging ${result.orientation.modes.foraging}, Stalking ${result.orientation.modes.stalking}, Vigilance ${result.orientation.modes.vigilance}.</p>`:''}
     ${result.trekWatchfulness?`<p><b>Stalking a Vigilance (HMK 145, 150):</b> ostražitost družiny ${esc(({lax:'Lax · snížená',normal:'Normal · běžná',alert:'Alert · zvýšená'})[result.trekWatchfulness.effective])}; vhodné dovednosti ${esc(result.trekWatchfulness.skills.join(' / '))}${result.trekWatchfulness.demoted?' · způsob dopravy snižuje ostražitost':''}. ${result.orientation?.modes.stalking?'Stalking je aktivní: umožňuje Tracking a příslušnou proceduru Surprise, ale sám o sobě nevytváří kořist.':'Stalking není aktivní; samostatný Tracking vyžaduje vlastní činnost.'}</p>`:''}
-    ${result.trackingMemory?`<p><b>Tracking</b> · ${result.trackingMemory.roll!==null?'(d100: '+result.trackingMemory.roll+') · ':''}SV ${result.trackingMemory.sv}, upravené ${result.trackingMemory.score?.adjustedSV??result.trackingMemory.sv}, Spoor ${result.trackingMemory.score?.spoorStars??'—'} ★ · ${esc(result.trackingMemory.trail)}.${result.trackingMemory.score?.awarenessNeeded?' Následný Awareness test (HMK 147).':''}${result.trackingMemory.score?.nextWatchBearingOnCF?' CF: nutný Bearing při dalším sledování.':''}</p>`:''}
+    ${result.trackingMemory?`<p><b>Tracking</b> · ${result.trackingMemory.roll!==null?'(d100: '+result.trackingMemory.roll+') · ':''}SV ${result.trackingMemory.sv}, upravené ${result.trackingMemory.score?.adjustedSV??result.trackingMemory.sv}, Spoor ${result.trackingFollowup?.spoorStars??'—'} ★ · ${esc(result.trackingMemory.trail)}.${result.trackingMemory.score?.awarenessNeeded?' Následný Awareness test (HMK 147).':''}${result.trackingMemory.score?.nextWatchBearingOnCF?' CF: nutný Bearing při dalším sledování.':''}</p>`:''}
     ${result.navigationState!=='clear'?`<p><b>Stav trasy: ${esc(result.navigationState)}</b> · přetrvává i do následujících epizod, dokud GM nepotvrdí napravení.</p>`:''}
     ${result.encounter?`<p><b>Encounter · minutový přepočet</b> · d100 ${result.encounter.d100}${result.encounter.d100Sub?' + upřesňující d100 '+result.encounter.d100Sub:''}, zdrojové TN d10 ${result.encounter.tn} (${result.encounter.night?'noc':'den / soumrak'}); pravděpodobnost alespoň jednoho setkání ${(result.encounter.chance*100).toLocaleString('cs-CZ',{maximumFractionDigits:2})} %, skutečný počet ${result.encounter.count}.</p>`:''}
     <p class="hc-hint">Jídlo a pití vyúčtuje původní časový účet výživy. Nezakládá se druhá spotřeba.</p>`;
