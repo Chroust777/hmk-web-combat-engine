@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.110';
+const APP_VERSION='94.111';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -16428,6 +16428,10 @@ function hskWeatherBleedingCarePanel(actorId,woundId=null){
    ${plan?`probíhá 5minutové ${plan.method==='cau'?'Cauterisation':'Staunch'} u ${esc(who?.name||plan.healerId)}`:
     'bez zahájeného ošetření'}.
    Každých 5 minut jeden Blood Loss na každého Bleedera; po skutečném Blood Stoppage výsledku CF/F/S ještě Blood Loss, po CS nikoliv (HMK 178).</p>`;
+  if(start&&!healerOptions.length)return `<article class="hc-calendar-linked-row">${head}
+   <p class="notice" role="status">Teď není dostupný způsobilý léčitel. V uvedeném termínu vyhodnoťte Blood Loss.</p>
+   <button type="button" data-medical-next-minute="${term.dueMinute}" data-medical-next-actor="${esc(actor.id)}"
+    data-medical-next-kind="bleeding" data-medical-next-source="${esc(w.id)}">Posunout čas k další kontrole krvácení</button></article>`;
   if(start){return `<article class="hc-calendar-linked-row">${head}
    <form data-weather-blood-start data-hmk-blood-bp="${state.bloodLoss.bp}" class="hc-fields"><input type="hidden" name="woundId" value="${esc(w.id)}">
    <div class="field-grid"><label>${helpTerm('Skutečný léčitel','Vyberte živého, schopného Physician z aktuální kampaně. Tato volba zaznamená začátek skutečného pětiminutového úkonu, ne provedený hod.')}
@@ -16440,7 +16444,7 @@ function hskWeatherBleedingCarePanel(actorId,woundId=null){
    <label><input type="checkbox" name="hasNeedleThread"> Jehla a nit pro Serious Edge/Point</label>
    <label><input type="checkbox" name="hasHeatedTool"> Rozžhavený kovový nástroj pro Cauterisation</label>
    <label><input type="checkbox" name="tourniquet"> Turniket (pouze končetina, Staunch +20)</label></div>
-   <button type="submit" ${healerOptions.length?'':'disabled'}>Zahájit 5minutové ošetření</button>
+   <button type="submit">Zahájit 5minutové ošetření</button>
    <p class="tiny">D100 se zatím nehází. Kalendář se sám neposune; GM jej posune na vyznačený konec ošetření.</p>
    </form></article>`;}
   if(due){
@@ -22308,14 +22312,23 @@ function openNoncombatHealthTerm(actor,event,{healerId}={}){
  box.textContent=actor.name+' · '+label+' · '+destination+
   (future&&!formReady?'. Termín '+displayCampaignMinute(event.minute)+'.':
    formReady?'. Pokračujte ve zvýrazněném kroku.':'. '+(event.reason||'Formulář ještě není dostupný. Zkontrolujte předchozí zdravotní povinnosti a čas v Kalendáři.'));
- const focusedForm=highlighted?.closest('form');
- if(focusedForm){focusedForm.prepend(box);return true;}
+ const focusedForm=highlighted?.closest('form')||document.activeElement?.closest('form');
+ if(formReady&&focusedForm&&chapter.contains(focusedForm)){focusedForm.prepend(box);return true;}
  chapter.prepend(box);
- if(future&&!formReady){
-  const next=document.createElement('button');next.type='button';next.textContent='Posunout čas k této kontrole';
-  next.dataset.medicalNextMinute=String(event.minute);next.dataset.medicalNextActor=actor.id;
-  next.dataset.medicalNextKind=kind;next.dataset.medicalNextSource=source;
-  box.after(next);next.classList.add('hmk-medical-required-target');
+ if(formReady)return true;
+ if(future){
+  const existing=[...chapter.querySelectorAll('[data-medical-next-kind]')].find(button=>
+   button.dataset.medicalNextKind===kind&&button.dataset.medicalNextSource===source&&
+   button.dataset.medicalNextActor===actor.id&&Number(button.dataset.medicalNextMinute)===event.minute);
+  const next=existing||document.createElement('button');
+  if(!existing){
+   next.type='button';next.textContent='Posunout čas k této kontrole';
+   next.dataset.medicalNextMinute=String(event.minute);next.dataset.medicalNextActor=actor.id;
+   next.dataset.medicalNextKind=kind;next.dataset.medicalNextSource=source;
+   box.after(next);
+  }
+  for(let parent=next.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+  next.classList.add('hmk-medical-required-target');
   next.scrollIntoView({block:'center'});next.focus({preventScroll:true});
  }else{
   box.tabIndex=-1;box.classList.add('hmk-medical-required-target');
