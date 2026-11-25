@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.107';
+const APP_VERSION='94.108';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -4713,21 +4713,18 @@ function campaignCalendarView(){
  const moraleUnknown=agenda.unknown.filter(x=>x.kind==='morale-reaction');
  const moraleWarnings=agenda.moraleWarnings||[];
  const moraleCalendarHTML=`<section class="panel hc-calendar hc-morale-reactions" data-calendar-morale-checks><h3>Morale Reaction · časované kontroly (HMK str. 162)</h3>
- <p class="hc-hint">Withdrawing: jedna skutečná minuta bez ohrožení; Routed: pět skutečných minut v bezpečí mimo dohled protivníků. Kalendář hlídá termín a rozhodnutí GM, žádný hod neprovádí automaticky. Stav Morale se mění jen po uložení skutečné d100.</p>
+ <p class="hc-hint">Withdrawing: po jedné minutě bez ohrožení. Routed: po pěti minutách v bezpečí mimo dohled protivníků. Při S nebo CS se postava uklidní (Steady). Při F nebo CF se další pokus koná po stejném bezpečném intervalu.</p>
  ${moraleWarnings.map(w=>`<p class="notice"><strong>Historický audit · ${esc(w.name)}:</strong> Mezi ${esc(displayCampaignMinute(w.from))} a ${esc(displayCampaignMinute(w.to))} nebyly doložené všechny minutové kontroly. Pozdější hod jejich výsledky nenahrazuje.</p>`).join('')}
  ${moraleChecks.map(x=>`<form data-calendar-morale-reaction="${esc(x.characterId)}" data-calendar-morale-due="${x.minute}" class="hc-morale-check"><strong>${esc(x.name)} · ${esc(x.moraleState)} · termín ${esc(displayCampaignMinute(x.minute))}</strong>
- ${x.minute<data.campaignClock.minute?`<p class="notice">Opožděný termín: ${esc(displayCampaignMinute(x.minute))}. Nynější hod bude označen jako opožděný a nezastoupí historické neprovedené hody.</p>`:''}
- <label>Byla příslušná bezpečná doba skutečně splněna?<select name="condition"><option value="safe">ANO – GM potvrzuje nepřerušené bezpečí (${x.duration} min)</option><option value="unsafe">NE – podmínky nebyly splněny, bez hodu</option></select></label>
- <label>Skutečný d100 (pouze při ANO)<input type="number" name="roll" min="1" max="100" step="1" placeholder="1–100"><button type="button" class="secondary hc-small" data-calendar-morale-die>⚄ Hodit d100 (software)</button></label>
- <label>Zdůvodnění GM při nesplněných podmínkách<input name="reason" maxlength="400" placeholder="Kde a proč trvalo ohrožení"></label>
- <p class="hc-hint">Při trvajícím ohrožení se bez hodu plánuje jen nejbližší možné nové posouzení (1 minuta pro withdrawing, 5 minut pro routed). Nejde o potvrzení budoucích podmínek.</p>
- <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje skutečné podmínky a použitý hod</label>
- <button type="submit">${esc(x.name)} · potvrdit Morale</button></form>`).join('')}
+ ${x.minute<data.campaignClock.minute?`<p class="notice">Opožděný termín: ${esc(displayCampaignMinute(x.minute))}. Případný hod bude označen jako opožděný.</p>`:''}
+ <label>Uplynula celá požadovaná doba v bezpečí?<select name="condition"><option value="safe">Ano · ${x.duration} min v bezpečí</option><option value="unsafe">Ne · podmínky zatím nesplněny</option></select></label>
+ <label>Initiative d100<input type="number" name="roll" min="1" max="100" step="1" placeholder="1–100" required></label>
+ <label hidden>Proč podmínky nebyly splněny?<input name="reason" minlength="10" maxlength="400" disabled></label>
+ <button type="submit" data-calendar-morale-submit>Vyhodnotit Morale Reaction</button></form>`).join('')}
  ${moraleFuture.map(x=>`<p tabindex="-1" data-calendar-morale-next="${esc(x.characterId)}">${esc(x.name)} · ${esc(x.moraleState)} · další Morale Reaction v ${esc(displayCampaignMinute(x.minute))}. <button type="button" class="secondary hc-small" data-medical-next-minute="${x.minute}" data-medical-next-morale="${esc(x.characterId)}">Posunout čas k Morale Reaction</button></p>`).join('')}
  ${moraleUnknown.map(x=>`<form data-calendar-morale-origin="${esc(x.characterId)}"><p class="notice">${esc(x.name)}: ${esc(x.reason)}</p>
  <label>Skutečně uplynulé celé minuty od původního Morale Rollu<input name="elapsed" type="number" min="0" max="${clock.minute}" required></label>
  <label>Důvod a doklad času<input name="reason" minlength="10" maxlength="400" required></label>
- <label class="hc-check"><input type="checkbox" name="gmConfirmed" value="yes" required> GM potvrzuje doložený počátek stavu</label>
  <button type="submit">Doložit počátek Morale bez nového hodu</button></form>`).join('')}
  ${!moraleChecks.length&&!moraleUnknown.length&&!moraleFuture.length?'<p class="hc-hint">Žádná okamžitě splatná Morale Reaction; budoucí termíny jsou v seznamu Kalendáře.</p>':''}</section>`;
  const renderDueGroups=events=>groupConcurrentObligations(events).map(g=>{
@@ -16397,7 +16394,6 @@ function hskWeatherInjuryMandatory(actorId){
   <p class="hc-hint">Aberrance je hodnota zdroje od GM. Samotný Morale hod je d100.</p>
   <button type="button" class="secondary hc-small" data-injury-morale-abe-help>Co je Aberrance (ABE)?</button>
   <label><span class="hc-help-term" tabindex="0" data-hmk-help="${esc(injuryMoraleAberranceHelp)}">Aberrance zdroje (0–200)</span><input name="aberrance" type="number" min="0" max="200" step="1" ${Number.isSafeInteger(w.moraleThreatABE)?`value="${w.moraleThreatABE}" readonly`:''} required></label>
-  ${Number.isSafeInteger(w.moraleThreatABE)?'':`<label class="hc-check"><input name="gmConfirmedAberrance" type="checkbox" required> GM potvrzuje, že zadaná Aberrance (včetně případné 0) je skutečně doložena; žádná hodnota nebyla odhadnuta.</label>`}
   <label>Skutečný Morale d100<input name="roll" type="number" min="1" max="100" required></label>
   <button type="submit" ${Number.isSafeInteger(init)?'':'disabled'}>Dokončit Injury Morale</button><output role="status"></output></form></section>`;
  }
@@ -18271,11 +18267,6 @@ document.addEventListener('submit',event=>{
     const missing=!/^\d+$/.test(abeValue)?'aberrance':'roll';
     markTravelBloodInput93787(form,form.elements.namedItem(missing));
     throw Error('Vyžaduje se skutečný Morale d100 a doložená Aberrance zdroje (také 0 musí být výslovně doložena)');
-   }
-   if(!Number.isSafeInteger(state.wounds.find(x=>x.id===woundId)?.moraleThreatABE)&&
-      !form.elements.namedItem('gmConfirmedAberrance')?.checked){
-    markTravelBloodInput93787(form,form.elements.namedItem('gmConfirmedAberrance'));
-    throw Error('GM musí výslovně potvrdit skutečný zdroj Aberrance včetně hodnoty 0');
    }
    const roll=Number(rollValue),abe=Number(abeValue);
    if(!Number.isSafeInteger(init)||!Number.isSafeInteger(roll)||roll<1||roll>100||!Number.isSafeInteger(abe)||abe<0||abe>200)throw Error('Chybí skutečný Initiative ML, Aberrance nebo d100');
@@ -23473,16 +23464,17 @@ document.addEventListener('click',e=>{
   return;
  }
 },true);
-document.addEventListener('click',e=>{
- const b=e.target.closest?.('[data-calendar-morale-die]');if(!b)return;
- e.preventDefault();
- const f=b.closest('form[data-calendar-morale-reaction]'),input=f?.elements.namedItem('roll');if(!input)return;
- const die=secureAutoDie(100);input.value=String(die);input.dataset.hmkMoraleSoftwareDie=String(die);
- b.textContent='⚄ d100 ('+die+')';
-},true);
-document.addEventListener('input',e=>{
- if(e.target.matches?.('form[data-calendar-morale-reaction] input[name="roll"]'))
-  delete e.target.dataset.hmkMoraleSoftwareDie;
+document.addEventListener('change',e=>{
+ const condition=e.target;
+ if(!condition.matches?.('form[data-calendar-morale-reaction] select[name="condition"]'))return;
+ const form=condition.form,safe=condition.value==='safe';
+ const roll=form.elements.namedItem('roll'),reason=form.elements.namedItem('reason');
+ hmkSyncConditionalRollField(roll,safe);
+ roll.closest('label').hidden=!safe;
+ reason.disabled=safe;reason.required=!safe;
+ reason.closest('label').hidden=safe;
+ form.querySelector('[data-calendar-morale-submit]').textContent=safe?
+  'Vyhodnotit Morale Reaction':'Zapsat nesplněné podmínky bez hodu';
 },true);
 document.addEventListener('submit',e=>{
  const f=e.target;
@@ -23492,7 +23484,6 @@ document.addEventListener('submit',e=>{
  try{
   const clock=data.campaignClock;if(!clock)throw Error('Chybí aktivní kalendář');
   if(combatInitiativeSequence)throw Error('Dokončete bojovou osu; mimo-bojové minuty nelze míchat s právě probíhajícími tahy.');
-  if(v.gmConfirmed!=='yes')throw Error('GM musí potvrdit skutečné podmínky');
   const id=f.dataset.calendarMoraleReaction||f.dataset.calendarMoraleOrigin,patient=character(id);
   if(!patient||!calendarMemberIds(clock,data.characters).some(c=>c.id===id))throw Error('Postava není v kampani');
   const morale=persistentStateOf(patient).morale?.state;
@@ -23500,8 +23491,8 @@ document.addEventListener('submit',e=>{
   if(f.hasAttribute('data-calendar-morale-origin')){
    const elapsed=Number(v.elapsed),next=registerMoraleOrigin(clock,{eventId:uuid(),characterId:id,
     moraleState:morale,elapsedMinutes:elapsed,reason:v.reason,gmConfirmed:true});
-   if(!uiConfirm('GM skutečně potvrzuje počátek '+morale+' před '+elapsed+' minutami?'))return;
-   if(mutate(()=>{data.campaignClock=next;}))render();return;
+   if(mutate(()=>{data.campaignClock=next;}))openCalendarMoraleReaction(patient);
+   return;
   }
   const agenda=campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory);
   const due=agenda.due.find(x=>x.kind==='morale-reaction'&&x.characterId===id);
@@ -23511,11 +23502,11 @@ document.addEventListener('submit',e=>{
    const next=registerMoraleUnsafe(clock,{eventId:uuid(),characterId:id,
     moraleState:morale,reason:v.reason,gmConfirmed:true});
    validateCampaignCalendar(next);
-   if(!uiConfirm('GM potvrzuje, že požadované bezpečí zatím nebylo splněno. Bez hodu; nejbližší další kontrola za '+due.duration+' min?'))return;
-   if(mutate(()=>{data.campaignClock=next;}))render();return;
+   if(mutate(()=>{data.campaignClock=next;}))openCalendarMoraleReaction(patient);
+   return;
   }
   if(v.condition!=='safe')throw Error('Zvolte skutečnou bezpečnostní podmínku');
-  const roll=Number(v.roll),software=f.elements.namedItem('roll')?.dataset.hmkMoraleSoftwareDie===String(v.roll);
+  const roll=Number(v.roll),software=f.elements.namedItem('roll')?.dataset.hmkAutoDice===String(v.roll);
   if(!Number.isSafeInteger(roll)||roll<1||roll>100)throw Error('Zadejte jeden skutečný d100 1–100');
   const state=persistentStateOf(patient),baseRound=Math.max(1,state.lastRound||0),
    timelineId='calendar-morale:'+campaignKey(clock),
@@ -23532,7 +23523,6 @@ document.addEventListener('submit',e=>{
   result.state.events.at(-1).details.physicalDice={format:'hmk-manual-dice-proof-v1',
    source:'HMK World of Kèthîra p.162',rolls:[{id:'reactionD100',faces:100,actorId:id,value:roll,source:dieSource}]};
   const nextClock=recordCampaignResolution(clock,{eventId:uuid(),sourceEventId:eventId,characterId:id,kind:'morale-reaction'});
-  if(!uiConfirm(patient.name+': uložit d100 ('+roll+') · '+morale+' → '+result.state.morale.state+'?'))return;
   if(mutate(()=>{
    if(JSON.stringify(persistentStateOf(character(id)))!==JSON.stringify(state))throw Error('Stav se před potvrzením změnil');
    synchronizeCombatInjuries(character(id),result.state);data.campaignClock=nextClock;
@@ -23546,7 +23536,14 @@ document.addEventListener('submit',e=>{
     combatProof:{sourceEventId:eventId,timelineId,round,actorId:id,actionKind:'calendar-morale-reaction',
      physicalDice:structuredClone(result.state.events.at(-1).details.physicalDice),
      transition:structuredClone(result.state.events.at(-1))}});
-  }))render();
+  })){
+   const {sl,rawEML}=result.state.events.at(-1).details;
+   notice=patient.name+' · d100 '+roll+' proti Initiative EML '+rawEML+' → '+sl+
+    (result.success?' · Steady, další Morale Reaction už není potřeba.':
+     ' · '+morale+' trvá, další pokus po bezpečném intervalu.');
+   if(result.success)render();
+   else openCalendarMoraleReaction(patient);
+  }
  }catch(err){alert('Morale Reaction nebyla uložena: '+err.message)}
 },true);
 document.addEventListener('submit',e=>{
