@@ -2,7 +2,7 @@ import {calendarPCShelteredControlsHTML} from './hmk-pc-sheltered-stay-93730.js'
 import {isTravelEpisodeReceipt,travelEpisodeCalendarSegments} from './hmk-episode-calendar-scope.js';
 import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js';
 import {isCompletedSkillTest,skillTestEvidenceHTML} from './hmk-skill-result-evidence-529.js';
-import {calendarEventDestination} from './hmk-calendar-event-routing.js?v=94.033';
+import {calendarEventDestination} from './hmk-calendar-event-routing.js?v=94.107';
 import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js?v=94.033';
 import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
 import {historicalHMKCalendarEntries} from './hmk-calendar-history.js?v=94.017';
@@ -38,7 +38,7 @@ function remainingActivityTime(minutes){const h=Math.floor(minutes/60),m=minutes
 function eventMark(p){return p.status==='resolved'?'✓':p.status==='cancelled'?'–':p.status==='due'?'!':p.status==='elapsed'?'◷':p.status==='active'?'▶':'•';}
 function eventStatus(p){return p.status==='resolved'?(p.kind==='trek-preparation'?'Podklady zapsány':p.origin==='history'?'Vyhodnoceno':'Dokončeno'):p.status==='cancelled'?'Zrušeno':p.status==='due'?'K vyřízení':p.status==='elapsed'?'Proběhlo':p.status==='active'?'Probíhá':'Naplánováno';}
 function eventName(p){return p.title||p.description||'Událost';}
-function eventDestination(p){return p.destination==='healing'?'Healing · Combat':p.destination==='skills'?'Skill Tests':p.destination==='combat'?'Combat':p.destination==='inventory'?'Arsenal & Gear':p.destination==='hazards'?'Nebezpečí / Trauma':p.destination==='calendar'?'Kalendář · Starvation/Thirst':'Deník postavy';}
+function eventDestination(p){if(p.kind==='morale-reaction')return 'Kalendář · Morale Reaction';return p.destination==='healing'?'Healing · Combat':p.destination==='skills'?'Skill Tests':p.destination==='combat'?'Combat':p.destination==='inventory'?'Arsenal & Gear':p.destination==='hazards'?'Nebezpečí / Trauma':p.destination==='calendar'?'Kalendář · Starvation/Thirst':'Deník postavy';}
 function shortEventName(p){
  // No duplicated HMK prefix, description or bookkeeping IDs in the timeline.
  if(p.origin==='hml')return p.description||p.title||'Pravidlová kontrola';
