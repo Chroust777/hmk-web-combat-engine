@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {initialCombatState} from '../src/integration/persistent-combat-state.js';
-import {prepareTrekkingWeatherTest,resolveBalmExposureRecovery,startTrekkingWeatherExposureTreatment,
+import {validateStartingPvarSpells} from '../src/integration/hmk-creation-starting-pvar.js';
+import {knowsExposureBalm,prepareTrekkingWeatherTest,resolveBalmExposureRecovery,startTrekkingWeatherExposureTreatment,
  advanceTrekkingWeatherExposure} from '../src/integration/hmk-weather-hazard-aftermath.js';
 
 const actor={id:'patient',hmk:{attributes:{end:14,wil:14}}};
@@ -10,6 +11,25 @@ const state=prepareTrekkingWeatherTest({state:initialCombatState(),sourceId,
  kind:'cold',coldCondition:'damp',originalSL:'F',weatherHazardConfirmed:true,gmConfirmed:true}).state;
 const args={state,actor,caster,sourceId,round:2,minute:110,originMinute:100,spellML:70,castingEML:65,
  castingD100:11,recoveryD100:11,range:'touch',understanding:'Úspěšný Diagnosis',gmConfirmed:true};
+
+const research={occupation:'Shèk-Pvâr (Fývria)',pvarismML:90,primary:'Fývria',chantryStars:3,startingARP:270};
+function createdMage(knownSpell){
+ const starting=validateStartingPvarSpells({...research,choices:[{id:knownSpell,assisted:true}]});
+ return {id:'trained-mage',occupation:research.occupation,hmk:{
+  attributes:{agl:12,aur:16,emp:11,end:12,cre:12,elo:12,rea:13,per:12,wil:14,str:12},
+  creation:{status:'complete',completed:{},step:14,values:{startingPvarSpellsProof:starting},
+   skillDP:{'Optional Skills':{'Pvârism':6}}},
+  startingPvarSpells:structuredClone(starting)
+ }};
+}
+const trainedCaster=createdMage('Fývria::Balm');
+assert.equal(knowsExposureBalm(trainedCaster),true);
+assert.equal(resolveBalmExposureRecovery({...args,caster:trainedCaster}).report.casterId,trainedCaster.id);
+assert.equal(knowsExposureBalm(createdMage('Fývria::Diagnosis')),false);
+const corruptedCaster=structuredClone(trainedCaster);
+corruptedCaster.hmk.startingPvarSpells.spells[0].arpCost=0;
+assert.equal(knowsExposureBalm(corruptedCaster),false);
+assert.throws(()=>resolveBalmExposureRecovery({...args,caster:corruptedCaster}),/známé kouzlo/);
 
 const successful=resolveBalmExposureRecovery(args);
 assert.deepEqual([successful.report.castingSL,successful.report.sl,successful.report.fromHR,successful.report.toHR],['S','S',4,5]);
@@ -45,4 +65,4 @@ const natural=advanceTrekkingWeatherExposure({state:failedBalm.state,actor,sourc
  roll:5,removedFromHazard:true,treatmentConfirmed:true,coolWater:true,gmConfirmed:true});
 assert.equal(natural.report.defeated,true);
 
-console.log('PASS Balm from witnessed casting, SI and range, no duplicate, F/CF without change, and independent wet Compress.');
+console.log('PASS Balm from both legacy and validated Shèk-Pvâr spellbooks, witnessed casting, SI and range, no duplicate, F/CF without change, and independent wet Compress.');

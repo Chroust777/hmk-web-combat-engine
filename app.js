@@ -79,7 +79,7 @@ import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgili
 import {previewSwimmingDanger,prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {asphyxiaCapacity,asphyxiaDeathCountdown} from './src/rules/ailments.js';
 import {successValue as swimmingWillSuccessValue} from './src/rules/tests.js';
-import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.121';
+import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.122';
 import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './src/integration/hmk-concurrent-procedures.js';
 import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.121';
+const APP_VERSION='94.122';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -16402,7 +16402,7 @@ function hskTrekkingWeatherTreatmentForms(actorId){
 }
 function exposureBalmForm(actorId,sourceId){
  const clock=data.campaignClock;
- const casters=data.characters.filter(c=>(clock?.characterIds||[]).includes(c.id)&&c.hmk?.arcane?.knownSpells?.includes('Balm'));
+ const casters=data.characters.filter(c=>(clock?.characterIds||[]).includes(c.id)&&knowsExposureBalm(c));
  if(!casters.length)return '';
  const number=(name,label,min,max)=>`<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" step="1" required></label>`;
  return `<details class="hsk-exposure-card"><summary>Arcane Recovery · Balm · okamžitý Exposure Healing</summary>

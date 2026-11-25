@@ -8,6 +8,7 @@ import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent
 import {healingBase} from '../rules/healing.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing} from '../rules/ailments.js';
 import {successLevel,SL} from '../rules/tests.js';
+import {alchemyArcaneCasterDossier} from './hmk-alchemy-arcane-casting-readiness.js';
 const need=(ok,msg)=>{if(!ok)throw Error(msg)};
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const cold={dry:{hr:5,period:240},damp:{hr:4,period:240},coolWater:{hr:4,period:120},coldWater:{hr:3,period:60},freezingWater:{hr:2,period:30}};
@@ -152,6 +153,22 @@ export function advanceTrekkingWeatherExposure({state,actor,sourceId,round=1,
  return {state:s,report:{method,kind:h.kind,hb,eml,sl:slText[sl],
   hr:h.hr,weakness:h.weaknessApplied,shock:s.shock,defeated:!!outcome.defeated,skinPending:h.skinPending}};
 }
+export function knowsExposureBalm(caster){
+ if(!caster?.id)return false;
+ const legacySpells=caster.hmk?.arcane?.knownSpells;
+ if(Array.isArray(legacySpells)&&legacySpells.includes('Balm'))return true;
+ const starting=caster.hmk?.startingPvarSpells;
+ const proof=caster.hmk?.creation?.values?.startingPvarSpellsProof;
+ if(!starting||!proof)return false;
+ try{
+  if(JSON.stringify(starting)!==JSON.stringify(proof))return false;
+  const dossier=alchemyArcaneCasterDossier(caster);
+  return dossier.verified&&dossier.known.includes('Fývria::Balm');
+ }catch{
+  return false;
+ }
+}
+
 export function resolveBalmExposureRecovery({state,actor,caster,sourceId,round=1,minute,originMinute,
  spellML,castingEML,castingD100,recoveryD100,range,understanding,gmConfirmed=false}={}){
  const id='arcane-balm-exposure:'+sourceId;
@@ -159,7 +176,7 @@ export function resolveBalmExposureRecovery({state,actor,caster,sourceId,round=1
  const hazard=s.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
  need(actor?.id&&hazard,'Balm vyžaduje konkrétní aktivní expozici.');
  need(!hazard.skinPending,'Nejprve vyhodnoťte případný Frostbite nebo Sunburn z téže expozice.');
- need(caster?.id&&caster.hmk?.arcane?.knownSpells?.includes('Balm'),'Sesilatel musí mít doložené známé kouzlo Balm.');
+ need(knowsExposureBalm(caster),'Sesilatel musí mít doložené známé kouzlo Balm.');
  need(int(minute,0,1e9)&&int(originMinute,0,minute),'Seslání vyžaduje skutečnou minutu po vzniku expozice.');
  need(int(spellML,70,200)&&int(castingEML,-400,400)&&int(castingD100,1,100)&&
   int(recoveryD100,1,100),'Doložte Spell ML alespoň 70, Casting EML a oba skutečné d100.');
