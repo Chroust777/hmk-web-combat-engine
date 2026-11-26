@@ -3,7 +3,7 @@
  * location-specific injury is a separate mandatory GM-confirmed procedure.
  * This reducer NEVER fabricates anatomy, dice, exposure periods or treatment.
  */
-import {validateCombatState} from './persistent-combat-state.js';
+import {applyComaCourse,applyExtendedShockCourse,validateCombatState} from './persistent-combat-state.js?v=94.128';
 import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
 import {healingBase} from '../rules/healing.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing} from '../rules/ailments.js';
@@ -169,35 +169,58 @@ export function knowsExposureBalm(caster){
  }
 }
 
-export function resolveBalmExposureRecovery({state,actor,caster,sourceId,round=1,minute,originMinute,
- spellML,castingEML,castingD100,recoveryD100,range,understanding,gmConfirmed=false}={}){
- const id='arcane-balm-exposure:'+sourceId;
- const s=prepared(state,round,sourceId,id,gmConfirmed);
- const hazard=s.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
- need(actor?.id&&hazard,'Balm vyžaduje konkrétní aktivní expozici.');
- need(!hazard.skinPending,'Nejprve vyhodnoťte případný Frostbite nebo Sunburn z téže expozice.');
+function verifiedBalmCasting({actor,caster,minute,originMinute,spellML,castingEML,castingD100,recoveryD100,range,understanding},minimumSI){
  need(knowsExposureBalm(caster),'Sesilatel musí mít doložené známé kouzlo Balm.');
- need(int(minute,0,1e9)&&int(originMinute,0,minute),'Seslání vyžaduje skutečnou minutu po vzniku expozice.');
- need(int(spellML,70,200)&&int(castingEML,-400,400)&&int(castingD100,1,100)&&
-  int(recoveryD100,1,100),'Doložte Spell ML alespoň 70, Casting EML a oba skutečné d100.');
+ need(int(minute,0,1e9)&&int(originMinute,0,minute),'Seslání vyžaduje skutečnou minutu od vzniku traumatu.');
+ need(int(spellML,minimumSI*10,200)&&int(castingEML,-400,400)&&int(castingD100,1,100)&&
+  int(recoveryD100,1,100),'Doložte Spell ML alespoň '+(minimumSI*10)+', Casting EML a oba skutečné d100.');
  const spellIndex=Math.floor(spellML/10);
  need(range==='touch'||range==='ten-feet-los'&&spellIndex>=9,'Balm vyžaduje dotyk nebo při SI 9+ dosah nejvýše 10 stop v LOS.');
  need(typeof understanding==='string'&&understanding.trim().length>=5&&understanding.trim().length<=240,
-  'Doložte, jak sesilatel porozuměl této expozici.');
+  'Doložte, jak sesilatel porozuměl tomuto traumatu.');
  const castingSL=successLevel(castingD100,castingEML);
- need(castingSL===SL.S||castingSL===SL.CS,'Okamžitý Exposure Healing vyžaduje úspěšný Spellfire Balm.');
+ need(castingSL===SL.S||castingSL===SL.CS,'Okamžitý hod vyžaduje úspěšný Spellfire Balm.');
  const {end,wil}=actor.hmk?.attributes??{};
- need(int(end,1,200)&&int(wil,1,200),'Pro Exposure Healing musí být doloženo END a WIL.');
- const fromHR=hazard.hr,hb=healingBase({endurance:end,will:wil}),bonus=castingSL===SL.CS?10:0;
+ need(int(end,1,200)&&int(wil,1,200),'Pro Arcane Recovery musí být doloženo END a WIL.');
+ return {actorId:actor.id,casterId:caster.id,minute,originMinute,spell:'Balm',spellML,spellIndex,castingEML,
+  castingD100,castingSL:slText[castingSL],range,understanding:understanding.trim(),recoveryD100,
+  hb:healingBase({endurance:end,will:wil}),bonus:castingSL===SL.CS?10:0};
+}
+export function resolveBalmExposureRecovery(input={}){
+ const {state,sourceId,round=1,gmConfirmed=false,recoveryD100}=input;
+ const id='arcane-balm-exposure:'+sourceId;
+ const s=prepared(state,round,sourceId,id,gmConfirmed);
+ const hazard=s.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
+ need(input.actor?.id&&hazard,'Balm vyžaduje konkrétní aktivní expozici.');
+ need(!hazard.skinPending,'Nejprve vyhodnoťte případný Frostbite nebo Sunburn z téže expozice.');
+ const casting=verifiedBalmCasting(input,7),{hb,bonus}=casting,fromHR=hazard.hr;
  const eml=hb*5+bonus,sl=successLevel(recoveryD100,eml);
  const outcome=exposureHealing({healingRate:fromHR,sl,arcaneRecovery:true});
  if(outcome.delta)applyStatus(s,hazard,outcome.healingRate);
  if(outcome.defeated)hazard.active=false;
- const report={eventId:id,sourceId,actorId:actor.id,casterId:caster.id,minute,originMinute,spell:'Balm',
-  spellML,spellIndex,castingEML,castingD100,castingSL:slText[castingSL],range,understanding:understanding.trim(),
-  recoveryD100,hb,bonus,eml,sl:slText[sl],fromHR,toHR:hazard.hr,
+ const report={eventId:id,sourceId,...casting,eml,sl:slText[sl],fromHR,toHR:hazard.hr,
   failureIgnored:outcome.arcaneFailureIgnored===true,defeated:!!outcome.defeated,sourcePages:[183,185,213,214]};
  s.events.push({id,type:'arcane-balm-exposure',round,details:report});
  s.lastRound=round;validateCombatState(s);
  return {state:s,report};
+}
+
+export function resolveBalmTraumaCourse(input={}){
+ const {state,actor,kind,sourceId,round=1,minute,originMinute,recoveryD100,physicianStars=0,restfulShelter,gmConfirmed=false}=input;
+ need(kind==='extended-shock'||kind==='coma','Vyberte Extended Shock nebo Coma.');
+ const id='arcane-balm-course:'+kind+':'+sourceId;
+ const s=prepared(state,round,sourceId,id,gmConfirmed);
+ const course=kind==='coma'?s.coma:s.extendedShock;
+ need(actor?.id&&course?.sourceId===sourceId&&(kind!=='coma'||course.active),'Balm vyžaduje konkrétní aktivní Course.');
+ const casting=verifiedBalmCasting(input,8),{hb,bonus}=casting;
+ const args={state:s,round,eventId:id,healingBase:hb,roll:recoveryD100,arcaneBonus:bonus,arcaneFreeRoll:true,gmConfirmed};
+ if(kind==='coma')need(typeof restfulShelter==='boolean','Doložte, zda je prostředí klidné a chráněné.');
+ const result=kind==='coma'?applyComaCourse({...args,daysElapsed:Math.floor((minute-originMinute)/1440)-course.elapsedDays,restfulShelter}):
+  applyExtendedShockCourse({...args,physicianStars});
+ const details=result.state.events.at(-1).details;
+ const report={eventId:id,sourceId,kind,...casting,fromHR:course.hr,toHR:kind==='coma'?result.hr:result.nextHR,
+  sl:details.sl,eml:details.rawEML,failureIgnored:details.failureIgnored,
+  shock:result.state.shock,comaActive:result.state.coma?.active===true,sourcePages:[179,183,213,214]};
+ details.arcaneRecovery=report;
+ return {state:result.state,report};
 }

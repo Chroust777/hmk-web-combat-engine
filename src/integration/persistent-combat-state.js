@@ -788,18 +788,18 @@ export function applyConfirmedShockRecovery({state,round,eventId,sl,timingConfir
 }
 /** p179: four hours must explicitly elapse per Course Roll. HB×HR minus
  * recorded fatigue; only GM-confirmed Physician SV stars and arcane bonus. */
-export function applyExtendedShockCourse({state,round,eventId,healingBase,roll,physicianStars=0,arcaneBonus=0,elapsedHoursSinceOnset=null,gmConfirmed=false}={}){
+export function applyExtendedShockCourse({state,round,eventId,healingBase,roll,physicianStars=0,arcaneBonus=0,elapsedHoursSinceOnset=null,arcaneFreeRoll=false,gmConfirmed=false}={}){
  const s=ready(state,round,eventId);
  requireCond(gmConfirmed===true,'GM musí potvrdit pravidlové podmínky a čas Extended Shock');
  requireCond(!s.asphyxiaComaPending,'Asphyxia CF: nejprve GM musí rozhodnout počáteční Coma HR, jinak Course nelze dokončit');
  requireCond(!!s.extendedShock&&['INC','UNC'].includes(s.shock),'Postava není v Extended Shock');
- requireCond(whole(elapsedHoursSinceOnset,4,100000)&&elapsedHoursSinceOnset===s.extendedShock.elapsedHours+EXTENDED_HOURS,'Course Roll musí následovat po doložených 4 hodinách: celkem '+(s.extendedShock.elapsedHours+4)+' h');
+ requireCond(arcaneFreeRoll||whole(elapsedHoursSinceOnset,4,100000)&&elapsedHoursSinceOnset===s.extendedShock.elapsedHours+EXTENDED_HOURS,'Course Roll musí následovat po doložených 4 hodinách: celkem '+(s.extendedShock.elapsedHours+4)+' h');
  requireCond(whole(healingBase,1,100)&&whole(roll,1,100)&&whole(physicianStars,0,10)&&whole(arcaneBonus,0,100),'Neplatné údaje Healing Base, d100 či bonusů');
  const oldHR=s.extendedShock.hr, fatigue=fatigueTotalUnsafe(s);
  const eml=healingBase*oldHR-fatigue+5*physicianStars+arcaneBonus;
- const sl=successLevel(roll,eml),delta=[-2,-1,1,2][sl];
+ const sl=successLevel(roll,eml),failureIgnored=arcaneFreeRoll&&sl<SL.S,delta=failureIgnored?0:[-2,-1,1,2][sl];
  const nextHR=oldHR+delta;
- s.extendedShock.elapsedHours=elapsedHoursSinceOnset;
+ if(!arcaneFreeRoll)s.extendedShock.elapsedHours=elapsedHoursSinceOnset;
  if(nextHR<=0){s.shock='KIA';s.shockOriginRound=round;s.extendedShock=null;s.shockFollowup=null;s.coma=null;}
  else if(nextHR>=6){
   // HMK 179: resolving Extended Shock does NOT wake a still-comatose patient.
@@ -809,22 +809,22 @@ export function applyExtendedShockCourse({state,round,eventId,healingBase,roll,p
   if(s.concurrentShockProjection)projectConcurrentShock(s,{round});
  }
  else s.extendedShock.hr=nextHR;
- record(s,eventId,'extended-shock-course',round,{oldHR,nextHR,healingBase,fatigue,physicianStars,arcaneBonus,rawEML:eml,eml:effectiveMasteryLevel(eml),roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:s.shock,comaActive:!!s.coma});
+ record(s,eventId,'extended-shock-course',round,{oldHR,nextHR,healingBase,fatigue,physicianStars,arcaneBonus,rawEML:eml,eml:effectiveMasteryLevel(eml),roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:s.shock,comaActive:!!s.coma,...(arcaneFreeRoll?{arcaneFreeRoll,failureIgnored}:{})});
  return {state:s,oldHR,nextHR,rawEML:eml,sl,comaActive:!!s.coma};
 }
 /** p179: a separate coma course persists after recovery from Extended Shock.
  * The d10 interval for each course is recorded, not silently rolled. */
-export function applyComaCourse({state,round,eventId,healingBase,roll,periodD10,daysElapsed,restfulShelter=true,arcaneBonus=0,gmConfirmed=false}={}){
+export function applyComaCourse({state,round,eventId,healingBase,roll,periodD10,daysElapsed,restfulShelter=true,arcaneBonus=0,arcaneFreeRoll=false,gmConfirmed=false}={}){
  const s=ready(state,round,eventId);
  requireCond(gmConfirmed===true&&!!s.coma&&s.coma.active,'Chybí potvrzený aktivní Coma Course Roll');
- requireCond(whole(healingBase,1,100)&&whole(roll,1,100)&&whole(daysElapsed,1,10000)&&whole(arcaneBonus,0,100),'Neplatné údaje Coma Course Roll');
- requireCond(daysElapsed===s.coma.nextCourseDays,'Musí uplynout přesně předchozí d10denní interval Coma');
+ requireCond(whole(healingBase,1,100)&&whole(roll,1,100)&&whole(daysElapsed,arcaneFreeRoll?0:1,10000)&&whole(arcaneBonus,0,100),'Neplatné údaje Coma Course Roll');
+ requireCond(arcaneFreeRoll?daysElapsed<=s.coma.nextCourseDays&&periodD10==null:daysElapsed===s.coma.nextCourseDays,'Musí uplynout přesně předchozí d10denní interval Coma');
  const before=s.coma.hr,fatigue=fatigueTotalUnsafe(s);
  const rawEML=healingBase*before-fatigue+(restfulShelter?0:-20)+arcaneBonus;
- const sl=successLevel(roll,rawEML),hr=before+[-2,-1,1,2][sl];
+ const sl=successLevel(roll,rawEML),failureIgnored=arcaneFreeRoll&&sl<SL.S,hr=before+(failureIgnored?0:[-2,-1,1,2][sl]);
  const duration=s.coma.elapsedDays+daysElapsed;
  // A new interval is rolled only if Coma actually continues (p.179).
- requireCond(hr<=0||hr>=6||whole(periodD10,1,10),'Pokračující Coma vyžaduje nový skutečný d10 pro další interval');
+ requireCond(arcaneFreeRoll||hr<=0||hr>=6||whole(periodD10,1,10),'Pokračující Coma vyžaduje nový skutečný d10 pro další interval');
  let wearinessAdded=0;
  if(hr<=0){s.shock='KIA';s.shockOriginRound=round;s.coma=null;s.extendedShock=null;s.shockFollowup=null;s.bloodShockPending=false;for(const w of s.wounds)w.nextAdvanceRound=null;}
  else if(hr>=6){
@@ -836,8 +836,8 @@ export function applyComaCourse({state,round,eventId,healingBase,roll,periodD10,
    if(s.concurrentShockProjection)projectConcurrentShock(s,{round});
   }
  }
- else {s.coma.hr=hr;s.coma.elapsedDays=duration;s.coma.nextCourseDays=periodD10;}
- record(s,eventId,'coma-course',round,{before,afterHR:hr,daysElapsed,duration,periodD10,healingBase,fatigue,arcaneBonus,restfulShelter,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),wearinessAdded,dead:s.shock==='KIA'});
+ else {s.coma.hr=hr;if(!arcaneFreeRoll){s.coma.elapsedDays=duration;s.coma.nextCourseDays=periodD10;}}
+ record(s,eventId,'coma-course',round,{before,afterHR:hr,daysElapsed,duration,periodD10,healingBase,fatigue,arcaneBonus,restfulShelter,rawEML,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),wearinessAdded,dead:s.shock==='KIA',...(arcaneFreeRoll?{arcaneFreeRoll,failureIgnored}:{})});
  return {state:s,hr,wearinessAdded};
 }
 /** HMK p.298: reembodiment restores physical perspective, adds real
