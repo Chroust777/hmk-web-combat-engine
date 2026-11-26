@@ -32,9 +32,22 @@ eq(p.missingAnimals,['cartA'],'unverified bestiary profile not accepted');
 p=pool({memberIds:group,characters:chars,activeIds:members});
 ok(p.ok,'ordinary foot party unaffected');
 eq(p.eligible.length,2,'two participants in foot party');
-p=pool({memberIds:group,stableAnimalIds:['elephant'],characters:[...chars,{id:'elephant',name:'Slon',kind:'Animal',hmk:{verifiedMountedBreed:'elephant',healthState:{}}}],activeIds:[...members,'elephant']});
-eq(p.unsupportedAnimals,['elephant'],'elephant J-table is not silently treated as horse C-table');
-ok(!p.ok,'unsupported animal requires GM handoff, not false Injury success');
+const elephantHealth=initialCombatState();
+const elephant={id:'elephant',name:'Slon',kind:'NPC',hmk:{verifiedMountedBreed:'elephant',
+ attributes:{agl:8},skills:[],healthState:elephantHealth}};
+p=pool({memberIds:group,stableAnimalIds:['elephant'],characters:[...chars,elephant],activeIds:[...members,'elephant']});
+eq(p.unsupportedAnimals,[],'registered elephant has a supported printed anatomy');
+ok(p.ok&&p.eligible.some(actor=>actor.id===elephant.id),'registered elephant enters the same victim draw');
+eq(verifiedMountedAnimalAnatomy('elephant').table,'J','elephant uses its own body table J');
+const elephantImpact=prepareAnimalSurvivalAccident({actor:elephant,state:elephantHealth,inventory:[],
+ sourceId:'elephant-fall',gmConfirmed:true,hazardD10:5,agilityD100:75,randomVictimConfirmed:true,
+ impactDie:1,zoneD10:5,locationD10:2,originMinute:100});
+eq(elephantImpact.bodyTable,'J','actual elephant Accident resolves with body table J');
+p=pool({memberIds:group,stableAnimalIds:['unknown'],characters:[...chars,
+ {id:'unknown',kind:'NPC',hmk:{verifiedMountedBreed:'unverified-table',healthState:initialCombatState()}}],
+ activeIds:[...members,'unknown']});
+eq(p.unsupportedAnimals,['unknown'],'a genuinely unsupported anatomy remains blocked');
+ok(!p.ok,'unsupported animal cannot be silently removed from the lottery');
 for(const breed of ['bovine','camel']){
  const anatomy=verifiedMountedAnimalAnatomy(breed);
  eq(anatomy.bodyTable??anatomy.table,'C','bovine/camel have printed C anatomy');
