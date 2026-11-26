@@ -125,6 +125,7 @@ import {resolveParallelColdReroll,resolveParallelColdCourse} from './src/integra
 import {assertAlternateManeuverWriteAllowed} from './src/integration/hmk-alternate-maneuver-write-gate.js';
 import {persistVerifiedCombatSnapshot} from './src/integration/verified-combat-storage.js?v=94.137';
 import {packTravelDraft,unpackTravelDraft} from './src/integration/hmk-travel-draft-storage.js?v=94.137';
+import {createCampaignStorage} from './src/integration/hmk-campaign-storage.js?v=94.138';
 import {prepareNeutralAlchemySpellstart,persistNeutralAlchemySpellstart} from './src/integration/hmk-alchemy-neutral-spellstart.js';
 import {activeAlchemyWard} from './src/integration/hmk-neutral-ward-lifecycle.js';
 import {prepareFailedNeutralSpellfire,persistFailedNeutralSpellfire,prepareCriticalNeutralSpellfire,persistCriticalNeutralSpellfire,prepareSuccessfulNeutralSpellfire,persistSuccessfulNeutralSpellfire} from './src/integration/hmk-alchemy-neutral-spellfire-commit.js';
@@ -413,8 +414,9 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.137';
+const APP_VERSION='94.138';
 const STORAGE='hmk-keepers-ledger-v1';
+const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -437,7 +439,7 @@ const validSlotForCategory=(slot,cat)=>SLOTS.some(s=>s[0]===slot)&&(!(slot==='ma
 function handSlotAvailable(characterId,slot,exceptId=null){return !['main_hand','off_hand'].includes(slot)||!data.inventory.some(x=>x.characterId===characterId&&x.slot===slot&&x.id!==exceptId)}
 const slotSelect=(name,value)=>`<label>Umístění / slot<select name="${name}">${SLOTS.filter(([id])=>id!=='none'&&id!=='stable'&&(id!=='chest'||value==='chest')).map(([id,label])=>`<option value="${id}" ${value===id||id==='carried'&&value==='none'?'selected':''}>${label}</option>`).join('')}</select></label>`;
 let storageReadOnly=false;
-let storageBaseline=null; // exact bytes last observed; prevents stale-tab overwrites
+let storageBaseline=null; // exact decoded JSON last observed; prevents stale-tab overwrites
 let data=clean(),view='characters',selected=null,editItem=null,query='',category='weapon',notice='';
 let combatBestiaryExpanded=false; // only presentation state, never the stored campaign
 let stableOwnerFocusedId=null; // Presentation-only selected animal in the current character journal
@@ -541,15 +543,15 @@ function cloudPanel(){
  <p class="tiny">Na tomto zařízení si můžeš token zapamatovat až do vypršení nebo ručního odstranění. Po jeho zrušení či vypršení vlož nový. Bez zapamatování zůstává jen v aktuální relaci prohlížeče. Neodeslané změny a konflikty se nezahazují; jiné zařízení je nemůže potichu přepsat.</p></section>`;
 }
 function acceptCloudSnapshot(raw,{allowClearedStorage=false}={}){
- if(localStorage.getItem(STORAGE)!==storageBaseline&&!(allowClearedStorage&&localStorage.getItem(STORAGE)===null))throw Error('Místní kampaň se mezitím změnila v jiné záložce.');
+ if(campaignStorage.getItem(STORAGE)!==storageBaseline&&!(allowClearedStorage&&campaignStorage.getItem(STORAGE)===null))throw Error('Místní kampaň se mezitím změnila v jiné záložce.');
  const incoming=normalizeLegacyCustomPrices(validate(JSON.parse(raw)));
- localStorage.setItem(STORAGE,raw);storageBaseline=raw;data=incoming;
+ campaignStorage.setItem(STORAGE,raw);storageBaseline=raw;data=incoming;
  selected=null;view='characters';encounterSelection=new Set();
  // Reload after the connected credentials have been stored by the caller.
  setTimeout(()=>window.location.reload(),1200);
 }
 const cloudStorage={
- getItem(key){return localStorage.getItem(key)},
+ getItem(key){return campaignStorage.getItem(key)},
  setItem(key,value){
   if(key===STORAGE&&window.__hmkOutdatedBuild)throw Error('Byla vydána nová verze aplikace. Obnovte stránku, než uložíte další herní akci.');
   if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('Nejprve připojte GitHub Cloud; tento prohlížeč nesmí zapsat starší stav.');
@@ -557,15 +559,15 @@ const cloudStorage={
   // uncommitted episode Skill Test evidence behind mutate()/save().
   if(key===STORAGE&&episodeStageBaseline&&!episodeFinalCommitInFlight&&!episodeIndependentMutationInFlight)
    throw Error('Nelze uložit rozpracované výsledky Cestování mimo dokončení celé epizody.');
-  const previous=key===STORAGE?localStorage.getItem(key):null;
-  localStorage.setItem(key,value);
+  const previous=key===STORAGE?campaignStorage.getItem(key):null;
+  campaignStorage.setItem(key,value);
   if(key===STORAGE&&cloudSync&&previous!==value)cloudSync.onLocalWrite(value);
  },
- removeItem(key){if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('GitHub Cloud není připojen.');localStorage.removeItem(key)}
+ removeItem(key){if(key===STORAGE&&cloudSync&&!cloudSync.canWrite())throw Error('GitHub Cloud není připojen.');campaignStorage.removeItem(key)}
 };
 cloudSync=createGitHubCloudSync({localStorage,sessionStorage,storageKey:STORAGE,
  validate:incoming=>validate(incoming),
- readLocal:()=>localStorage.getItem(STORAGE)||JSON.stringify(data),
+ readLocal:()=>campaignStorage.getItem(STORAGE)||JSON.stringify(data),
  applyRemote:acceptCloudSnapshot,
  approveReplace:()=>true,
  onStatus:()=>{const node=document.querySelector('[data-cloud-status]');if(node)node.textContent=cloudStatusLabel()+(cloudSync?.issue?' · '+cloudSync.issue:'');const side=document.querySelector('[data-cloud-sidebar]');if(side)side.textContent=cloudStatusLabel();const block=document.querySelector('[data-cloud-block-banner]');if(block)block.hidden=cloudSync?.canWrite()??true;}
@@ -590,7 +592,7 @@ function normalizeLegacyCustomPrices(doc){
  }
  return doc;
 }
-try{const saved=localStorage.getItem(STORAGE);if(saved)data=normalizeLegacyCustomPrices(validate(JSON.parse(saved)));storageBaseline=saved;}catch(e){storageReadOnly=true;notice='POZOR: Původní data se nepodařilo načíst. Zápisy jsou zablokovány, aby se nepřepsala. Zálohujte data prohlížeče a opravte úložiště.';console.error(e)}
+try{const saved=campaignStorage.getItem(STORAGE);if(saved)data=normalizeLegacyCustomPrices(validate(JSON.parse(saved)));storageBaseline=saved;}catch(e){storageReadOnly=true;notice='POZOR: Původní data se nepodařilo načíst. Zápisy jsou zablokovány, aby se nepřepsala. Zálohujte data prohlížeče a opravte úložiště.';console.error(e)}
 // Restore the encounter draft only after character IDs are available.
 // On unreadable database data, do not rehydrate potentially stale selections.
 if(!storageReadOnly){
@@ -964,7 +966,13 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
   return false;
  }
 }
-window.addEventListener('storage',event=>{if(event.key===STORAGE&&event.newValue!==storageBaseline){storageReadOnly=true;notice='Data se změnila v jiné záložce. Zápisy jsou zablokovány, obnovte stránku.';render()}});
+window.addEventListener('storage',event=>{
+ if(event.key!==STORAGE||event.storageArea!==localStorage)return;
+ try{if(campaignStorage.getItem(STORAGE)===storageBaseline)return;}catch{/* Block a checkpoint that cannot be read. */}
+ storageReadOnly=true;
+ notice='Data se změnila v jiné záložce. Zápisy jsou zablokovány, obnovte stránku.';
+ render();
+});
 /** Attach origin evidence for newly committed, state-changing HMK procedures.
  * Called only inside the original atomic mutate transaction, after the rule
  * engine has produced a verified persistent state. No guessed timestamps.
@@ -11334,7 +11342,7 @@ function importCharacterPackage(pkg){
  return {copy,inventory,journal,archived:pkg.archived};
 }
 function downloadRawStorage(){
- let raw;try{raw=localStorage.getItem(STORAGE)}catch(e){alert('Prohlížeč nedovolil přečíst původní data: '+e.message);return}
+ let raw;try{raw=campaignStorage.getItem(STORAGE)}catch(e){alert('Prohlížeč nedovolil přečíst původní data: '+e.message);return}
  if(raw===null){alert('V tomto prohlížeči není původní záznam.');return}
  const blob=new Blob([raw],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='hmk-raw-emergency-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
@@ -11385,7 +11393,7 @@ function downloadUnfinishedHMKState93859(){
  const pkg={format:'hmk-local-working-diagnostic-v93.865',appVersion:APP_VERSION,
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
-  committedCampaign:read(localStorage,STORAGE),
+  committedCampaign:read(campaignStorage,STORAGE),
   travelSidecar:read(localStorage,EPISODE_SIDECAR_KEY,unpackTravelDraft),
   agilityConfirmationDraft:read(localStorage,HSK_AGILITY_STAGE_KEY_93864),
   combat:{previewHistory:read(sessionStorage,COMBAT_DRAFT_HISTORY_KEY),
@@ -27158,7 +27166,7 @@ document.addEventListener('change',async e=>{if(e.target.matches?.('form[data-li
  }if(e.target.id==='category'){category=e.target.value;render()}if(e.target.id==='catalog-status'){catalogStatus=e.target.value;libraryPage=0;render()}if(e.target.id==='import-character-file'){
  const f=e.target.files?.[0];if(!f)return;
  if(combatInitiativeSequence){e.target.value='';return alert('Během Initiative nelze importovat postavu ani její inventář mimo Combat průvodce.');}
- try{if(f.size>10*1024*1024)throw Error('Soubor přesahuje 10 MB');if(storageReadOnly)throw Error('Zápis je zablokován');const baselineBeforeImport=storageBaseline;const pkg=JSON.parse(await f.text());if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');const incoming=importCharacterPackage(pkg);
+ try{if(f.size>10*1024*1024)throw Error('Soubor přesahuje 10 MB');if(storageReadOnly)throw Error('Zápis je zablokován');const baselineBeforeImport=storageBaseline;const pkg=JSON.parse(await f.text());if(campaignStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');const incoming=importCharacterPackage(pkg);
  if(!ask(`Přidat postavu „${incoming.copy.name}“? Stávající postavy zůstanou zachovány. Importovaná postava dostane nové identifikátory.`))return;
  if(combatInitiativeSequence)throw Error('Během načítání začala Initiative; import byl zablokován.');
  if(mutate(()=>{if(combatInitiativeSequence)throw Error('Import inventáře do běžící Initiative není povolen.');(incoming.archived?data.trash:data.characters).push(incoming.copy);data.inventory.push(...incoming.inventory);data.journal.push(...incoming.journal)})){view='characters';selected=null;notice='Postava byla přidána ze zálohy.';render()}
@@ -27173,14 +27181,14 @@ document.addEventListener('change',async e=>{if(e.target.matches?.('form[data-li
    const incoming=JSON.parse(await file.text());
    const pending=prepareCatalogImport(incoming,data.items);
    const collisions=catalogNameConflicts(pending,data.items);
-   if(localStorage.getItem(STORAGE)!==baseline)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');
+   if(campaignStorage.getItem(STORAGE)!==baseline)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');
    if(!pending.length){alert('Všechny položky katalogu již existují. Nebylo nic změněno.');return}
    if(!ask(`Přidat ${pending.length} nových položek do knihovny?${collisions.length?'\n\nPOZOR: '+collisions.length+' nových definic má stejný název a kategorii jako existující položka, ale odlišné parametry. Budou přidány jako samostatné varianty.\n'+collisions.slice(0,12).map(x=>'• '+x).join('\n')+(collisions.length>12?'\n…':''):''}\n\nExistující položky ani inventáře se nezmění.`))return;
    if(mutate(()=>data.items.push(...pending))){notice=`Do knihovny bylo přidáno ${pending.length} položek.`;view='library';render()}
   }catch(err){alert('Import katalogu selhal: '+err.message)}finally{e.target.value=''}
   return;
  }
- if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(combatInitiativeSequence)throw Error('Import zálohy během běžící Initiative by mohl přepsat nedokončený boj a jeho trvalé následky. Nejprve bezpečně ukončete střetnutí.');if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=normalizeLegacyCustomPrices(validate(JSON.parse(await f.text())));if(localStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;if(combatInitiativeSequence)throw Error('Během načítání zálohy začala Initiative; nelze přepsat rozpracovaný boj.');const old=data;data=imported;if(!save({restoreBackup:true})){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}clearTimeEpisodeDraft();selected=null;encounterSelection.clear();persistEncounterDraft();if(combatInitiativeSequence)persistInitiativeSequence(null);view='characters';notice='Import byl dokončen.';render() }catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
+ if(e.target.id==='import-file'){const f=e.target.files?.[0];if(!f)return;try{if(combatInitiativeSequence)throw Error('Import zálohy během běžící Initiative by mohl přepsat nedokončený boj a jeho trvalé následky. Nejprve bezpečně ukončete střetnutí.');if(f.size>10*1024*1024)throw Error('Záloha přesahuje limit 10 MB');const baselineBeforeImport=storageBaseline;const imported=normalizeLegacyCustomPrices(validate(JSON.parse(await f.text())));if(campaignStorage.getItem(STORAGE)!==baselineBeforeImport)throw Error('Data se mezitím změnila v jiné záložce. Obnovte stránku.');if(storageReadOnly)throw Error('Import je zablokován kvůli nečitelným původním datům.');if(!ask('Import nahradí všechna současná data. Máte uloženou aktuální JSON zálohu? Pokračovat?'))return;if(combatInitiativeSequence)throw Error('Během načítání zálohy začala Initiative; nelze přepsat rozpracovaný boj.');const old=data;data=imported;if(!save({restoreBackup:true})){data=old;render();throw Error('Úložiště odmítlo zápis; původní data zůstala zachována')}clearTimeEpisodeDraft();selected=null;encounterSelection.clear();persistEncounterDraft();if(combatInitiativeSequence)persistInitiativeSequence(null);view='characters';notice='Import byl dokončen.';render() }catch(err){alert('Neplatný soubor zálohy: '+err.message)}}});
 
 
 // HMK UI v2: source-grounded character attributes and editable equipment records.
