@@ -412,7 +412,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.131';
+const APP_VERSION='94.132';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7794,10 +7794,12 @@ const JOURNAL_HISTORY_CATEGORIES=Object.freeze([
  ['skills','Skill Tests a návaznosti'],['health','Boj, zranění a léčení'],
  ['equipment','Předměty a inventář'],['calendar','Kalendář, události a činnosti'],
  ['finance','Mince, nákupy a prodeje'],['notes','Osobní poznámky'],['other','Ostatní události']]);
+const BALM_RECOVERY_PROOF_TYPES=new Set(['arcane-balm-exposure','arcane-balm-blood-loss','arcane-balm-course']);
 function journalHistoryCategory(entry){
  const j=entry||{},title=String(j.title||'').toLocaleLowerCase('cs');
  // Timed medical receipts are health evidence, even when their title is not English.
  if((typeof j.calendarEpisodeTimedMedical?.type==='string'&&!!j.calendarEpisodeTimedMedical?.key)||j.calendarMalnutritionMedical)return 'health';
+ if(BALM_RECOVERY_PROOF_TYPES.has(j.skillTestProof?.type))return 'health';
  if(j.skillTestProof)return 'skills';
  if(j.combatProof||/shock|treatment|healing|wound|injur|zraněn|léčen|krvác|coma|infection|chirurg/.test(title))return 'health';
  if(j.origin==='cash'||j.cashReceipt||j.calendarCashProof||/mince|hotovost|nákup|prodej|platba/.test(title))return 'finance';
@@ -8584,11 +8586,12 @@ const HEALTH_EVENT_LABELS_950={
 };
 function characterHealthHistory950(c,logs){
  const relevant=entry=>entry.calendarEpisodeTimedMedical||entry.calendarMalnutritionMedical||entry.calendarGMHealthOverride||
+  BALM_RECOVERY_PROOF_TYPES.has(entry.skillTestProof?.type)||
   /^(?:skill-weather-|skill-cold-water-|weather-|parallel-cold-|skill-physical-consequence|skill-swimming-aftermath|skill-aggravation-aftermath|mundane-fire-|mundane-smoke-|poison-|disease-)/.test(entry.skillTestProof?.type||'')||
   (!entry.skillTestProof&&!isPersonalNote(entry)&&/treatment|healing|infection|blood|shock|coma|amput|zranění|léčen/i.test(entry.title||''));
  const receipts=logs.filter(relevant);
  const represented=new Set(receipts.flatMap(j=>[j.id,j.skillTestProof?.originEventId,j.calendarGMHealthOverride?.sourceEventId,
-  j.calendarTravelBloodProof?.eventId]));
+  j.calendarTravelBloodProof?.eventId,BALM_RECOVERY_PROOF_TYPES.has(j.skillTestProof?.type)?j.skillTestProof.report?.eventId:null]));
  const state=persistentStateOf(c);
  const calendarMoments=new Map();
  for(const clock of allCampaignClocks(data))
@@ -8602,7 +8605,8 @@ function characterHealthHistory950(c,logs){
   return parts.flatMap(([key,label])=>['string','number','boolean'].includes(typeof d?.[key])?[label+' '+(typeof d[key]==='boolean'?(d[key]?'ano':'ne'):d[key])]:[]).join(' · ');
  };
  const rows=[...receipts.map(entry=>({id:entry.id,title:entry.title,time:personalNoteGameMoment(entry),
-  html:journalTimedMedicalResultHTML(entry),text:resultText(entry.skillTestProof?.report)||entry.body||'',
+  html:journalTimedMedicalResultHTML(entry),text:BALM_RECOVERY_PROOF_TYPES.has(entry.skillTestProof?.type)?
+   entry.body||'':resultText(entry.skillTestProof?.report)||entry.body||'',
   minute:entry.campaignMinute??-1})),...events.reverse().map(e=>{
    const d=e.details||{},procedure=d.procedureTime;
    const moment=calendarMoments.get(e.id);
@@ -16405,6 +16409,25 @@ function hskTrekkingWeatherTreatmentForms(actorId){
    <output role="status" aria-live="polite"></output></form></details>`;
  }).join('');
 }
+const BALM_RECOVERY_DICE=['castingD100','recoveryD100'];
+const balmAcceptedRolls=new WeakMap();
+function balmRollFields(form){
+ return BALM_RECOVERY_DICE.map(name=>form.elements.namedItem(name));
+}
+function balmRollsAccepted(form){
+ const accepted=balmAcceptedRolls.get(form);
+ return !!accepted&&balmRollFields(form).every((field,index)=>field.value===accepted[index]&&field.validity.valid);
+}
+function syncBalmRollControls(form){
+ const accepted=balmRollsAccepted(form),fields=balmRollFields(form);
+ form.querySelector('[data-balm-rolls-accept]').disabled=accepted||!fields.every(field=>field.value&&field.validity.valid);
+ form.querySelector('button[type="submit"]').disabled=!accepted;
+ for(const field of fields){
+  field.closest('label').classList.toggle('hmk-simple-current-93915',!accepted);
+  field.closest('label').classList.toggle('hmk-simple-done-93915',accepted);
+ }
+ form.querySelector('[data-balm-rolls-status]').textContent=accepted?'Oba d100 jsou potvrzené.':'Zadejte nebo vygenerujte oba d100 a potvrďte je společně.';
+}
 const BALM_RECOVERY_LABELS={exposure:'Exposure Healing','blood-loss':'Blood Loss Healing',
  'extended-shock':'Extended Shock Course',coma:'Coma Course'};
 function hskBalmRecoveryForm(actorId,sourceId,kind='exposure'){
@@ -16413,7 +16436,7 @@ function hskBalmRecoveryForm(actorId,sourceId,kind='exposure'){
  if(!casters.length)return '';
  const minimumSI=kind==='extended-shock'||kind==='coma'?8:7;
  const label=BALM_RECOVERY_LABELS[kind];
- const number=(name,label,min,max)=>`<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" step="1" required></label>`;
+ const number=(name,label,min,max)=>`<label ${BALM_RECOVERY_DICE.includes(name)?'class="hmk-simple-current-93915"':''}>${label}<input type="number" name="${name}" min="${min}" max="${max}" step="1" required></label>`;
  return `<details class="hsk-exposure-card"><summary>Arcane Recovery · Balm · ${label}</summary>
   <form data-balm-exposure-recovery>
    <input type="hidden" name="actorId" value="${esc(actorId)}">
@@ -16428,8 +16451,10 @@ function hskBalmRecoveryForm(actorId,sourceId,kind='exposure'){
    <label>Jak sesilatel porozuměl tomuto traumatu?<input name="understanding" required minlength="5" maxlength="240" placeholder="Např. úspěšný Diagnosis"></label>
    ${kind==='coma'?'<label>Klidné chráněné prostředí<select name="restfulShelter" required><option value="">Vyberte podmínky</option><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label>':''}
    ${number('recoveryD100','Skutečný '+label+' d100',1,100)}
+   <button type="button" class="secondary" data-balm-rolls-accept disabled>Vložit oba d100</button>
+   <p role="status" data-balm-rolls-status>Zadejte nebo vygenerujte oba d100 a potvrďte je společně.</p>
    <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje původní Spellfire a okamžitý hod v této minutě.</label>
-   <button type="submit">Zapsat Balm a okamžitý ${label}</button><output role="status" aria-live="polite"></output>
+   <button type="submit" disabled>Zapsat Balm a okamžitý ${label}</button><output role="status" aria-live="polite"></output>
   </form></details>`;
 }
 function hskTrekkingWeatherCourseForms(actorId){
@@ -19063,12 +19088,28 @@ document.addEventListener('submit',event=>{
   form.closest('details')?.replaceWith(Object.assign(document.createElement('p'),{textContent:'Course/Healing Roll byl trvale zapsán. Další splatný krok najdeš v deníku.'}));
  }catch(e){if(out)out.textContent='Exposure Course se neuložil: '+e.message;}
 },true);
+document.addEventListener('input',event=>{
+ const field=event.target,form=field?.closest?.('[data-balm-exposure-recovery]');
+ if(!form||!BALM_RECOVERY_DICE.includes(field.name))return;
+ balmAcceptedRolls.delete(form);
+ syncBalmRollControls(form);
+},true);
+document.addEventListener('click',event=>{
+ const button=event.target.closest?.('[data-balm-rolls-accept]');
+ if(!button||button.disabled)return;
+ const form=button.closest('form'),fields=balmRollFields(form);
+ if(!fields.every(field=>field.value&&field.validity.valid))return;
+ balmAcceptedRolls.set(form,fields.map(field=>field.value));
+ syncBalmRollControls(form);
+ form.elements.namedItem('confirmed').focus();
+},true);
 document.addEventListener('submit',event=>{
  const form=event.target;
  if(!form?.matches?.('[data-balm-exposure-recovery]'))return;
  event.preventDefault();event.stopImmediatePropagation();
  const out=form.querySelector('output'),value=name=>form.elements.namedItem(name)?.value;
  try{
+  if(!balmRollsAccepted(form))throw Error('Před zápisem potvrďte oba d100 tlačítkem Vložit oba d100.');
   const clock=data.campaignClock,actor=character(value('actorId')),caster=character(value('casterId'));
   const sourceId=value('sourceId'),kind=value('kind');
   if(!Object.hasOwn(BALM_RECOVERY_LABELS,kind))throw Error('Chybí konkrétní trauma pro Balm.');
