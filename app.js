@@ -412,7 +412,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.134';
+const APP_VERSION='94.135';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -2493,7 +2493,7 @@ let episodeCurrentGuidedStep=null;
 // after Evaluate locks the actual episode (and can deadlock the calendar).
 const EPISODE_IMMUTABLE_FIELDS=['kind','guideId','conveyance','travelRideAnimalId','travelRideRiderId','droverActorId','packHandlers93859','memberIds','animalIds','stableAnimalIds',
  'trackingUse','trackingActorId','trackingTrail','trackingRoad','trackingPartyTracked',
- 'trackingSnow','trackingRain','trackingAlpine','trackingScentAnimalId'];
+ 'trackingAlpine','trackingScentAnimalId'];
 let skillCompletion93928=null; // UI only: a saved Skill Test must never silently start another d100.
 let episodePendingSkillRequest=null;
 // Only a request initiated by the episode may capture a newly saved Skill Test.
@@ -14022,7 +14022,12 @@ document.addEventListener('input',event=>{
  const field=event.target;if(!(field instanceof HTMLInputElement)||field.type!=='number')return;
  // User typing creates a trusted browser event; generated buttons dispatch an
  // untrusted update after first marking the exact recorded value.
- if(event.isTrusted&&field.dataset.hmkAutoDice)delete field.dataset.hmkAutoDice;
+ if(event.isTrusted&&field.dataset.hmkAutoDice){
+  delete field.dataset.hmkAutoDice;
+  const generator=field.nextElementSibling;
+  if(generator?.dataset.hmkGeneralAutoDie==='true')
+   generator.textContent='⚄ d'+generator.dataset.hmkDieFaces;
+ }
 },true);
 
 document.addEventListener('click',e=>{
@@ -30750,12 +30755,18 @@ function episodeIdentityMismatch(form){
   snapshot.orientationPriority!=='stealth'&&Number(snapshot.mode_stalking||0)!==1;
  if(unrelatedTracking){
   for(const k of ['trackingUse','trackingActorId','trackingTrail','trackingRoad',
-   'trackingPartyTracked','trackingSnow','trackingRain','trackingAlpine'])
+   'trackingPartyTracked','trackingAlpine'])
    actual[k]=episodeEvaluatedIdentity[k];
  }
  // Internal confirmation metadata is not a form identity field. Compare
  // only the immutable identity properties, even while the trail is editable.
- const {trackingConfirmed:confirmationMeta,...lockedIdentity}=episodeEvaluatedIdentity;
+ const {trackingConfirmed:confirmationMeta,trackingSnow:legacySnow,trackingRain:legacyRain,
+  trackingPrecipitationD6,...lockedIdentity}=episodeEvaluatedIdentity;
+ // Rain and snow checkboxes are projections, not original inputs. A draft can
+ // acquire precipitation after Evaluate. Freeze the accepted die only when
+ // requesting a real Tracking test, then require that same die on return.
+ if(trackingPrecipitationD6!==undefined&&trackingPrecipitationD6!==String(snapshot.precipitationD6??''))
+  return 'Po zahájení Tracking se změnil potvrzený srážkový d6. Vraťte původní hodnotu pro tento test.';
  // Existing v93.935-and-earlier episodes have no animal Scent selection.
  // Preserve the old immutable identity by defaulting ONLY this newly added
  // optional field to absent; a newly selected animal must not be backfilled
@@ -30784,18 +30795,6 @@ function episodeIdentityMismatch(form){
   // verified receipt, all other fields and GM overrides remain immutable.
   actual.trackingRoad=lockedIdentity.trackingRoad;
  }
- // v93.877: precipitation d6 can resolve continuous rain AFTER the episode
- // identity was locked. These three disabled checkboxes are derived from the
- // same weather and terrain; no GM choice or recorded Tracking test changes.
- // Preserve all other locked fields, especially actor, rider, animals and trail.
- if(!episodePinnedSkillFields.has('trackingProofId')&&
-    !episodePendingSkillRequest?.field?.startsWith('tracking')&&
-    !snapshot.trackingProofId){
-  for(const key of ['trackingSnow','trackingRain','trackingAlpine']){
-   const control=form.elements.namedItem(key);
-   if(control?.disabled&&Object.prototype.hasOwnProperty.call(lockedIdentity,key))actual[key]=lockedIdentity[key];
-  }
- }
  // A typed trail is only a DRAFT until the explicit Evaluate/confirm click.
  if(episodeDeferredTrackingTrailAllowed(form)){
   // New Stalking may allow late selection of a tracker; it may not rewrite
@@ -30805,7 +30804,7 @@ function episodeIdentityMismatch(form){
   if(JSON.stringify(withoutTrail)===JSON.stringify(lockedIdentity))return '';
  }
  if(JSON.stringify(actual)===JSON.stringify(lockedIdentity))return '';
- const labels={kind:'druh činnosti',guideId:'průvodce',memberIds:'účastníci',animalIds:'zvířata výpravy',stableAnimalIds:'zvířata ze Stáje',trackingUse:'režim Tracking',trackingActorId:'stopař',trackingTrail:'identifikace stopy',trackingRoad:'povrch stopy',trackingPartyTracked:'počet sledovaných',trackingSnow:'sníh na stopě',trackingRain:'déšť na stopě',trackingAlpine:'alpské podmínky stopy'};
+ const labels={kind:'druh činnosti',guideId:'průvodce',memberIds:'účastníci',animalIds:'zvířata výpravy',stableAnimalIds:'zvířata ze Stáje',trackingUse:'režim Tracking',trackingActorId:'stopař',trackingTrail:'identifikace stopy',trackingRoad:'povrch stopy',trackingPartyTracked:'počet sledovaných',trackingAlpine:'alpské podmínky stopy'};
  const changed=Object.keys(lockedIdentity).filter(k=>JSON.stringify(lockedIdentity[k])!==JSON.stringify(actual[k]));
  return 'Po zahájení vyhodnocení se změnilo uzamčené nastavení: '+changed.map(k=>labels[k]||k).join(', ')+
   '. Dřívější hody nelze převést na jinou skupinu. Dokončete původní epizodu, nebo použijte bezpečné nouzové zrušení.';
@@ -31275,6 +31274,8 @@ function episodeStartSkillRequest(field,skill,actorId){
   return false;
  }
  if(episodePinnedSkillFields.has(field))return false;
+ if(field==='trackingProofId'&&form&&episodeEvaluatedIdentity)
+  episodeEvaluatedIdentity.trackingPrecipitationD6=String(episodeFormSnapshot(form).precipitationD6??'');
  const request={id:uuid(),episodeEpoch:episodeDraftEpoch,field,skill,actorId,campaignId:campaignKey(clock),minute:clock.minute,status:'waiting',completedId:null};
  episodePendingSkillRequest=request;episodeActiveSkillRequestId=request.id;episodeSkillReturnPending=true;
  skillCompletion93928=null; // a fresh explicit travel request must be visible
@@ -34222,7 +34223,7 @@ function updateEpisodePreview(form){
    const existing=episodeCurrentWeather(form,data.campaignClock,{mandatory:false})?.weather;
    const rain=form.elements.namedItem('trackingRain'),snow=form.elements.namedItem('trackingSnow');
    if(rain&&snow){
-    const d6=Number(form.elements.namedItem('precipitationD6')?.value||0);
+    const d6=Number(episodeDiceAccepted93849.get('precipitationD6')||0);
     const continuous=!!existing?.hasPrecipitation&&d6===1;
     const currentHazard=sky?.period==='night'?existing?.nightHazard:existing?.daylightHazard;
     const kind=!continuous?'none':currentHazard==='cold'?
