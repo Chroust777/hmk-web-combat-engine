@@ -5,7 +5,7 @@
  * histories exist in the current engine. Therefore no result is committed.
  */
 import {availableMasteries} from './hmk-skill-test-engine.js';
-import {validateStartingPvarSpells} from './hmk-creation-starting-pvar.js';
+import {validateStartingPvarSpells} from './hmk-creation-starting-pvar.js?v=94.131';
 import {indexOf,successLevel} from '../rules/tests.js';
 import {classifySpellMisfire} from './hmk-spell-misfire-effects.js';
 import {neutralChaosStormGeometry} from './hmk-neutral-arcane-exceptions.js';

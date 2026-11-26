@@ -8,7 +8,7 @@ import {initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent
 import {healingBase} from '../rules/healing.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing} from '../rules/ailments.js';
 import {successLevel,SL} from '../rules/tests.js';
-import {alchemyArcaneCasterDossier} from './hmk-alchemy-arcane-casting-readiness.js';
+import {alchemyArcaneCasterDossier} from './hmk-alchemy-arcane-casting-readiness.js?v=94.131';
 import {applyConfirmedBloodLossHealing} from './hmk-healing-persistence.js?v=94.129';
 const need=(ok,msg)=>{if(!ok)throw Error(msg)};
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;

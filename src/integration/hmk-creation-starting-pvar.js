@@ -8,6 +8,11 @@ const LEVEL={Primary:0,Secondary:1,Neutral:2,Tertiary:3,Diametric:4};
 const optimal={Primary:1,Neutral:2,Secondary:3,Tertiary:4,Diametric:5};
 export const PVAR_GUILD_RANKS=Object.freeze(['Mavâr','Satía Mavâr','Shenâva','Vîrán']);
 const whole=(n,lo,hi)=>Number.isInteger(n)&&n>=lo&&n<=hi;
+export function occupationPrimaryConvocation(occupation){
+ const variant=/^Shèk-Pvâr \(([^)]+)\)$/.exec(String(occupation??''))?.[1];
+ if(variant?.startsWith('Fývria: '))return 'Fývria';
+ return CREATION_PVAR_CONVOCATIONS.includes(variant)?variant:null;
+}
 export function convocationAffinity(primary,convocation){
  if(!CREATION_PVAR_CONVOCATIONS.includes(primary))throw Error('Neznámá Primary Convocation');
  if(convocation==='Neutral')return 'Neutral';
@@ -29,9 +34,12 @@ export function validateStartingPvarSpells({occupation,pvarismML,primary,chantry
  const job=String(occupation??'');
  const verifiedChantry=resolveStartingChantry({chantryId,homeChantry,chantryConvocation,chantryStars});
  if(verifiedChantry){homeChantry=verifiedChantry.name;chantryConvocation=verifiedChantry.convocation;chantryStars=verifiedChantry.stars;}
- if(!job.startsWith('Shèk-Pvâr (')||!job.includes(primary+')'))throw Error('Primary Convocation musí odpovídat povolání Shèk-Pvâr');
+ const actualPrimary=occupationPrimaryConvocation(job);
+ // Keep the original label in historical proofs so exact journal revalidation still works.
+ const legacyFyvriaLabel=actualPrimary==='Fývria'&&job===`Shèk-Pvâr (${primary})`&&primary?.startsWith('Fývria: ');
+ if(!actualPrimary||(primary!==actualPrimary&&!legacyFyvriaLabel))throw Error('Primary Convocation musí odpovídat povolání Shèk-Pvâr');
  if(!whole(pvarismML,0,200)||!whole(chantryStars,1,5)||!(Number.isFinite(startingARP)&&startingARP>=0&&startingARP<=2000&&Math.round(startingARP*4)===startingARP*4))throw Error('Chybí Pvârism ML, ARP nebo doložená hvězdná kvalita chantry');
- if(chantryConvocation===undefined)chantryConvocation=primary; // existing v93.228 saved files remain valid
+ if(chantryConvocation===undefined)chantryConvocation=actualPrimary; // existing v93.228 saved files remain valid
  if(!CREATION_PVAR_CONVOCATIONS.includes(chantryConvocation))throw Error('Domovská chantry: ověřte její vlastní Primary Convocation (p.197,205)');
  if(guildRank&&!PVAR_GUILD_RANKS.includes(guildRank))throw Error('Neplatný Guild Rank (p.199)');
  if(typeof attunedObject!=='string'||attunedObject.length>160||typeof homeChantry!=='string'||homeChantry.length>160)throw Error('Neplatný popis attunement / chantry');
@@ -42,7 +50,7 @@ export function validateStartingPvarSpells({occupation,pvarismML,primary,chantry
   const id=typeof row==='string'?row:row?.id,assisted=typeof row==='string'?true:row?.assisted!==false;
   const s=SPELL_MAP.get(id);
   if(!s||seen.has(id)||known.has(id))throw Error('Neznámé, duplicitní nebo bezplatné Neutral kouzlo v nákupu ARP');
-  const affinity=convocationAffinity(primary,s.convocation);
+  const affinity=convocationAffinity(actualPrimary,s.convocation);
   if(!allowedStartingSpell({pvarismML,affinity,naturalAttunement,assisted}))throw Error(`Spell ${id} není dostupný pro současný Pvârism ML a typ výzkumu (p.205)`);
   const resourceAffinity=convocationAffinity(chantryConvocation,s.convocation);
   let cost=s.complexity+LEVEL[affinity];

@@ -7,7 +7,8 @@
  * Talent or an owned item as proof that a character can execute a procedure.
  * Action eligibility remains owned by the original rule-specific writer.
  */
-import {calculateSheetSkills,characterJournalReadiness} from './hmk-character-creation.js?v=94.014';
+import {calculateSheetSkills,characterJournalReadiness} from './hmk-character-creation.js?v=94.131';
+import {occupationPrimaryConvocation} from './hmk-creation-starting-pvar.js?v=94.131';
 
 export const CHARACTER_SPECIALTY_DEFINITIONS=Object.freeze([
  {id:'special-alchemy',label:'Alchemy',title:'Alchemy · elixíry',page:'HMK 265–274'},
@@ -44,7 +45,7 @@ export function characterSpecialtyChapters(character){
     JSON.stringify(h.startingPvarSpells)===JSON.stringify(spells)){
   const known=[...spells.freeSpells,...spells.spells.map(s=>s.id)];
   add('special-spellbook','Osvojený Pvârism a potvrzená konkrétní kouzla z Character Creation.',
-   [detail('Pvârism ML',pvar.ml),detail('Primary Convocation',spells.primary),
+   [detail('Pvârism ML',pvar.ml),detail('Primary Convocation',occupationPrimaryConvocation(spells.occupation)??spells.primary),
     ...known.map(name=>detail('Známé kouzlo',name))],
    'Seznam je počáteční důkaz znalosti, nikoli automatické seslání. Úspěch seslání, trvání a následky vyhodnocují existující Spellfire/Initiative procedury.');
  }

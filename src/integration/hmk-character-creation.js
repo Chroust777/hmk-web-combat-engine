@@ -11,7 +11,7 @@ import {creationPsycheCount,creationPsycheFromPhysical} from './hmk-creation-psy
 import {divineAspectFromChoice} from './hmk-creation-divine-aspects.js';
 import {validateStartingSpiritPowers,validateShamanTradition} from './hmk-creation-spirit-powers.js';
 import {validateStartingElixirs} from './hmk-creation-starting-elixirs.js';
-import {validateStartingPvarSpells} from './hmk-creation-starting-pvar.js';
+import {validateStartingPvarSpells} from './hmk-creation-starting-pvar.js?v=94.131';
 import {VERIFIED_WEST_DOCTRINES,VERIFIED_COVENANT_DOCTRINES,moralityOrthodoxyPenalty,validateStartingReligion} from './hmk-creation-doctrine.js';
 import {isTribalEmhle,covenantPostOccupationGrants} from './hmk-creation-special-skill-grants.js';
 import {SOCIETIES,classFromRoll,VERIFIED_REGIONS,regionAllowedForFolk,realmFromRegionRoll,realmFromRegionSelection,OCCUPATIONS,occupationVariantNames,priestReligionOf,isArcaneOccupationEligible,CHIEFTAIN_VARIANTS,chieftainVariantForSubsistence,familyOccupationProfile,familySkillCap,validateFamilySkillAllocation,OCCUPATION_PAGES,availableBackgroundSkills,tribalFreeOccupation,standingFromWealth,printedParentWealthDie,occupationWealthDie,evaluateWealthDice,wealthDiceCounts,ritualFollowerFromML,folkSkillsFromDice,graceFromDie,arcaneStartingResearch,REGION_D1000,ELDER_FOLK_REGIONS,regionFromD1000} from './hmk-creation-tables.js';
