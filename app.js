@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.124';
+const APP_VERSION='94.125';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -10958,6 +10958,8 @@ function characterStableView(owner){
  const active=animals.filter(a=>!stableBurden(data,cid,a).exit);
  if(!active.length)return journalChapterShell('Stáj · '+owner.name,'Žádné právě vlastněné zvíře',`<p class="hmk-stable-note">Zvíře lze pořídit v Knihovně → Stáj · zvířata.</p>${sharedTimeWindowActivePlanId?'<button type="button" class="hc-small" data-hmk-stable-go-travel>← Vrátit se do rozpracovaného Pochodu</button>':''}`,'journal-book--personal-stable');
  const selectedAnimal=active.find(a=>a.id===stableOwnerFocusedId)||active[0];
+ // Keep the medical submit context in sync with the displayed default animal.
+ stableOwnerFocusedId=selectedAnimal.id;
  const activeButtons=active.map(a=>`<button type="button" class="${a.id===selectedAnimal.id?'':'secondary'}" data-hmk-stable-pick-animal="${esc(a.id)}" aria-pressed="${a.id===selectedAnimal.id}">${esc(a.name)} · ${esc(a.spec.name)}</button>`).join('');
  let folioLeft='',folioRight='';
  try{
