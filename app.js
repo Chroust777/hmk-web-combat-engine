@@ -79,7 +79,7 @@ import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgili
 import {previewSwimmingDanger,prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {asphyxiaCapacity,asphyxiaDeathCountdown} from './src/rules/ailments.js';
 import {successValue as swimmingWillSuccessValue} from './src/rules/tests.js';
-import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,resolveBalmTraumaCourse,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.128';
+import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,resolveBalmTraumaCourse,resolveBalmBloodLossRecovery,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.129';
 import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './src/integration/hmk-concurrent-procedures.js';
 import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.128';
+const APP_VERSION='94.129';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -16402,12 +16402,14 @@ function hskTrekkingWeatherTreatmentForms(actorId){
    <output role="status" aria-live="polite"></output></form></details>`;
  }).join('');
 }
-function exposureBalmForm(actorId,sourceId,kind='exposure'){
+const BALM_RECOVERY_LABELS={exposure:'Exposure Healing','blood-loss':'Blood Loss Healing',
+ 'extended-shock':'Extended Shock Course',coma:'Coma Course'};
+function hskBalmRecoveryForm(actorId,sourceId,kind='exposure'){
  const clock=data.campaignClock;
  const casters=data.characters.filter(c=>(clock?.characterIds||[]).includes(c.id)&&knowsExposureBalm(c));
  if(!casters.length)return '';
- const exposure=kind==='exposure',minimumSI=exposure?7:8;
- const label=exposure?'Exposure Healing':kind==='coma'?'Coma Course':'Extended Shock Course';
+ const minimumSI=kind==='extended-shock'||kind==='coma'?8:7;
+ const label=BALM_RECOVERY_LABELS[kind];
  const number=(name,label,min,max)=>`<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" step="1" required></label>`;
  return `<details class="hsk-exposure-card"><summary>Arcane Recovery · Balm · ${label}</summary>
   <form data-balm-exposure-recovery>
@@ -16455,7 +16457,7 @@ function hskTrekkingWeatherCourseForms(actorId){
     <button type="submit" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.course)}">Vyhodnotit právě splatný d100</button></div>
     <output role="status" aria-live="polite"></output></form>`:
     `<p class="hsk-exposure-wait" role="status">${due&&clock&&due.minute>clock.minute?'Další hod ještě není splatný. Před tímto termínem není možné zadávat kostku ani vytvářet další Course.':due&&clock&&due.minute<clock.minute?'Termín již uplynul; je potřeba zkontrolovat časovou osu, nelze zpětně vymyslet hod.':'Nejdříve musí být doložena časová kotva v Kalendáři.'}</p>`}
-   </details>${origin&&elapsedActual>=0&&!h.skinPending&&!state.events.some(e=>e.id==='arcane-balm-exposure:'+h.sourceId)?exposureBalmForm(actor.id,h.sourceId):''}`;
+   </details>${origin&&elapsedActual>=0&&!h.skinPending&&!state.events.some(e=>e.id==='arcane-balm-exposure:'+h.sourceId)?hskBalmRecoveryForm(actor.id,h.sourceId):''}`;
  }).join('');
 }
 /** Environmental medical continuations have a dedicated Health/Exposure
@@ -16778,8 +16780,11 @@ function hskWeatherHealthConsequences(actorId,{stable=false}={}){
  const parallel=hskParallelColdHealthPanel(actorId);
  if(stable)return success+parallel+hskWeatherBleedingCarePanel(actorId)+(weatherShock||hskWeatherTraumaCourseForm(actorId)||'')+hskWeatherInjuryMandatory(actorId);
  const patient=character(actorId),health=patient&&persistentStateOf(patient);
+ const bloodAnchor=health?.bloodLoss?.bp>0&&health.shock!=='KIA'&&getCampaignAnchor(data.campaignClock,'blood-loss',actorId);
+ const bloodBalm=bloodAnchor&&!health.events.some(e=>e.id==='arcane-balm-blood-loss:'+bloodAnchor.eventId)?
+  hskBalmRecoveryForm(actorId,bloodAnchor.eventId,'blood-loss'):'';
  if(data.campaignClock&&health?.wounds.some(w=>activeNoncombatBleeder966(w,health)))
-  return success+parallel+(weatherShock||'')+hskWeatherInjuryMandatory(actorId);
+  return success+parallel+(weatherShock||'')+hskWeatherInjuryMandatory(actorId)+bloodBalm;
  // One current compulsory health test per actor; no new Cold/Heat dice while
  // a prior weather-induced Shock reroll remains unresolved.
  if(weatherShock){
@@ -16795,15 +16800,15 @@ function hskWeatherHealthConsequences(actorId,{stable=false}={}){
    Number.isSafeInteger(now)&&now>=q.originMinute&&now<q.originMinute+10;
   const priorExposure=beforeShockDue?hskEpisodeWeatherOnsetForms(actorId):'';
   const exposurePanel=priorExposure?'<section class="panel wide hmk-health-exposure-followups"><h3>Nejprve dokončit původní Cold Exposure · HMK 185</h3><p class="hc-hint">Původní ponoření a nový Cold Shock jsou už doloženy. Vyhodnoť nyní jeho dosud nezapsaný zdravotní následek; samostatný Shock Reroll zůstává naplánovaný na svůj skutečný termín.</p>'+priorExposure+'</section>':'';
-  return success+parallel+(hskWeatherInjuryMandatory(actorId)||'')+exposurePanel+weatherShock;
+  return success+parallel+(hskWeatherInjuryMandatory(actorId)||'')+exposurePanel+weatherShock+bloodBalm;
  }
  const trauma=hskWeatherTraumaCourseForm(actorId);
  const balm=['extended-shock','coma'].map(kind=>{
   const course=kind==='coma'?(health?.coma?.active?health.coma:null):health?.extendedShock;
   const clock=data.campaignClock;
   return clock&&course?.sourceId&&isNoncombatMedicalOrigin(course.domain)&&getCampaignAnchor(clock,kind,actorId)&&
-   !health.events.some(e=>e.id==='arcane-balm-course:'+kind+':'+course.sourceId)?exposureBalmForm(actorId,course.sourceId,kind):'';
- }).join('');
+   !health.events.some(e=>e.id==='arcane-balm-course:'+kind+':'+course.sourceId)?hskBalmRecoveryForm(actorId,course.sourceId,kind):'';
+ }).join('')+bloodBalm;
  if(trauma)return success+parallel+trauma+balm;
  const injuryMandatory=hskWeatherInjuryMandatory(actorId);
  if(injuryMandatory)return success+parallel+injuryMandatory+balm;
@@ -19063,14 +19068,16 @@ document.addEventListener('submit',event=>{
  try{
   const clock=data.campaignClock,actor=character(value('actorId')),caster=character(value('casterId'));
   const sourceId=value('sourceId'),kind=value('kind');
-  if(!['exposure','extended-shock','coma'].includes(kind))throw Error('Chybí konkrétní trauma pro Balm.');
+  if(!Object.hasOwn(BALM_RECOVERY_LABELS,kind))throw Error('Chybí konkrétní trauma pro Balm.');
   if(!clock||!actor||!caster||![actor.id,caster.id].every(id=>(clock.characterIds||[]).includes(id)))
    throw Error('Balm vyžaduje pacienta a sesilatele v aktuálním kalendáři.');
   if(combatActorLocked93725(actor.id)||combatActorLocked93725(caster.id))
    throw Error('Balm účastníků aktivního boje vyřešte v pořadí Combat.');
   const state=persistentStateOf(actor),hazard=state.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
   const course=kind==='coma'?state.coma:state.extendedShock;
+  const bloodAnchor=kind==='blood-loss'&&getCampaignAnchor(clock,'blood-loss',actor.id);
   const anchor=kind==='exposure'?(hazard&&getCampaignEpisodeAnchor(clock,'weather',actor.id,hazard.id)):
+   kind==='blood-loss'?(bloodAnchor?.eventId===sourceId&&bloodAnchor):
    (course?.sourceId===sourceId&&isNoncombatMedicalOrigin(course.domain)&&getCampaignAnchor(clock,kind,actor.id));
   if(!anchor)throw Error('Chybí kalendářový počátek původního traumatu.');
   const input={state,actor,caster,sourceId,kind,
@@ -19078,23 +19085,26 @@ document.addEventListener('submit',event=>{
    spellML:Number(value('spellML')),castingEML:value('castingEML')?.trim()?Number(value('castingEML')):NaN,castingD100:Number(value('castingD100')),
    recoveryD100:Number(value('recoveryD100')),range:value('range'),understanding:value('understanding'),
    gmConfirmed:form.elements.namedItem('confirmed').checked};
-  const outcome=kind==='exposure'?resolveBalmExposureRecovery(input):resolveBalmTraumaCourse({...input,
-   physicianStars:kind==='extended-shock'?physicianCourseStars965(actor):0,
+  const outcomes={exposure:resolveBalmExposureRecovery,'blood-loss':resolveBalmBloodLossRecovery,
+   'extended-shock':resolveBalmTraumaCourse,coma:resolveBalmTraumaCourse};
+  const outcome=outcomes[kind]({...input,physicianStars:kind==='extended-shock'?physicianCourseStars965(actor):0,
    restfulShelter:kind==='coma'&&['yes','no'].includes(value('restfulShelter'))?value('restfulShelter')==='yes':undefined});
   const report=outcome.report;
-  const label=kind==='exposure'?'Exposure Healing':kind==='coma'?'Coma Course':'Extended Shock Course';
+  const label=BALM_RECOVERY_LABELS[kind];
+  const recovery=kind==='blood-loss'?'BP '+report.bpBefore+' → '+report.bpAfter:'HR '+report.fromHR+' → '+report.toHR;
   const description=caster.name+' · Spellfire d100 '+report.castingD100+' ('+report.castingSL+
-   ') · '+label+' d100 '+report.recoveryD100+' ('+report.sl+') · HR '+report.fromHR+' → '+report.toHR+
+   ') · '+label+' d100 '+report.recoveryD100+' ('+report.sl+') · '+recovery+
    (report.failureIgnored?' · neúspěch bez účinku':'')+'.';
   if(!mutate(()=>{
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
     createdAt:stamp(),title:'Arcane Recovery · Balm · '+label,body:description,
-    skillTestProof:{type:kind==='exposure'?'arcane-balm-exposure':'arcane-balm-course',actorId:actor.id,sourceId,report}});
+    skillTestProof:{type:kind==='exposure'||kind==='blood-loss'?'arcane-balm-'+kind:'arcane-balm-course',actorId:actor.id,sourceId,report}});
    notice=description;
   }))throw Error('Balm a okamžitý hod nelze uložit.');
   if(kind!=='exposure'){
-   hskWeatherHealthLastReceipt={actorId:actor.id,campaignId:campaignKey(clock),message:description+' Aktuální Shock: '+report.shock+'.'};
+   hskWeatherHealthLastReceipt={actorId:actor.id,campaignId:campaignKey(clock),message:description+
+    (report.shock?' Aktuální Shock: '+report.shock+'.':'')};
    openNextNoncombatHealthTerm(actor);
   }
  }catch(error){if(out)out.textContent=error.message;}
