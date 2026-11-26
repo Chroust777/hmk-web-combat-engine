@@ -3,7 +3,7 @@
  * are supplied explicitly; never derived from encounter-local round numbers.
  */
 import {SL,successLevel} from '../rules/tests.js';
-import {treatmentContract,canPerformTreatment,resolveTreatmentTable,treatmentRollEMLFromInjury,
+import {TREATMENT_ROLL_TABLE,treatmentContract,canPerformTreatment,resolveTreatmentTable,treatmentRollEMLFromInjury,
  healingBase,resolveInjuryHealingRoll,healingFailureIsCritical,healingStageZoneEffect,
  severityFromInjuryLevel,permanentHealingImpairment,infectionInitialHR,infectionCourseEML,
  resolveInfectionCourse,infectionWeaknessFatigue,resolveBloodLossHealing} from '../rules/healing.js';
@@ -173,10 +173,23 @@ export function applyConfirmedTreatment({state,round,eventId,woundId,daySinceInj
   untreatedBleeder,bleedingAfterTreatment:!!w.bleeding,source:'HMK pp178,180'}});
  return {state:s,healed:false,treatment:w.healing};
 }
-export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,herbalContext=null,historicalEvidence=null,gmConfirmed=false}={}){
- const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing;verifyWoundDay(s,woundId,daySinceInjury);
- requireRule(gmConfirmed===true&&h?.treated&&int(h.healingRate,1,6),'Rána nemá potvrzenou léčbu ani Healing Rate');
- requireRule(!h.noMundaneHealing&&!(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&h.healingRate<=2),
+// Balm may use the CF cell as a rate without applying a mundane Treatment.
+export function injuryArcaneHealingRate(w){
+ if(w.healing?.treated)return int(w.healing.healingRate,1,6)?w.healing.healingRate:null;
+ const aspect=w.projectileArrowOrBolt===true||w.impaled?'projectile':aspectKey(w);
+ if(!Object.hasOwn(TREATMENT_ROLL_TABLE,aspect))return null;
+ const cf=treatmentContract({aspect,injuryLevel:w.level}).results[SL.CF];
+ if(cf.kind!=='hr')return null;
+ return Math.max(1,correctedMountedHealingRate(w,cf.healingRate).rate-(w.aggravationUntreatedReduction??0));
+}
+export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinceInjury,endurance,will,roll,herbalContext=null,historicalEvidence=null,arcaneFreeRoll=false,arcaneBonus=0,gmConfirmed=false}={}){
+ const s=begin(state,{round,eventId,daySinceInjury});const w=wound(s,woundId),h=w.healing??{};verifyWoundDay(s,woundId,daySinceInjury);
+ const hr=arcaneFreeRoll?injuryArcaneHealingRate(w):h.healingRate;
+ requireRule(gmConfirmed===true&&(arcaneFreeRoll||h.treated)&&int(hr,1,6),
+  arcaneFreeRoll?'Rána nemá doloženou Healing Rate':'Rána nemá potvrzenou léčbu ani Healing Rate');
+ requireRule(arcaneFreeRoll?int(arcaneBonus,0,100)&&historicalEvidence===null:arcaneBonus===0,
+  'Neplatný bonus nebo historický doklad okamžitého Arcane Recovery');
+ requireRule(arcaneFreeRoll||!h.noMundaneHealing&&!(w.bodyKind==='horse'&&['flg','hlg'].includes(w.location)&&h.healingRate<=2),
   'HMK str.354: HR koně po zlomenině nohy ≤2, bez esoteriky se rána nemůže hojit');
  requireRule(!s.wounds.some(x=>x.healing?.infected),'HMK str.181: jakákoli aktivní infekce přerušuje všechny Injury Healing Rolls');
  if(historicalEvidence!==null){
@@ -187,29 +200,30 @@ export function applyConfirmedInjuryHealing({state,round,eventId,woundId,daySinc
    'Historický Healing Roll vyžaduje doložený původ původního d100, GM potvrzení a aktuální den');
   requireRule(herbalContext===null,'Zpětný Healing Roll nesmí převzít dnešní bylinný bonus jako historický');
  }
- requireRule(daySinceInjury===h.nextHealingDay,'Healing Roll je splatný přesně podle pětideního intervalu: den '+h.nextHealingDay);
+ requireRule(arcaneFreeRoll||daySinceInjury===h.nextHealingDay,'Healing Roll je splatný přesně podle pětideního intervalu: den '+h.nextHealingDay);
  requireRule(int(roll,1,100),'Povinný skutečný d100');
  const herb=herbalContext?curativeHealingEvidence({...herbalContext,woundId}):{bonus:0,sourceIds:[]};
- const hb=healingBase({endurance,will}),rawEML=hb*h.healingRate+herb.bonus;
+ const hb=healingBase({endurance,will}),rawEML=hb*hr+herb.bonus+arcaneBonus;
  let sl=successLevel(roll,rawEML);
  if(sl===SL.F&&healingFailureIsCritical({roll,cauterised:!!h.cauterised,area:!!h.area}))sl=SL.CF;
- const result=resolveInjuryHealingRoll({injuryLevel:w.level,sl,infectionPossible:!!h.infectionPossible});
+ const result=resolveInjuryHealingRoll({injuryLevel:w.level,sl,infectionPossible:!!h.infectionPossible,arcaneRecovery:arcaneFreeRoll});
  const originalSeverity=w.severity;
  if(result.infected){h.infected=true;h.infectionHR=infectionInitialHR(h.healingRate);h.nextInfectionDay=daySinceInjury+1;setInfectionWeakness(s,w,infectionWeaknessFatigue(h.infectionHR));}
  else if(result.injuryLevel===0){
+  w.healing=h;
   // A CS from S2 can jump straight to healed, skipping the recorded M1 stage.
   if(originalSeverity!=='M'&&h.daysToMinor==null)h.daysToMinor=daySinceInjury;
   w.healed=true;h.healedDay=daySinceInjury;w.bleeding=false;w.nextAdvanceRound=null;h.grimWound=false;h.nextGrimShockDay=null;
  }
- else {
+ else if(!result.arcaneFailureIgnored){
   w.level=result.injuryLevel;w.severity=severityFromInjuryLevel(w.level);
   // HMK p180: daily Grim Shock ends as soon as this wound is no longer Grievous.
   if(w.severity!=='G'){h.grimWound=false;h.nextGrimShockDay=null;}
   if(originalSeverity!=='M'&&w.severity==='M'&&h.daysToMinor==null)h.daysToMinor=daySinceInjury;
  }
- accruePermanentImpairment(w,daySinceInjury);
- if(!w.healed&&!result.infected)h.nextHealingDay=daySinceInjury+5;
- track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr:h.healingRate,rawEML,herbalBonus:herb.bonus,herbalSourceIds:herb.sourceIds,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected,historicalEvidence:historicalEvidence?{...historicalEvidence,sourceDay:daySinceInjury}:null}});
+ if(!result.arcaneFailureIgnored)accruePermanentImpairment(w,daySinceInjury);
+ if(!arcaneFreeRoll&&!w.healed&&!result.infected)h.nextHealingDay=daySinceInjury+5;
+ track(s,{eventId,round,type:'injury-healing-roll',details:{woundId,daySinceInjury,hb,hr,rawEML,herbalBonus:herb.bonus,herbalSourceIds:herb.sourceIds,roll,sl:Object.keys(SL).find(k=>SL[k]===sl),after:w.healed?'healed':w.severity+w.level,infected:!!result.infected,...(arcaneFreeRoll?{arcaneFreeRoll,arcaneBonus,failureIgnored:result.arcaneFailureIgnored===true}:{}),historicalEvidence:historicalEvidence?{...historicalEvidence,sourceDay:daySinceInjury}:null}});
  return {state:s,healed:!!w.healed,infected:!!h.infected,result};
 }
 /** HMK p181: Infection suspends ALL injury healing. The day index of an

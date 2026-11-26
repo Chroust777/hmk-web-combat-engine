@@ -9,7 +9,7 @@ import {healingBase} from '../rules/healing.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing} from '../rules/ailments.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {alchemyArcaneCasterDossier} from './hmk-alchemy-arcane-casting-readiness.js?v=94.131';
-import {applyConfirmedBloodLossHealing} from './hmk-healing-persistence.js?v=94.129';
+import {applyConfirmedBloodLossHealing,applyConfirmedInjuryHealing} from './hmk-healing-persistence.js?v=94.133';
 const need=(ok,msg)=>{if(!ok)throw Error(msg)};
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const cold={dry:{hr:5,period:240},damp:{hr:4,period:240},coolWater:{hr:4,period:120},coldWater:{hr:3,period:60},freezingWater:{hr:2,period:30}};
@@ -173,8 +173,8 @@ export function knowsExposureBalm(caster){
 function verifiedBalmCasting({actor,caster,minute,originMinute,spellML,castingEML,castingD100,recoveryD100,range,understanding},minimumSI){
  need(knowsExposureBalm(caster),'Sesilatel musí mít doložené známé kouzlo Balm.');
  need(int(minute,0,1e9)&&int(originMinute,0,minute),'Seslání vyžaduje skutečnou minutu od vzniku traumatu.');
- need(int(spellML,minimumSI*10,200)&&int(castingEML,-400,400)&&int(castingD100,1,100)&&
-  int(recoveryD100,1,100),'Doložte Spell ML alespoň '+(minimumSI*10)+', Casting EML a oba skutečné d100.');
+ need(int(spellML,Math.max(1,minimumSI*10),200)&&int(castingEML,-400,400)&&int(castingD100,1,100)&&
+  int(recoveryD100,1,100),'Doložte Spell ML alespoň '+Math.max(1,minimumSI*10)+', Casting EML a oba skutečné d100.');
  const spellIndex=Math.floor(spellML/10);
  need(range==='touch'||range==='ten-feet-los'&&spellIndex>=9,'Balm vyžaduje dotyk nebo při SI 9+ dosah nejvýše 10 stop v LOS.');
  need(typeof understanding==='string'&&understanding.trim().length>=5&&understanding.trim().length<=240,
@@ -241,6 +241,26 @@ export function resolveBalmBloodLossRecovery(input={}){
  const report={eventId:id,sourceId,kind:'blood-loss',...casting,bpBefore:result.bpBefore,bpAfter:result.bpAfter,
   eml:details.eml,sl:details.sl,failureIgnored:details.failureIgnored,
   nextHealingDay:result.nextHealingDay,sourcePages:[181,183,213,214]};
+ details.arcaneRecovery=report;
+ return {state:result.state,report};
+}
+
+export function resolveBalmInjuryRecovery(input={}){
+ const {state,actor,sourceId:woundId,round=1,minute,originMinute,recoveryD100,herbalContext=null,gmConfirmed=false}=input;
+ const casting=verifiedBalmCasting(input,0);
+ const id='arcane-balm-injury:'+woundId;
+ const s=prepared(state,round,woundId,id,gmConfirmed);
+ const wound=s.wounds.find(w=>w.id===woundId&&!w.healed);
+ need(actor?.id&&wound,'Balm vyžaduje konkrétní aktivní ránu.');
+ const {end: endurance, wil: will}=actor.hmk?.attributes??{};
+ verifiedBalmHealingBase(actor);
+ const result=applyConfirmedInjuryHealing({state:s,round,eventId:id,woundId,
+  daySinceInjury:Math.floor((minute-originMinute)/1440),endurance,will,roll:recoveryD100,
+  herbalContext,arcaneFreeRoll:true,arcaneBonus:casting.bonus,gmConfirmed});
+ const details=result.state.events.at(-1).details;
+ const report={eventId:id,sourceId:woundId,kind:'injury',...casting,hr:details.hr,
+  ilBefore:wound.level,ilAfter:result.result.injuryLevel,herbalBonus:details.herbalBonus,herbalSourceIds:details.herbalSourceIds,eml:details.rawEML,sl:details.sl,
+  failureIgnored:details.failureIgnored,healed:result.healed,sourcePages:[180,181,213,214]};
  details.arcaneRecovery=report;
  return {state:result.state,report};
 }
