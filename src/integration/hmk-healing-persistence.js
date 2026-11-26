@@ -6,7 +6,7 @@ import {SL,successLevel} from '../rules/tests.js';
 import {treatmentContract,canPerformTreatment,resolveTreatmentTable,treatmentRollEMLFromInjury,
  healingBase,resolveInjuryHealingRoll,healingFailureIsCritical,healingStageZoneEffect,
  severityFromInjuryLevel,permanentHealingImpairment,infectionInitialHR,infectionCourseEML,
- resolveInfectionCourse,infectionWeaknessFatigue} from '../rules/healing.js';
+ resolveInfectionCourse,infectionWeaknessFatigue,resolveBloodLossHealing} from '../rules/healing.js';
 import {validateCombatState,initialCombatState} from './persistent-combat-state.js';
 import {hmkHumanLocationSymbols,hmkAmputationAssessment,hmkInjuryMishaps} from './injury-special-hmk.js';
 import {calculateShockState,applyShockState,SHOCK_STATE} from '../rules/shock.js';
@@ -270,27 +270,31 @@ export function applyConfirmedInfectionCourse({state,round,eventId,woundId,daySi
  return {state:s,result};
 }
 /** HMK p181: every ten days after actual BP loss; ignore only weakness CAUSED by anaemia. */
-export function applyConfirmedBloodLossHealing({state,round,eventId,daySinceBloodLoss,endurance,roll,gmConfirmed=false}={}){
+export function applyConfirmedBloodLossHealing({state,round,eventId,daySinceBloodLoss,endurance,roll,arcaneFreeRoll=false,arcaneBonus=0,gmConfirmed=false}={}){
  const s=copy(state??initialCombatState());validateCombatState(s);
- requireRule(gmConfirmed===true&&s.shock!=='KIA','GM musí potvrdit skutečné desetidenní léčení Blood Loss');
+ requireRule(gmConfirmed===true&&s.shock!=='KIA','GM musí potvrdit skutečný Blood Loss Healing');
  requireRule(int(round,1,9999)&&round>=s.lastRound&&typeof eventId==='string'&&eventId&&!s.events.some(e=>e.id===eventId),'Neplatné ID/kolo');
  requireRule(int(daySinceBloodLoss,0,100000)&&int(endurance,1,40)&&int(roll,1,100),'Povinný den, END a skutečný d100');
+ requireRule(arcaneFreeRoll?int(arcaneBonus,0,100):arcaneBonus===0,'Neplatný bonus okamžitého Arcane Recovery');
  requireRule(s.bloodLoss.bp>0,'Postava nemá BP k obnovení');
  const due=s.bloodLoss.healingNextDay??10;
- requireRule(daySinceBloodLoss===due,'Blood Loss Healing Roll je splatný den '+due);
+ requireRule(arcaneFreeRoll||daySinceBloodLoss===due,'Blood Loss Healing Roll je splatný den '+due);
  // HMK p181 explicitly excludes all fatigue except WEAKNESS from sources
  // other than this anaemia. Windedness and Weariness are NOT modifiers here.
  const otherWeakness=s.fatigue.otherWeakness;
  const enduranceML=endurance*5;
- const eml=enduranceML-otherWeakness,sl=successLevel(roll,eml);
+ const eml=enduranceML-otherWeakness+arcaneBonus,sl=successLevel(roll,eml);
  const prior=s.bloodLoss.bp;
- s.bloodLoss.bp=Math.max(0,prior-(sl===SL.CS?2:sl===SL.S?1:0));
- s.bloodLoss.weaknessFatigue=s.bloodLoss.bp*5;
- s.bloodLoss.healingNextDay=s.bloodLoss.bp===0?null:daySinceBloodLoss+(sl===SL.CF?20:10);
+ const outcome=resolveBloodLossHealing({bp:prior,sl,arcaneRecovery:arcaneFreeRoll});
+ s.bloodLoss.bp=outcome.bp;
+ s.bloodLoss.weaknessFatigue=outcome.weaknessFatigue;
+ if(!outcome.bp)s.bloodLoss.healingNextDay=null;
+ else if(!arcaneFreeRoll)s.bloodLoss.healingNextDay=daySinceBloodLoss+(outcome.skipNextPeriod?20:10);
  track(s,{eventId,round,type:'blood-loss-healing',details:{daySinceBloodLoss,roll,endurance,
   enduranceML,otherWeakness,otherFatigue:otherWeakness,excludedWindedness:s.fatigue.windedness,
   excludedWeariness:s.fatigue.weariness,excludedAnaemia:prior*5,
-  eml,sl:Object.keys(SL).find(k=>SL[k]===sl),bpBefore:prior,bpAfter:s.bloodLoss.bp,nextDay:s.bloodLoss.healingNextDay}});
+  eml,sl:Object.keys(SL).find(k=>SL[k]===sl),bpBefore:prior,bpAfter:s.bloodLoss.bp,nextDay:s.bloodLoss.healingNextDay,
+  ...(arcaneFreeRoll?{arcaneFreeRoll,arcaneBonus,failureIgnored:outcome.arcaneFailureIgnored===true}:{})}});
  return {state:s,bpBefore:prior,bpAfter:s.bloodLoss.bp,nextHealingDay:s.bloodLoss.healingNextDay};
 }
 /** Grim G/CF wound: daily Location Shock Roll until no longer G or CF-treated (p180). */

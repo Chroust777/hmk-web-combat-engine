@@ -9,6 +9,7 @@ import {healingBase} from '../rules/healing.js';
 import {ailmentOutcome,exposureAdvance,exposureHealing} from '../rules/ailments.js';
 import {successLevel,SL} from '../rules/tests.js';
 import {alchemyArcaneCasterDossier} from './hmk-alchemy-arcane-casting-readiness.js';
+import {applyConfirmedBloodLossHealing} from './hmk-healing-persistence.js?v=94.129';
 const need=(ok,msg)=>{if(!ok)throw Error(msg)};
 const int=(x,lo=0,hi=999999)=>Number.isSafeInteger(x)&&x>=lo&&x<=hi;
 const cold={dry:{hr:5,period:240},damp:{hr:4,period:240},coolWater:{hr:4,period:120},coldWater:{hr:3,period:60},freezingWater:{hr:2,period:30}};
@@ -180,11 +181,14 @@ function verifiedBalmCasting({actor,caster,minute,originMinute,spellML,castingEM
   'Doložte, jak sesilatel porozuměl tomuto traumatu.');
  const castingSL=successLevel(castingD100,castingEML);
  need(castingSL===SL.S||castingSL===SL.CS,'Okamžitý hod vyžaduje úspěšný Spellfire Balm.');
- const {end,wil}=actor.hmk?.attributes??{};
- need(int(end,1,200)&&int(wil,1,200),'Pro Arcane Recovery musí být doloženo END a WIL.');
  return {actorId:actor.id,casterId:caster.id,minute,originMinute,spell:'Balm',spellML,spellIndex,castingEML,
   castingD100,castingSL:slText[castingSL],range,understanding:understanding.trim(),recoveryD100,
-  hb:healingBase({endurance:end,will:wil}),bonus:castingSL===SL.CS?10:0};
+  bonus:castingSL===SL.CS?10:0};
+}
+function verifiedBalmHealingBase(actor){
+ const {end,wil}=actor.hmk?.attributes??{};
+ need(int(end,1,200)&&int(wil,1,200),'Pro tento Arcane Recovery hod musí být doloženo END a WIL.');
+ return healingBase({endurance:end,will:wil});
 }
 export function resolveBalmExposureRecovery(input={}){
  const {state,sourceId,round=1,gmConfirmed=false,recoveryD100}=input;
@@ -193,12 +197,12 @@ export function resolveBalmExposureRecovery(input={}){
  const hazard=s.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
  need(input.actor?.id&&hazard,'Balm vyžaduje konkrétní aktivní expozici.');
  need(!hazard.skinPending,'Nejprve vyhodnoťte případný Frostbite nebo Sunburn z téže expozice.');
- const casting=verifiedBalmCasting(input,7),{hb,bonus}=casting,fromHR=hazard.hr;
+ const casting=verifiedBalmCasting(input,7),{bonus}=casting,hb=verifiedBalmHealingBase(input.actor),fromHR=hazard.hr;
  const eml=hb*5+bonus,sl=successLevel(recoveryD100,eml);
  const outcome=exposureHealing({healingRate:fromHR,sl,arcaneRecovery:true});
  if(outcome.delta)applyStatus(s,hazard,outcome.healingRate);
  if(outcome.defeated)hazard.active=false;
- const report={eventId:id,sourceId,...casting,eml,sl:slText[sl],fromHR,toHR:hazard.hr,
+ const report={eventId:id,sourceId,...casting,hb,eml,sl:slText[sl],fromHR,toHR:hazard.hr,
   failureIgnored:outcome.arcaneFailureIgnored===true,defeated:!!outcome.defeated,sourcePages:[183,185,213,214]};
  s.events.push({id,type:'arcane-balm-exposure',round,details:report});
  s.lastRound=round;validateCombatState(s);
@@ -212,15 +216,31 @@ export function resolveBalmTraumaCourse(input={}){
  const s=prepared(state,round,sourceId,id,gmConfirmed);
  const course=kind==='coma'?s.coma:s.extendedShock;
  need(actor?.id&&course?.sourceId===sourceId&&(kind!=='coma'||course.active),'Balm vyžaduje konkrétní aktivní Course.');
- const casting=verifiedBalmCasting(input,8),{hb,bonus}=casting;
+ const casting=verifiedBalmCasting(input,8),{bonus}=casting,hb=verifiedBalmHealingBase(actor);
  const args={state:s,round,eventId:id,healingBase:hb,roll:recoveryD100,arcaneBonus:bonus,arcaneFreeRoll:true,gmConfirmed};
  if(kind==='coma')need(typeof restfulShelter==='boolean','Doložte, zda je prostředí klidné a chráněné.');
  const result=kind==='coma'?applyComaCourse({...args,daysElapsed:Math.floor((minute-originMinute)/1440)-course.elapsedDays,restfulShelter}):
   applyExtendedShockCourse({...args,physicianStars});
  const details=result.state.events.at(-1).details;
- const report={eventId:id,sourceId,kind,...casting,fromHR:course.hr,toHR:kind==='coma'?result.hr:result.nextHR,
+ const report={eventId:id,sourceId,kind,...casting,hb,fromHR:course.hr,toHR:kind==='coma'?result.hr:result.nextHR,
   sl:details.sl,eml:details.rawEML,failureIgnored:details.failureIgnored,
   shock:result.state.shock,comaActive:result.state.coma?.active===true,sourcePages:[179,183,213,214]};
+ details.arcaneRecovery=report;
+ return {state:result.state,report};
+}
+
+export function resolveBalmBloodLossRecovery(input={}){
+ const {state,actor,sourceId,round=1,minute,originMinute,recoveryD100,gmConfirmed=false}=input;
+ const id='arcane-balm-blood-loss:'+sourceId;
+ const s=prepared(state,round,sourceId,id,gmConfirmed);
+ need(actor?.id&&s.bloodLoss.bp>0,'Balm vyžaduje aktivní Blood Loss.');
+ const casting=verifiedBalmCasting(input,7);
+ const result=applyConfirmedBloodLossHealing({state:s,round,eventId:id,daySinceBloodLoss:Math.floor((minute-originMinute)/1440),
+  endurance:actor.hmk?.attributes?.end,roll:recoveryD100,arcaneFreeRoll:true,arcaneBonus:casting.bonus,gmConfirmed});
+ const details=result.state.events.at(-1).details;
+ const report={eventId:id,sourceId,kind:'blood-loss',...casting,bpBefore:result.bpBefore,bpAfter:result.bpAfter,
+  eml:details.eml,sl:details.sl,failureIgnored:details.failureIgnored,
+  nextHealingDay:result.nextHealingDay,sourcePages:[181,183,213,214]};
  details.arcaneRecovery=report;
  return {state:result.state,report};
 }
