@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.125';
+const APP_VERSION='94.126';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -7393,7 +7393,7 @@ const JOURNAL_ZN_GROUPS={sk:['Head','1',3],sh:['Arms','2–3',5],tx:['Torso','4�
 const JOURNAL_LN_RANGES={sk:'1–5',fa:'6–8',nk:'9–10',sh:'1–3',ua:'4–6',el:'7',fo:'8–9',ha:'10',tx:'1–4',ab:'5–7',pv:'8–10',th:'1–4',kn:'5',ca:'6–8',ft:'9–10'};
 function journalWoundCareButton(actor,wound,label){
  if(!wound.id||wound.healed||persistentStateOf(actor).shock==='KIA')return '';
- return ` <button type="button" class="secondary journal-wound-care" data-wound-treatment="${esc(wound.id)}"
+ return ` <button type="button" class="secondary journal-wound-care" data-hmk-gm-only data-wound-treatment="${esc(wound.id)}"
   data-wound-patient="${esc(actor.id)}" aria-label="${esc('Léčba · '+label)}">Léčba</button>`;
 }
 function hmkAnimalWoundAnatomyHTML(c,{showUnmapped=false}={}){
