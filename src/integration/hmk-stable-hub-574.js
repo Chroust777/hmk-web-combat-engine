@@ -312,11 +312,21 @@ export function validateStableHub(data,offerForId=null){
  // Entire live inventory is projected from the immutable transfers. Manual
  // editing, selling or slot-changing a loaded object cannot bypass its proof.
  const loaded=new Map(),activeCampaign=data?.campaignClock?.campaignId??null;
+ const activeMembers=new Set(data?.campaignClock?.characterIds??(data?.characters||[]).map(c=>c.id));
  for(const [animalId,state] of snapshots)if(!activeCampaign||animals.get(animalId)?.campaignId===activeCampaign)for(const [id,proof] of [...state.inventory,...state.gear]){
   requireValid(!loaded.has(id),'inventární předmět je současně na více zvířatech');loaded.set(id,animalId);
  }
  for(const id of loaded.keys())requireValid((data.inventory||[]).some(i=>i.id===id),'naložený inventární předmět byl smazán');
  for(const item of data?.inventory||[]){const animalId=loaded.get(item.id);
+  const previousAnimal=animals.get(item.stableAnimalId);
+  const previousState=snapshots.get(item.stableAnimalId);
+  // The registry can still show the last branch of a nonparticipant. Its
+  // foreign attachment must have both its original receipt and archived item.
+  if(!animalId&&activeCampaign&&!activeMembers.has(item.characterId)&&item.slot==='stable'&&
+     previousAnimal?.ownerId===item.characterId&&previousAnimal.campaignId!==activeCampaign&&
+     (previousState?.inventory.has(item.id)||previousState?.gear.has(item.id))&&
+     data.campaignActorBranches?.[previousAnimal.campaignId]?.[item.characterId]?.inventory?.some(
+      archived=>archived.id===item.id&&JSON.stringify(archived)===JSON.stringify(item)))continue;
   requireValid(animalId?(item.slot==='stable'&&item.stableAnimalId===animalId):
    (item.slot!=='stable'&&item.stableAnimalId===undefined),'umístění inventáře se neshoduje s dokladem stáje');
  }

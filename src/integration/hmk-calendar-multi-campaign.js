@@ -76,10 +76,18 @@ function activate(next,clock){
    if(!source||source.minute!==clock.minute||!sameTr)
     fail(`Postava ${c.name} má doložené časované magické účinky. Jejich absolutní lhůty nelze automaticky přenést na odlišnou časovou osu bez rozporu s původním pravidlovým důkazem. Časová větev nebyla vytvořena.`);
   }
-  const snap=bucket[c.id]??(bucket[c.id]={...captureCampaignActor(c,next.inventory),
-    forkedFrom:campaignKey((next.campaignClocks||[]).at(-1)),
-    forkedFromMinute:(next.campaignClocks||[]).at(-1)?.minute??null,
-    forkedAtMinute:clock.minute});
+  if(!bucket[c.id]){
+   const fork=captureCampaignActor(c,next.inventory);
+   // The new branch inherits the possessions, but the original animal and
+   // its loading receipts belong to the source campaign.
+   for(const item of fork.inventory)if(item.slot==='stable'){
+    item.slot='carried';
+    delete item.stableAnimalId;
+   }
+   bucket[c.id]={...fork,forkedFrom:campaignKey((next.campaignClocks||[]).at(-1)),
+    forkedFromMinute:(next.campaignClocks||[]).at(-1)?.minute??null,forkedAtMinute:clock.minute};
+  }
+  const snap=bucket[c.id];
   c.hmk??={};for(const field of TIME_KEYS){if(Object.hasOwn(snap.hmk,field))c.hmk[field]=clone(snap.hmk[field]);else delete c.hmk[field];}
   next.inventory=next.inventory.filter(i=>i.characterId!==c.id).concat(clone(snap.inventory));
  }
