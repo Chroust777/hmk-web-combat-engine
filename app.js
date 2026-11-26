@@ -79,7 +79,7 @@ import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgili
 import {previewSwimmingDanger,prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {asphyxiaCapacity,asphyxiaDeathCountdown} from './src/rules/ailments.js';
 import {successValue as swimmingWillSuccessValue} from './src/rules/tests.js';
-import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.122';
+import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,resolveBalmTraumaCourse,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.128';
 import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './src/integration/hmk-concurrent-procedures.js';
 import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.127';
+const APP_VERSION='94.128';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -16402,25 +16402,29 @@ function hskTrekkingWeatherTreatmentForms(actorId){
    <output role="status" aria-live="polite"></output></form></details>`;
  }).join('');
 }
-function exposureBalmForm(actorId,sourceId){
+function exposureBalmForm(actorId,sourceId,kind='exposure'){
  const clock=data.campaignClock;
  const casters=data.characters.filter(c=>(clock?.characterIds||[]).includes(c.id)&&knowsExposureBalm(c));
  if(!casters.length)return '';
+ const exposure=kind==='exposure',minimumSI=exposure?7:8;
+ const label=exposure?'Exposure Healing':kind==='coma'?'Coma Course':'Extended Shock Course';
  const number=(name,label,min,max)=>`<label>${label}<input type="number" name="${name}" min="${min}" max="${max}" step="1" required></label>`;
- return `<details class="hsk-exposure-card"><summary>Arcane Recovery · Balm · okamžitý Exposure Healing</summary>
+ return `<details class="hsk-exposure-card"><summary>Arcane Recovery · Balm · ${label}</summary>
   <form data-balm-exposure-recovery>
    <input type="hidden" name="actorId" value="${esc(actorId)}">
    <input type="hidden" name="sourceId" value="${esc(sourceId)}">
-   <p class="hc-hint">Doložte úspěšný Spellfire provedený u stolu v aktuální minutě. Balm se SI 7+ poskytne této expozici jeden okamžitý Healing d100. Při F nebo CF se stav nezhorší.</p>
+   <input type="hidden" name="kind" value="${kind}">
+   <p class="hc-hint">Doložte úspěšný Spellfire v aktuální minutě. Balm se SI ${minimumSI}+ umožní jeden okamžitý ${label} d100. Při F nebo CF se stav nezhorší.</p>
    <label>Sesilatel s kouzlem Balm<select name="casterId" required><option value="">Vyberte sesilatele</option>${casters.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label>
-   ${number('spellML','Doložené Spell ML Balm (SI alespoň 7)',70,200)}
+   ${number('spellML','Doložené Spell ML Balm (SI alespoň '+minimumSI+')',minimumSI*10,200)}
    ${number('castingEML','Doložené Casting EML',-400,400)}
    ${number('castingD100','Skutečný Spellfire d100',1,100)}
    <label>Skutečný dosah<select name="range" required><option value="">Vyberte dosah</option><option value="touch">Dotyk</option><option value="ten-feet-los">Nejvýše 10 stop, v dohledu (SI 9+)</option></select></label>
-   <label>Jak sesilatel porozuměl této expozici?<input name="understanding" required minlength="5" maxlength="240" placeholder="Např. úspěšný Diagnosis"></label>
-   ${number('recoveryD100','Skutečný Exposure Healing d100',1,100)}
-   <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje původní Spellfire a okamžitý Healing hod v této minutě.</label>
-   <button type="submit">Zapsat Balm a okamžitý Healing</button><output role="status" aria-live="polite"></output>
+   <label>Jak sesilatel porozuměl tomuto traumatu?<input name="understanding" required minlength="5" maxlength="240" placeholder="Např. úspěšný Diagnosis"></label>
+   ${kind==='coma'?'<label>Klidné chráněné prostředí<select name="restfulShelter" required><option value="">Vyberte podmínky</option><option value="yes">Ano</option><option value="no">Ne (−20)</option></select></label>':''}
+   ${number('recoveryD100','Skutečný '+label+' d100',1,100)}
+   <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje původní Spellfire a okamžitý hod v této minutě.</label>
+   <button type="submit">Zapsat Balm a okamžitý ${label}</button><output role="status" aria-live="polite"></output>
   </form></details>`;
 }
 function hskTrekkingWeatherCourseForms(actorId){
@@ -16794,13 +16798,19 @@ function hskWeatherHealthConsequences(actorId,{stable=false}={}){
   return success+parallel+(hskWeatherInjuryMandatory(actorId)||'')+exposurePanel+weatherShock;
  }
  const trauma=hskWeatherTraumaCourseForm(actorId);
- if(trauma)return success+parallel+trauma;
+ const balm=['extended-shock','coma'].map(kind=>{
+  const course=kind==='coma'?(health?.coma?.active?health.coma:null):health?.extendedShock;
+  const clock=data.campaignClock;
+  return clock&&course?.sourceId&&isNoncombatMedicalOrigin(course.domain)&&getCampaignAnchor(clock,kind,actorId)&&
+   !health.events.some(e=>e.id==='arcane-balm-course:'+kind+':'+course.sourceId)?exposureBalmForm(actorId,course.sourceId,kind):'';
+ }).join('');
+ if(trauma)return success+parallel+trauma+balm;
  const injuryMandatory=hskWeatherInjuryMandatory(actorId);
- if(injuryMandatory)return success+parallel+injuryMandatory;
+ if(injuryMandatory)return success+parallel+injuryMandatory+balm;
  const html=entries.map(x=>hskTrekkingWeatherForm(x)+hskTrekkingColdShockForm(x)).join('')+
   hskEpisodeWeatherOnsetForms(actorId)+hskTrekkingWeatherTreatmentForms(actorId)+
   hskTrekkingWeatherCourseForms(actorId)+hskTrekkingSkinForms(actorId);
- return success+parallel+(html?'<section class="panel wide hmk-health-exposure-followups"><h3>Počasí · zdravotní vyhodnocení HMK 149, 185</h3><p class="hc-hint">Každý jednotlivý hod má původní ID a pravidlový termín. Po uložení aplikace sama vybere další splatnou povinnost; další potvrzovací checkbox není třeba. Combat pouze čte trvalý zdravotní stav.</p>'+html+'</section>':'');
+ return success+parallel+balm+(html?'<section class="panel wide hmk-health-exposure-followups"><h3>Počasí · zdravotní vyhodnocení HMK 149, 185</h3><p class="hc-hint">Každý jednotlivý hod má původní ID a pravidlový termín. Po uložení aplikace sama vybere další splatnou povinnost; další potvrzovací checkbox není třeba. Combat pouze čte trvalý zdravotní stav.</p>'+html+'</section>':'');
 }
 function hskPendingSkillPhysicalConsequences(actorId,{includeWeather=true}={}){
  const pending=data.journal.filter(x=>x.skillTestProof?.type==='critical-followup'&&
@@ -19049,33 +19059,44 @@ document.addEventListener('submit',event=>{
  const form=event.target;
  if(!form?.matches?.('[data-balm-exposure-recovery]'))return;
  event.preventDefault();event.stopImmediatePropagation();
- const out=form.querySelector('output'),value=name=>form.elements.namedItem(name).value;
+ const out=form.querySelector('output'),value=name=>form.elements.namedItem(name)?.value;
  try{
   const clock=data.campaignClock,actor=character(value('actorId')),caster=character(value('casterId'));
-  const sourceId=value('sourceId');
+  const sourceId=value('sourceId'),kind=value('kind');
+  if(!['exposure','extended-shock','coma'].includes(kind))throw Error('Chybí konkrétní trauma pro Balm.');
   if(!clock||!actor||!caster||![actor.id,caster.id].every(id=>(clock.characterIds||[]).includes(id)))
    throw Error('Balm vyžaduje pacienta a sesilatele v aktuálním kalendáři.');
   if(combatActorLocked93725(actor.id)||combatActorLocked93725(caster.id))
    throw Error('Balm účastníků aktivního boje vyřešte v pořadí Combat.');
   const state=persistentStateOf(actor),hazard=state.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
-  const anchor=hazard&&getCampaignEpisodeAnchor(clock,'weather',actor.id,hazard.id);
-  if(!anchor)throw Error('Chybí kalendářový počátek původní expozice.');
-  const outcome=resolveBalmExposureRecovery({state,actor,caster,sourceId,
+  const course=kind==='coma'?state.coma:state.extendedShock;
+  const anchor=kind==='exposure'?(hazard&&getCampaignEpisodeAnchor(clock,'weather',actor.id,hazard.id)):
+   (course?.sourceId===sourceId&&isNoncombatMedicalOrigin(course.domain)&&getCampaignAnchor(clock,kind,actor.id));
+  if(!anchor)throw Error('Chybí kalendářový počátek původního traumatu.');
+  const input={state,actor,caster,sourceId,kind,
    round:Math.max(1,state.lastRound||0,combatClock.round||0),minute:clock.minute,originMinute:anchor.minute,
-   spellML:Number(value('spellML')),castingEML:Number(value('castingEML')),castingD100:Number(value('castingD100')),
+   spellML:Number(value('spellML')),castingEML:value('castingEML')?.trim()?Number(value('castingEML')):NaN,castingD100:Number(value('castingD100')),
    recoveryD100:Number(value('recoveryD100')),range:value('range'),understanding:value('understanding'),
-   gmConfirmed:form.elements.namedItem('confirmed').checked});
+   gmConfirmed:form.elements.namedItem('confirmed').checked};
+  const outcome=kind==='exposure'?resolveBalmExposureRecovery(input):resolveBalmTraumaCourse({...input,
+   physicianStars:kind==='extended-shock'?physicianCourseStars965(actor):0,
+   restfulShelter:kind==='coma'&&['yes','no'].includes(value('restfulShelter'))?value('restfulShelter')==='yes':undefined});
   const report=outcome.report;
+  const label=kind==='exposure'?'Exposure Healing':kind==='coma'?'Coma Course':'Extended Shock Course';
   const description=caster.name+' · Spellfire d100 '+report.castingD100+' ('+report.castingSL+
-   ') · Healing d100 '+report.recoveryD100+' ('+report.sl+') · HR '+report.fromHR+' → '+report.toHR+
+   ') · '+label+' d100 '+report.recoveryD100+' ('+report.sl+') · HR '+report.fromHR+' → '+report.toHR+
    (report.failureIgnored?' · neúspěch bez účinku':'')+'.';
   if(!mutate(()=>{
    synchronizeCombatInjuries(actor,outcome.state);
    data.journal.push({id:uuid(),characterId:actor.id,calendarCampaignId:campaignKey(clock),campaignMinute:clock.minute,
-    createdAt:stamp(),title:'Arcane Recovery · Balm · Heat/Cold Exposure',body:description,
-    skillTestProof:{type:'arcane-balm-exposure',actorId:actor.id,sourceId,report}});
+    createdAt:stamp(),title:'Arcane Recovery · Balm · '+label,body:description,
+    skillTestProof:{type:kind==='exposure'?'arcane-balm-exposure':'arcane-balm-course',actorId:actor.id,sourceId,report}});
    notice=description;
-  }))throw Error('Balm a Healing nelze uložit.');
+  }))throw Error('Balm a okamžitý hod nelze uložit.');
+  if(kind!=='exposure'){
+   hskWeatherHealthLastReceipt={actorId:actor.id,campaignId:campaignKey(clock),message:description+' Aktuální Shock: '+report.shock+'.'};
+   openNextNoncombatHealthTerm(actor);
+  }
  }catch(error){if(out)out.textContent=error.message;}
 },true);
 document.addEventListener('submit',event=>{
