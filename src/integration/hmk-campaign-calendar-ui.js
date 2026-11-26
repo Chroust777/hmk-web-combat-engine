@@ -1,9 +1,9 @@
 import {calendarPCShelteredControlsHTML} from './hmk-pc-sheltered-stay-93730.js';
 import {isTravelEpisodeReceipt,travelEpisodeCalendarSegments} from './hmk-episode-calendar-scope.js';
-import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js';
+import {TR_MONTHS,campaignTRDate,formatTRDate,gmCalendarAgenda,campaignSunsignForDate} from './hmk-calendar-planner.js?v=94.140';
 import {isCompletedSkillTest,skillTestEvidenceHTML} from './hmk-skill-result-evidence-529.js';
 import {calendarEventDestination} from './hmk-calendar-event-routing.js?v=94.110';
-import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js?v=94.110';
+import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js?v=94.140';
 import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
 import {historicalHMKCalendarEntries} from './hmk-calendar-history.js?v=94.017';
 import {calendarActorActivities} from './hmk-calendar-activities.js';
@@ -110,7 +110,7 @@ function compactNutritionTimelineEvents(events,journal){
  return passthrough;
 }
 export function calendarBoardEvents({clock,characters=[],journal=[],additionalEvents=[]}={}){
- const agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock);
+ const agenda=campaignCalendarAgenda(clock,characters,journal),custom=gmCalendarAgenda(clock,characters);
  // Animal recovery is a real calendar activity, but animals are NOT added
  // to the human party roster or to nutrition / medical due calculations.
  const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;

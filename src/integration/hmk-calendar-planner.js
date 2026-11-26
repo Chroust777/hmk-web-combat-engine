@@ -1,3 +1,4 @@
+import {deceasedCalendarActors} from './hmk-calendar-deceased.js';
 /** HMK v1.2 p.11, 22: TR uses 12 named 30-day months, three tendays per month.
  * GM scenario scheduling is application functionality, not an invented rule.
  * Campaign minute remains the sole authoritative clock (see hmk-campaign-calendar).
@@ -108,16 +109,17 @@ export function completeGMCalendarPlan(clock,{id,planId,note='',kind='resolved',
  append(next,id,kind==='cancelled'?'cancel-plan':'resolve-plan',`${kind==='cancelled'?'GM zrušil':'GM potvrdil událost'}: ${plan.title}`);
  return next;
 }
-export function gmCalendarAgenda(clock){
+export function gmCalendarAgenda(clock,characters=[]){
  validateCalendarPlans(clock);
  const resolutions=new Map((clock.planResolutions??[]).map(r=>[r.planId,r]));
- return (clock.plans??[]).map(p=>{
+ const deceased=deceasedCalendarActors(characters);
+ return (clock.plans??[]).filter(p=>!p.requiresAction||resolutions.has(p.id)||!deceased.has(p.characterId)).map(p=>{
   const dueMinute=p.trigger==='end'?p.endMinute:p.minute;
   return {...p,dueMinute,resolution:resolutions.get(p.id)||null,status:resolutions.has(p.id)?resolutions.get(p.id).kind:dueMinute<=clock.minute?(p.requiresAction?'due':'elapsed'):'future'};
  }).sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
 }
-export function nextGMBlockingEvent(clock,nextMinute){
- return gmCalendarAgenda(clock).find(x=>x.requiresAction&&!x.resolution&&x.dueMinute<nextMinute)||null;
+export function nextGMBlockingEvent(clock,nextMinute,characters=[]){
+ return gmCalendarAgenda(clock,characters).find(x=>x.requiresAction&&!x.resolution&&x.dueMinute<nextMinute)||null;
 }
 export function assertCalendarPlansAppendOnly(before,after){
  if(!before)return true;

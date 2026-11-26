@@ -1,3 +1,4 @@
+import {deceasedCalendarActors} from './hmk-calendar-deceased.js';
 import {noncombatHealthDestination} from './hmk-calendar-event-routing.js?v=94.110';
 import {medicalOriginOfWound,MEDICAL_ORIGIN,isNoncombatMedicalOrigin,projectLegacyGrimShock,projectLegacyAlchemyShock} from './hmk-medical-origin.js?v=93.988';
 import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentProceduresAppendOnly,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './hmk-concurrent-procedures.js';
@@ -7,7 +8,7 @@ import {validateConcurrentProcedures,openConcurrentProcedures,assertConcurrentPr
  * A day has 1,440 minutes. Day numbers are intentionally neutral: no
  * unsupported Kèthîran month/calendar names or real-world timezone.
  */
-import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly} from './hmk-calendar-planner.js';
+import {validateCalendarPlans,nextGMBlockingEvent,assertCalendarPlansAppendOnly} from './hmk-calendar-planner.js?v=94.140';
 import {automaticHMKFollowups} from './hmk-calendar-automatic-followups.js?v=94.018';
 import {calendarMoraleProjection} from './hmk-calendar-morale-93891.js';
 import {projectedCalendarJournal} from './hmk-calendar-campaign-lifecycle.js';
@@ -202,6 +203,8 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
   const state=c.hmk?.healthState,projected=projectLegacyAlchemyShock(projectLegacyGrimShock(state,clock,c.id),clock,c.id);
   return projected===state?c:{...c,hmk:{...c.hmk,healthState:projected}};
  });
+ const deceased=deceasedCalendarActors(characters);
+ const aliveOwner=x=>!deceased.has(x.characterId);
  const all=[],unknown=[],suspended=[];
  const add=(c,kind,description,daysOrHours,woundId=null,unit='days',extra={})=>{
   const anchor=getCampaignAnchor(clock,kind==='healing'||kind==='infection'||kind==='grim'?'wound':kind,c.id,woundId);
@@ -341,10 +344,11 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
    }
   }
  }
- const morale=calendarMoraleProjection(clock,characters,journal);
+ const living=characters.filter(c=>!deceased.has(c.id));
+ const morale=calendarMoraleProjection(clock,living,journal);
  all.push(...morale.all);
  unknown.push(...morale.unknown);
- const automatic=automaticHMKFollowups(clock,characters,journal,getCampaignEpisodeAnchor,inventory);
+ const automatic=automaticHMKFollowups(clock,living,journal,getCampaignEpisodeAnchor,inventory);
  // A saved Trekking Routine is only a PREPARATION. It does not by itself
  // start a journey or expose the party to its possible hazards. Preserve its
  // skill/hazard navigation as nonblocking preparation until an authenticated
@@ -386,7 +390,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  }
  // A potion remains due at exactly its ten-minute preparation deadline.
  // The GM may arrive at the deadline but not skip it without the Herblore result.
- const herbMembers=new Map(characters.map(c=>[c.id,c]));
+ const herbMembers=new Map(living.map(c=>[c.id,c]));
  for(const j of journal){const h=j.calendarHerbPotionStart;
   if(!h||j.calendarCampaignId!==clock.campaignId||!herbMembers.has(j.characterId)||
    journal.some(x=>x.calendarHerbPotionComplete?.startId===j.id&&x.calendarCampaignId===clock.campaignId))continue;
@@ -418,7 +422,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
  // Independently begun procedures are scheduled, not already treated.
  // The original Treatment obligation is represented by the authenticated
  // in-progress operation, never emitted a second time at its onset.
- const running=openConcurrentProcedures(clock);
+ const running=openConcurrentProcedures(clock).filter(op=>aliveOwner(op)&&!deceased.has(op.healerId));
  const busy=new Set(running.map(p=>p.characterId+'::'+p.woundId));
  const occupiedPatient=new Map(running.map(op=>[op.characterId,op]));
  for(let i=all.length-1;i>=0;i--){
@@ -444,13 +448,14 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
    status:op.endMinute<=clock.minute?'due':'future'});
  }
  all.sort((a,b)=>a.minute-b.minute||a.id.localeCompare(b.id));
- const eligible=all.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
+ const isVisible=x=>aliveOwner(x)&&!gmCalendarCancellationMatches(clock,x,journal);
+ const eligible=all.filter(isVisible);
  const deferred=eligible.filter(x=>isGMDeferredCalendarEvent(clock,x));
  const actionable=eligible.filter(x=>!isGMDeferredCalendarEvent(clock,x));
- const liveUnknown=unknown.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
- const liveSuspended=suspended.filter(x=>!gmCalendarCancellationMatches(clock,x,journal));
+ const liveUnknown=unknown.filter(isVisible);
+ const liveSuspended=suspended.filter(isVisible);
  return {due:actionable.filter(x=>x.status==='due'),future:actionable.filter(x=>x.status==='future'),
-  unknown:liveUnknown,moraleWarnings:morale.warnings,all:actionable,deferred,suspended:liveSuspended,prepared:prepared.filter(x=>!gmCalendarCancellationMatches(clock,x,journal))};
+  unknown:liveUnknown,moraleWarnings:morale.warnings.filter(aliveOwner),all:actionable,deferred,suspended:liveSuspended,prepared:prepared.filter(isVisible)};
 }
 export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmConfirmed,characters=[],journal=[],inventory=[],deferConcurrentTreatmentAtStart=false}={}){
  validateCampaignCalendar(clock);
@@ -465,7 +470,7 @@ export function advanceCampaignCalendar(clock,{deltaMinutes,eventId,reason,gmCon
  if(agenda.unknown.length)throw Error('Nelze posunout čas: neověřený nebo neuzavřený časový závazek – '+
   agenda.unknown[0].name+' / '+agenda.unknown[0].description+'. '+agenda.unknown[0].reason);
  const nextMinute=clock.minute+deltaMinutes;
- const gmBlocking=nextGMBlockingEvent(clock,nextMinute);
+ const gmBlocking=nextGMBlockingEvent(clock,nextMinute,characters);
  if(gmBlocking)throw Error(`Nelze přeskočit nevyřízenou GM událost „${gmBlocking.title}“: ${displayCampaignMinute(gmBlocking.dueMinute)}.`);
  // New Treatment is attested by the ONE wound being completed in this
  // transaction. Do not turn the concurrent-Treatment exception into a generic

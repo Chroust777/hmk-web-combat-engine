@@ -1,3 +1,4 @@
+import {deceasedCalendarActors,livingPersonalCalendarSources} from './src/integration/hmk-calendar-deceased.js';
 import {installChat} from './src/ui/chat.js?v=94.106';
 import {gmNavigationMarkup,gmPageAttribute} from './src/ui/gm-mode.js?v=94.134';
 import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.098';
@@ -226,7 +227,7 @@ import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,travelBloodStoppageEML,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
-import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.137';
+import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.140';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination,noncombatHealthDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.110';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
@@ -238,7 +239,7 @@ import {availableSpellAuralRecoveries,persistSpellAuralRecovery} from './src/int
 import {pendingTranscendenceWill,createTranscendenceWill,applyTranscendenceWill,requireTranscendenceWillGMTimeMayAdvance,validateTranscendenceWillJournal,assertTranscendenceWillAppendOnly} from './src/integration/hmk-herbal-transcendence-will.js';
 import {availableSpellPsycheRecoveries,persistSpellPsycheRecoverySchedule,persistSpellPsycheRecoveryRoll} from './src/integration/hmk-spell-psyche-recovery.js';
 import {pendingSpellPsycheManifestations,persistSpellPsycheManifestation} from './src/integration/hmk-spell-psyche-manifestation.js';
-import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan,gmCalendarAgenda,CALENDAR_DAY_MINUTES} from './src/integration/hmk-calendar-planner.js';
+import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarPlan,completeGMCalendarPlan,gmCalendarAgenda,CALENDAR_DAY_MINUTES} from './src/integration/hmk-calendar-planner.js?v=94.140';
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery,commitExpeditionFatigue} from './src/integration/hmk-calendar-expedition.js';
 import {scheduleHMKActivity,finishDueHMKActivities,finishInterruptedHMKTravel,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
 import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
@@ -337,7 +338,7 @@ import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAp
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
 import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation,assertCampaignColdShockHistory} from './src/integration/hmk-calendar-multi-campaign.js?v=94.136';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
-import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.110';
+import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.140';
 import {operationalProjectJournal,projectKind,projectEnded,validateProjectCancellations,assertProjectCancellationsAppendOnly} from './src/integration/hmk-project-cancellation-94017.js';
 import {cancelGMCalendarObligation,gmCalendarCancellationMatches,gmCalendarUnknownId,gmCancellationPendingJournal} from './src/integration/hmk-calendar-gm-cancellation.js';
 import {automaticAilmentOnsets} from './src/integration/hmk-calendar-automatic-onsets.js';
@@ -414,7 +415,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.139';
+const APP_VERSION='94.140';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -1145,14 +1146,23 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
   // initial NPC safe stay. Do not silently create receipts for unrelated older
   // NPCs on an arbitrary subsequent save (legacy cases have a dedicated button).
   const newCampaign=!!data.campaignClock&&(!previous.campaignClock||campaignKey(previous.campaignClock)!==campaignKey(data.campaignClock));
+  const clock=data.campaignClock,deceased=deceasedCalendarActors(data.characters);
+  if(clock&&deceased.size){
+   for(const op of openConcurrentProcedures(clock)){
+    if(!deceased.has(op.characterId)&&!deceased.has(op.healerId))continue;
+    const reason=deceased.has(op.characterId)?'Ošetření ukončeno úmrtím pacienta.':'Ošetření přerušeno úmrtím léčitele.';
+    data.campaignClock=cancelConcurrentProcedure(data.campaignClock,{id:uuid(),startId:op.startId,reason,confirmed:true});
+   }
+  }
   const pendingJournal=gmCancellationPendingJournal(data.campaignClock,projectJournal());
+  const personalPendingJournal=livingPersonalCalendarSources(pendingJournal,campaignKey(data.campaignClock),deceased);
   const beforePeople=new Set(previous.characters.map(c=>c.id));
   const beforeMembers=new Set(previous.campaignClock?.characterIds||[]);
   const freshNPC=missingNPCShelterDefaults93802().filter(c=>newCampaign||!beforePeople.has(c.id)||!beforeMembers.has(c.id));
   if(freshNPC.length)seedNPCShelterDefaults93802(new Set(freshNPC.map(c=>c.id)));
   const priorInventory=new Map((previous.inventory||[]).map(x=>[x.id,x]));
   for(const itm of data.inventory||[]){const before=priorInventory.get(itm.id);if(before&&(itm.slot!==before.slot||itm.characterId!==before.characterId)&&itm.coldWorn)itm.coldWorn=false;}
-  closeWeatherNoEffectAftercare();closeDeterministicWeatherAftercare();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWildDueBeforeAdvance93912(previous.journal,campaignKey(data.campaignClock),previous.campaignClock.minute,data.campaignClock.minute);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});enrollUnmonitoredNutrition(data,{fromMinute:previous.campaignClock.minute,idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute&&
+  closeWeatherNoEffectAftercare();closeDeterministicWeatherAftercare();assertGMOnlyCampaignTime(previous,data,{gmClockAdvance});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))assertWildDueBeforeAdvance93912(previous.journal,campaignKey(data.campaignClock),previous.campaignClock.minute,data.campaignClock.minute);if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireHallucinogenicGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireTranscendenceWillGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireEmeticGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireWeaponPoisonResistanceGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireGreatPoisonGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireParalyticGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireSoporificGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireAlchemyDecayGMTimeMayAdvance({journal:pendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock))requireDarkvisionHealingGMTimeMayAdvance({journal:personalPendingJournal,campaignId:campaignKey(data.campaignClock),beforeMinute:previous.campaignClock.minute,afterMinute:data.campaignClock.minute});if(gmClockAdvance&&previous.campaignClock&&data.campaignClock&&campaignKey(previous.campaignClock)===campaignKey(data.campaignClock)&&data.campaignClock.minute>previous.campaignClock.minute){finishDueHMKActivities(data,{idFactory:uuid,stamp});enrollUnmonitoredNutrition(data,{fromMinute:previous.campaignClock.minute,idFactory:uuid,stamp});finishDueNutritionDays(data,{idFactory:uuid,stamp});applyDueMalnutritionOnsets(data,{idFactory:uuid,stamp});const missed=dueMalnutritionCases(data).find(t=>t.dueMinute<data.campaignClock.minute&&
  !gmCalendarCancellationMatches(data.campaignClock,{id:'automatic:malnutrition-course:'+encodeURIComponent(t.characterId)+':'+encodeURIComponent(t.episodeId||t.id||''),kind:'malnutrition-course',characterId:t.characterId,sourceId:t.episodeId||t.id,minute:t.dueMinute},data.journal)&&
  !data.campaignClock.events.some(e=>e.type==='gm-defer'&&e.kind==='malnutrition-course'&&
  e.characterId===t.characterId&&e.dueMinute===t.dueMinute&&
@@ -2925,7 +2935,7 @@ function episodeMandatoryWindow(clock=data.campaignClock){
  const scopedAgenda=ownCF.size?{...agenda,all:agenda.all.filter(x=>
   !(x.kind==='skill-critical'&&ownCF.has(x.originId)))}:agenda;
  return mandatoryCalendarWindow({minute:clock.minute,
-  agenda:scopedAgenda,gmAgenda:gmCalendarAgenda(clock)});
+  agenda:scopedAgenda,gmAgenda:gmCalendarAgenda(clock,data.characters)});
 }
 // Only genuinely outdoor activity needs a new daily weather certificate.
 // A documented safe indoor stay by ALL participating PCs, or a separate GM
@@ -4327,24 +4337,25 @@ function characterCraftPanel(clock,maker,discipline){
  const areaCurativeTargets=participants.flatMap(c=>(c.hmk?.healthState?.wounds??[])
   .filter(w=>!w.healed&&curativeIsArea(w)&&getCampaignAnchor(clock,'wound',c.id,w.id)&&!curativeAlreadyApplied(campaignKey(clock),c.id,w.id))
   .map(w=>({ref:c.id+'::'+w.id,label:c.name+' · '+w.location+' · '+w.severity+w.level})));
+ const personalSources=livingPersonalCalendarSources(projectJournal(),campaignKey(clock),deceasedCalendarActors(data.characters));
  const appliedPotions=projectJournal().filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotionAdminister);
- const unresolvedEmetics=pendingEmeticShocks(projectJournal(),campaignKey(clock),combatInjuryTimelineId);
- const pendingHallDreams=pendingHallucinogenicDreams(projectJournal(),campaignKey(clock));
- const pendingHallTrances=pendingHallucinogenicTrances(projectJournal(),campaignKey(clock));
- const pendingSaviris=pendingHallucinogenicSaviris(projectJournal(),campaignKey(clock));
- const pendingTranscendence=pendingHallucinogenicTranscendence(projectJournal(),campaignKey(clock));
- const pendingAstralWill=pendingTranscendenceWill(projectJournal(),campaignKey(clock));
- const pendingReembodiment=pendingHallucinogenicReembodiments(projectJournal(),campaignKey(clock));
- const unresolvedGreatPoison=pendingGreatPoisons(projectJournal(),campaignKey(clock));
+ const unresolvedEmetics=pendingEmeticShocks(personalSources,campaignKey(clock),combatInjuryTimelineId);
+ const pendingHallDreams=pendingHallucinogenicDreams(personalSources,campaignKey(clock));
+ const pendingHallTrances=pendingHallucinogenicTrances(personalSources,campaignKey(clock));
+ const pendingSaviris=pendingHallucinogenicSaviris(personalSources,campaignKey(clock));
+ const pendingTranscendence=pendingHallucinogenicTranscendence(personalSources,campaignKey(clock));
+ const pendingAstralWill=pendingTranscendenceWill(personalSources,campaignKey(clock));
+ const pendingReembodiment=pendingHallucinogenicReembodiments(personalSources,campaignKey(clock));
+ const unresolvedGreatPoison=pendingGreatPoisons(personalSources,campaignKey(clock));
  const armedWeaponPoisons=pendingWeaponPoisonPastes(projectJournal(),campaignKey(clock));
- const unresolvedParalytics=pendingParalyticChecks(projectJournal(),campaignKey(clock));
- const pendingSoporificEND=pendingSoporificTests(projectJournal(),campaignKey(clock));
- const pendingSoporificOnsets=pendingSoporificEffects(projectJournal(),campaignKey(clock));
+ const unresolvedParalytics=pendingParalyticChecks(personalSources,campaignKey(clock));
+ const pendingSoporificEND=pendingSoporificTests(personalSources,campaignKey(clock));
+ const pendingSoporificOnsets=pendingSoporificEffects(personalSources,campaignKey(clock));
  const legacyParalytics=appliedPotions.filter(j=>j.calendarHerbPotionAdminister.herbType==='paralytic'&&j.calendarHerbPotionAdminister.paralyticTracked!==true);
  const paralyzedNow=data.characters.filter(c=>activeHerbalParalysis(c.hmk?.healthState,clock.minute));
- const pendingHerbalPotions=projectJournal().filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotionStart?.actorId===actorId&&
+ const pendingHerbalPotions=personalSources.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarHerbPotionStart?.actorId===actorId&&
   !projectJournal().some(r=>r.calendarHerbPotionComplete?.startId===j.id));
- const ongoingAlchemy=pendingAlchemyPreparations(projectJournal(),campaignKey(clock));
+ const ongoingAlchemy=pendingAlchemyPreparations(personalSources,campaignKey(clock));
  const pendingAlchemy=ongoingAlchemy.filter(forMaker);
  const occupiedAlchemists=new Set(ongoingAlchemy.flatMap(row=>[
   row.characterId,...(row.calendarAlchemyStart.assistantPlan??[]).map(helper=>helper.actorId)
@@ -4470,7 +4481,7 @@ function characterCraftPanel(clock,maker,discipline){
  ${onlyMaker.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute),shock=c.hmk?.arcane?.auralShockLevels??0;return effects.map(x=>`<p class="hc-hint">${esc(c.name)} · Darkvision AS ${x.state.currentAS} · ${shock>0?`<strong>Aural Shock ${esc(shock)}: prospěch z vidění ve tmě pozastaven (HMK 270)</strong>; AS a Decay běží dál`:`vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong>`} · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
 <h4>Darkvision · CF citlivost na světlo · HP d6 dní / HR5</h4>
 <p class="hc-hint" data-craft-rule>HMK 270–271: postih mimo stín/pološero je polovina původní AS × 5. Úplné uzdravení při HR6; další testy po d6 dnech od skutečného CF. Success +1 HR, Critical Success +2 HR; CF znamená přeskočit další periodu. Doba pouze podle kalendáře GM.</p>
- ${pendingDarkvisionHealing(data.journal,campaignKey(clock),clock.minute).map(h=>{const c=character(h.targetId),attrs=c?.hmk?.attributes;return `<article class="hc-event"><strong>${esc(c?.name||h.targetId)} · citlivost na světlo −${h.penalty} EML (jen zrak při jasném světle)</strong><p>HR ${h.healingRate} · ${h.pendingStart?'Chybí d6 Healing Period – starý CF důkaz':clock.minute>h.nextDueMinute?'ZMEŠKANÁ SPLATNOST '+esc(displayCampaignMinute(h.nextDueMinute)):'Příští hod '+esc(displayCampaignMinute(h.nextDueMinute))}</p>
+ ${pendingDarkvisionHealing(personalSources,campaignKey(clock),clock.minute).map(h=>{const c=character(h.targetId),attrs=c?.hmk?.attributes;return `<article class="hc-event"><strong>${esc(c?.name||h.targetId)} · citlivost na světlo −${h.penalty} EML (jen zrak při jasném světle)</strong><p>HR ${h.healingRate} · ${h.pendingStart?'Chybí d6 Healing Period – starý CF důkaz':clock.minute>h.nextDueMinute?'ZMEŠKANÁ SPLATNOST '+esc(displayCampaignMinute(h.nextDueMinute)):'Příští hod '+esc(displayCampaignMinute(h.nextDueMinute))}</p>
  ${h.pendingStart&&clock.minute===h.onsetMinute?`<form data-darkvision-healing-start><input type="hidden" name="useId" value="${esc(h.useId)}"><input type="hidden" name="targetId" value="${esc(h.targetId)}"><label>Healing Period d6<input type="number" name="hpD6" min="1" max="6" required></label><button type="button" data-darkvision-roll-hp class="hc-small">⚄ d6</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje hod d6 při původním CF</label><button type="submit">Zapsat Healing Period</button></form>`:''}
  ${!h.pendingStart&&clock.minute===h.nextDueMinute&&attrs?.end&&attrs?.wil?`<form data-darkvision-healing-roll><input type="hidden" name="useId" value="${esc(h.useId)}"><input type="hidden" name="targetId" value="${esc(h.targetId)}"><p>END ${attrs.end}, WIL ${attrs.wil}; Healing Base a EML se vypočítají ze stávajících pravidel.</p><label>Skutečný Healing d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" data-darkvision-roll-heal class="hc-small">⚄ d100</button><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje skutečný Healing Roll v termínu</label><button type="submit">Zapsat zotavení / HR</button></form>`:''}</article>`}).join('')}
  <h4>Applied Elixirs · Mending / Object Aegis (HMK 269,273)</h4>
@@ -5003,7 +5014,7 @@ function campaignCalendarView(){
    starts.push({id:j.id,name:(TIMED_SKILL_LABELS_600[p.kind]||p.kind)+' · '+p.projectName,actor:actor?.name||'Postava',start:p.startMinute,due:p.kind==='brewing'&&linked?p.craftReadyMinute:isWorkshopCraft(p.kind)?(projectJournal().find(x=>x.calendarSkillFletchingAllocation996?.startId===j.id)?.calendarSkillFletchingAllocation996.outcome.dueMinute??p.earliestMinute):p.earliestMinute,
     details:(p.craftDayResolution==='day'?'Splatnost od začátku herního dne. ':'')+(p.kind==='brewing'?('Práce do '+displayCampaignMinute(p.earliestMinute)+', zrání do '+displayCampaignMinute(p.craftReadyMinute)+'. '+(linked?'SV kvality uložen, čeká na potvrzení zrání.':'Čeká na původní Brewing SV.')):'Nejčasnější možný SV; základní termín '+displayCampaignMinute(p.baseDueMinute)+'. '+(linked?'Původní SV uložen, čeká na případné uzavření.':'Vyžaduje původní Skill Test navázaný na tento projekt.'))});
   }
-  for(const row of pendingAlchemyPreparations(projectJournal(),cid)){
+  for(const row of pendingAlchemyPreparations(livingPersonalCalendarSources(projectJournal(),cid,deceasedCalendarActors(data.characters)),cid)){
    const prep=row.calendarAlchemyStart;
    starts.push({id:row.id,name:'Alchemy · '+prep.elixirName,actor:character(prep.actorId)?.name||'Postava',
     start:prep.minute,due:prep.dueMinute,details:'Preparation Roll v termínu. Pokračujte v deníku postavy.'});
@@ -12588,7 +12599,9 @@ function interruptedTreatmentWound(actor){
 }
 function concurrentMedicalProceduresHTML({actorId=null}={}){
  const clock=data.campaignClock;if(!clock)return '';
- const plans=openConcurrentProcedures(clock).filter(p=>!actorId||p.characterId===actorId);
+ const deceased=deceasedCalendarActors(data.characters);
+ const plans=openConcurrentProcedures(clock).filter(p=>(!actorId||p.characterId===actorId)&&
+  !deceased.has(p.characterId)&&!deceased.has(p.healerId));
  if(!plans.length&&actorId)return '';
  return `<section class="panel hmk-concurrent-health" aria-label="Časový přehled ošetření"><h3>Časový přehled ošetření${plans.length?' · '+plans.length:''}</h3>
  ${plans.length?plans.map(p=>{
@@ -35291,7 +35304,7 @@ document.addEventListener('change',e=>{
  const input=e.target.closest?.('[data-episode-gm-review]');if(!input)return;
  const form=document.querySelector('#hmk-time-episode-form');if(!form)return;
  const id=decodeURIComponent(input.dataset.episodeGmReview),clock=data.campaignClock;
- const p=gmCalendarAgenda(clock).find(x=>x.id===id);
+ const p=gmCalendarAgenda(clock,data.characters).find(x=>x.id===id);
  if(!p||p.destination!=='notes'||!p.requiresAction||p.resolution){input.checked=false;return;}
  const reviews=episodeGMReviewData(form);if(input.checked)reviews[id]=p.dueMinute;else delete reviews[id];
  form.elements.namedItem('episodeGMReviewedJson').value=JSON.stringify(reviews);
