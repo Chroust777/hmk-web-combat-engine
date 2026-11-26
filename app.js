@@ -415,7 +415,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.140';
+const APP_VERSION='94.141';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -33206,8 +33206,18 @@ function updateEpisodeTaskFocus(form){
     while(row&&row.parentElement!==grid)row=row.parentElement;
     // A proof can live outside the main grid. In that case none of the
     // grid's unrelated input choices should remain available.
-    for(const other of grid.children)if(other!==row&&!(field==='hazardComplicationSkill'&&
-     other.querySelector('[name="hazardComplicationDecision"],[name="hazardComplicationScope"],[name="hazardWorkerId"]')))other.classList.add('hc-episode-step-suppressed');
+    const showCompass=field==='hazardDirectionD10'&&episodeDiceAccepted93849.has(field)&&
+     episodeHazardChoicesRequired93840(form)&&episodeHazardPending93840(form);
+    for(const other of grid.children){
+     if(other===row)continue;
+     if(showCompass&&other.hasAttribute('data-hazard-direction-compass')){
+      other.hidden=false;
+      continue;
+     }
+     if(field==='hazardComplicationSkill'&&
+      other.querySelector('[name="hazardComplicationDecision"],[name="hazardComplicationScope"],[name="hazardWorkerId"]'))continue;
+     other.classList.add('hc-episode-step-suppressed');
+    }
     if(row){
      if(row.hidden)row.hidden=false;
      for(let ancestor=target.parentElement;ancestor&&ancestor!==row;ancestor=ancestor.parentElement)
