@@ -185,7 +185,7 @@ import {animalBaselineFromStable93861,missingStableHealth93861,validateStableAut
 import {equipmentHazardSkill93843} from './src/integration/hmk-equipment-hazard-skill-93843.js';
 import {verifiedLivestock,livestockOffer,livestockTravelActors,validateLivestockEvidence,assertLivestockAppendOnly} from './src/integration/hmk-livestock-562.js';
 import {planTravelEquipment93812,resolveTravelMount93837,isRidingAnimal93837} from './src/integration/hmk-travel-equipment-guide-93812.js?v=93.956';
-import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,stableGearFit93838,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js';
+import {stableHubProjection,stableCargoCapacity,stableBurden,validateStableHub,assertStableHubAppendOnly,stableGearFit93838,STABLE_HUB_FORMAT_574} from './src/integration/hmk-stable-hub-574.js?v=94.136';
 import {stableAnimalZones575,stableTraining575,effectiveStableBeast575,stableHauling575,validateStableTravel575} from './src/integration/hmk-stable-operations-575.js';
 import {availableTransportVehicles93756,transportVehicleReceipt93756,validateTransportVehicleHistory93756} from './src/integration/hmk-travel-vehicle-93756.js?v=93.956';
 import {carriedStableAnimal93879,loadedStableAnimalIds93879} from './src/integration/hmk-transport-animal-cargo-93879.js';
@@ -333,7 +333,7 @@ import {malnutritionPrognosis,malnutritionStateLabel} from './src/integration/hm
 import {nutritionAnimals,createAnimalAccess,animalLoadedItemAt,validateNutritionAnimalAccess,assertNutritionAnimalAppendOnly} from './src/integration/hmk-nutrition-animal-access.js';
 import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAppendOnly} from './src/integration/hmk-nutrition-assisted-intake.js';
 import {createOrienteeringContext} from './src/integration/hmk-trekking-orienteering.js';
-import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation,assertCampaignColdShockHistory} from './src/integration/hmk-calendar-multi-campaign.js?v=94.116';
+import {allCampaignClocks,campaignKey,availableCampaignCharacters,switchCampaign,beginAdditionalCalendar,syncCampaignMembership,dropCampaignBranch,dropCampaignActorBranch,captureCampaignActor,validateCampaignPortfolio,assertCampaignPortfolioAppendOnly,assertCampaignActorTimeIsolation,assertCampaignColdShockHistory} from './src/integration/hmk-calendar-multi-campaign.js?v=94.136';
 import {removeCharacterWithEvidence,assertOnlyCharacterWasDeleted} from './src/integration/hmk-character-removal.js';
 import {DAY_MINUTES,displayCampaignMinute,validateCampaignCalendar,createCampaignCalendar,anchorCampaignOrigin,getCampaignAnchor,getCampaignEpisodeAnchor,elapsedCalendarDays,campaignCalendarAgenda,advanceCampaignCalendar,recordCampaignResolution,deferGMCalendarHealthObligation,GM_DEFERABLE_HEALTH_KINDS,isGMDeferredCalendarEvent,assertCampaignCalendarAppendOnly} from './src/integration/hmk-campaign-calendar.js?v=94.110';
 import {operationalProjectJournal,projectKind,projectEnded,validateProjectCancellations,assertProjectCancellationsAppendOnly} from './src/integration/hmk-project-cancellation-94017.js';
@@ -412,7 +412,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.135';
+const APP_VERSION='94.136';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
