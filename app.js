@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.129';
+const APP_VERSION='94.130';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -8559,7 +8559,9 @@ function characterSkillHistory950(c,logs,{latest=10,gm=false}={}){
   // The shared resolver calculates an SV for several test modes. Only an
   // explicit Success Value test uses it as a result in the character journal.
   const sv=['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(proof.type)?result.sv:null;
-  return [{entry,result,sv,name:proof.skills?.[other?1:0]??proof.skill??entry.title}];
+  const isFollowup=proof.type==='critical-followup'||proof.type==='skill-critical-followup';
+  const followupSkill=isFollowup?proof.technique:null;
+  return [{entry,result,sv,name:followupSkill||(proof.skills?.[other?1:0]??proof.skill??entry.title)}];
  });
  const hidden=gm?new Set():hiddenLogbookIds(data,c.id);
  const visible=rows.filter(row=>!hidden.has(row.entry.id)),removed=rows.filter(row=>hidden.has(row.entry.id));
@@ -20400,16 +20402,20 @@ document.addEventListener('submit',async event=>{
   }
   const a=hskResolveSide({person:actor,form,side:'A'});
   const sv=form.id==='skill-value-form',opposed=form.id==='skill-secondary-form'&&form.elements.namedItem('opposed')?.checked;
-  const fateA=await hmkOfferFate93866({actor,skill:a.info.primary,group:a.mastery.group,original:a.result});
-  if(fateA?.cancelled)throw Error('Fate: test byl zrušen bez uložení.');
-  if(fateA){const prior=a.result;a.result=hmkFateApplySkillSide93866({fatedResult:prior,fate:fateA,sr:a.sr,form,skill:a.info.primary,side:'A',originalResult:prior});
-   a.consequence=classifySkillConsequence({actor,skill:a.info.primary,result:a.result,trauma:a.ctx.trauma,context:'general'});}
-  let body=hskResultText('A',a),b=null,comparison=null,fateB=null;
+  let b=null;
   if(opposed){
    if(!form.elements.namedItem('opponentSkill')?.value)throw Error('U Opposed Testu vyberte dovednost oponenta; bez pravidlové dvojice je volba rozhodnutím GM.');
    const other=character(form.elements.namedItem('opponentId')?.value);
    if(!other||other.id===actor.id)throw Error('Vyberte jinou postavu jako oponenta');
    b=hskResolveSide({person:other,form,side:'B'});
+  }
+  const fateA=await hmkOfferFate93866({actor,skill:a.info.primary,group:a.mastery.group,original:a.result});
+  if(fateA?.cancelled)throw Error('Fate: test byl zrušen bez uložení.');
+  if(fateA){const prior=a.result;a.result=hmkFateApplySkillSide93866({fatedResult:prior,fate:fateA,sr:a.sr,form,skill:a.info.primary,side:'A',originalResult:prior});
+   a.consequence=classifySkillConsequence({actor,skill:a.info.primary,result:a.result,trauma:a.ctx.trauma,context:'general'});}
+  let body=hskResultText('A',a),comparison=null,fateB=null;
+  if(b){
+   const other=b.person;
    fateB=await hmkOfferFate93866({actor:other,skill:b.info.primary,group:b.mastery.group,original:b.result});
    if(fateB?.cancelled)throw Error('Fate: Opposed Test byl zrušen bez uložení.');
    if(fateB){const prior=b.result;b.result=hmkFateApplySkillSide93866({fatedResult:prior,fate:fateB,sr:b.sr,form,skill:b.info.primary,side:'B',originalResult:prior});
