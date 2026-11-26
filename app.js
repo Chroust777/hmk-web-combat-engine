@@ -411,7 +411,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.123';
+const APP_VERSION='94.124';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -31063,7 +31063,10 @@ function episodeMarkField(form,name,{focus=false}={}){
   (field instanceof RadioNodeList?field[0]:field);
  if(!target||!target.isConnected)return false;
  for(let el=target.parentElement;el&&el!==form;el=el.parentElement){
-  if(el.tagName==='DETAILS')el.open=true;
+  if(el.tagName==='DETAILS'){
+   el.open=true;
+   if(name==='droverActorId'&&!target.disabled&&el.dataset.episodeSection==='skills')el.hidden=false;
+  }
  }
  const mark=target.closest('label')||target;
  mark.classList.add('hc-episode-needs-input');
@@ -33615,24 +33618,25 @@ function episodeGroupRoleChoices93856(form,v){
    mountReady=!!riderMount.animal&&!gear.checks.some(c=>c.status==='missing');
   }catch{mountReady=false;}
  }
- const setChoices=(name,placeholder,enabled)=>{
+ const setChoices=(name,placeholder,enabled,allowed=able)=>{
   const field=form.elements.namedItem(name);if(!field)return;
   const prior=field.value;
   const options=[['',placeholder],...roster.map(id=>[id,(character(id).name||id)+(name==='travelRideRiderId'?' · Riding ML '+(availableMasteries(character(id)).find(x=>x.name==='Riding'&&x.ml>0)?.ml??'neosvojeno'):'')])];
-  const signature=JSON.stringify([options,enabled,roster.map(id=>[id,able(id),roleHealth.get(id)?.reason]),episodeEvaluationRequested&&prior&&!roster.includes(prior)?prior:null]);
+  const signature=JSON.stringify([options,enabled,roster.map(id=>[id,allowed(id),roleHealth.get(id)?.reason]),episodeEvaluationRequested&&prior&&!roster.includes(prior)?prior:null]);
   if(field.dataset.episodeGroupSignature!==signature){
    const fragment=document.createDocumentFragment();
    for(const [value,title] of options){const opt=document.createElement('option');opt.value=value;opt.textContent=title;
-    opt.disabled=!!value&&(!enabled||!able(value));
+    opt.disabled=!!value&&(!enabled||!allowed(value));
     if(value&&!able(value)){opt.textContent=title+' · NEZPŮSOBILÝ: '+roleHealth.get(value)?.reason;opt.title=roleHealth.get(value)?.reason||'';}
-    fragment.appendChild(opt);}
+    if(value&&able(value)&&!allowed(value))opt.textContent=title+' · mimo vůz';
+   fragment.appendChild(opt);}
    if(episodeEvaluationRequested&&prior&&!roster.includes(prior)){
     const invalid=document.createElement('option');invalid.value=prior;invalid.disabled=true;
     invalid.textContent='Nepřípustná původní volba mimo tuto skupinu';fragment.appendChild(invalid);
    }
    field.replaceChildren(fragment);field.dataset.episodeGroupSignature=signature;
   }
-  if(prior&&(able(prior)||episodeEvaluationRequested))field.value=prior;
+  if(prior&&(allowed(prior)||episodeEvaluationRequested))field.value=prior;
   else if(prior)field.value='';
   field.disabled=!enabled||!ableRoster.length||!!(episodeEvaluationRequested&&episodeEvaluatedIdentity);
   field.closest('label')?.classList.toggle('hc-episode-inactive',!enabled);
@@ -33688,11 +33692,15 @@ function episodeGroupRoleChoices93856(form,v){
    if(!select.value)unassigned++;
   }else if(!episodeEvaluationRequested)select.value='';
   select.disabled=!show||episodeEvaluationRequested;
+  v[select.name]=select.value;
  }
  const packStatus=form.querySelector('[data-episode-pack-handler-status]');
  if(packStatus)packStatus.textContent=unassigned?'Zbývá určit roli pro '+unassigned+' zvířat.':
   'Doprava skupiny se řídí jejím nejpomalejším způsobem přesunu.';
- const actor=setChoices('droverActorId',healthyRide&&!mixedRide?'— Totožný s jezdcem —':'— Hlavní Drover skupiny —',!healthyRide||mixedRide);
+ const vehicleOccupants=wheeled?new Set(travelWheeledOccupants93956(v)):null;
+ const canDrive=id=>able(id)&&(!vehicleOccupants||vehicleOccupants.has(id)&&!(v.transportedMemberIds||[]).includes(id));
+ const actor=setChoices('droverActorId',healthyRide&&!mixedRide?'— Totožný s jezdcem —':'— Hlavní Drover skupiny —',
+  !healthyRide||mixedRide,canDrive);
  if(actor){
   if(healthyRide&&!mixedRide&&!episodeEvaluationRequested){
    actor.value=able(rider?.value)?rider.value:able(v.guideId)?v.guideId:ableRoster[0]||'';
@@ -33862,14 +33870,15 @@ function updateEpisodePreview(form){
    const current=episodeFormSnapshot(form);const need=episodeDroverRequirement93851(current);
    if(need.present&&current.conveyance==='mount'&&!(current.transportedMemberIds||[]).length){
     droverField.value=need.actorId;
-   }else if(need.present&&!episodeTravelRoleEligibility93865(droverField.value).eligible){
-    const possible=current.memberIds.find(id=>{
-     if(!episodeTravelRoleEligibility93865(id).eligible)return false;
-     const m=availableMasteries(character(id));
-     const skill=current.conveyance==='mount'&&need.animals.length<=1?'Riding':'Animalcraft';
-     return m.some(row=>row.name===skill&&row.ml>0);
+   }else if(need.present&&(!droverField.value||droverField.selectedOptions[0]?.disabled||!episodeTravelRoleEligibility93865(droverField.value).eligible)){
+    const passengers=new Set(current.transportedMemberIds||[]);
+    const occupants=['cart','wagon'].includes(current.conveyance)?travelWheeledOccupants93956(current):current.memberIds;
+    const eligible=occupants.filter(id=>!passengers.has(id)&&episodeTravelRoleEligibility93865(id).eligible);
+    const possible=eligible.find(id=>{
+     const skill=episodeDroverRequirement93851({...current,droverActorId:id}).skill;
+     return availableMasteries(character(id)).some(row=>row.name===skill&&row.ml>0);
     });
-    droverField.value=possible||(episodeTravelRoleEligibility93865(current.guideId).eligible?current.guideId:'');
+    droverField.value=possible||(eligible.includes(current.guideId)?current.guideId:eligible.length===1?eligible[0]:'');
    }
   }
  }
