@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {initialCombatState} from '../src/integration/persistent-combat-state.js';
-import {validateStartingPvarSpells} from '../src/integration/hmk-creation-starting-pvar.js';
+import {occupationPrimaryConvocation,validateStartingPvarSpells} from '../src/integration/hmk-creation-starting-pvar.js';
 import {knowsExposureBalm,prepareTrekkingWeatherTest,resolveBalmExposureRecovery,startTrekkingWeatherExposureTreatment,
  advanceTrekkingWeatherExposure} from '../src/integration/hmk-weather-hazard-aftermath.js';
 
@@ -12,7 +12,16 @@ const state=prepareTrekkingWeatherTest({state:initialCombatState(),sourceId,
 const args={state,actor,caster,sourceId,round:2,minute:110,originMinute:100,spellML:70,castingEML:65,
  castingD100:11,recoveryD100:11,range:'touch',understanding:'Úspěšný Diagnosis',gmConfirmed:true};
 
-const research={occupation:'Shèk-Pvâr (Fývria)',pvarismML:90,primary:'Fývria',chantryStars:3,startingARP:270};
+const research={occupation:'Shèk-Pvâr (Fývria: Herblore + Physician)',pvarismML:36,primary:'Fývria',chantryStars:3,startingARP:9};
+assert.equal(occupationPrimaryConvocation(research.occupation),'Fývria');
+assert.equal(occupationPrimaryConvocation('Shèk-Pvâr (Fývria)'),'Fývria');
+assert.equal(occupationPrimaryConvocation('Shèk-Pvâr (Jmôrvi)'),'Jmôrvi');
+assert.equal(occupationPrimaryConvocation('Physician'),null);
+assert.throws(()=>validateStartingPvarSpells({...research,primary:'Jmôrvi'}),/odpovídat povolání/);
+const legacyResearch={...research,primary:'Fývria: Herblore + Physician',chantryConvocation:'Fývria'};
+const legacyProof=validateStartingPvarSpells(legacyResearch);
+assert.equal(legacyProof.primary,legacyResearch.primary);
+assert.deepEqual(validateStartingPvarSpells({...legacyProof,choices:[]}),legacyProof);
 function createdMage(knownSpell){
  const starting=validateStartingPvarSpells({...research,choices:[{id:knownSpell,assisted:true}]});
  return {id:'trained-mage',occupation:research.occupation,hmk:{
@@ -24,6 +33,7 @@ function createdMage(knownSpell){
 }
 const trainedCaster=createdMage('Fývria::Balm');
 assert.equal(knowsExposureBalm(trainedCaster),true);
+assert.equal(trainedCaster.hmk.startingPvarSpells.spells[0].arpCost,1);
 assert.equal(resolveBalmExposureRecovery({...args,caster:trainedCaster}).report.casterId,trainedCaster.id);
 assert.equal(knowsExposureBalm(createdMage('Fývria::Diagnosis')),false);
 const corruptedCaster=structuredClone(trainedCaster);
