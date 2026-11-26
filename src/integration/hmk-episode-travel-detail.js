@@ -154,12 +154,19 @@ export function episodeEncounterSurprise({partyModes={},conveyance='foot',drovin
   partySkill,foeSkill,partyLevel:pLevel,foeLevel:fLevel,
   ...(partyEvidence?{partyEvidence}:{}),...(foeEvidence?{foeEvidence}:{}),winner,verified,decision,alertness,sourcePage:150};
 }
+export const DEVIATION_COMPASS_LABELS=Object.freeze({
+ N:'sever',NE:'severovýchod',E:'východ',SE:'jihovýchod',
+ S:'jih',SW:'jihozápad',W:'západ',NW:'severozápad'
+});
 export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
  equipmentDisposition='repair',complicationDecision='test',
  accidentAgility=null,accidentD6=null,accidentZD10=null,complicationSkill=null,complicationLevel=null,
- directionTurn=null,directionD10=null,directionAwareness=null,directionObservationDeferred=false}={}){
+ directionTurn=null,directionD10=null,directionCompass=null,directionAwareness=null,directionObservationDeferred=false}={}){
  requireTrue(['equipment','accident','complication','misdirection','lost','lost-time'].includes(hazard),
   'Nesprávný druh hazardu.');
+ requireTrue(directionCompass===null||(['misdirection','lost'].includes(hazard)&&
+  die(directionD10,10)&&typeof directionCompass==='string'&&Object.hasOwn(DEVIATION_COMPASS_LABELS,directionCompass)),
+  'Světová strana odklonu vyžaduje doložený směrový hod a platný údaj z mapy.');
  requireTrue((['repair','ignore','abandon'].includes(equipmentDisposition)||hazard==='equipment'&&equipmentDisposition==='no-equipment')&&
   ['test','reroute'].includes(complicationDecision),'Hazard: neplatné rozhodnutí GM.');
  const outcomes={CF:'irreparable',F:'long-delay',S:'short-delay',CS:'no-delay'};
@@ -207,6 +214,7 @@ export function episodeHazardFollowup({hazard,repairSkill=null,repairLevel=null,
  if(hazard==='lost-time')result='extra-slow-current-episode';
  return {format:'hmk-episode-hazard-followup-v1',hazard,repairSkill,repairLevel,equipmentDisposition,complicationDecision,accidentAgility,
   accidentD6,accidentZD10,complicationSkill,complicationLevel,directionTurn,directionD10,directionAwareness,
+  ...(directionCompass?{directionCompass}:{}),
   ...(directionObservationDeferred?{directionObservationDeferred:true}:{}),
   result,requiresGMCompletion:result==='pending'||result==='pending-injury'||result==='pending-direction'||
    result==='pending-awareness'||(typeof result==='object'&&result.requiresInjurySequence),sourcePages:[148,149]};

@@ -67,11 +67,12 @@ export function persistVerifiedCombatSnapshot({storage,key,baseline,serialized,g
  }
  // A host may report a write error after the bytes were changed. A blind
  // in-memory rollback in that case would allow the same action to be replayed.
- try{storage.setItem(key,serialized)}catch{/* decide by readback */}
+ let writeError;
+ try{storage.setItem(key,serialized)}catch(error){writeError=error;}
  let after;
  try{after=storage.getItem(key)}
  catch{return result(false,true,'verification-failed')}
  if(after===serialized)return result(true,false,'verified');
- if(after===baseline)return result(false,false,'not-saved');
+ if(after===baseline)return result(false,false,writeError?.name==='QuotaExceededError'?'quota-exceeded':'not-saved');
  return result(false,true,'ambiguous-or-concurrent-change');
 }

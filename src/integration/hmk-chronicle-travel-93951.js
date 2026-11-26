@@ -1,5 +1,6 @@
 import {knownChronicleCase,novelActor,novelDistance,novelScene} from './hmk-chronicle-novel-93961.js?v=94.043';
 import {literaryChronicleIntro} from './hmk-chronicle-literary-93892.js?v=93.961';
+import {DEVIATION_COMPASS_LABELS} from './hmk-episode-travel-detail.js?v=94.137';
 /** Czech travel prose built from the committed episode, with stable variation. */
 const list = values => new Intl.ListFormat('cs').format(values);
 const unique = values => [...new Set(values.filter(Boolean))];
@@ -320,13 +321,15 @@ function aftermath(p, name, hazard, say, {narratedHazard=false,narratedDirection
    `${wound.who} utrží ${injury}${location}.`
   ]));
  }
+ const deviation=narratedDirection?'':deviationSentence(p,details);
+ if(deviation)lines.push(deviation);
  if(!narratedDirection&&(p.navigationRecovered||p.navigationReorientedInWatch)) lines.push(say('return',[
   'Družina se vrací na správnou cestu.','Bloudění končí a správný směr je znovu nalezen.','Poutníci znovu nacházejí cestu, kterou hledali.'
  ]));
  else if(!narratedDirection&&(p.navigationState==='lost'||p.direction?.direction==='lost')) lines.push(say('lost',[
   'Družina ztrácí cestu a správný směr zůstává neznámý.','Družina bloudí; známá cesta je prozatím pryč.','Kudy se vydat dál, není jisté. Poutníci zůstávají ztraceni.'
  ]));
- else if(!narratedDirection&&(p.navigationState==='misdirection'||p.direction?.direction==='misdirection')) lines.push(say('wrong',[
+ else if(!narratedDirection&&!deviation&&(p.navigationState==='misdirection'||p.direction?.direction==='misdirection')) lines.push(say('wrong',[
   'Družina se odchyluje od zamýšlené cesty.','Další kroky vedou jinam, než družina zamýšlela.','Další kroky vedou jinam, než si výprava předsevzala. O tom, kam tato odchylka zavede, rozhodne až další cesta.'
  ]));
  else if(!narratedDirection&&p.direction?.direction==='lost-time') lines.push(say('lost-time',[
@@ -426,6 +429,17 @@ const directions={
  misdirection:'Družina se odchýlila od zamýšlené cesty.',
  lost:'Dosavadní směr se ztratil. Družina zatím nevěděla, kudy se vrátit na správnou cestu.'
 };
+function deviationSentence(episode,details){
+ const hazard=episode.direction?.direction;
+ if(hazard!=='lost'&&hazard!=='misdirection')return '';
+ const receipt=details.find(detail=>detail.hazard===hazard);
+ const side={left:'doleva',right:'doprava'}[receipt?.directionTurn];
+ if(!side)return '';
+ const compass=Object.hasOwn(DEVIATION_COMPASS_LABELS,receipt.directionCompass)?
+  DEVIATION_COMPASS_LABELS[receipt.directionCompass]:null;
+ return compass?`Výprava se od zamýšlené trasy odchýlila ${side} a zamířila na ${compass}.`:
+  `Výprava se od zamýšlené trasy odchýlila ${side}.`;
+}
 const travelerName=(test,name)=>(test.actorId&&name(test.actorId))||'Poutník';
 const skillFamily=skill=>/survival|orienteer/.test(skill)?'survival':
  /forag|sběr|potrav|zásob/.test(skill)?'foraging':Object.keys(actionPhrases).find(key=>skill.includes(key));
@@ -609,13 +623,15 @@ export function chronicleRollStories(entry,p,tests,name,hazard,formatMinute,{lan
  const bearing=take(isDirection);
  const awareness=byIds(directionIds);
  const direction=p.direction?.direction||p.navigationState;
- const directionEnd=p.navigationRecovered||p.navigationReorientedInWatch?
+ const deviation=deviationSentence(p,details);
+ const navigationOutcome=p.navigationRecovered||p.navigationReorientedInWatch?
   'Výpravě se nakonec podařilo nalézt správný směr.':language&&direction==='lost-time'?
    passage(entry.id,'román-hledání',[
     'Hledání směru stálo výpravu chvíli, kterou už cestě nikdo nevrátí.',
     'Část času, který měl patřit cestě, padla na hledání směru.',
     'O kus času je cesta delší. Výprava jej strávila hledáním směru.'
-   ]):directions[direction];
+   ]):direction==='misdirection'&&deviation?'':directions[direction];
+ const directionEnd=[deviation,navigationOutcome].filter(Boolean).join(' ');
  for(const [i,test] of bearing.entries())sections.push({kind:'direction',test,before:i===0?
   (language?'Zbývá rozsoudit, kudy dál povede cesta.':'Nad dosavadním směrem zůstala pochybnost. Teprve další postup měl ukázat, co bude znamenat.'):
   (language?'Výprava znovu hledá v kraji pevné vodítko.':'Přišlo na další zkoušku směru.'),

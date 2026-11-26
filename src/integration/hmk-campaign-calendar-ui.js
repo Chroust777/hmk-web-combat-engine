@@ -137,9 +137,12 @@ export function calendarBoardEvents({clock,characters=[],journal=[],additionalEv
  visible.sort((a,b)=>a.dueMinute-b.dueMinute||a.id.localeCompare(b.id));
  return visible;
 }
-export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,escapeHTML,additionalEvents=[]}={}){
+export function campaignCalendarBoardHTML({clock,characters=[],journal=[],ui,escapeHTML,additionalEvents=[],describeWound}={}){
  const esc=escapeHTML,agenda=campaignCalendarAgenda(clock,characters,journal);
- const all=calendarBoardEvents({clock,characters,journal,additionalEvents});
+ const all=calendarBoardEvents({clock,characters,journal,additionalEvents}).map(event=>{
+  const wound=event.origin==='hml'&&event.woundId?describeWound?.(event):null;
+  return wound?{...event,description:shortEventName(event)+' · '+wound}:event;
+ });
  // Index immutable evidence once. The day/hour/minute views otherwise scan
  // the entire character audit once per cell (30 + 24 + 60 repeated scans).
  const eventsByDay=new Map();

@@ -56,7 +56,7 @@ import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.046';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=94.043';
-import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=94.043';
+import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=94.137';
 import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integration/hmk-chronicle-novel-93961.js?v=94.043';
 import {CHRONICLE_NOVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.962';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
@@ -123,7 +123,8 @@ import {auditArmourLibraryConsistency} from './src/integration/armour-library-co
 import {assertLegacyMutationDoesNotChangeCombat} from './src/integration/active-combat-write-boundary.js';
 import {resolveParallelColdReroll,resolveParallelColdCourse} from './src/integration/hmk-parallel-cold-shock.js';
 import {assertAlternateManeuverWriteAllowed} from './src/integration/hmk-alternate-maneuver-write-gate.js';
-import {persistVerifiedCombatSnapshot} from './src/integration/verified-combat-storage.js';
+import {persistVerifiedCombatSnapshot} from './src/integration/verified-combat-storage.js?v=94.137';
+import {packTravelDraft,unpackTravelDraft} from './src/integration/hmk-travel-draft-storage.js?v=94.137';
 import {prepareNeutralAlchemySpellstart,persistNeutralAlchemySpellstart} from './src/integration/hmk-alchemy-neutral-spellstart.js';
 import {activeAlchemyWard} from './src/integration/hmk-neutral-ward-lifecycle.js';
 import {prepareFailedNeutralSpellfire,persistFailedNeutralSpellfire,prepareCriticalNeutralSpellfire,persistCriticalNeutralSpellfire,prepareSuccessfulNeutralSpellfire,persistSuccessfulNeutralSpellfire} from './src/integration/hmk-alchemy-neutral-spellfire-commit.js';
@@ -224,7 +225,7 @@ import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
 import {resolveBestiaryFrostAV93725,parseBestiaryFrostSites93725} from './src/integration/hmk-bestiary-frost-auto-av-93725.js';
 import {travelBleedingTerm,travelBloodStoppageEML,beginTravelBloodStoppage,completeTravelBleedingInterval,completeTravelBloodShockReroll} from './src/integration/hmk-travel-blood-stoppage-93714.js';
-import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.118';
+import {calendarInitialUI,campaignCalendarBoardHTML,calendarBoardEvents} from './src/integration/hmk-campaign-calendar-ui.js?v=94.137';
 import {makeCalendarUIReceipt,calendarEventControlKind} from './src/integration/hmk-calendar-event-controls.js';
 import {calendarEventDestination,noncombatHealthDestination} from './src/integration/hmk-calendar-event-routing.js?v=94.110';
 import {registerMoraleUnsafe,registerMoraleOrigin} from './src/integration/hmk-calendar-morale-93891.js';
@@ -256,8 +257,8 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingAwareness,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.123';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS} from './src/integration/hmk-episode-travel-detail.js?v=94.123';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingAwareness,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.137';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS,DEVIATION_COMPASS_LABELS} from './src/integration/hmk-episode-travel-detail.js?v=94.137';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {weatherSkinComplexion} from './src/integration/hmk-weather-skin-coverage.js';
@@ -412,7 +413,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.136';
+const APP_VERSION='94.137';
 const STORAGE='hmk-keepers-ledger-v1';
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clean=()=>({schemaVersion:1,characters:[],items:[],inventory:[],trash:[],journal:[]});
@@ -930,6 +931,7 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
   }
   validate(data);
   const serialized=JSON.stringify(data);
+  if(episodeCommit)compactStoredEpisodeDraft();
   let r;
   episodeFinalCommitInFlight=!!episodeCommit;
   try{r=persistVerifiedCombatSnapshot({storage:cloudStorage,key:STORAGE,baseline:storageBaseline,serialized,gmClockAdvance,restoreBackup,characterDeletionId});}
@@ -938,6 +940,8 @@ function save({gmClockAdvance=false,restoreBackup=false,characterDeletionId=null
   if(r.readOnly){
    storageReadOnly=true;
    notice='Nelze bezpečně ověřit trvalý bojový zápis ('+r.code+'). Další zápisy jsou zablokovány. Obnovte stránku z aktuálního úložiště a ověřte poslední bojovou událost; neopakujte naslepo fyzický hod.';
+  }else if(r.code==='quota-exceeded'){
+   notice='V místním úložišti prohlížeče není dost místa. Původní stav kampaně zůstal uložený.';
   }else{
    notice='Úložiště odmítlo zápis a původní data zůstala ověřeně nezměněna. Bojový krok nebyl dokončen.';
   }
@@ -1185,7 +1189,13 @@ function mutate(fn,{gmClockAdvance=false,episodeSkillStaging=false,episodeCommit
   let savedOk=false;
   try{savedOk=save({gmClockAdvance,episodeCommit});}
   finally{episodeIndependentMutationInFlight=false;}
-  if(!savedOk){data=unrelatedDuringEpisode?stagedWorkingData:previous;render();if(automaticGenerationBusy)lastAutomaticGenerationMutationError='Uložení do úložiště selhalo';else alert('Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');return false}if(episodeCommit){episodeStageBaseline=null;discardEpisodeDraftSidecar();}
+  if(!savedOk){
+   data=unrelatedDuringEpisode?stagedWorkingData:previous;render();
+   if(automaticGenerationBusy)lastAutomaticGenerationMutationError='Uložení do úložiště selhalo';
+   else alert(notice||'Uložení selhalo. Změna nebyla provedena. Exportujte zálohu.');
+   return false;
+  }
+  if(episodeCommit){episodeStageBaseline=null;discardEpisodeDraftSidecar();}
   if(unrelatedDuringEpisode){
    const committed=structuredClone(data);
    episodeStageBaseline=committed;
@@ -1402,7 +1412,7 @@ function readableCampaignDuration(minutes){
 }
 /** The p.167 anatomical labels are shared with the character journal. An unknown
  * limb side is NOT presented as '?' because it is not evidence of a side. */
-function medicalWoundOptionLabel(c,w,n){
+function medicalWoundOptionLabel(c,w,n,{includePatient=true}={}){
  const loc=String(w.location||'').toLowerCase();
  const full=HMK_WOUND_LOCATION_NAMES[loc]||String(w.location||'Unknown location');
  const name=full.charAt(0).toUpperCase()+full.slice(1);
@@ -1412,7 +1422,15 @@ function medicalWoundOptionLabel(c,w,n){
  const aspectName=({b:'Blunt',e:'Edge',p:'Point',f:'Fire',frost:'Frost',fire:'Fire',edge:'Edge',point:'Point',blunt:'Blunt',projectile:'Projectile'})[kind]||
    (kind?kind.charAt(0).toUpperCase()+kind.slice(1):'');
  const injuryCode=String(w.severity||'')+String(w.level??'');
- return `${c.name} · ${[sideName,name].filter(Boolean).join(' ')} · ${injuryCode}${aspectName?' '+aspectName:''} · rána ${n}${!w.healed&&!w.healing?.treated?' (neošetřená)':''}`;
+ return `${includePatient?c.name+' · ':''}${[sideName,name].filter(Boolean).join(' ')} · ${injuryCode}${aspectName?' '+aspectName:''} · rána ${n}${!w.healed&&!w.healing?.treated?' (neošetřená)':''}`;
+}
+function calendarWoundLabel(event){
+ if(!event.woundId)return '';
+ const patient=character(event.characterId);
+ if(!patient)return '';
+ const wounds=persistentStateOf(patient).wounds;
+ const index=wounds.findIndex(w=>w.id===event.woundId);
+ return index<0?'':medicalWoundOptionLabel(patient,wounds[index],index+1,{includePatient:false});
 }
 function syncCalendarMedicalDerivedRolls(form,patient,wound){
  if(!form?.closest('.hmk-weather-care')||!patient||!wound)return;
@@ -2700,7 +2718,17 @@ function persistEpisodeDraftSidecar({snapshotForm=false}={}){
   sharedQueue:sharedTimeWindowQueue.map(({apply,...receipt})=>structuredClone(receipt)),
   baselineToken:sharedCommittedBaselineToken93769(),
   diagnostic93859:form?episodeDiagnosticGate93859(form):null};
- localStorage.setItem(EPISODE_SIDECAR_KEY,JSON.stringify(body));
+ localStorage.setItem(EPISODE_SIDECAR_KEY,packTravelDraft(JSON.stringify(body)));
+}
+function compactStoredEpisodeDraft(){
+ // Upgrade a restored legacy draft in place. Leave it intact until the
+ // campaign write has been verified, even if compaction or the save fails.
+ try{
+  const raw=localStorage.getItem(EPISODE_SIDECAR_KEY);
+  if(!raw||!raw.startsWith('{'))return;
+  const compact=packTravelDraft(raw);
+  if(compact!==raw)localStorage.setItem(EPISODE_SIDECAR_KEY,compact);
+ }catch{/* The regular verified write still reports its own outcome. */}
 }
 function discardEpisodeDraftSidecar(){localStorage.removeItem(EPISODE_SIDECAR_KEY);}
 // Used only after the caller has safely kept or replaced the committed campaign.
@@ -2716,7 +2744,7 @@ function clearTimeEpisodeDraft(){
 }
 function restoreEpisodeDraftSidecar(){
  const raw=localStorage.getItem(EPISODE_SIDECAR_KEY);if(!raw)return;
- let side;try{side=JSON.parse(raw);}catch{return;}
+ let side;try{side=JSON.parse(unpackTravelDraft(raw));}catch{return;}
  if(side?.sharedWindowId){
   // Only fully serialized verified receipts may survive a reload. v93.768
   // closure-only markers are deliberately discarded without touching campaign.
@@ -3686,6 +3714,9 @@ function timeEpisodePageHTML(clock,participants){
  <input name="incidentPlannedMinutes" type="hidden" value="">
  <p class="hc-hint" data-episode-accident-result>Zadejte a potvrďte minutu. Zdravotní hody se provedou až po potvrzení celého intervalu.</p></div>
  <label data-hazard-direction>Skutečný d10 pro směr odchýlení (liché = vlevo, sudé = vpravo)<span class="hc-episode-die"><input name="hazardDirectionD10" type="number" min="1" max="10" placeholder="1–10"><button type="button" data-episode-die="hazardDirectionD10" data-episode-faces="10">⚄ d10</button></span></label>
+ <label data-hazard-direction data-hazard-direction-compass hidden>Skutečná světová strana odklonu podle mapy · volitelné
+ <select name="hazardDirectionCompass"><option value="">— nezadáno · zapsat vlevo/vpravo —</option>${Object.entries(DEVIATION_COMPASS_LABELS).map(([key,label])=>option(key,label)).join('')}</select>
+ <small>Po hodu vlevo/vpravo určete na mapě skutečný směr odklonu. Tato volba nevytváří další hod.</small></label>
  <div data-hazard-direction-awareness><label>Awareness při Misdirection · skutečný Skill Test<select name="hazardDirectionProofId"><option value="">— pokud byl skutečně proveden —</option>${skillCandidates.filter(j=>episodeSkillProof(j,'Awareness',j.characterId,campaignKey(clock),clock.minute)).map(j=>option(j.id,(character(j.characterId)?.name||j.characterId)+' · '+j.title)).join('')}</select></label>
  <label class="hc-check"><input name="hazardDirectionDeferAwareness" type="checkbox"> Družina nyní nepoužila Awareness a pokračuje chybným směrem (bez hodu a bez předpokládaného úspěchu).</label></div>
  </div><div class="hc-episode-hazard-proof">
@@ -4762,7 +4793,8 @@ function campaignCalendarView(){
    arr.push({kind:'aural',name:'Aural Shock',unit:'hodiny',episodeId:'aural-legacy'});
   return arr.map(x=>({...x,characterId:c.id,label:c.name+' · '+x.name}));
  });
- const renderItem=x=>{const route=calendarEventDestination(x);return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(x.name)} · ${esc(x.description)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))}${isHerbalCalendarCheck(x.kind)?'':' · '+esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button>${x.cancellable===false?'':`<button type="button" class="hc-small danger" data-cal-gm-cancel-due="${esc(x.id)}" data-cal-gm-cancel-actor="${esc(x.characterId)}" title="GM: zrušit povinnost a navázané termíny">×</button>`}</div></div>`;};
+ const renderItem=x=>{const route=calendarEventDestination(x),label=[x.name,x.description,calendarWoundLabel(x)].filter(Boolean).join(' · ');
+ return `<div class="list-row hc-calendar-linked-row"><div><b>${esc(label)}</b><div class="muted">${esc(displayCampaignMinute(x.minute))}${isHerbalCalendarCheck(x.kind)?'':' · '+esc(x.kind)}</div></div><div class="hc-calendar-row-action"><span class="hc-status ${x.status==='due'?'hc-status--due':''}">${x.status==='preparation'?'PŘÍPRAVA':x.status==='due'?'SPLATNÉ':'Čeká'}</span><button type="button" class="hc-small" data-cal-link="${esc(x.characterId)}" data-cal-agenda="${esc(x.id)}" data-cal-destination="${esc(route)}" data-cal-kind="${esc(x.kind)}" data-cal-source="${esc(x.sourceId||x.woundId||'')}" data-cal-elapsed="${esc(x.elapsedMinutes??'')}">${x.status==='preparation'?'Otevřít přípravný test ↗':x.status==='due'?'Otevřít příslušnou kontrolu ↗':'Zobrazit stav (čeká) ↗'}</button>${x.cancellable===false?'':`<button type="button" class="hc-small danger" data-cal-gm-cancel-due="${esc(x.id)}" data-cal-gm-cancel-actor="${esc(x.characterId)}" title="GM: zrušit povinnost a navázané termíny">×</button>`}</div></div>`;};
  const moraleChecks=agenda.due.filter(x=>x.kind==='morale-reaction');
  const moraleFuture=agenda.future.filter(x=>x.kind==='morale-reaction');
  const moraleUnknown=agenda.unknown.filter(x=>x.kind==='morale-reaction');
@@ -4792,7 +4824,7 @@ function campaignCalendarView(){
  }).join('');
  if(!calendarUI)calendarUI=calendarInitialUI(clock);
  const selectedCalendarPeople=calendarMemberIds(clock,data.characters);
- const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc,additionalEvents:stableHealingCalendarEvents(clock)});
+ const board=campaignCalendarBoardHTML({clock,characters:selectedCalendarPeople,journal:data.journal,ui:calendarUI,escapeHTML:esc,additionalEvents:stableHealingCalendarEvents(clock),describeWound:calendarWoundLabel});
  const forageRows=data.journal.filter(j=>j.calendarTrekProof&&j.calendarCampaignId===campaignKey(clock)&&
   participants.some(c=>c.id===j.characterId)&&!data.journal.some(x=>x.calendarTrekWildernessProof?.sourceId===j.id)).flatMap(j=>{
   let req;try{req=requiredWildernessWatch({source:j,journal:data.journal,campaignId:campaignKey(clock),minute:j.campaignMinute})}catch{return []}
@@ -11346,15 +11378,15 @@ function downloadUnfinishedHMKState93859(){
  // the CURRENT form, not only the last sidecar autosave. No campaign commit.
  if(document.querySelector('#hmk-time-episode-form')&&(episodeStageBaseline||sharedTimeWindowDraft))
   persistEpisodeDraftSidecar({snapshotForm:true});
- const read=(store,key)=>{try{const raw=store.getItem(key);if(raw===null)return {present:false};
-  try{return {present:true,value:JSON.parse(raw)}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
+ const read=(store,key,decode=value=>value)=>{try{const raw=store.getItem(key);if(raw===null)return {present:false};
+  try{return {present:true,value:JSON.parse(decode(raw))}}catch{return {present:true,unparsedRaw:raw,parseError:true}}}
   catch(e){return {present:false,readError:String(e?.message||e)}}};
  const currentForm=document.querySelector('#hmk-time-episode-form');
  const pkg={format:'hmk-local-working-diagnostic-v93.865',appVersion:APP_VERSION,
   exportedAt:new Date().toISOString(),scope:'local-only-no-cloud-token',
   note:'Obsahuje historii kampaně a nedokončené testy. Neslouží k importu; před sdílením chraňte soukromé údaje.',
   committedCampaign:read(localStorage,STORAGE),
-  travelSidecar:read(localStorage,EPISODE_SIDECAR_KEY),
+  travelSidecar:read(localStorage,EPISODE_SIDECAR_KEY,unpackTravelDraft),
   agilityConfirmationDraft:read(localStorage,HSK_AGILITY_STAGE_KEY_93864),
   combat:{previewHistory:read(sessionStorage,COMBAT_DRAFT_HISTORY_KEY),
    initiative:read(sessionStorage,COMBAT_INITIATIVE_SEQUENCE_KEY),
@@ -15751,7 +15783,7 @@ function hskSkillPhysicalImpactForm(entry){
  <p class="tiny" data-hsk-agility-ml aria-live="polite">Vyberte účastníka. Vedle každého jména je základní Agility ML; před potvrzením se ověří i aktuální EML.</p>
  <button type="button" class="hc-small hc-provision-generate" data-hsk-agility-confirm ${accidentPoolError?'disabled':''}>✓ Potvrdit Agility d100 a výsledek</button>
  <p class="tiny" data-hsk-agility-confirm-status role="status" aria-live="polite">Nepotvrzené Agility. Impact, ZD, LD a další hody zatím nelze zadat.</p>
- <p class="tiny">Účastníka lze určit skutečným náhodným losem nebo doložit fyzický výsledek. Po stisku Potvrdit Agility rozhodněte přímo zde: <b>Uložit bez Fate</b> nebo <b>Použít Fate</b>. Teprve potom se odemkne Vyhodnotit Hazard. Potvrzení samo neukládá zranění ani neposouvá Kalendář. Při F/CF jsou navíc povinné skutečné Impact, ZD a LD hody.</p></div>
+ <p class="tiny">Účastníka lze určit skutečným náhodným losem nebo doložit fyzický výsledek. Po stisku Potvrdit Agility se u způsobilé hráčské postavy nabídne <b>Uložit bez Fate</b> nebo <b>Použít Fate</b>. Jinak se výsledek Agility potvrdí rovnou. Při F/CF doložte Impact, ZD a LD. Zranění se zapíše až tlačítkem Vyhodnotit Hazard. Čas kampaně se tím nemění.</p></div>
  <div data-hsk-hazard-gm hidden class="hsk-hazard-step"><label>GM: doložený skutečný následek Equipment nebo Complication
  <textarea name="gmHazardOutcome" rows="3" minlength="8" maxlength="600" placeholder="Konkrétní událost, případný opravný/terénní Skill Test a výsledek, zdržení či dopad na další hlídku."></textarea></label>
  <p class="tiny">Equipment: HMK str. 148 rozlišuje opravné dovednosti a zdržení podle CF/F/S/CS. Complication: HMK str. 149 řeší průchod překážkou a návaznou hlídku. Aplikace zde neprovádí další neprokázaný Skill Test ani sama nemění pohyb další hlídky. GM musí výsledné rozhodnutí výslovně doložit.</p></div>`:''}
@@ -16382,9 +16414,9 @@ document.addEventListener('click',event=>{
  */
 const HSK_EXPOSURE_HELP_93726=Object.freeze({
  warming:'HMK 185: zahajuje léčbu chladu až po skutečném vyvedení z chladu a vody. Od této minuty běží Warming (zahřívání), Healing Base × 5 každé 2 hodiny až do HR6. Je to vědomé rozhodnutí GM; samotné otevření formuláře nic nezapíše.',
- compress:'HMK 185: zahajuje léčbu horka po odstranění ze slunečního záření. Compress = obklady a Healing Base × 5 každých 15 minut; při skutečném chlazení chladnou vodou každých 5 minut. Další hody plánuje Kalendář.',
+ compress:'HMK 185: zahajuje léčbu horka po odstranění ze slunečního záření. Compress = obklady a Healing Base × 5 každých 15 minut; při koupeli v chladné vodě každých 5 minut. Další hody plánuje Kalendář.',
  removed:'Toto není údaj odvozovaný z inventáře ani hod kostkou. GM potvrdí skutečnou změnu prostředí: při chladu postava není nadále vystavena původnímu chladu ani studené vodě, při horku je mimo přímé slunce. Bez splnění podmínky nemůže začít Healing.',
- water:'Pouze Heat Exposure při skutečném chlazení chladnou vodou: Compress Healing po 5 minutách místo běžných 15 (HMK 185). Neznamená ponoření do ledové vody a nevyvolává Cold Shock.',
+ water:'Pouze Heat Exposure při skutečné koupeli v chladné vodě: Healing po 5 minutách místo běžných 15 (HMK 185). Běžný mokrý obklad má interval 15 minut.',
  start:'Kliknutí na Zahájit léčbu potvrdí doložené vyvedení z expozice a v aktuální minutě vytvoří počátek Warming/Compress. Žádný Course d100 se teď nehází a Kalendář se tímto tlačítkem neposune.',
  method:'Exposure Advance: postava je stále vystavena příčině; d100 proti Healing Base × aktuální HR na konci každého pravidlového intervalu. Exposure Healing: po doloženém vyvedení a zahájení Warming/Compress se hází d100 proti Healing Base × 5 v intervalu léčby. Jeden hod nikdy nenahrazuje druhý.',
  elapsed:'Toto je skutečná doba mezi doloženým začátkem expozice a nynějším okamžikem Kalendáře. Aplikace ji počítá sama. Vnitřní počet intervalů se může lišit při Critical Success, který vynechá další Course; fyzický čas se ale nepřepisuje.',
@@ -16407,8 +16439,8 @@ function hskTrekkingWeatherTreatmentForms(actorId){
    <div class="hsk-exposure-choice" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.removed)}" tabindex="0">
     <label class="hsk-exposure-check"><input name="removedFromHazard" type="checkbox" required> <span><strong>Skutečně vyvedeno z ${kind?'chladu a vody':'přímého slunce'}</strong><small>GM potvrdí změnu prostředí; bez ní nelze zahájit Healing.</small></span></label>
    </div>
-   ${kind?'':`<div class="hsk-exposure-choice" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.water)}" tabindex="0"><label class="hsk-exposure-check"><input name="coolWater" type="checkbox"><span><strong>Compress s chlazením chladnou vodou</strong><small>Skutečné chlazení: kontrola po 5 místo 15 minutách.</small></span></label></div>`}
-   <p class="hc-hint" data-hmk-help="${esc(kind?HSK_EXPOSURE_HELP_93726.warming:HSK_EXPOSURE_HELP_93726.compress)}" tabindex="0">${kind?'Warming: HB × 5 jednou za 120 minut.':'Compress: HB × 5 každých 15 minut, nebo každých 5 při skutečném chlazení vodou.'}</p>
+   ${kind?'':`<div class="hsk-exposure-choice" data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.water)}" tabindex="0"><label class="hsk-exposure-check"><input name="coolWater" type="checkbox"><span><strong>Skutečná koupel v chladné vodě</strong><small>Kontrola po 5 minutách. Běžný mokrý obklad má interval 15 minut.</small></span></label></div>`}
+   <p class="hc-hint" data-hmk-help="${esc(kind?HSK_EXPOSURE_HELP_93726.warming:HSK_EXPOSURE_HELP_93726.compress)}" tabindex="0">${kind?'Warming: HB × 5 jednou za 120 minut.':'Compress: HB × 5 každých 15 minut. Při koupeli v chladné vodě každých 5 minut.'}</p>
    <button type="submit" ${ready?'':'disabled'} data-hmk-help="${esc(HSK_EXPOSURE_HELP_93726.start)}">Zahájit ${treatment} v aktuální minutě</button>
    ${!ready?'<p class="hc-hint">Chybí platná kalendářová kotva této expozice; čas nelze domýšlet.</p>':''}
    <output role="status" aria-live="polite"></output></form></details>`;
@@ -30365,7 +30397,7 @@ const episodeHazardSelectable93840=new Set([
  'hazardEquipmentDisposition','hazardComplicationDecision','hazardItemId','hazardRepairSkill',
  'hazardComplicationSkill','hazardWorkerId','hazardComplicationScope',
  'hazardComplicationRouteChanged','hazardSkillLevel','hazardAtMinute','hazardEvidenceId',
- 'hazardDirectionD10','hazardDirectionProofId','hazardDirectionDeferAwareness']);
+ 'hazardDirectionD10','hazardDirectionCompass','hazardDirectionProofId','hazardDirectionDeferAwareness']);
 // hazardDelayNow is a read-only consequence of the confirmed obstruction minute.
 // It changes after preview recalculation and is NOT a separate GM decision.
 function episodeHazardInputs93840(form){
@@ -30401,6 +30433,7 @@ function episodeHazardState93840(form){
  const current=episodeHazardRead93840(form),context=episodeHazardContext93840(form);
  const accident=['travel','forage'].includes(form.elements.namedItem('kind')?.value)&&
   /^[456]$/.test(String(form.elements.namedItem('survivalD10')?.value||''));
+ if(saved?.values&&!Object.hasOwn(saved.values,'hazardDirectionCompass'))saved.values.hazardDirectionCompass='';
  const valid=!!saved&&saved.context===context&&
   (!accident||saved.confirmationPolicy==='explicit-incident-minute-v93.863')&&
   Object.keys(current).every(k=>String(saved.values?.[k])===String(current[k]));
@@ -31990,6 +32023,7 @@ function episodePreviewFromForm(form,clock){
    complicationLevel:hazardType==='complication'?(complicationParty?complicationWorst:l):null,
    directionD10:['misdirection','lost'].includes(hazardType)&&String(v.hazardDirectionD10??'').trim()?Number(v.hazardDirectionD10):null,
    directionTurn:['misdirection','lost'].includes(hazardType)&&String(v.hazardDirectionD10??'').trim()?(Number(v.hazardDirectionD10)%2?'left':'right'):null,
+   directionCompass:['misdirection','lost'].includes(hazardType)&&v.hazardDirectionD10?v.hazardDirectionCompass||null:null,
    directionAwareness:hazardType==='misdirection'?episodeSkillProof(data.journal.find(j=>j.id===v.hazardDirectionProofId),
     'Awareness',guideId,campaignKey(clock),clock.minute)?.level||null:null,
    directionObservationDeferred:hazardType==='misdirection'&&!!v.hazardDirectionDeferAwareness});
@@ -32903,7 +32937,7 @@ function episodeDirectionConfirmationTask93850(form){
  if(!button||button.disabled||button.hidden)return false;
  const checklist=document.querySelector('.hc-episode-spread-right [data-episode-checklist]');
  if(checklist)checklist.innerHTML='<p class="hc-episode-task-lead">Aktuální povinný krok · potvrzení Direction Hazardu</p>'+ 
-  '<div class="hc-episode-task hc-episode-setup-task"><strong>✓ Směr odchýlení: d10 '+esc(accepted)+'</strong><p>Hod je doložen. Nyní výslovně potvrďte postup Direction Hazardu. Teprve potom se určí případný Awareness nebo dokončení cesty.</p>'+ 
+  '<div class="hc-episode-task hc-episode-setup-task"><strong>✓ Směr odchýlení: d10 '+esc(accepted)+(Number(accepted)%2?' · vlevo':' · vpravo')+'</strong><p>Podle mapy můžete doplnit světovou stranu. Poté potvrďte postup Direction Hazardu.</p>'+ 
   '<button type="button" class="secondary" data-episode-jump="hazardDirectionD10" data-episode-hazard-confirm-next>Potvrdit postup Direction Hazardu</button></div>';
  for(const b of document.querySelectorAll('[data-episode-finalize],[data-episode-window-stage]'))b.disabled=true;
  return true;
@@ -34586,6 +34620,8 @@ function updateEpisodePreview(form){
      'Kalendář stále potvrdí celých '+result.minutes+' minut. Zdravotní následky pokračují samostatně po potvrzení GM.';
    }
    for(const n of hz.querySelectorAll('[data-hazard-direction]'))n.hidden=!types.some(x=>['misdirection','lost'].includes(x));
+   const compass=hz.querySelector('[data-hazard-direction-compass]');
+   if(compass)compass.hidden=compass.hidden||!episodeDiceAccepted93849.has('hazardDirectionD10');
    for(const n of hz.querySelectorAll('[data-hazard-direction-awareness]'))n.hidden=!types.includes('misdirection');
    // The generic cross-hazard evidence selector is NOT an Accident input.
    // Leaving it clickable beside the GM minute invites an unrelated document.

@@ -15,7 +15,7 @@ import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-o
 import {allocateTrekModes} from './hmk-trekking-correction.js';
 import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js?v=94.123';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js?v=94.137';
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 import {incidentMinutes93863} from './hmk-incident-window-93863.js';
@@ -1078,7 +1078,8 @@ export function validateTimeEpisodes(journal=[]){
      complicationDecision:h.complicationDecision,accidentAgility:h.accidentAgility,
      accidentD6:h.accidentD6,accidentZD10:h.accidentZD10,
      complicationSkill:h.complicationSkill,complicationLevel:h.complicationLevel,
-     directionTurn:h.directionTurn,directionD10:h.directionD10??null,directionAwareness:h.directionAwareness,
+     directionTurn:h.directionTurn,directionD10:h.directionD10??null,directionCompass:h.directionCompass??null,
+     directionAwareness:h.directionAwareness,
      directionObservationDeferred:h.directionObservationDeferred===true});
     const linked=h.evidenceId?journal.find(k=>k.id===h.evidenceId&&
      k.calendarCampaignId===j.calendarCampaignId&&k.campaignMinute===e.startMinute):null;
