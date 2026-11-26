@@ -30,7 +30,7 @@ import {incidentMinutes93863} from './src/integration/hmk-incident-window-93863.
 import {randomEpisodeMinute93868,deferredEpisodeEvent93868,validateDeferredEpisodeEvent93868,actualGroupMovement93868,splitEpisodeEndDice93868} from './src/integration/hmk-episode-interruption-93868.js';
 import {UNIVERSAL_STOP_REASONS_93869,confirmUniversalStop93869,validateUniversalStop93869,effectiveActivityMinutes93869,UNIVERSAL_STOP_RESOLUTION_FORMAT_93869} from './src/integration/hmk-universal-window-interruption-93869.js';
 import {captureSharedActivityDelta93769,replaySharedActivityDelta93769} from './src/integration/hmk-shared-serial-receipts-93769.js';
-import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js';
+import {episodeTimedMedicalPreview,episodeTimedMedicalKey,episodeActorCanAct} from './src/integration/hmk-episode-timed-medical.js?v=94.139';
 import {createGitHubCloudSync,CLOUD_CONFIG_KEY,CLOUD_PENDING_KEY,CLOUD_SESSION_KEY} from './src/integration/hmk-github-cloud-sync.js?v=94.099';
 import {heftPenalty,strengthImpactModifier,twoHandedImpactBonus} from './src/rules/weapon-modes.js';
 import {resolveCrossbowArcheryChoice} from './src/integration/hmk-crossbow-archery-choice.js';
@@ -330,7 +330,7 @@ import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,l
 import {isRoutineInventoryHistory} from './src/integration/hmk-routine-history-filter-549.js';
 import {createFreshRationStocks,recordPhysicalRationHandoff,recordPhysicalRationLoss,availableRationLots,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js?v=94.116';
 import {characterCarryProjection,partyCarryProjection,supplyDurationText} from './src/integration/hmk-provisions-simple-view.js';
-import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js';
+import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js?v=94.139';
 import {malnutritionPrognosis,malnutritionStateLabel} from './src/integration/hmk-malnutrition-prognosis.js';
 import {nutritionAnimals,createAnimalAccess,animalLoadedItemAt,validateNutritionAnimalAccess,assertNutritionAnimalAppendOnly} from './src/integration/hmk-nutrition-animal-access.js';
 import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAppendOnly} from './src/integration/hmk-nutrition-assisted-intake.js';
@@ -414,7 +414,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.138';
+const APP_VERSION='94.139';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;

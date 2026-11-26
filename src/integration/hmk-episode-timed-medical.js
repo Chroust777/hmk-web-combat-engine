@@ -3,7 +3,7 @@
  * Results are replayed at their ACTUAL due minute with the authoritative HMK
  * nutrition and malnutrition modules, then committed with the whole episode.
  */
-import {dueMalnutritionCases,resolveMalnutritionCourse,applyDueMalnutritionOnsets} from './hmk-malnutrition-medical.js';
+import {dueMalnutritionCases,resolveMalnutritionCourse,applyDueMalnutritionOnsets} from './hmk-malnutrition-medical.js?v=94.139';
 import {activeNutritionPolicies,finishDueNutritionDays,enrollUnmonitoredNutrition} from './hmk-nutrition-days.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {episodeTimedCourseAgenda,episodeTimedCourseStep,episodeTimedCourseKey,episodeTimedCourseFields} from './hmk-episode-timed-courses.js';
@@ -43,8 +43,7 @@ export function episodeTimedMedicalPreview(database,{endMinute,rolls={},idFactor
    const days=temp.journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===p.characterId&&j.calendarNutritionDay?.policyId===p.id);
    return (days.at(-1)?.calendarNutritionDay.endMinute??p.campaignMinute)+1440;
   }).filter(m=>m>=at&&m<=endMinute);
-  const dueCases=dueMalnutritionCases(temp).filter(t=>t.dueMinute<endMinute&&
-   temp.characters.find(c=>c.id===t.characterId)?.hmk?.healthState?.shock!=='KIA');
+  const dueCases=dueMalnutritionCases(temp).filter(t=>t.dueMinute<endMinute);
   const dueTimes=dueCases.map(t=>Math.max(at,t.dueMinute));
   const courseAgenda=episodeTimedCourseAgenda(temp,endMinute-1);
   const next=Math.min(endMinute,...dayEnds,...dueTimes,...courseAgenda.map(t=>Math.max(at,t.minute)));

@@ -121,7 +121,10 @@ export function dueMalnutritionCases(database){
  const clock=database?.campaignClock;if(!clock)return [];
  const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
  const members=new Set(clock.characterIds??database.characters.map(c=>c.id));
- return database.characters.filter(c=>members.has(c.id)).flatMap(c=>episodes(c).filter(e=>e.campaignId===campaignId&&e.status==='active').map(e=>{
+ // A fatal course ends all further rolls for this person. Keep the other
+ // episodes and their evidence for history, without scheduling their checks.
+ return database.characters.filter(c=>members.has(c.id)&&c.hmk?.healthState?.shock!=='KIA')
+ .flatMap(c=>episodes(c).filter(e=>e.campaignId===campaignId&&e.status==='active').map(e=>{
   const days=entries(database.journal,campaignId,c.id),last=days.find(x=>x.calendarNutritionDay.endMinute===e.nextDueMinute);
   const status=last?rationStatus(last.calendarNutritionDay,e.kind):'unknown';
   const mode=status==='full'?'healing':status==='unknown'?'pending':'advance';
