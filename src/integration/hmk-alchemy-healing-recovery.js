@@ -310,6 +310,37 @@ export function pendingAlchemyHealing(characters,clock,campaignId){
   return [...sources.values()].filter(source=>source.nextMinute!==null).map(source=>({...source,actor}));
  });
 }
+/** Close the daily routine when another confirmed procedure heals its last
+ * original trauma. Use the same recovery history as a scheduled daily check.
+ */
+export function closeResolvedAlchemyHealing({actor,clock,campaignId}){
+ const state=actor.hmk?.healthState;
+ if(!state||state.shock==='KIA'||!clock.characterIds?.includes(actor.id))return {state,rows:[]};
+ const sources=new Map();
+ for(const event of state.events){
+  if((event.type!==eventType&&event.type!==interactionType)||event.details.campaignId!==campaignId)continue;
+  const receipt=event.details;
+  const source=sources.get(receipt.useId);
+  sources.set(receipt.useId,{initial:source?.initial??receipt,last:receipt});
+ }
+ let next=state;
+ const rows=[];
+ for(const {initial,last} of sources.values()){
+  if(last.nextMinute===null||clock.minute<last.minute||clock.minute>last.nextMinute||
+   !initial.traumas?.length||activeTraumas(state,clock,actor.id,initial.traumas).length)continue;
+  const day=last.day+1,id=last.useId+':healing:'+day;
+  const receipt={campaignId,useId:last.useId,actorId:actor.id,minute:clock.minute,day,
+   asBefore:last.asAfter,asAfter:last.asAfter,weakness:0,dailyRoll:null,rolled:[],overlapped:[],
+   nextMinute:null,endedBy:'original-traumas-healed'};
+  if(next===state)next=structuredClone(state);
+  next.fatigue.otherWeakness-=Math.min(last.weakness,next.fatigue.otherWeakness);
+  record(next,Math.max(1,next.lastRound),id,receipt);
+  rows.push({id,characterId:actor.id,calendarCampaignId:campaignId,campaignMinute:clock.minute,
+   calendarAlchemyHealingRecovery:receipt});
+ }
+ return {state:next,rows};
+}
+
 export function assertAlchemyHealingMayAdvance(characters,clock,campaignId,targetMinute){
  const missed=pendingAlchemyHealing(characters,clock,campaignId).find(source=>source.nextMinute<targetMinute);
  check(!missed,'nejprve vyhodnoťte denní zotavení u postavy '+missed?.actor.name+' v minutě '+missed?.nextMinute+'.');
@@ -378,6 +409,12 @@ export function validateAlchemyHealingRecovery(journal,characters,branches={},ac
    check(seenUses.has(interaction.triggerId)&&trigger&&old&&JSON.stringify(healingInteraction(old,trigger,use,interaction.triggerId))===JSON.stringify(interaction)&&
     !interactions.has(row.id),'poškozený nebo duplicitní souběh Healing.');
    interactions.add(row.id);
+  }else if(receipt.endedBy!==undefined){
+   check(receipt.endedBy==='original-traumas-healed'&&old&&old.nextMinute!==null&&
+    day===old.day+1&&minute>=old.minute&&minute<=old.nextMinute&&
+    asBefore===old.asAfter&&asAfter===asBefore&&nextMinute===null&&dailyRoll===null&&
+    receipt.weakness===0&&receipt.rolled?.length===0&&receipt.overlapped?.length===0,
+    'poškozený doklad automatického ukončení Healing.');
   }else if(!old){
    check(day===0&&minute===use.minute&&asBefore===use.finalAS&&asAfter===asBefore,
     'poškozený počátek léčení.');

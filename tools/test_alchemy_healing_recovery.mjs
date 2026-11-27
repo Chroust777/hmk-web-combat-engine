@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import {advanceCampaignCalendar,anchorCampaignOrigin,createCampaignCalendar,DAY_MINUTES} from '../src/integration/hmk-campaign-calendar.js';
 import {initialCombatState,validateCombatState} from '../src/integration/persistent-combat-state.js';
-import {startAlchemyHealingRecovery,advanceAlchemyHealingRecovery,prepareAlchemyHealingUse,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed,prepareAlchemyHealingInteractions,pendingAlchemyHealing} from '../src/integration/hmk-alchemy-healing-recovery.js';
+import {startAlchemyHealingRecovery,advanceAlchemyHealingRecovery,prepareAlchemyHealingUse,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed,prepareAlchemyHealingInteractions,pendingAlchemyHealing,closeResolvedAlchemyHealing,assertAlchemyHealingMayAdvance} from '../src/integration/hmk-alchemy-healing-recovery.js';
 
 import {validateAlchemyImbibingJournal,activeAlchemyProfusionCohort,activeAlchemyPhysicTargets,createAlchemyPhysicImbibing,createAlchemyFootpadImbibing} from '../src/integration/hmk-alchemy-imbibing.js';
 import {alchemyElixirStrength} from '../src/integration/hmk-alchemy-decay.js';
 import {createAlchemyVialBinding,createAlchemyVialEmpty,alchemyVialState} from '../src/integration/hmk-alchemy-vial-ledger.js';
+import {applyConfirmedInjuryHealing} from '../src/integration/hmk-healing-persistence.js';
 import {PRINTED_VIAL} from '../src/integration/hmk-herbal-vial-ledger.js';
 
 const actor={id:'patient',hmk:{attributes:{end:16,wil:16}}},campaignId='campaign',useId='dose';
@@ -159,6 +160,43 @@ assert.equal(profusion.receipt.weaknessAdded,40);
 assert.equal(profusion.state.fatigue.otherWeakness,prepared.state.fatigue.otherWeakness+40);
 assert.equal(profusion.receipt.asAfter,9);
 assert.equal(profusion.receipt.nextMinute,prepared.receipt.nextMinute);
+// Two original traumas, an unrelated new wound, and Weakness from Profusion.
+const externallyHealed=applyConfirmedInjuryHealing({state:profusion.state,woundId:'old',round:2,
+ eventId:'natural-recovery',daySinceInjury:5,endurance:16,will:16,roll:5,gmConfirmed:true}).state;
+assert.ok(externallyHealed.wounds.find(wound=>wound.id==='old').healed);
+const withState=state=>({...actors[0],hmk:{...actors[0].hmk,healthState:state}});
+const beforeDue=advanceCampaignCalendar(clock,{deltaMinutes:60,eventId:'short-advance',reason:'Doložený posun',
+ gmConfirmed:true});
+const closureArgs={actor:withState(externallyHealed),clock:beforeDue,campaignId};
+assert.deepEqual(closeResolvedAlchemyHealing(closureArgs).rows,[]); // Original blood loss remains.
+const recovered=structuredClone(externallyHealed);
+recovered.bloodLoss={bp:0,weaknessFatigue:0,healingNextDay:null};
+recovered.wounds.push(wound('unrelated-new-injury'));
+const end=closeResolvedAlchemyHealing({...closureArgs,actor:withState(recovered)});
+assert.equal(end.rows.length,1);
+const ended=end.rows[0].calendarAlchemyHealingRecovery;
+assert.equal(ended.endedBy,'original-traumas-healed');
+assert.equal(ended.asAfter,profusion.receipt.asAfter);
+assert.equal(ended.dailyRoll,null);
+assert.equal(ended.minute,beforeDue.minute);
+assert.equal(ended.nextMinute,null);
+assert.equal(end.state.fatigue.otherWeakness,prepared.state.fatigue.otherWeakness);
+assert.equal(recovered.fatigue.otherWeakness,profusion.state.fatigue.otherWeakness);
+assert.equal(end.state.wounds.find(wound=>wound.id==='unrelated-new-injury').healed,undefined);
+assert.deepEqual(closeResolvedAlchemyHealing({...closureArgs,actor:withState(end.state)}).rows,[]);
+const endJournal=[...profusion.journal,...end.rows],closedActors=[withState(end.state)];
+assert.equal(validateAlchemyHealingRecovery(endJournal,closedActors),true);
+assert.equal(validateAlchemyImbibingJournal(endJournal),true);
+for(const cohort of [activeAlchemyProfusionCohort,activeAlchemyPhysicTargets]){
+ assert.ok(cohort(endJournal,campaignId,actor.id,beforeDue.minute-1).some(source=>source.useId===use.useId));
+ assert.ok(!cohort(endJournal,campaignId,actor.id,beforeDue.minute).some(source=>source.useId===use.useId));
+}
+assert.deepEqual(pendingAlchemyHealing(closedActors,beforeDue,campaignId),[]);
+assert.doesNotThrow(()=>assertAlchemyHealingMayAdvance(closedActors,beforeDue,campaignId,time(clock,2).minute));
+const corrupt=structuredClone(endJournal);
+corrupt.at(-1).calendarAlchemyHealingRecovery.asAfter--;
+assert.throws(()=>validateAlchemyHealingRecovery(corrupt,closedActors),/poškozený doklad automatického ukončení/);
+console.log('PASS Healing: natural last-trauma closure, source-specific Weakness, unrelated wound, clock and alchemy release');
 const reduced=consume({elixirName:'Physic',baseAS:6,d100:11,create:createAlchemyPhysicImbibing});
 assert.equal(reduced.proof.sl,'S');
 assert.equal(reduced.receipt.asAfter,3);
