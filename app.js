@@ -415,7 +415,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.143';
+const APP_VERSION='94.144';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -22686,16 +22686,24 @@ function openNoncombatHealthTerm(actor,event,{healerId}={}){
   if(step)weatherCareActiveSection=step;
  }
  openHealthPatient952(actor);
+ const chapter=document.querySelector('[data-stable-health-patient]')||document.querySelector('.journal-book--hazards');
+ const exposureForm=kind==='weather-course'&&chapter&&
+  [...chapter.querySelectorAll('form[data-skill-weather-course]')].find(form=>
+   form.elements.namedItem('sourceId')?.value===source);
+ const currentShockForm=!future&&kind==='weather-course'&&!exposureForm?
+  chapter?.querySelector('form[data-weather-trauma-course] input[name="kind"][value="extended-shock"]')?.form:null;
  let formReady=false;
  // A Bleeder may be prepared five minutes before the check.
- if(!future||(kind==='bleeding'&&event.minute===clock.minute+5))
+ if(currentShockForm)
+  formReady=focusCalendarRuleAction(actor,'extended-shock',currentShockForm.elements.namedItem('sourceId')?.value);
+ else if(!future||(kind==='bleeding'&&event.minute===clock.minute+5))
   formReady=focusCalendarRuleAction(actor,kind,source,event.elapsedMinutes,{healerId});
- const chapter=document.querySelector('[data-stable-health-patient]')||document.querySelector('.journal-book--hazards');
  if(!chapter)return true;
  const highlighted=chapter.querySelector('.hmk-medical-required-target');
  const box=document.createElement('p');box.className='notice';box.setAttribute('role','status');
  box.textContent=actor.name+' · '+label+' · '+destination+
   (future&&!formReady?'. Termín '+displayCampaignMinute(event.minute)+'.':
+   currentShockForm&&formReady?'. Nejprve dokončete zvýrazněný Extended Shock Course. Potom pokračujte v této kontrole expozice.':
    formReady?'. Pokračujte ve zvýrazněném kroku.':'. '+(event.reason||'Formulář ještě není dostupný. Zkontrolujte předchozí zdravotní povinnosti a čas v Kalendáři.'));
  const focusedForm=highlighted?.closest('form')||document.activeElement?.closest('form');
  if(formReady&&focusedForm&&chapter.contains(focusedForm)){focusedForm.prepend(box);return true;}
