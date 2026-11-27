@@ -61,6 +61,7 @@ import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} fro
 import {chronicleCases,chronicleLanguage,knownChronicleCase} from './src/integration/hmk-chronicle-novel-93961.js?v=94.043';
 import {CHRONICLE_NOVEL_LAYOUT,chroniclePresentationSnapshot,validateChroniclePresentation93889,assertChroniclePresentationAppendOnly93889,recordChroniclePresentation93889,campaignChronicleEpisodeEdit,campaignChronicleEventText,recordCampaignChronicleEdit} from './src/integration/hmk-chronicle-presentation-93889.js?v=93.962';
 import {historyBelongsToCharacter,historyDisplayTitle,groupHistoryByCharacter} from './src/integration/hmk-opposed-history-555.js';
+import {SKILL_CHECK_LEVELS,characterLogbookSkillChecks,summarizeLogbookSkillChecks} from './src/integration/hmk-logbook-skill-stats.js?v=94.149';
 import {skillLoadEvidenceHTML,skillLoadModifierDisplay} from './src/integration/hmk-skill-load-evidence.js';
 import {criticalActivities,skillFollowupActivities,skillFailureGuidance,criticalFollowupPlan,criticalFollowupResult,criticalEMLRange} from './src/integration/hmk-skill-critical-activities.js?v=94.005';
 import {balanceNervesCandidate,resolveBalanceNerves} from './src/integration/hmk-skill-balance-547.js';
@@ -415,7 +416,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.148';
+const APP_VERSION='94.149';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -8638,11 +8639,13 @@ function journalAddInventoryForm(){
  const catalog=allCatalogItems();
  return `<div class="hmk-inventory-add"><h4>Předmět z knihovny</h4><form id="add-inventory"><label>Předmět<select name="itemId" required><option value="">Vyberte…</option>${catalog.slice().sort((a,b)=>a.name.localeCompare(b.name,'cs',{sensitivity:'base'})||String(a.category).localeCompare(String(b.category))).map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${numericField('currentWQ','Aktuální WQ (prázdné = katalog)','')}${field('condition','Stav / poznámka','')}${slotSelect('slot','carried')}<button type="submit" ${catalog.length?'':'disabled'}>Přiřadit předmět</button></form><p class="tiny muted">V inventáři vzniká kopie parametrů z knihovny.</p></div>`;
 }
-function characterSkillHistory950(c,logs,{latest=10,gm=false}={}){
+function characterSkillHistory950(c,logs,{latest=5,gm=false,checks=[]}={}){
+ const projectedIds=new Set(checks.filter(row=>!row.die).map(row=>row.entry.id));
  const rows=logs.flatMap(entry=>{
+  if(projectedIds.has(entry.id))return [];
   const proof=entry.skillTestProof;
   if(!proof||!['success-test','success-value-test','success-value-specific','secondary-mastery-test',
-   'secondary-mastery-value-test','opposed-success-test','assistance-success-test','special-secondary-roll',
+   'secondary-mastery-value-test','skill-value-result','opposed-success-test','assistance-success-test','special-secondary-roll',
    'critical-followup','skill-critical-followup','opposed-tiebreak'].includes(proof.type))return [];
   const other=proof.opponentId===c.id&&proof.actorId!==c.id;
   let result=other?proof.b:proof.a??proof.primaryResult??proof.result;
@@ -8666,12 +8669,32 @@ function characterSkillHistory950(c,logs,{latest=10,gm=false}={}){
   return [{entry,result,sv,name:followupSkill||(proof.skills?.[other?1:0]??proof.skill??entry.title)}];
  });
  const hidden=gm?new Set():hiddenLogbookIds(data,c.id);
+ if(!gm)rows.push(...checks);
+ if(!gm)rows.sort((a,b)=>String(b.entry.createdAt??'').localeCompare(String(a.entry.createdAt??''))||
+  (b.entry.campaignMinute??-1)-(a.entry.campaignMinute??-1)||(b.order??0)-(a.order??0));
  const visible=rows.filter(row=>!hidden.has(row.entry.id)),removed=rows.filter(row=>hidden.has(row.entry.id));
- const table=items=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Datum a čas</th><th>Test</th><th>EML</th><th>Hod</th><th>Výsledek</th>${gm?'':'<th>Akce</th>'}</tr></thead><tbody>${items.map(({entry,result,sv,name})=>
-  `<tr><td>${esc(personalNoteGameMoment(entry))}</td><td>${journalTerm(name,chronicleSkillHelp953(name))}</td><td>${esc(result.eml??result.finalEML??'—')}</td><td>${esc(result.roll??'—')}</td><td>${esc(result.level)}${Number.isInteger(sv)?' · SV '+esc(sv):''}</td>${gm?'':`<td><button type="button" class="secondary hc-small" data-${hidden.has(entry.id)?'restore':'hide'}-log="${esc(entry.id)}">${hidden.has(entry.id)?'Obnovit':'Smazat ze zápisníku'}</button></td>`}</tr>`).join('')}</tbody></table></div>`;
- return `<details class="hc-personal-archive" data-personal-skill-history ${gm?'open':''}><summary>Historie Skill Checků</summary>${visible.length?table(visible.slice(0,latest)):'<p>Žádné doložené testy.</p>'}
+ const table=items=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Datum a čas</th><th>Test</th><th>${gm?'EML':'EML / TN'}</th><th>Hod</th><th>Výsledek</th>${gm?'':'<th>Akce</th>'}</tr></thead><tbody>${items.map(({entry,result,sv,name,stars,travel,die,episodeRoll})=>
+  `<tr><td>${esc(personalNoteGameMoment(entry))}</td><td>${journalTerm(name,chronicleSkillHelp953(name))}${travel?'<br><small>Cestování</small>':''}</td><td>${esc(result.eml??result.finalEML??'—')}</td><td>${die?esc(die)+' ':''}${esc(result.roll??'—')}</td><td>${esc(result.level)}${Number.isInteger(sv)?' · SV '+esc(sv):''}${Number.isInteger(stars)?' · '+stars+' ★':''}</td>${gm?'':episodeRoll?'<td>—</td>':`<td><button type="button" class="secondary hc-small" data-${hidden.has(entry.id)?'restore':'hide'}-log="${esc(entry.id)}">${hidden.has(entry.id)?'Obnovit':'Smazat ze zápisníku'}</button></td>`}</tr>`).join('')}</tbody></table></div>`;
+ return `<details class="hc-personal-archive" data-personal-skill-history open><summary>Historie Skill Checků · posledních ${latest} hodů</summary>${visible.length?table(visible.slice(0,latest)):'<p>Žádné doložené testy.</p>'}
  ${visible.length>latest?`<details><summary>Příloha · starší Skill Checky</summary>${table(visible.slice(latest))}</details>`:''}
  ${removed.length?`<details><summary>Smazané ze zápisníku · obnovit</summary>${table(removed)}</details>`:''}</details>`;
+}
+function characterSkillStatistics(checks){
+ const skills=summarizeLogbookSkillChecks(checks);
+ return `<details class="hc-personal-archive" data-personal-skill-statistics open>
+  <summary>Statistika Skill Checků</summary>
+  ${skills.length?`<p class="journal-minor">Doložené hody z celé historie postavy včetně cestování a položek skrytých ze zápisníku.</p>
+  <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Dovednost</th>
+  ${SKILL_CHECK_LEVELS.map(level=>`<th scope="col">${level}</th>`).join('')}
+  <th scope="col">SV ★ celkem</th><th scope="col">SV ★ podle počtu</th></tr></thead>
+  <tbody>${skills.map(skill=>{
+   const counts=[...skill.starsByCount].sort(([a],[b])=>a-b);
+   return `<tr><th scope="row">${journalTerm(skill.name,chronicleSkillHelp953(skill.name))}</th>
+   ${SKILL_CHECK_LEVELS.map(level=>`<td>${skill[level]}</td>`).join('')}
+   <td>${counts.length?skill.starsTotal:'—'}</td>
+   <td>${counts.map(([stars,count])=>`<span style="white-space:nowrap">${stars} ★ × ${count}</span>`).join(' · ')||'—'}</td></tr>`;
+  }).join('')}</tbody></table></div>`:'<p>Žádné doložené hody.</p>'}
+ </details>`;
 }
 const HEALTH_EVENT_LABELS_950={
  'injury-treatment':'Treatment','injury-healing-roll':'Healing Roll','infection-course':'Infection Course',
@@ -9997,10 +10020,11 @@ function sheetSupplementTabs(c,inv,editing,auditPanel,logs){
  if(activeSheetSection==='inventory')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Arsenal & Gear</h3><p>Inventář, výbava, zatížení a speciální efekty.</p></header><div class="columns journal-tech-columns"><section class="panel wide panel--chapter"><h3>Inventář postavy</h3>${equippedHandsPanel(inv,c)}${characterInventoryOverview(c,inv)}${physicalWaterPanel(c)}</section>${foragingEvidenceInCharacterInventory(c.id)}${combatantLoadPanel(c)}${armourLoadoutPanel(inv,c)}<section class="panel wide hmk-inventory-add-panel" data-hmk-gm-only>${journalAddInventoryForm()}</section>${liveSpecialEffectsPanel(c)}${(()=>{const p=covenantClergyPath(c);return p.available?`<section class="panel wide"><h3>Kněžská dráha Covenant · HMK p.343</h3><p>${esc(p.role)} · ${esc(p.religion)} · Ritual ML ${esc(p.ml)} · Circle ${esc(p.circle)}</p><p class="muted">Status plyne z Ritual ML, nejde o smyšlené povolání Priest v tabulce Émhlè.</p></section>`:''})()}</div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='status')return journalShell(`<section class="journal-technical-shell"><header class="journal-alt-header"><h3>Combat & Conditions</h3><p>Aktuální stav, povinné procedury, zranění a návazné herní sekvence.</p></header><div class="columns journal-tech-columns">${hskPendingSkillPhysicalConsequences(c.id,{includeWeather:false})}${hskHazardSummary(c.id)}${sheetCombatActionHTML(c,data.characters)}${sheetMandatoryBridge(c)}${hmkSheet(c)}${readinessPanel(c)}<section class="panel wide"><h3>Skill Tests</h3><p class="muted">Success, Opposed, Value, Secondary a Assistance mají vlastní přehlednou obrazovku.</p><button type="button" data-nav="skills">⚄ Otevřít Skill Tests</button></section></div></section>`,`journal-book--chapter`);
  if(activeSheetSection==='notes'){
+  const checks=characterLogbookSkillChecks((episodeStageBaseline??data).journal,c.id);
   const personalNotes=logs.filter(isPersonalNote).filter(j=>!hiddenLogbookIds(data,c.id).has(j.id));
   const noteRows=personalNotes.map(l=>`<article class="journal-personal-note" data-journal-entry="${esc(l.id)}"><div class="journal-personal-note__heading"><b>${esc(l.title||'Bez názvu')}</b><time>${esc(personalNoteGameMoment(l))}</time></div><p>${esc(l.body||'').replace(/\n/g,'<br>')}</p><div class="actions"><button class="secondary" type="button" data-edit-log="${esc(l.id)}">Upravit</button><button class="danger" type="button" data-delete-log="${esc(l.id)}">Smazat</button></div></article>`).join('');
   const currentTime=data.campaignClock&&calendarMemberIds(data.campaignClock,data.characters).some(a=>a.id===c.id)?medicalFullMoment(data.campaignClock.minute):'Herní datum a čas nejsou dostupné';
-  const chroniclePanel=`<section class="panel panel--chapter hmk-notes-left"><h3>Osobní zápisník</h3><p class="journal-minor">Přehled cestovních epizod, doložených hodů a jejich skutečných následků.</p>${data.campaignClock?personalTimeEpisodeChronicleHTML(data.campaignClock,c.id):'<p>Postava nemá otevřenou kampaň.</p>'}${characterSkillHistory950(c,logs)}${chronicleLanguagePanel961(c.id,c.name,c.hmk?.chronicleLanguage)}</section>`;
+  const chroniclePanel=`<section class="panel panel--chapter hmk-notes-left"><h3>Osobní zápisník</h3><p class="journal-minor">Přehled cestovních epizod, doložených hodů a jejich skutečných následků.</p>${data.campaignClock?personalTimeEpisodeChronicleHTML(data.campaignClock,c.id):'<p>Postava nemá otevřenou kampaň.</p>'}${characterSkillHistory950(c,logs,{checks})}${characterSkillStatistics(checks)}${chronicleLanguagePanel961(c.id,c.name,c.hmk?.chronicleLanguage)}</section>`;
   const notesPanel=`<aside class="panel panel--chapter hmk-notes-right"><h3>Vlastní poznámky</h3><p class="journal-note-current-time">Herní čas pro nový zápis: <strong>${esc(currentTime)}</strong></p><form id="journal-form" class="journal-personal-note-form">${field('title','Nadpis záznamu')}${area('body','Zápis')}<button type="submit">Přidat záznam</button></form><div class="journal-personal-note-list">${noteRows||'<p class="muted">Zatím nejsou zapsány žádné vlastní poznámky.</p>'}</div></aside>`;
   return journalShell(`<section class="journal-technical-shell hmk-notes-screen"><header class="journal-alt-header"><h3>Notes & Logbook</h3><p>Vlevo osobní kronika cestování; vpravo vlastní poznámky zapsané s herním datem a časem.</p></header><div class="journal-tech-columns hmk-notes-columns">${chroniclePanel}${notesPanel}</div></section>`,`journal-book--chapter journal-book--notes`);
  }
@@ -10029,7 +10053,8 @@ function sheetView(){
   title:'Úprava hotovosti GM',body:(p.deltaPence>0?'+':'')+p.deltaPence+'d · '+p.reason+
    ' · čas kampaně '+displayCampaignMinute(p.campaignMinute),
   campaignMinute:p.campaignMinute,createdAt:p.at||''}))]:[];
- const logs=[...data.journal.filter(x=>historyBelongsToCharacter(x,c.id)),...cashLogs].sort((a,b)=>
+ const journal=activeSheetSection==='notes'?(episodeStageBaseline??data).journal:data.journal;
+ const logs=[...journal.filter(x=>historyBelongsToCharacter(x,c.id)),...cashLogs].sort((a,b)=>
   String(b.createdAt||'').localeCompare(String(a.createdAt||''))||
   (b.campaignMinute??-1)-(a.campaignMinute??-1));
  return `${activeSheetSection==='overview'?characterJournalHero(c,inv,editing):sheetSupplementTabs(c,inv,editing,auditPanel,logs)}`
