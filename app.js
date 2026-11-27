@@ -423,7 +423,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.171';
+const APP_VERSION='94.172';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -8990,11 +8990,12 @@ function projectQualificationStatus(lookup,requirements=[]){
  }));
  return {blocked:groups.some(({rows})=>rows.length&&!rows.some(row=>!row.missingML&&!row.missingDP)),
   html:groups.length?`<div class="hmk-specialty-facts" aria-label="Požadavky na dovednosti">${groups.map(({label,rows})=>
-   `<div>${label?`<p><strong>${esc(label)}</strong></p>`:''}${rows.map(row=>
-    `<p><strong>${esc(row.name)} · min. ML ${row.minML}${row.minDP?` · otevření ${row.minDP} DP`:''} |</strong>
-    <span>${esc(row.actorName)}: ML ${row.currentML}${Number.isFinite(row.currentDP)?` · ${row.currentDP} DP`:''}. ${[
-     row.missingML?`Chybí ${row.missingML} ML`:'',row.missingDP?`chybí ${row.missingDP} DP`:''
-    ].filter(Boolean).join(' · ')||'Splněno'}</span></p>`).join('')}</div>`).join('')}</div>`:''};
+   `<div>${label?`<p><strong>${esc(label)}</strong></p>`:''}${rows.map(row=>{
+    const missing=[row.missingML?`${row.missingML} ML`:'',row.missingDP?`${row.missingDP} DP`:'']
+     .filter(Boolean).join(' a ');
+    return `<p><strong>${esc(row.name)} - ML ${row.minML}+${row.minDP?` a ${row.minDP} DP k otevření oboru`:''} |</strong>
+    <span>${esc(row.actorName)} má ML ${row.currentML}${Number.isFinite(row.currentDP)?` a ${row.currentDP} DP`:''}${missing?`. Chybí ${missing}.`:' splněno.'}</span></p>`;
+   }).join('')}</div>`).join('')}</div>`:''};
 }
 function projectProcedureAvailability(procedure,lookup,active){
  const status=projectQualificationStatus(lookup,procedure.requirements);
