@@ -420,7 +420,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.162';
+const APP_VERSION='94.163';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -4377,21 +4377,9 @@ function alchemyElixirDescriptionHTML(name,{showEffect=true}={}){
 }
 function alchemyElixirField(actorId,suffix=''){
  const selection=alchemyElixirSelections.get(actorId)??CANONICAL_ALCHEMY_ELIXIRS[0].name;
- const recipes=CANONICAL_ALCHEMY_ELIXIRS.map(({name,principle,convocation})=>({
-  name,label:`${name} · ${principle} (${convocation}) · ML ${alchemyPreparationML.create}+`
- }));
- return `<div class="hmk-alchemy-elixir-field">
-  <label class="hmk-alchemy-native-picker">Druh elixíru<select name="elixirName${suffix}" data-alchemy-elixir-picker required>
-   ${recipes.map(({name,label})=>`<option value="${esc(name)}" ${name===selection?'selected':''}>${esc(label)}</option>`).join('')}
-  </select></label>
-  <details class="hmk-alchemy-picker">
-   <summary><span>Druh elixíru</span> <strong data-alchemy-picker-label>${esc(recipes.find(({name})=>name===selection).label)}</strong></summary>
-   <div class="hmk-alchemy-picker-options" role="group" aria-label="Druhy elixírů">
-    ${recipes.map(({name,label})=>`<button type="button" data-alchemy-picker-option="${esc(name)}" aria-pressed="${name===selection}" tabindex="${name===selection?'0':'-1'}">${esc(label)}</button>`).join('')}
-   </div>
-  </details>
-  <div class="hc-hint" data-alchemy-elixir-help aria-live="polite">${alchemyElixirDescriptionHTML(selection)}</div>
- </div>`;
+ return `<label>Druh elixíru<select name="elixirName${suffix}" data-alchemy-elixir-picker required>
+  ${CANONICAL_ALCHEMY_ELIXIRS.map(elixir=>`<option value="${esc(elixir.name)}" ${elixir.name===selection?'selected':''}>${esc(elixir.name)} · ${esc(elixir.principle)} (${esc(elixir.convocation)}) · ML ${alchemyPreparationML.create}+</option>`).join('')}
+ </select></label><div class="hc-hint" data-alchemy-elixir-help aria-live="polite">${alchemyElixirDescriptionHTML(selection)}</div>`;
 }
 function herbalPotionPreparation(actorId,reservations,reservationHTML){
  const groups=new Map();
@@ -4572,6 +4560,10 @@ function characterCraftPanel(clock,maker,discipline){
    <li><strong>Proveďte Preparation Roll.</strong> V termínu otevřete Alchemy Success Value. Použijte Herblore, Mineralogy a modifikátor Sunsign. Pokud máte Mathematics, můžete přidat Secondary Roll. Úspěšnou dávku může posílit Augmentation d10 podle kvality dílny.</li>
    <li><strong>Uložte dávku.</strong> Tekutý nebo plynný elixír přiřaďte k volné lahvičce Vial, 4 oz. Plná nádoba váží 0,5 lb. Chybějící lahvičku pořídíte u hotové dávky.</li>
   </ol>
+  <p><strong>Herblore a Mineralogy (HMK 62 a 268)</strong><br>
+   Jde o povinné Secondary Modifiers. Postava musí mít v obou dovednostech alespoň ML 1.
+   Index každé dovednosti upravuje cílové číslo EML hlavního hodu Alchemy d100.
+   Například Herblore ML 43 dává −5 EML a Mineralogy ML 54 dává 0 EML. Na tyto dovednosti se zvlášť nehází.</p>
   <p class="hc-hint">AS je aktuální síla elixíru. Základní AS je síla před úpravou za vypití.
    CF je kritický neúspěch, AV je hodnota ochrany, HR je míra hojení a HP interval mezi hody na zotavení.
    Skladované dávky podléhají Decay po 30 dnech. Jedna dávka se použije celá do konce jediného kola.</p>
@@ -9001,7 +8993,7 @@ function projectProcedureAvailability(procedure,lookup,active){
  if(active&&!status.blocked)return {...procedure,html:status.html+procedure.html};
  const content=document.createElement('template');
  content.innerHTML=procedure.html;
- const actions=[...content.content.querySelectorAll('button:not([data-project-draft-cancel], [data-alchemy-picker-option]),input[type="submit"]')];
+ const actions=[...content.content.querySelectorAll('button:not([data-project-draft-cancel]),input[type="submit"]')];
  for(const button of actions)button.disabled=true;
  for(const form of content.content.querySelectorAll('form'))form.dataset.projectReadOnly='yes';
  return {...procedure,html:status.html+content.innerHTML+
@@ -10068,21 +10060,13 @@ document.addEventListener('change',event=>{
  if(['sourceId','method'].includes(field.name)&&field.form?.matches('[data-script-copy="start"],[data-script-reading="start"]'))
   refreshProjectTextSource(field.form);
  if(field.matches?.('[data-alchemy-dose-count]')){
-  for(const dose of field.form.querySelectorAll('[data-alchemy-dose]')){
+  for(const dose of field.form.querySelectorAll('[data-alchemy-dose]'))
    dose.hidden=dose.disabled=Number(dose.dataset.alchemyDose)>Number(field.value);
-   if(dose.hidden)dose.querySelector('.hmk-alchemy-picker[open]')?.removeAttribute('open');
-  }
  }
  if(field.matches?.('[data-alchemy-elixir-picker]')){
   if(field.name==='elixirName'&&view==='sheet')alchemyElixirSelections.set(selected,field.value);
-  const container=field.closest('.hmk-alchemy-elixir-field');
-  container.querySelector('[data-alchemy-elixir-help]').innerHTML=alchemyElixirDescriptionHTML(field.value);
-  container.querySelector('[data-alchemy-picker-label]').textContent=field.selectedOptions[0].textContent;
-  for(const button of container.querySelectorAll('[data-alchemy-picker-option]')){
-   const isSelected=button.dataset.alchemyPickerOption===field.value;
-   button.setAttribute('aria-pressed',String(isSelected));
-   button.tabIndex=isSelected?0:-1;
-  }
+  const help=field.closest('label')?.nextElementSibling;
+  if(help?.matches('[data-alchemy-elixir-help]'))help.innerHTML=alchemyElixirDescriptionHTML(field.value);
   return;
  }
  if(field.matches?.('[data-character-project-procedure]')&&view==='sheet'&&activeSheetSection==='projects'){
@@ -10105,41 +10089,6 @@ document.addEventListener('change',event=>{
  characterProjectSelections.set(selected,field.value);
  render();
  document.querySelector('[data-character-project-discipline]')?.focus({preventScroll:true});
-});
-document.addEventListener('click',event=>{
- const picker=event.target.closest?.('.hmk-alchemy-picker');
- for(const open of document.querySelectorAll('.hmk-alchemy-picker[open]')){
-  if(open!==picker)open.open=false;
- }
- const option=event.target.closest?.('[data-alchemy-picker-option]');
- if(!option)return;
- const field=picker.closest('.hmk-alchemy-elixir-field').querySelector('[data-alchemy-elixir-picker]');
- field.value=option.dataset.alchemyPickerOption;
- field.dispatchEvent(new Event('change',{bubbles:true}));
- picker.open=false;
- picker.querySelector('summary').focus();
-});
-document.addEventListener('keydown',event=>{
- const picker=event.target.closest?.('.hmk-alchemy-picker');
- if(!picker||!['Escape','ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
- if(event.key==='Escape'){
-  if(!picker.open)return;
-  picker.open=false;
-  picker.querySelector('summary').focus();
- }else{
-  picker.open=true;
-  const options=[...picker.querySelectorAll('[data-alchemy-picker-option]')];
-  const index=options.indexOf(event.target);
-  const target=event.key==='Home'?options[0]:event.key==='End'?options.at(-1):
-   index<0?picker.querySelector('[aria-pressed="true"]'):
-   options[Math.max(0,Math.min(options.length-1,index+(event.key==='ArrowDown'?1:-1)))];
-  target.focus();
- }
- event.preventDefault();
-});
-document.addEventListener('focusout',event=>{
- const picker=event.target.closest?.('.hmk-alchemy-picker[open]');
- if(picker&&event.relatedTarget&&!picker.contains(event.relatedTarget))picker.open=false;
 });
 document.addEventListener('click',event=>{
  const button=event.target.closest?.('[data-character-project-open],[data-character-project-return],[data-character-project-item],[data-calendar-character-project]');
