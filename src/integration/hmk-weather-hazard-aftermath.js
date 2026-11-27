@@ -190,23 +190,32 @@ function verifiedBalmHealingBase(actor){
  need(int(end,1,200)&&int(wil,1,200),'Pro tento Arcane Recovery hod musí být doloženo END a WIL.');
  return healingBase({endurance:end,will:wil});
 }
-export function resolveBalmExposureRecovery(input={}){
- const {state,sourceId,round=1,gmConfirmed=false,recoveryD100}=input;
- const id='arcane-balm-exposure:'+sourceId;
+function resolveFreeExposureRecovery({state,sourceId,round=1,gmConfirmed=false,recoveryD100,actor},
+ {id,type,bonus,casting={},sourcePages}){
  const s=prepared(state,round,sourceId,id,gmConfirmed);
  const hazard=s.environmentalHazards?.find(h=>h.active&&h.sourceId===sourceId);
- need(input.actor?.id&&hazard,'Balm vyžaduje konkrétní aktivní expozici.');
+ need(actor?.id&&hazard,'Arcane Recovery vyžaduje konkrétní aktivní expozici.');
  need(!hazard.skinPending,'Nejprve vyhodnoťte případný Frostbite nebo Sunburn z téže expozice.');
- const casting=verifiedBalmCasting(input,7),{bonus}=casting,hb=verifiedBalmHealingBase(input.actor),fromHR=hazard.hr;
+ need(int(recoveryD100,1,100),'Chybí skutečný d100 expozice.');
+ const hb=verifiedBalmHealingBase(actor),fromHR=hazard.hr;
  const eml=hb*5+bonus,sl=successLevel(recoveryD100,eml);
  const outcome=exposureHealing({healingRate:fromHR,sl,arcaneRecovery:true});
  if(outcome.delta)applyStatus(s,hazard,outcome.healingRate);
  if(outcome.defeated)hazard.active=false;
  const report={eventId:id,sourceId,...casting,hb,eml,sl:slText[sl],fromHR,toHR:hazard.hr,
-  failureIgnored:outcome.arcaneFailureIgnored===true,defeated:!!outcome.defeated,sourcePages:[183,185,213,214]};
- s.events.push({id,type:'arcane-balm-exposure',round,details:report});
+  failureIgnored:outcome.arcaneFailureIgnored===true,defeated:!!outcome.defeated,sourcePages};
+ s.events.push({id,type,round,details:report});
  s.lastRound=round;validateCombatState(s);
  return {state:s,report};
+}
+export function resolveBalmExposureRecovery(input={}){
+ const casting=verifiedBalmCasting(input,7);
+ return resolveFreeExposureRecovery(input,{id:'arcane-balm-exposure:'+input.sourceId,type:'arcane-balm-exposure',
+  bonus:casting.bonus,casting,sourcePages:[183,185,213,214]});
+}
+export function resolveElixirExposureRecovery(input){
+ return resolveFreeExposureRecovery(input,{id:input.eventId,type:'alchemy-healing-exposure',
+  bonus:0,sourcePages:[183,185,213,272]});
 }
 
 export function resolveBalmTraumaCourse(input={}){

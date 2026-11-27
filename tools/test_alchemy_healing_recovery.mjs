@@ -115,7 +115,7 @@ assert.throws(()=>prepareAlchemyHealingUse({...use,inventory:[]}),/skutečná n�
 assert.throws(()=>prepareAlchemyHealingUse({...use,campaignId:'other-campaign'}),/chybí živý příjemce/);
 const extended=structuredClone(health);
 extended.extendedShock={originState:'INC',hr:4,elapsedHours:0};
-assert.throws(()=>startAlchemyHealingRecovery({...context,state:extended,imbibing,rolls:[old,blood]}),/všechny přítomné druhy/);
+assert.throws(()=>startAlchemyHealingRecovery({...context,state:extended,imbibing,rolls:[old,blood]}),/kalendářový počátek traumatu/);
 assert.deepEqual(health,original);
 const event=(id,field,proof,minute=clock.minute)=>({id,characterId:actor.id,campaignMinute:minute,calendarCampaignId:campaignId,[field]:proof});
 const useRow=event(use.useId,'calendarAlchemyImbibing',prepared.imbibing);
@@ -134,3 +134,41 @@ assert.throws(()=>activeAlchemyPhysicTargets(saved,campaignId,actor.id,clock.min
 const exhausted={...initialRow,calendarAlchemyHealingRecovery:{...prepared.receipt,nextMinute:null}};
 assert.equal(activeAlchemyProfusionCohort([...closed,useRow,exhausted],campaignId,actor.id,clock.minute).length,0);
 console.log('PASS Healing: verified vial and emptiness proof, provenance, instant mitigation, failed magic without damage, daily AS, CF weakness, Balm overlap, original wounds only, reload');
+
+const courseClock=anchorCampaignOrigin(anchor(anchor(clock,'extended-shock','extended-at'),'coma','coma-at'),{
+ kind:'weather',characterId:actor.id,episodeId:'cold-demo',eventId:'cold-at',gmConfirmed:true
+});
+const afflicted=structuredClone(health);
+afflicted.shock='UNC';
+afflicted.extendedShock={originState:'UNC',hr:4,elapsedHours:0};
+afflicted.coma={active:true,hr:4,elapsedDays:0,nextCourseDays:3};
+Object.assign(afflicted.wounds[0].healing,{infected:true,infectionHR:4,nextInfectionDay:1});
+const {prepareTrekkingWeatherTest}=await import('../src/integration/hmk-weather-hazard-aftermath.js');
+const exposed=prepareTrekkingWeatherTest({state:afflicted,sourceId:'cold-demo',kind:'cold',originalSL:'F',coldCondition:'damp',weatherHazardConfirmed:true,gmConfirmed:true}).state;
+const checks=(d100)=>[blood,roll('infection','old',d100),roll('extended-shock','extended-at',d100),
+ roll('coma','coma-at',d100),roll('exposure','cold-demo',d100)];
+const courseInput={...context,clock:courseClock,state:exposed,imbibing:{...imbibing,sl:'S',finalAS:8},restfulShelter:true};
+const firstCourse=startAlchemyHealingRecovery({...courseInput,rolls:checks(100)});
+assert.equal(firstCourse.receipt.rolled.length,5);
+assert.equal(firstCourse.state.shock,'UNC');
+assert.equal(firstCourse.state.extendedShock.elapsedHours,0);
+assert.equal(firstCourse.state.coma.nextCourseDays,3);
+assert.equal(firstCourse.state.wounds[0].healing.nextInfectionDay,1);
+assert.equal(firstCourse.state.environmentalHazards[0].hr,4);
+const improved=startAlchemyHealingRecovery({...courseInput,rolls:checks(5)});
+assert.equal(improved.state.extendedShock,null);
+assert.equal(improved.state.coma,null);
+assert.equal(improved.state.shock,'NONE');
+assert.equal(improved.state.environmentalHazards[0].active,false);
+assert.equal(improved.state.wounds[0].healing.infected,false);
+assert.equal(improved.state.wounds[0].healing.nextHealingDay,5);
+assert.equal(improved.state.wounds[0].level,3);
+assert.equal(improved.receipt.nextMinute,clock.minute+DAY_MINUTES);
+assert.equal(exposed.wounds[0].healing.infected,true);
+assert.throws(()=>startAlchemyHealingRecovery({...courseInput,rolls:checks(5),restfulShelter:undefined}),/chráněné prostředí/);
+const independent=startAlchemyHealingRecovery({...courseInput,rolls:checks(5).map(x=>x.kind==='coma'?{...x,value:100}:x)});
+assert.equal(independent.state.extendedShock,null);
+assert.equal(independent.state.shock,'UNC');
+assert.equal(independent.state.coma.hr,4);
+assert.equal(independent.state.coma.nextCourseDays,3);
+console.log('PASS Healing: independent Extended Shock and Coma, cold Exposure, Infection, no timer advance on arcane failure');

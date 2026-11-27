@@ -81,7 +81,7 @@ import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgili
 import {previewSwimmingDanger,prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {asphyxiaCapacity,asphyxiaDeathCountdown} from './src/rules/ailments.js';
 import {successValue as swimmingWillSuccessValue} from './src/rules/tests.js';
-import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,resolveBalmTraumaCourse,resolveBalmBloodLossRecovery,resolveBalmInjuryRecovery,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.133';
+import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,resolveBalmTraumaCourse,resolveBalmBloodLossRecovery,resolveBalmInjuryRecovery,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.151';
 import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './src/integration/hmk-concurrent-procedures.js';
 import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
@@ -222,7 +222,7 @@ import {resolveGuidedShieldUnsling,resolveGuidedWeaponStow,startGuidedBackpackGr
 import {startGuidedCrossbowSpan,startGuidedMissileLoad,startGuidedMissileAim,performGuidedFreeMissileLoad,performGuidedNearbyFreeMissileLoad,previewGuidedTestedNearbyFreeMissileLoad,performGuidedTestedNearbyFreeMissileLoad,registerInitiallyLoadedCrossbow,verifiedMissileAimBonus,completeGuidedMissilePreparation,requireLoadedMissile,consumeLoadedMissile} from './src/integration/hmk-guided-missile-preparation.js?v=94.009';
 import {parseSpatialBarrierSegments,effectiveSpatialBarriers} from './src/integration/hmk-guided-spatial-barriers.js';
 import {recordEncounterFreeAction,encounterFreeActionAvailable,createEncounterSequence,validateEncounterSequence,startEncounterTurn,finishEncounterTurn,finalizeStagedEncounterTurn,nextEncounterRound,dueEncounterEvents,dueEndTurnEvents,currentEncounterActor,assertScheduledMeleeActor,resolveReadiedEncounterAction,cancelReadiedEncounterAction,completeReadiedEncounterAction,confirmAlertnessReaction,confirmConcentrationCompletion,abandonEncounterConcentration,ongoingEncounterConcentration,requireConcentrationCompatibleDefence,assertScheduledHitCanCommit,recordScheduledHitCommit,setEncounterTieOrder,configureInitialCrossbowPriority,requireInitialCrossbowShot} from './src/integration/encounter-turn-sequence.js';
-import {applyConfirmedTreatment,applyConfirmedFrostAmputation,applyConfirmedInfectionAmputation,canAmputateInfectedLimb,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock,injuryArcaneHealingRate} from './src/integration/hmk-healing-persistence.js?v=94.133';
+import {applyConfirmedTreatment,applyConfirmedFrostAmputation,applyConfirmedInfectionAmputation,canAmputateInfectedLimb,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,applyConfirmedBloodLossHealing,applyConfirmedGrimWoundShock,injuryArcaneHealingRate} from './src/integration/hmk-healing-persistence.js?v=94.151';
 import {weatherTreatmentTiming} from './src/integration/hmk-weather-treatment-timing.js?v=94.113';
 import {calculateWeatherAreaAV} from './src/integration/hmk-weather-area-av.js';
 import {coldCatalogRule,coldLibrarySummary,clothingColdText,coldInventoryChoices,resolveColdHazardEquipment} from './src/integration/hmk-cold-gear-93740.js';
@@ -295,7 +295,7 @@ import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlch
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js?v=94.036';
 import {createAlchemyHealingImbibing} from './src/integration/hmk-alchemy-imbibing.js?v=94.150';
-import {prepareAlchemyHealingUse,advanceAlchemyHealingRecovery,alchemyHealingRollPlan,pendingAlchemyHealing,assertAlchemyHealingMayAdvance,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed} from './src/integration/hmk-alchemy-healing-recovery.js?v=94.150';
+import {prepareAlchemyHealingUse,advanceAlchemyHealingRecovery,alchemyHealingRollPlan,pendingAlchemyHealing,assertAlchemyHealingMayAdvance,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed} from './src/integration/hmk-alchemy-healing-recovery.js?v=94.151';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
 import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {eruditionSkillEvidence,applyEruditionSkillResult} from './src/integration/hmk-alchemy-erudition-skill.js';
@@ -418,7 +418,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.150';
+const APP_VERSION='94.151';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -22341,6 +22341,8 @@ document.addEventListener('submit',e=>{
   }))notice='Erudition doloženo · AS '+proof.finalAS+(resolved?' · Aural Shock 1':'')+'; čas GM nezměněn.';
  }catch(err){alert('Erudition: '+err.message)}
 },true);
+const ALCHEMY_HEALING_CHECK_LABELS={injury:'Injury Healing',infection:'Infection Course',
+ 'blood-loss':'Blood Loss Healing',exposure:'Exposure Healing','extended-shock':'Extended Shock Course',coma:'Coma Course'};
 const alchemyHealingField=(name,faces,label)=>`<label class="hmk-medical-required-target">${esc(label)}
  <input name="${esc(name)}" type="number" min="1" max="${faces}" step="1" required>
  <button type="button" class="hc-small" data-alchemy-healing-generate="${esc(name)}">⚄ d${faces}</button></label>`;
@@ -22403,9 +22405,10 @@ function refreshAlchemyHealingForm(form){
    const state=persistentStateOf(actor);
    container.innerHTML=rolls.map(({kind,sourceId},index)=>{
     const woundIndex=state.wounds.findIndex(w=>w.id===sourceId);
-    return alchemyHealingField('heal'+index,100,kind==='injury'?
-     'Healing d100 · '+medicalWoundOptionLabel(actor,state.wounds[woundIndex],woundIndex+1):'Blood Loss Healing d100');
-   }).join('')+darkvision.map(effect=>alchemyHealingField('healingHp_'+effect.sourceUseId,6,'Darkvision Ill Effect · Healing Period d6')).join('');
+    const wound=['injury','infection'].includes(kind)?' · '+medicalWoundOptionLabel(actor,state.wounds[woundIndex],woundIndex+1):'';
+    return alchemyHealingField('heal'+index,100,ALCHEMY_HEALING_CHECK_LABELS[kind]+' d100'+wound);
+   }).join('')+(rolls.some(roll=>roll.kind==='coma')?
+    '<label>Klidné chráněné prostředí při Coma Course<select name="healingShelter" required><option value="">Vyberte skutečné prostředí</option><option value="yes">Ano</option><option value="no">Ne · postih −20</option></select></label>':'')+darkvision.map(effect=>alchemyHealingField('healingHp_'+effect.sourceUseId,6,'Darkvision Ill Effect · Healing Period d6')).join('');
    container.dataset.signature=signature;
   }
   status.textContent=info;
@@ -22455,7 +22458,10 @@ document.addEventListener('submit',event=>{
    const field=fields.namedItem(name);
    return field?{value:Number(field.value),origin:field.dataset.alchemyGenerated===field.value?'cryptographic-software-die':'manual'}:null;
   };
+  const shelter=fields.healingShelter?.value;
   const common={actor,clock,campaignId,journal:data.journal,gmConfirmed:fields.confirmed.checked,
+   physicianStars:rolls.some(roll=>roll.kind==='extended-shock')?physicianCourseStars965(actor):0,
+   restfulShelter:shelter?shelter==='yes':undefined,
    rolls:rolls.map((trauma,index)=>({...trauma,...dice('heal'+index)}))};
   const useId=fields.useId?.value??uuid(),emptyId=uuid();
   const outcome=maker?prepareAlchemyHealingUse({...common,maker,useId,emptyId,inventory:data.inventory,
@@ -22479,8 +22485,8 @@ document.addEventListener('submit',event=>{
   const description=[outcome.imbibing?'Imbibing '+outcome.imbibing.sl:'Denní d10 '+(receipt.dailyRoll?.value??'—'),
    'AS '+receipt.asBefore+' → '+receipt.asAfter,
    ...(removed?['Windedness −'+removed.windedness+', Weariness −'+removed.weariness,
-    'Krvácení zastaveno u '+removed.bleeding.length+' ran','Shock '+removed.shock+' → NONE']:[]),
-   ...receipt.rolled.map(roll=>(roll.kind==='injury'?'Injury Healing':'Blood Loss Healing')+' d100 '+roll.d100+' · '+roll.sl),
+    'Krvácení zastaveno u '+removed.bleeding.length+' ran','Shock '+removed.shock+' → '+(removed.shockAfter??'NONE')]:[]),
+   ...receipt.rolled.map(roll=>ALCHEMY_HEALING_CHECK_LABELS[roll.kind]+' d100 '+roll.d100+' · '+roll.sl),
    ...(receipt.nextMinute!==null?['Další termín '+displayCampaignMinute(receipt.nextMinute)]:[])].join(' · ');
   rows.push(row(useId+':healing:'+receipt.day,actor.id,receipt.day?'Healing · denní zotavení':'Healing · okamžité zotavení',
    description,{calendarAlchemyHealingRecovery:receipt}),...(secondary?.rows??[]));

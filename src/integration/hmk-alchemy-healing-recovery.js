@@ -2,14 +2,17 @@
  * Both the original trauma list and every daily result are recorded in the
  * character's health events. No natural recovery timer is advanced here.
  */
-import {DAY_MINUTES,getCampaignAnchor} from './hmk-campaign-calendar.js';
+import {DAY_MINUTES,getCampaignAnchor,getCampaignEpisodeAnchor} from './hmk-campaign-calendar.js';
 import {openConcurrentProcedures} from './hmk-concurrent-procedures.js';
 import {createAlchemyHealingImbibing} from './hmk-alchemy-imbibing.js';
 import {createAlchemyVialEmpty} from './hmk-alchemy-vial-ledger.js';
 import {availableMasteries} from './hmk-skill-test-engine.js';
-import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
-import {applyConfirmedBloodLossHealing,applyConfirmedInjuryHealing,injuryArcaneHealingRate} from './hmk-healing-persistence.js';
-import {concurrentShockSources,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
+import {initialCombatState,validateCombatState,applyExtendedShockCourse,applyComaCourse} from './persistent-combat-state.js';
+import {applyConfirmedBloodLossHealing,applyConfirmedInjuryHealing,applyConfirmedInfectionCourse,infectionResumptionRequirements,injuryArcaneHealingRate} from './hmk-healing-persistence.js?v=94.151';
+import {concurrentShockSources,initializeConcurrentShock,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
+
+import {healingBase} from '../rules/healing.js';
+import {resolveElixirExposureRecovery} from './hmk-weather-hazard-aftermath.js?v=94.151';
 
 const integer=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const check=(condition,message)=>{if(!condition)throw Error('Healing: '+message);};
@@ -19,25 +22,41 @@ const key=({kind,sourceId})=>kind+'::'+sourceId;
 const rowsFor=(state,campaignId,useId)=>state.events.filter(event=>event.type===eventType&&
  event.details.campaignId===campaignId&&event.details.useId===useId);
 
-function anchorFor(clock,actorId,trauma){
- return getCampaignAnchor(clock,trauma.kind==='injury'?'wound':'blood-loss',actorId,
-  trauma.kind==='injury'?trauma.sourceId:null);
+function anchorFor(clock,actorId,{kind,sourceId},state){
+ if(kind==='exposure'){
+  const hazard=state?.environmentalHazards?.find(item=>item.sourceId===sourceId);
+  return getCampaignEpisodeAnchor(clock,'weather',actorId,hazard?.id??sourceId)??getCampaignEpisodeAnchor(clock,'weather',actorId,sourceId);
+ }
+ if(kind==='injury'||kind==='infection')return getCampaignAnchor(clock,'wound',actorId,sourceId);
+ return getCampaignAnchor(clock,kind,actorId);
 }
 function activeTraumas(state,clock,actorId,initial){
- const current=initial??[...state.wounds.filter(wound=>!wound.healed).map(wound=>({kind:'injury',sourceId:wound.id})),
-  ...(state.bloodLoss.bp?[{kind:'blood-loss',sourceId:getCampaignAnchor(clock,'blood-loss',actorId)?.eventId}]:[])];
- return current.filter(trauma=>trauma.kind==='injury'?
-  state.wounds.some(wound=>wound.id===trauma.sourceId&&!wound.healed):
-  state.bloodLoss.bp>0&&(!initial||anchorFor(clock,actorId,trauma)?.eventId===trauma.sourceId));
+ const extendedId=state.extendedShock?.sourceId??getCampaignAnchor(clock,'extended-shock',actorId)?.eventId;
+ const comaId=state.coma?.sourceId??getCampaignAnchor(clock,'coma',actorId)?.eventId;
+ const current=initial??[
+  ...state.wounds.filter(wound=>!wound.healed).map(wound=>({kind:'injury',sourceId:wound.id})),
+  ...(state.bloodLoss.bp?[{kind:'blood-loss',sourceId:getCampaignAnchor(clock,'blood-loss',actorId)?.eventId}]:[]),
+  ...state.wounds.filter(wound=>wound.healing?.infected).map(wound=>({kind:'infection',sourceId:wound.id})),
+  ...(state.extendedShock?[{kind:'extended-shock',sourceId:extendedId}]:[]),
+  ...(state.coma?.active?[{kind:'coma',sourceId:comaId}]:[]),
+  ...(state.environmentalHazards??[]).filter(hazard=>hazard.active).map(hazard=>({kind:'exposure',sourceId:hazard.sourceId}))
+ ];
+ return current.filter(trauma=>{
+  switch(trauma.kind){
+   case 'injury':return state.wounds.some(wound=>wound.id===trauma.sourceId&&!wound.healed);
+   case 'infection':return state.wounds.some(wound=>wound.id===trauma.sourceId&&wound.healing?.infected);
+   case 'extended-shock':return !!state.extendedShock&&extendedId===trauma.sourceId;
+   case 'coma':return state.coma?.active&&comaId===trauma.sourceId;
+   case 'exposure':return state.environmentalHazards?.some(hazard=>hazard.active&&hazard.sourceId===trauma.sourceId);
+   case 'blood-loss':return state.bloodLoss.bp>0&&(!initial||anchorFor(clock,actorId,trauma)?.eventId===trauma.sourceId);
+   default:return false;
+  }
+ });
 }
 function requireHandledTrauma(state){
- check(!state.extendedShock&&!state.coma?.active&&!state.asphyxiaComaPending&&
-  !state.sleepDeprivation?.activeWeariness&&!state.herbalSoporific&&!state.herbalParalysis&&
-  concurrentShockSources(state).length===0&&
-  !state.wounds.some(wound=>wound.healing?.infected)&&
-  !(state.environmentalHazards??[]).some(hazard=>hazard.active)&&
-  !(state.diseaseCourses??[]).some(course=>course.status==='active')&&
-  !(state.toxinCourses??[]).some(course=>course.status==='active'),
+ check(!state.asphyxiaComaPending&&!state.sleepDeprivation?.activeWeariness&&!state.herbalSoporific&&!state.herbalParalysis&&
+  concurrentShockSources(state).every(source=>source.kind==='weather')&&
+  !(state.environmentalHazards??[]).some(hazard=>hazard.active&&hazard.skinPending),
   'tento krok zatím neumí vyhodnotit všechny přítomné druhy traumatu.');
 }
 function overlapRows(journal,campaignId,actorId,minute,state){
@@ -45,13 +64,12 @@ function overlapRows(journal,campaignId,actorId,minute,state){
  for(const row of journal){
   const proof=row.skillTestProof;
   if(row.calendarCampaignId!==campaignId||row.characterId!==actorId||row.campaignMinute!==minute)continue;
-  if(proof?.type==='arcane-balm-injury'||proof?.type==='arcane-balm-blood-loss'){
-   const kind=proof.type==='arcane-balm-injury'?'injury':'blood-loss';
-   const eventType=kind==='injury'?'injury-healing-roll':'blood-loss-healing';
-   if(state.events.some(event=>event.id===proof.report?.eventId&&event.type===eventType&&
-    event.details?.arcaneRecovery?.sourceId===proof.sourceId&&event.details.arcaneRecovery.minute===minute))
-    keys.add(key({kind,sourceId:proof.sourceId}));
-  }
+  const kind=({'arcane-balm-injury':'injury','arcane-balm-blood-loss':'blood-loss',
+   'arcane-balm-exposure':'exposure','arcane-balm-course':proof?.report?.kind})[proof?.type];
+  if(kind&&state.events.some(event=>{
+   const recorded=event.details?.arcaneRecovery??event.details;
+   return event.id===proof.report?.eventId&&recorded?.sourceId===proof.sourceId&&recorded.minute===minute;
+  }))keys.add(key({kind,sourceId:proof.sourceId}));
  }
  for(const event of state.events){
   const p=event.details;
@@ -66,7 +84,7 @@ function eligibleTraumaRolls(traumas,state,clock,actorId){
  return traumas.filter(trauma=>trauma.kind!=='injury'||!infected&&!procedures.some(proc=>
   proc.characterId===actorId&&proc.woundId===trauma.sourceId));
 }
-function recoverTraumas({actor,state,clock,campaignId,traumas,rolls,id,round,journal}){
+function recoverTraumas({actor,state,clock,campaignId,traumas,rolls,id,round,journal,physicianStars,restfulShelter}){
  let next=state;
  const overlap=overlapRows(journal,campaignId,actor.id,clock.minute,state);
  const eligible=eligibleTraumaRolls(traumas,state,clock,actor.id);
@@ -77,16 +95,32 @@ function recoverTraumas({actor,state,clock,campaignId,traumas,rolls,id,round,jou
  const {end:endurance,wil:will}=actor.hmk?.attributes??{};
  const applied=[];
  for(const trauma of needed){
-  const anchor=anchorFor(clock,actor.id,trauma);
+  const anchor=anchorFor(clock,actor.id,trauma,next);
   check(anchor&&anchor.minute<=clock.minute,'chybí časový počátek traumatu.');
   const day=Math.floor((clock.minute-anchor.minute)/DAY_MINUTES);
   const dice=rolls.find(roll=>key(roll)===key(trauma));
   const common={state:next,round,eventId:id+':'+(applied.length+1),endurance,roll:dice.value,
    arcaneFreeRoll:true,gmConfirmed:true};
-  const action=trauma.kind==='injury'?applyConfirmedInjuryHealing({...common,woundId:trauma.sourceId,
-   daySinceInjury:day,will,herbalContext:{journal,campaignId,minute:clock.minute,
-    targetId:actor.id,woundOnsetMinute:anchor.minute}}):
-   applyConfirmedBloodLossHealing({...common,daySinceBloodLoss:day});
+  const woundContext={...common,woundId:trauma.sourceId,daySinceInjury:day,will,
+   herbalContext:{journal,campaignId,minute:clock.minute,targetId:actor.id,woundOnsetMinute:anchor.minute}};
+  let action;
+  switch(trauma.kind){
+   case 'injury':action=applyConfirmedInjuryHealing(woundContext);break;
+   case 'blood-loss':action=applyConfirmedBloodLossHealing({...common,daySinceBloodLoss:day});break;
+   case 'infection':{
+    const otherWoundDays=Object.fromEntries(infectionResumptionRequirements(next,trauma.sourceId).flatMap(({woundId})=>{
+     const woundAnchor=getCampaignAnchor(clock,'wound',actor.id,woundId);
+     return woundAnchor?[[woundId,Math.floor((clock.minute-woundAnchor.minute)/DAY_MINUTES)]]:[];
+    }));
+    action=applyConfirmedInfectionCourse({...woundContext,otherWoundDays});break;
+   }
+   case 'exposure':action=resolveElixirExposureRecovery({...common,actor,sourceId:trauma.sourceId,recoveryD100:dice.value});break;
+   case 'extended-shock':action=applyExtendedShockCourse({...common,healingBase:healingBase({endurance,will}),physicianStars});break;
+   case 'coma':
+    check(typeof restfulShelter==='boolean','doložte klidné chráněné prostředí pro Coma Course.');
+    action=applyComaCourse({...common,healingBase:healingBase({endurance,will}),restfulShelter,
+     daysElapsed:day-next.coma.elapsedDays});break;
+  }
   next=action.state;
   const evidence=next.events.at(-1);
   evidence.details.alchemyHealing={recoveryId:id,minute:clock.minute,origin:dice.origin,sourcePage:272};
@@ -108,7 +142,7 @@ function record(state,round,id,details){
 }
 
 export function startAlchemyHealingRecovery({actor,clock,campaignId,useId,
- state=actor?.hmk?.healthState??initialCombatState(),imbibing,rolls=[],journal=[],gmConfirmed=false}={}){
+ state=actor?.hmk?.healthState??initialCombatState(),imbibing,rolls=[],journal=[],physicianStars=0,restfulShelter,gmConfirmed=false}={}){
  requireContext({state,actor,clock,campaignId,useId,gmConfirmed});
  check(rowsFor(state,campaignId,useId).length===0,'tato dávka již působila.');
  const delta={CF:-2,F:-1,S:0,CS:1}[imbibing?.sl];
@@ -127,8 +161,8 @@ export function startAlchemyHealingRecovery({actor,clock,campaignId,useId,
  }
  requireHandledTrauma(state);
  result.traumas=activeTraumas(state,clock,actor.id,null);
- check(result.traumas.every(trauma=>anchorFor(clock,actor.id,trauma)),'chybí kalendářový počátek traumatu.');
- check(eligibleTraumaRolls(result.traumas,state,clock,actor.id).length===result.traumas.length,
+ check(result.traumas.every(trauma=>trauma.sourceId&&anchorFor(clock,actor.id,trauma,state)),'chybí kalendářový počátek traumatu.');
+ check(!openConcurrentProcedures(clock).some(proc=>proc.characterId===actor.id&&result.traumas.some(t=>t.kind==='injury'&&t.sourceId===proc.woundId)),
   'nejdřív dokončete probíhající ošetření rány.');
  check(state.wounds.every(wound=>wound.healed||injuryArcaneHealingRate(wound)!==null),
   'přítomná rána potřebuje jiný postup než Injury Healing Roll.');
@@ -138,14 +172,19 @@ export function startAlchemyHealingRecovery({actor,clock,campaignId,useId,
  for(const wound of next.wounds){
   if(wound.bleeding){wound.bleeding=false;wound.nextAdvanceRound=null;}
  }
- next.shock='NONE';next.shockOriginRound=null;next.shockFollowup=null;next.bloodShockPending=false;
- if(next.concurrentShockProjection)projectConcurrentShock(next);
+ if(!next.extendedShock&&!next.coma?.active){
+  const projection=initializeConcurrentShock(next);
+  projection.baseShock='NONE';
+  next.shockOriginRound=null;next.shockFollowup=null;next.bloodShockPending=false;
+  projectConcurrentShock(next);
+ }
  if(imbibing.sl==='CF'){
   result.weakness=imbibing.baseAS*5;
   next.fatigue.otherWeakness+=result.weakness;
  }
- const recovered=recoverTraumas({actor,state:next,clock,campaignId,traumas:result.traumas,rolls,id,round,journal});
+ const recovered=recoverTraumas({actor,state:next,clock,campaignId,traumas:result.traumas,rolls,id,round,journal,physicianStars,restfulShelter});
  next=recovered.state;result.rolled=recovered.rolled;result.overlapped=recovered.overlapped;
+ result.removed.shockAfter=next.shock;
  const remaining=activeTraumas(next,clock,actor.id,result.traumas);
  if(remaining.length)result.nextMinute=clock.minute+DAY_MINUTES;
  else if(result.traumas.length&&result.weakness){
@@ -155,7 +194,7 @@ export function startAlchemyHealingRecovery({actor,clock,campaignId,useId,
 }
 
 export function advanceAlchemyHealingRecovery({actor,clock,campaignId,useId,
- state=actor?.hmk?.healthState??initialCombatState(),dailyRoll=null,rolls=[],journal=[],gmConfirmed=false}={}){
+ state=actor?.hmk?.healthState??initialCombatState(),dailyRoll=null,rolls=[],journal=[],physicianStars=0,restfulShelter,gmConfirmed=false}={}){
  requireContext({state,actor,clock,campaignId,useId,gmConfirmed});
  check(Array.isArray(rolls),'chybí seznam léčebných hodů.');
  const history=rowsFor(state,campaignId,useId),previous=history.at(-1)?.details;
@@ -177,7 +216,7 @@ export function advanceAlchemyHealingRecovery({actor,clock,campaignId,useId,
  if(result.success){
   const released=Math.min(5,result.weakness,next.fatigue.otherWeakness);
   result.weakness-=released;next.fatigue.otherWeakness-=released;
-  const recovered=recoverTraumas({actor,state:next,clock,campaignId,traumas:remaining,rolls,id,round,journal});
+  const recovered=recoverTraumas({actor,state:next,clock,campaignId,traumas:remaining,rolls,id,round,journal,physicianStars,restfulShelter});
   next=recovered.state;result.rolled=recovered.rolled;result.overlapped=recovered.overlapped;
  }else check(rolls.length===0,'neúspěšný denní d10 nevytváří léčebné hody.');
  if(activeTraumas(next,clock,actor.id,traumas).length){
@@ -191,7 +230,7 @@ export function advanceAlchemyHealingRecovery({actor,clock,campaignId,useId,
 
 /** Prepare the health update and both vial receipts for one atomic commit. */
 export function prepareAlchemyHealingUse({actor,maker,clock,campaignId,useId,emptyId,finishId,testSkill,imbibingRoll,
- journal=[],inventory=[],rolls=[],gmConfirmed=false}={}){
+ journal=[],inventory=[],rolls=[],physicianStars=0,restfulShelter,gmConfirmed=false}={}){
  const state=actor?.hmk?.healthState??initialCombatState();
  requireContext({state,actor,clock,campaignId,useId,gmConfirmed});
  check(clock.characterIds.includes(maker?.id)&&!['KIA','INC','UNC','STN'].includes(maker.hmk?.healthState?.shock),
@@ -208,7 +247,7 @@ export function prepareAlchemyHealingUse({actor,maker,clock,campaignId,useId,emp
   origin:imbibingRoll.origin,emptyId,gmConfirmed});
  const empty=createAlchemyVialEmpty({journal,inventory,campaignId,minute,actorId:maker.id,finishId,
   reason:'Healing · vypití či podání',confirmedByGM:true});
- const recovery=startAlchemyHealingRecovery({actor,clock,campaignId,useId,state,imbibing,rolls,journal,gmConfirmed});
+ const recovery=startAlchemyHealingRecovery({actor,clock,campaignId,useId,state,imbibing,rolls,journal,physicianStars,restfulShelter,gmConfirmed});
  return {imbibing,empty,...recovery};
 }
 
