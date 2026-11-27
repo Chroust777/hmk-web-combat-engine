@@ -19,7 +19,6 @@ const kinds=['starvation','thirst'];
 const column={starvation:['foodReceived','foodNeed'],thirst:['waterReceived','waterNeed']};
 const weakness=hr=>ailmentOutcome(hr).weaknessFatigue;
 const shock=hr=>({stunned:'STN',incapacitated:'INC',unconscious:'UNC',killed:'KIA',none:'NONE'})[ailmentOutcome(hr).shockState]??'NONE';
-const severity={NONE:0,STN:1,INC:2,UNC:3,KIA:4};
 function episodes(c){return c?.hmk?.healthState?.malnutritionEpisodes??[]}
 /** Journal entries survive campaign switches. Their medical events may reside
  * in an inactive campaign's preserved actor branch, not the visible actor.
@@ -35,7 +34,7 @@ function ensureState(c){c.hmk??={};c.hmk.healthState??=initialCombatState();retu
 function rationStatus(p,kind){const [received,needed]=column[kind],got=p[received],want=p[needed];
  if(got>=want)return 'full';if(got===0)return 'none';if(got===want/2)return 'half';return 'partial';}
 function entries(journal,campaignId,actorId){return journal.filter(j=>j.calendarCampaignId===campaignId&&j.characterId===actorId&&j.calendarNutritionDay?.format==='hmk-nutrition-day-v1').sort((a,b)=>a.calendarNutritionDay.endMinute-b.calendarNutritionDay.endMinute)}
-function chooseShock(state,prev){
+function chooseShock(state){
  // Every starvation/thirst course retains its own HR, source, fatigue and
  // due date. Combined Shock is projected from all independently active
  // causes instead of rejecting an unrelated Poison, Disease or Coma.
@@ -58,7 +57,7 @@ export function applyDueMalnutritionOnsets(database,{idFactory,stamp}={}){
    // accounted for while that episode was active. Resume onset surveillance
    // only AFTER its final proven healing/death roll.
    const previousOnset=Math.max(-1,...episodes(actor).filter(e=>e.kind===kind&&e.campaignId===campaignId)
-    .map(e=>e.status==='active'?e.originMinute:Math.max(e.originMinute,e.lastDueMinute)));
+    .map(e=>e.status==='active'?e.originMinute:Math.max(e.originMinute,e.lastDueMinute,e.arcaneResolvedMinute??-1)));
    for(const j of history){const d=j.calendarNutritionDay;
     if(d.endMinute<=previousOnset)continue;
     const policy=database.journal.find(x=>x.id===d.policyId)?.calendarNutritionPolicy;
@@ -139,6 +138,65 @@ export function dueMalnutritionCases(database){
    dueMinute:e.nextDueMinute,mode,foodStatus:status,overdue:clock.minute>e.nextDueMinute};
  })).sort((a,b)=>a.dueMinute-b.dueMinute);
 }
+function applyNutritionOutcome(state,episodeId,nextHR){
+ const next=structuredClone(state);initializeConcurrentShock(next);
+ const t=next.malnutritionEpisodes.find(x=>x.id===episodeId);
+ const nextWeak=weakness(nextHR),delta=nextWeak-t.weaknessApplied;
+ check(next.fatigue.otherWeakness+delta>=0&&next.fatigue.otherWeakness+delta<=99999,
+  'Malnutrition: změna slabosti by poškodila jiné zdroje');
+ t.hr=nextHR;t.weaknessApplied=nextWeak;t.shockApplied=shock(nextHR);
+ t.status=nextHR===0?'dead':nextHR===6?'defeated':'active';
+ next.fatigue.otherWeakness+=delta;
+ chooseShock(next);
+ return {next,t};
+}
+
+export function alchemyNutritionContext({journal,campaignId,actorId,minute:at,episode}){
+ const day=entries(journal,campaignId,actorId).findLast(row=>row.calendarNutritionDay.endMinute<=at&&
+  row.calendarNutritionDay.endMinute>=episode.originMinute);
+ check(day,'Malnutrition: chybí doložená strava nebo voda od začátku stavu.');
+ const ration=rationStatus(day.calendarNutritionDay,episode.kind);
+ return {mode:ration==='full'?'healing':'advance',ration,dayId:day.id,
+  completeRest:day.calendarNutritionDay.foodNeed===0.5};
+}
+
+/** An extra HMK 213/272 roll uses the current documented ration and never
+ * pretends that the ordinary due roll has been performed. */
+export function resolveAlchemyNutritionRecovery({state,actor,clock,campaignId,journal,episodeId,eventId,round,roll,gmConfirmed}){
+ validateCombatState(state);
+ const at=clock?.minute;
+ const e=state.malnutritionEpisodes?.find(item=>item.id===episodeId&&item.campaignId===campaignId&&item.status==='active');
+ check(gmConfirmed===true&&campaignKey(clock)===campaignId&&clock.characterIds?.includes(actor.id)&&
+  state.shock!=='KIA'&&e&&minute(at)&&at>=e.originMinute&&
+  typeof eventId==='string'&&eventId&&!state.events.some(event=>event.id===eventId)&&
+  Number.isSafeInteger(round)&&round>=Math.max(1,state.lastRound)&&Number.isSafeInteger(roll)&&roll>=1&&roll<=100,
+  'Malnutrition: neplatný kontext volného hodu Healing.');
+ const context=alchemyNutritionContext({journal,campaignId,actorId:actor.id,minute:at,episode:e});
+ const attr=actor.hmk?.attributes;
+ check(Number.isSafeInteger(attr?.end)&&Number.isSafeInteger(attr?.wil),'Malnutrition: chybí ověřené END/WIL');
+ const hb=healingBase({endurance:attr.end,will:attr.wil});
+ const recovering=context.mode==='healing';
+ const eml=hb*(recovering?5:e.hr),sl=successLevel(roll,eml);
+ const applyRoll=recovering?exposureHealing:exposureAdvance;
+ const result=applyRoll({healingRate:e.hr,sl,arcaneRecovery:true});
+ const nextHR=Math.min(6,result.healingRate);
+ const next=result.delta?applyNutritionOutcome(state,episodeId,nextHR).next:structuredClone(state);
+ const t=next.malnutritionEpisodes.find(item=>item.id===episodeId);
+ if(t.status==='defeated'){
+  t.arcaneResolvedMinute=at;
+  t.nextDueMinute=null;
+ }else if(result.skipNext){
+  const interval=malnutritionSchedule({kind:t.kind,halfRations:context.ration==='half',completeRest:context.completeRest}).advanceEveryDays*DAY;
+  t.nextDueMinute+=interval;
+ }
+ const details={kind:t.kind,episodeId,fromHR:e.hr,toHR:nextHR,roll,eml,sl:['CF','F','S','CS'][sl],
+  mode:context.mode,ration:context.ration,sourceNutritionDayId:context.dayId,resolvedMinute:at,
+  failureIgnored:result.arcaneFailureIgnored===true,skipNext:result.skipNext,dueBefore:e.nextDueMinute,dueAfter:t.nextDueMinute};
+ next.events.push({id:eventId,type:'alchemy-healing-malnutrition',round,details});next.lastRound=round;
+ validateCombatState(next);
+ return {state:next,report:details};
+}
+
 /** The GM may resolve an overdue roll at the actual current minute; the
  * attested due minute remains unchanged in history. No clock mutation. */
 export function resolveMalnutritionCourse(database,{actorId,episodeId,roll,rollOrigin='manual',gmConfirmed=false,idFactory,stamp}={}){
@@ -159,21 +217,13 @@ export function resolveMalnutritionCourse(database,{actorId,episodeId,roll,rollO
  const hb=healingBase({endurance:attr.end,will:attr.wil});
  const eml=hb*(due.mode==='healing'?5:e.hr),sl=successLevel(roll,eml);
  const transition=due.mode==='healing'?exposureHealing({healingRate:e.hr,sl}):exposureAdvance({healingRate:e.hr,sl});
- const before=e.hr,prevShock=state.malnutritionEpisodes.filter(x=>x.status==='active').reduce((s,x)=>severity[shock(x.hr)]>severity[s]?shock(x.hr):s,'NONE');
- const nextHR=Math.max(0,Math.min(6,transition.healingRate));
- const nextWeak=weakness(nextHR),delta=nextWeak-e.weaknessApplied;
- check(state.fatigue.otherWeakness+delta>=0&&state.fatigue.otherWeakness+delta<=99999,'Malnutrition: změna slabosti by poškodila jiné zdroje');
- // Clone the health state and commit only when the entire medical outcome is valid.
- const next=structuredClone(state);initializeConcurrentShock(next);
- const t=next.malnutritionEpisodes.find(x=>x.id===episodeId);
- t.hr=nextHR;t.weaknessApplied=nextWeak;t.shockApplied=shock(nextHR);t.sequence+=1;
- t.status=nextHR===0?'dead':nextHR===6?'defeated':'active';
+ const before=e.hr,nextHR=Math.max(0,Math.min(6,transition.healingRate));
+ const {next,t}=applyNutritionOutcome(state,episodeId,nextHR),nextWeak=t.weaknessApplied;
+ t.sequence+=1;
  const interval=due.mode==='healing'?DAY:malnutritionSchedule({kind:e.kind,halfRations:half,completeRest:rest}).advanceEveryDays*DAY;
  t.lastDueMinute=due.dueMinute;t.lastMode=due.mode;
  t.skipRecoveryBefore=due.mode==='healing'&&transition.skipNext?due.dueMinute+2*DAY:null;
  t.nextDueMinute=t.status==='active'?due.dueMinute+interval*(transition.skipNext?2:1):null;
- next.fatigue.otherWeakness+=delta;
- chooseShock(next,prevShock);
  const eventId=idFactory(),jId=idFactory(),round=Math.max(1,next.lastRound);
  next.events.push({id:eventId,type:'malnutrition-'+due.mode,round,details:{kind:e.kind,episodeId,fromHR:before,toHR:nextHR,
   roll,eml,sl:['CF','F','S','CS'][sl],dueMinute:due.dueMinute,resolvedMinute:clock.minute}});
@@ -195,6 +245,9 @@ export function validateMalnutritionEvidence(database){
    check(e.format===MALNUTRITION_FORMAT&&kinds.includes(e.kind)&&!existing.has(e.id)&&
     Number.isSafeInteger(e.originMinute)&&e.originMinute>=0&&Number.isSafeInteger(e.sequence)&&e.sequence>=0&&
     Number.isSafeInteger(e.hr)&&e.hr>=0&&e.hr<=6&&e.weaknessApplied===weakness(e.hr)&&
+    (e.arcaneResolvedMinute===undefined||e.status==='defeated'&&minute(e.arcaneResolvedMinute)&&e.arcaneResolvedMinute>=e.originMinute&&
+     state.events.some(event=>event.type==='alchemy-healing-malnutrition'&&event.details?.episodeId===e.id&&
+      event.details?.toHR===6&&event.details?.resolvedMinute===e.arcaneResolvedMinute))&&
     e.status===(e.hr===0?'dead':e.hr===6?'defeated':'active')&&e.shockApplied===shock(e.hr)&&
     (e.status==='active'?minute(e.nextDueMinute):e.nextDueMinute===null)&&
     state.events.some(x=>x.id===e.id&&x.type==='malnutrition-onset')&&

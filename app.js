@@ -295,7 +295,7 @@ import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlch
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js?v=94.036';
 import {createAlchemyHealingImbibing} from './src/integration/hmk-alchemy-imbibing.js?v=94.150';
-import {prepareAlchemyHealingUse,advanceAlchemyHealingRecovery,alchemyHealingRollPlan,pendingAlchemyHealing,assertAlchemyHealingMayAdvance,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed} from './src/integration/hmk-alchemy-healing-recovery.js?v=94.153';
+import {prepareAlchemyHealingUse,advanceAlchemyHealingRecovery,alchemyHealingRollPlan,pendingAlchemyHealing,assertAlchemyHealingMayAdvance,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed} from './src/integration/hmk-alchemy-healing-recovery.js?v=94.154';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
 import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {eruditionSkillEvidence,applyEruditionSkillResult} from './src/integration/hmk-alchemy-erudition-skill.js';
@@ -334,7 +334,7 @@ import {isPersonalNote,hiddenLogbookIds,visibleLogbookEntries,logbookHideEntry,l
 import {isRoutineInventoryHistory} from './src/integration/hmk-routine-history-filter-549.js';
 import {createFreshRationStocks,recordPhysicalRationHandoff,recordPhysicalRationLoss,availableRationLots,rationStockBalances,projectCampaignRationInventory,validatePhysicalRationJournal,assertPhysicalRationBacking,assertPhysicalRationAppendOnly} from './src/integration/hmk-physical-ration-ledger.js?v=94.116';
 import {characterCarryProjection,partyCarryProjection,supplyDurationText} from './src/integration/hmk-provisions-simple-view.js';
-import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js?v=94.139';
+import {applyDueMalnutritionOnsets,dueMalnutritionCases,resolveMalnutritionCourse,validateMalnutritionEvidence,assertMalnutritionMedicalAppendOnly} from './src/integration/hmk-malnutrition-medical.js?v=94.154';
 import {malnutritionPrognosis,malnutritionStateLabel} from './src/integration/hmk-malnutrition-prognosis.js';
 import {nutritionAnimals,createAnimalAccess,animalLoadedItemAt,validateNutritionAnimalAccess,assertNutritionAnimalAppendOnly} from './src/integration/hmk-nutrition-animal-access.js';
 import {needsAssistedIntake,validateAssistedIntakeJournal,assertAssistedIntakeAppendOnly} from './src/integration/hmk-nutrition-assisted-intake.js';
@@ -418,7 +418,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.153';
+const APP_VERSION='94.154';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -22360,7 +22360,11 @@ document.addEventListener('submit',e=>{
 },true);
 const ALCHEMY_HEALING_CHECK_LABELS={injury:'Injury Healing',infection:'Infection Course',
  'blood-loss':'Blood Loss Healing',exposure:'Exposure Healing','extended-shock':'Extended Shock Course',coma:'Coma Course',
- disease:'Disease Course',poison:'Poison/Toxin Course'};
+ disease:'Disease Course',poison:'Poison/Toxin Course',starvation:'Hlad',thirst:'Žízeň'};
+function alchemyHealingCheckLabel(trauma){
+ const mode=trauma.nutritionMode;
+ return ALCHEMY_HEALING_CHECK_LABELS[trauma.kind]+(mode?' · '+(mode==='healing'?'Healing':'Advance'):'');
+}
 const alchemyHealingField=(name,faces,label)=>`<label class="hmk-medical-required-target">${esc(label)}
  <input name="${esc(name)}" type="number" min="1" max="${faces}" step="1" required>
  <button type="button" class="hc-small" data-alchemy-healing-generate="${esc(name)}">⚄ d${faces}</button></label>`;
@@ -22383,7 +22387,7 @@ function alchemyHealingDailyPanel(actor,clock){
  ${clock.minute===source.nextMinute?`<form data-alchemy-healing-daily>
  <input type="hidden" name="useId" value="${esc(source.useId)}">
  <input type="hidden" name="targetId" value="${esc(actor.id)}">
- ${alchemyHealingRollPlan({actor,clock,campaignId:campaignKey(clock),useId:source.useId,journal:data.journal}).remaining.length?
+ ${alchemyHealingRollPlan({actor,clock,campaignId:campaignKey(clock),useId:source.useId,journal:data.journal,includeRolls:false}).remaining.length?
   alchemyHealingField('daily',10,'Denní d10 proti AS '+source.asAfter):''}
  <div data-alchemy-healing-rolls></div><p data-alchemy-healing-status role="status"></p>
  <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje denní zotavení a zadané hody.</label>
@@ -22407,8 +22411,6 @@ function alchemyHealingFormPlan(form){
  const proof=createAlchemyHealingImbibing({journal:data.journal,inventory:data.inventory,campaignId,minute,
   actorId:maker?.id,targetId:target.id,finishId:fields.finishId.value,testSkill,ml,
   d100:Number(fields.imbibing.value),origin:'manual',emptyId:'preview-healing',gmConfirmed:true});
- if(proof.finalAS>0&&dueMalnutritionCases(data).some(item=>item.characterId===target.id))
-  throw Error('Healing zatím nepokrývá aktivní hlad nebo žízeň tohoto příjemce.');
  return {actor:target,maker,proof,rolls:proof.finalAS>0?plan.rolls:[],
   info:proof.sl+' · AS '+proof.asBefore+' → '+proof.finalAS+'.'};
 }
@@ -22421,12 +22423,13 @@ function refreshAlchemyHealingForm(form){
   const signature=JSON.stringify([actor.id,proof?.sl,rolls,darkvision]);
   if(container.dataset.signature!==signature){
    const state=persistentStateOf(actor);
-   container.innerHTML=rolls.map(({kind,sourceId},index)=>{
+   container.innerHTML=rolls.map((trauma,index)=>{
+    const {kind,sourceId}=trauma;
     const woundIndex=state.wounds.findIndex(w=>w.id===sourceId);
     const wound=['injury','infection'].includes(kind)?' · '+medicalWoundOptionLabel(actor,state.wounds[woundIndex],woundIndex+1):'';
     const ailment=kind==='disease'?state.diseaseCourses?.find(course=>course.sourceId===sourceId)?.diseaseKey:
      kind==='poison'?'otrava '+(rolls.slice(0,index).filter(roll=>roll.kind==='poison').length+1):null;
-    return alchemyHealingField('heal'+index,100,ALCHEMY_HEALING_CHECK_LABELS[kind]+' d100'+wound+(ailment?' · '+ailment:''));
+    return alchemyHealingField('heal'+index,100,alchemyHealingCheckLabel(trauma)+' d100'+wound+(ailment?' · '+ailment:''));
    }).join('')+(rolls.some(roll=>roll.kind==='coma')?
     '<label>Klidné chráněné prostředí při Coma Course<select name="healingShelter" required><option value="">Vyberte skutečné prostředí</option><option value="yes">Ano</option><option value="no">Ne · postih −20</option></select></label>':'')+darkvision.map(effect=>alchemyHealingField('healingHp_'+effect.sourceUseId,6,'Darkvision Ill Effect · Healing Period d6')).join('');
    container.dataset.signature=signature;
@@ -22506,7 +22509,7 @@ document.addEventListener('submit',event=>{
    'AS '+receipt.asBefore+' → '+receipt.asAfter,
    ...(removed?['Windedness −'+removed.windedness+', Weariness −'+removed.weariness,
     'Krvácení zastaveno u '+removed.bleeding.length+' ran','Shock '+removed.shock+' → '+(removed.shockAfter??'NONE')]:[]),
-   ...receipt.rolled.map(roll=>ALCHEMY_HEALING_CHECK_LABELS[roll.kind]+' d100 '+roll.d100+' · '+roll.sl),
+   ...receipt.rolled.map(roll=>alchemyHealingCheckLabel(roll)+' d100 '+roll.d100+' · '+roll.sl),
    ...(receipt.nextMinute!==null?['Další termín '+displayCampaignMinute(receipt.nextMinute)]:[])].join(' · ');
   rows.push(row(useId+':healing:'+receipt.day,actor.id,receipt.day?'Healing · denní zotavení':'Healing · okamžité zotavení',
    description,{calendarAlchemyHealingRecovery:receipt}),...(secondary?.rows??[]));

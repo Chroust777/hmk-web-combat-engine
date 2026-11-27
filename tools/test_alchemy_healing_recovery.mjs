@@ -214,3 +214,53 @@ assert.equal(dailyAilments.receipt.nextMinute,null);
 assert.equal(dailyAilments.state.fatigue.otherWeakness,0);
 assert.deepEqual(ailments.diseaseCourses[0],sick.episode);
 console.log('PASS Healing: disease and toxin isolation, natural Course preservation, ignored CF, daily recovery');
+
+const {createNutritionPolicy,createNutritionProvisionSwitch,finishDueNutritionDays,validateNutritionJournal}=await import('../src/integration/hmk-nutrition-days.js');
+const {applyDueMalnutritionOnsets,dueMalnutritionCases,validateMalnutritionEvidence}=await import('../src/integration/hmk-malnutrition-medical.js');
+const nutritionActor={...actor,kind:'PC',hmk:{...actor.hmk,healthState:initialCombatState()}};
+let sequence=0;
+const audit={idFactory:()=>('nutrition-'+(++sequence)),stamp:()=> '2026-11-27T18:00:00Z'};
+const nutritionDB={characters:[nutritionActor],campaignClock:when,inventory:[],journal:[{
+ id:audit.idFactory(),characterId:actor.id,calendarCampaignId:campaignId,campaignMinute:when.minute,
+ calendarNutritionPolicy:createNutritionPolicy({campaignId,minute:when.minute,actorId:actor.id,autoNeeds:true,inventoryRations:true,inventoryWater:true})
+}]};
+function closeNutritionDay(){
+ nutritionDB.campaignClock=time(nutritionDB.campaignClock,1);
+ finishDueNutritionDays(nutritionDB,audit);
+ applyDueMalnutritionOnsets(nutritionDB,audit);
+}
+closeNutritionDay();
+const nutritionClock=nutritionDB.campaignClock;
+const nutritionState=nutritionActor.hmk.healthState;
+const nutByKind=Object.fromEntries(nutritionState.malnutritionEpisodes.map(item=>[item.kind,item]));
+const nutritionInput={...context,actor:nutritionActor,clock:nutritionClock,state:nutritionState,journal:nutritionDB.journal,
+ imbibing:{...imbibing,minute:nutritionClock.minute,sl:'S',finalAS:8}};
+const nutritionRolls=(hunger,thirst)=>[roll('starvation',nutByKind.starvation.id,hunger),roll('thirst',nutByKind.thirst.id,thirst)];
+const withoutRations=startAlchemyHealingRecovery({...nutritionInput,rolls:nutritionRolls(100,5)});
+assert.equal(withoutRations.state.fatigue.otherWeakness,15);
+assert.deepEqual(withoutRations.receipt.rolled.map(x=>[x.kind,x.nutritionMode,x.sl]),[['starvation','advance','CF'],['thirst','advance','CS']]);
+const hunger=withoutRations.state.malnutritionEpisodes.find(x=>x.kind==='starvation');
+const thirst=withoutRations.state.malnutritionEpisodes.find(x=>x.kind==='thirst');
+assert.equal(hunger.nextDueMinute,nutByKind.starvation.nextDueMinute);
+assert.equal(thirst.nextDueMinute,nutByKind.thirst.nextDueMinute+DAY_MINUTES);
+assert.equal(hunger.sequence,0);
+assert.equal(thirst.sequence,0);
+const famineRation=nutritionDB.journal.find(x=>x.calendarNutritionDay)?.id;
+assert.equal(withoutRations.state.events.find(e=>e.type==='alchemy-healing-malnutrition').details.sourceNutritionDayId,famineRation);
+nutritionActor.hmk.healthState=withoutRations.state;
+nutritionDB.journal.push({id:audit.idFactory(),characterId:actor.id,calendarCampaignId:campaignId,campaignMinute:nutritionClock.minute,
+ calendarNutritionProvisionSwitch:createNutritionProvisionSwitch({campaignId,actorId:actor.id,minute:nutritionClock.minute,provisioned:true})});
+closeNutritionDay();
+assert.deepEqual(dueMalnutritionCases(nutritionDB).map(x=>x.mode),['healing','healing']);
+const fed=advanceAlchemyHealingRecovery({...nutritionInput,clock:nutritionDB.campaignClock,state:nutritionActor.hmk.healthState,
+ dailyRoll:r10(1),rolls:nutritionRolls(5,5)});
+assert.deepEqual(fed.receipt.rolled.map(x=>x.nutritionMode),['healing','healing']);
+assert.equal(fed.state.fatigue.otherWeakness,0);
+assert.ok(fed.state.malnutritionEpisodes.every(e=>e.status==='defeated'&&e.nextDueMinute===null&&e.arcaneResolvedMinute===nutritionDB.campaignClock.minute));
+assert.equal(fed.receipt.nextMinute,null);
+nutritionActor.hmk.healthState=fed.state;
+applyDueMalnutritionOnsets(nutritionDB,audit);
+assert.equal(nutritionActor.hmk.healthState.malnutritionEpisodes.length,2);
+assert.equal(validateMalnutritionEvidence(JSON.parse(JSON.stringify(nutritionDB))),true);
+assert.equal(validateNutritionJournal(nutritionDB.journal),true);
+console.log('PASS Healing: independent starvation/thirst, documented ration mode switch, Advance CS, no invented ration or repeated onset');

@@ -17,6 +17,8 @@ import {resolveElixirExposureRecovery} from './hmk-weather-hazard-aftermath.js?v
 import {prepareDiseaseCourse} from './hmk-disease-course.js?v=94.153';
 import {preparePoisonCourse} from './hmk-poison-course.js?v=94.153';
 
+import {alchemyNutritionContext,resolveAlchemyNutritionRecovery} from './hmk-malnutrition-medical.js?v=94.154';
+
 const integer=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const check=(condition,message)=>{if(!condition)throw Error('Healing: '+message);};
 const die=(proof,faces)=>integer(proof?.value,1,faces)&&['manual','cryptographic-software-die'].includes(proof.origin);
@@ -30,6 +32,10 @@ function anchorFor(clock,actorId,{kind,sourceId},state){
   const hazard=state?.environmentalHazards?.find(item=>item.sourceId===sourceId);
   return getCampaignEpisodeAnchor(clock,'weather',actorId,hazard?.id??sourceId)??getCampaignEpisodeAnchor(clock,'weather',actorId,sourceId);
  }
+ if(kind==='starvation'||kind==='thirst'){
+  const episode=state?.malnutritionEpisodes?.find(item=>item.id===sourceId);
+  return episode?{minute:episode.originMinute}:null;
+ }
  if(kind==='disease'||kind==='poison')return getCampaignEpisodeAnchor(clock,kind,actorId,kind+':'+sourceId);
  if(kind==='injury'||kind==='infection')return getCampaignAnchor(clock,'wound',actorId,sourceId);
  return getCampaignAnchor(clock,kind,actorId);
@@ -37,6 +43,8 @@ function anchorFor(clock,actorId,{kind,sourceId},state){
 function activeTraumas(state,clock,actorId,initial){
  const extendedId=state.extendedShock?.sourceId??getCampaignAnchor(clock,'extended-shock',actorId)?.eventId;
  const comaId=state.coma?.sourceId??getCampaignAnchor(clock,'coma',actorId)?.eventId;
+ const campaignId=clock.campaignId||`legacy:${clock.events?.[0]?.id||''}`;
+ const nutrition=(state.malnutritionEpisodes??[]).filter(item=>item.campaignId===campaignId&&item.status==='active');
  const current=initial??[
   ...state.wounds.filter(wound=>!wound.healed).map(wound=>({kind:'injury',sourceId:wound.id})),
   ...(state.bloodLoss.bp?[{kind:'blood-loss',sourceId:getCampaignAnchor(clock,'blood-loss',actorId)?.eventId}]:[]),
@@ -45,10 +53,13 @@ function activeTraumas(state,clock,actorId,initial){
   ...(state.coma?.active?[{kind:'coma',sourceId:comaId}]:[]),
   ...(state.environmentalHazards??[]).filter(hazard=>hazard.active).map(hazard=>({kind:'exposure',sourceId:hazard.sourceId})),
   ...(state.diseaseCourses??[]).filter(course=>course.status==='active').map(course=>({kind:'disease',sourceId:course.sourceId})),
-  ...(state.toxinCourses??[]).filter(course=>course.status==='active').map(course=>({kind:'poison',sourceId:course.sourceId}))
+  ...(state.toxinCourses??[]).filter(course=>course.status==='active').map(course=>({kind:'poison',sourceId:course.sourceId})),
+  ...nutrition.map(item=>({kind:item.kind,sourceId:item.id}))
  ];
  return current.filter(trauma=>{
   switch(trauma.kind){
+   case 'starvation':
+   case 'thirst':return nutrition.some(item=>item.id===trauma.sourceId&&item.kind===trauma.kind);
    case 'injury':return state.wounds.some(wound=>wound.id===trauma.sourceId&&!wound.healed);
    case 'infection':return state.wounds.some(wound=>wound.id===trauma.sourceId&&wound.healing?.infected);
    case 'extended-shock':return !!state.extendedShock&&extendedId===trauma.sourceId;
@@ -63,7 +74,7 @@ function activeTraumas(state,clock,actorId,initial){
 }
 function requireHandledTrauma(state){
  check(!state.asphyxiaComaPending&&!state.sleepDeprivation?.activeWeariness&&!state.herbalSoporific&&!state.herbalParalysis&&
-  concurrentShockSources(state).every(source=>['weather','disease','poison'].includes(source.kind))&&
+  concurrentShockSources(state).every(source=>['weather','disease','poison','malnutrition'].includes(source.kind))&&
   !(state.environmentalHazards??[]).some(hazard=>hazard.active&&hazard.skinPending),
   'tento krok zatím neumí vyhodnotit všechny přítomné druhy traumatu.');
 }
@@ -113,6 +124,8 @@ function recoverTraumas({actor,state,clock,campaignId,traumas,rolls,id,round,jou
    herbalContext:{journal,campaignId,minute:clock.minute,targetId:actor.id,woundOnsetMinute:anchor.minute}};
   let action;
   switch(trauma.kind){
+   case 'starvation':
+   case 'thirst':action=resolveAlchemyNutritionRecovery({...common,actor,clock,campaignId,journal,episodeId:trauma.sourceId});break;
    case 'injury':action=applyConfirmedInjuryHealing(woundContext);break;
    case 'blood-loss':action=applyConfirmedBloodLossHealing({...common,daySinceBloodLoss:day});break;
    case 'infection':{
@@ -141,7 +154,8 @@ function recoverTraumas({actor,state,clock,campaignId,traumas,rolls,id,round,jou
   next=action.state;
   const evidence=next.events.at(-1);
   evidence.details.alchemyHealing={recoveryId:id,minute:clock.minute,origin:dice.origin,sourcePage:272};
-  applied.push({...trauma,d100:dice.value,origin:dice.origin,sl:evidence.details.sl});
+  applied.push({...trauma,d100:dice.value,origin:dice.origin,sl:evidence.details.sl,
+   ...(['starvation','thirst'].includes(trauma.kind)?{nutritionMode:evidence.details.mode,ration:evidence.details.ration}:{})});
  }
  return {state:next,rolled:applied,overlapped:eligible.filter(trauma=>overlap.has(key(trauma)))};
 }
@@ -269,14 +283,20 @@ export function prepareAlchemyHealingUse({actor,maker,clock,campaignId,useId,emp
 }
 
 
-export function alchemyHealingRollPlan({actor,clock,campaignId,useId=null,journal=[]}){
+export function alchemyHealingRollPlan({actor,clock,campaignId,useId=null,journal=[],includeRolls=true}){
  const state=actor?.hmk?.healthState??initialCombatState();
  const history=useId?rowsFor(state,campaignId,useId):[];
  const previous=history.at(-1)?.details;
  const remaining=activeTraumas(state,clock,actor.id,history[0]?.details.traumas);
  const overlap=overlapRows(journal,campaignId,actor.id,clock.minute,state);
+ if(!includeRolls)return {remaining};
  return {dailyTN:previous?.asAfter??null,remaining,
-  rolls:eligibleTraumaRolls(remaining,state,clock,actor.id).filter(trauma=>!overlap.has(key(trauma)))};
+  rolls:eligibleTraumaRolls(remaining,state,clock,actor.id).filter(trauma=>!overlap.has(key(trauma))).map(trauma=>{
+   if(!['starvation','thirst'].includes(trauma.kind))return trauma;
+   const episode=state.malnutritionEpisodes.find(item=>item.id===trauma.sourceId);
+   const context=alchemyNutritionContext({journal,campaignId,actorId:actor.id,minute:clock.minute,episode});
+   return {...trauma,nutritionMode:context.mode,ration:context.ration};
+  })};
 }
 export function pendingAlchemyHealing(characters,clock,campaignId){
  return characters.flatMap(actor=>{
