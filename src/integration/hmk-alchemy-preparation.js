@@ -13,6 +13,7 @@ export const ALCHEMY_START_FORMAT='hmk-alchemy-preparation-start-v1';
 export const ALCHEMY_FINISH_FORMAT='hmk-alchemy-preparation-finish-v1';
 export const ALCHEMY_ABORT_FORMAT='hmk-alchemy-preparation-abort-v1';
 const DAY=1440;
+export const MAX_ALCHEMY_PREPARATIONS=15;
 const ok=(condition,message)=>{if(!condition)throw Error(message);};
 const whole=(value,low,high)=>Number.isSafeInteger(value)&&value>=low&&value<=high;
 const validOrigin=x=>x==='manual'||x==='cryptographic-software-die';
@@ -51,11 +52,13 @@ export function inventionSVPenalty({journal=[],campaignId,actorId,startId}={}){
 }
 
 export function pendingAlchemyPreparations(journal=[],campaignId){
- return campaignRows(journal,campaignId).filter(r=>r.calendarAlchemyStart&&!campaignRows(journal,campaignId).some(x=>x.calendarAlchemyFinish?.startId===r.id||x.calendarAlchemyAbort?.startId===r.id));
+ const rows=campaignRows(journal,campaignId);
+ const closed=new Set(rows.map(r=>r.calendarAlchemyFinish?.startId??r.calendarAlchemyAbort?.startId));
+ return rows.filter(r=>r.calendarAlchemyStart&&!closed.has(r.id));
 }
 export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemyML,elixirName,sunsign,
  workshopSource='private',wealth=null,workshopStars=null,workshopConfirmed=false,
- timeD6=[],timeOrigins=[],uniqueElixir=null,assistantPlan=null}={}){
+ timeD6=[],timeOrigins=[],uniqueElixir=null,assistantPlan=null,requireLinkedRoll=false}={}){
  ok(typeof campaignId==='string'&&campaignId&&typeof actorId==='string'&&actorId&&whole(minute,0,1e9),'Alchemy: chybí kampaň, postava nebo platný čas GM');
  ok(whole(alchemyML,60,1000),'Alchemy Create vyžaduje ML 60+');
  let elixir=CANONICAL_ALCHEMY_ELIXIRS.find(x=>x.name===elixirName);
@@ -113,9 +116,11 @@ export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemy
  ok(whole(stars,1,5),'Dílna musí mít skutečnou kvalitu 1–5 ★');
  ok(Array.isArray(timeD6)&&timeD6.length===3&&timeD6.every(x=>whole(x,1,6))&&
   Array.isArray(timeOrigins)&&timeOrigins.length===3&&timeOrigins.every(validOrigin),'Nutné přesné 3d6 a auditní původ každé kostky');
- ok(!pendingAlchemyPreparations(journal,campaignId).some(r=>r.characterId===actorId||
-  r.calendarAlchemyStart.assistantPlan?.some(h=>h.actorId===actorId)),
-  'Postava již připravuje jiný elixír nebo asistuje u nepřerušené alchymistické přípravy');
+ const pending=pendingAlchemyPreparations(journal,campaignId);
+ ok(pending.filter(r=>r.characterId===actorId).length<MAX_ALCHEMY_PREPARATIONS,
+  'Alchemy: postava už má rozpracováno všech '+MAX_ALCHEMY_PREPARATIONS+' dávek.');
+ ok(!pending.some(r=>r.calendarAlchemyStart.assistantPlan?.some(h=>h.actorId===actorId)),
+  'Postava již asistuje u jiné nepřerušené alchymistické přípravy');
  // Historical preparations predate assistant planning: null deliberately replays
  // their unchanged proof shape. New calendar starts explicitly submit [] or 1–2.
  if(assistantPlan!==null){
@@ -125,7 +130,7 @@ export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemy
    ok(h&&typeof h.actorId==='string'&&h.actorId&&h.actorId!==actorId&&!seen.has(h.actorId)&&
     whole(h.ml,40,1000),'Alchemy: pomocník musí být jiná skutečná postava s Alchemy ML40+');
    seen.add(h.actorId);
-   ok(!pendingAlchemyPreparations(journal,campaignId).some(r=>r.characterId===h.actorId||
+   ok(!pending.some(r=>r.characterId===h.actorId||
      r.calendarAlchemyStart.assistantPlan?.some(v=>v.actorId===h.actorId)),
      'Alchemy: pomocník je již přidělen k jiné nepřerušené alchymistické přípravě');
   }
@@ -137,7 +142,7 @@ export function createAlchemyStart({journal=[],campaignId,minute,actorId,alchemy
   workshopSource,wealth:workshopSource==='private'?wealth:null,workshopStars:stars,workshopConfirmed:true,
   timeD6:[...timeD6],timeOrigins:[...timeOrigins],durationDays,dueMinute,inventoryCreated:false,
   ...(assistantPlan!==null?{assistantPlan:assistantPlan.map(h=>({actorId:h.actorId,ml:h.ml}))}:{}),
-  ...(unique?{uniqueElixir:unique}:{}),sourcePages:[265,266,267,268]};
+  ...(unique?{uniqueElixir:unique}:{}),...(requireLinkedRoll?{requireLinkedRoll:true}:{}),sourcePages:[265,266,267,268]};
 }
 export function requireAlchemyGMTimeMayAdvance({journal=[],campaignId,beforeMinute,afterMinute}={}){
  for(const row of pendingAlchemyPreparations(journal,campaignId)){
@@ -147,8 +152,30 @@ export function requireAlchemyGMTimeMayAdvance({journal=[],campaignId,beforeMinu
  }
  return true;
 }
-const attendedAt=(j,c,actor,start,finish)=>j.some(r=>r.calendarCampaignId===c&&r.characterId===actor&&r.campaignMinute>start&&r.campaignMinute<finish&&
- (r.skillTestProof||r.combatProof||r.calendarActivityProof||r.calendarTrekProof||r.calendarHerbPotionStart||r.calendarHerbPotionComplete||r.calendarAlchemyStart));
+export function alchemyRollBelongsToPreparation(row,startRow){
+ const preparation=startRow.calendarAlchemyStart;
+ const proof=row.skillTestProof;
+ const linkedId=row.calendarCharacterCraftSkill?.startId;
+ return (linkedId===startRow.id||(!row.calendarCharacterCraftSkill&&!preparation.requireLinkedRoll))&&
+  row.calendarCampaignId===preparation.campaignId&&row.characterId===preparation.actorId&&
+  row.campaignMinute===preparation.dueMinute&&proof?.type==='secondary-mastery-value-test'&&
+  (proof.skills?.[0]||proof.skill)==='Alchemy'&&proof.secondarySkills?.[0]==='Herblore'&&
+  proof.secondarySkills?.[1]==='Mineralogy'&&proof.secondaryRollResult?.routineId==='alchemy-elixir';
+}
+function attendedAt(journal,campaignId,actorId,start,finish){
+ const rows=campaignRows(journal,campaignId).filter(r=>r.characterId===actorId);
+ const preparations=new Map(rows.filter(r=>r.calendarAlchemyStart).map(r=>[r.id,r]));
+ const finishedRolls=new Map(rows.filter(r=>r.calendarAlchemyFinish)
+  .map(r=>[r.calendarAlchemyFinish.skillId,r.calendarAlchemyFinish.startId]));
+ return rows.some(r=>{
+  if(r.campaignMinute<=start||r.campaignMinute>=finish)return false;
+  if(r.combatProof||r.calendarActivityProof||r.calendarTrekProof||r.calendarHerbPotionStart||r.calendarHerbPotionComplete)return true;
+  if(!r.skillTestProof)return false;
+  // Parallel doses share workshop time, including their scheduled Preparation Rolls.
+  const source=preparations.get(r.calendarCharacterCraftSkill?.startId??finishedRolls.get(r.id));
+  return !source||!alchemyRollBelongsToPreparation(r,source);
+ });
+}
 /** HMK p.268: any interruption forces a restart. Original start remains immutable.
  * Aborting before the final Preparation Roll never requires an invented roll.
  */
@@ -172,10 +199,7 @@ export function createAlchemyFinish({journal=[],campaignId,minute,actorId,startI
  ok(!attendedAt(journal,campaignId,actorId,start.minute,minute),'Alchemy: doložená jiná činnost přerušila přípravu (HMK 268)');
  ok(gmContinuityConfirmed===true,'GM musí potvrdit nepřerušenou přípravu a koncentraci v pracovních hodinách (HMK 268)');
  const row=journal.find(x=>x.id===skillId),p=row?.skillTestProof,r=p?.a||p?.result;
- ok(row&&row.calendarCampaignId===campaignId&&row.characterId===actorId&&row.campaignMinute===minute&&
-  p?.type==='secondary-mastery-value-test'&&(p.skills?.[0]||p.skill)==='Alchemy'&&
-  p.secondarySkills?.[0]==='Herblore'&&p.secondarySkills?.[1]==='Mineralogy'&&
-  p.secondaryRollResult?.routineId==='alchemy-elixir'&&
+ ok(row&&alchemyRollBelongsToPreparation(row,src)&&
   r&&whole(r.ml,60,1000)&&r.ml>=60&&whole(r.roll,1,100)&&whole(r.index,6,100)&&Number.isSafeInteger(r.sv),
   'Vyžadován nový originální Alchemy SV ve Skill Workbench s Herblore, Mineralogy a Mathematics SR (HMK 268)');
  ok(!journal.some(x=>x.calendarAlchemyFinish?.skillId===skillId),'Preparation Roll už byl použit');
