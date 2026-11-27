@@ -243,13 +243,13 @@ import {TR_MONTHS,campaignTRDate,formatTRDate,setCampaignTROrigin,addGMCalendarP
 import {secureHMKDie,expeditionDiceSubmission,expeditionWatchFatigue,expeditionRestRecovery,commitExpeditionFatigue} from './src/integration/hmk-calendar-expedition.js';
 import {scheduleHMKActivity,finishDueHMKActivities,finishInterruptedHMKTravel,validateHMKActivityEvidence,assertHMKActivitiesAppendOnly,activeHMKActivities,interruptHMKActivity} from './src/integration/hmk-calendar-activities.js';
 import {nutritionRestActivity,interruptionForCancelledNutritionRest} from './src/integration/hmk-nutrition-rest-bridge.js';
-import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js';
-import {trekPartyModes,trekPersonHealthSnapshot,trekTravelOperatorEligibility} from './src/integration/hmk-trekking-party-modes.js';
+import {planHMKGroupWatch} from './src/integration/hmk-group-travel.js?v=94.145';
+import {trekPartyModes,trekPersonHealthSnapshot,trekTravelOperatorEligibility} from './src/integration/hmk-trekking-party-modes.js?v=94.145';
 import {trekRegisteredAnimalHealth,assertTrekAnimalCanMove,resolveTrekAnimalReadiness93815,assertNoActiveBestiaryTravelConflict93815} from './src/integration/hmk-trekking-animal-health.js';
 import {eligibleRestingAnimals,planAnimalRest} from './src/integration/hmk-trekking-animal-rest.js';
 import {ANIMAL_AREA_AV,weatherAnimalCandidates,prepareAnimalTrekkingWeather,validateAnimalWeatherJournal} from './src/integration/hmk-trekking-animal-weather.js';
 import {assertGMOnlyCampaignTime} from './src/integration/hmk-gm-clock-authority.js';
-import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekWeatherReference,trekAvailableTerrain,trekMovementTableRow,trekBearingRequirement,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence,assertTrekDailyWeatherAppendOnly} from './src/integration/hmk-trekking-routine.js';
+import {trekSeasonFromMonth,trekWeatherDay,trekWeatherWatch,trekWeatherReference,trekAvailableTerrain,trekMovementTableRow,trekBearingRequirement,trekMovement,trekWatchMovement,trekHazards,trekEncounterCheck,adjustedTrekkingMovement,validateTrekkingJournalEvidence,assertTrekDailyWeatherAppendOnly} from './src/integration/hmk-trekking-routine.js?v=94.145';
 import {createPCShelteredStay,pcShelteredStayAt,validatePCShelteredStayJournal,assertPCShelteredStayAppendOnly} from './src/integration/hmk-pc-sheltered-stay-93730.js';
 import {weather24HourTimeline,trekkingDaylightSeason} from './src/integration/hmk-episode-weather-timeline.js';
 import {weatherDisplayDay,travelWeatherDisplay,hourlyWeatherLabels,travelHourlyWeatherProse} from './src/integration/hmk-hourly-weather.js?v=94.043';
@@ -415,7 +415,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.144';
+const APP_VERSION='94.145';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
