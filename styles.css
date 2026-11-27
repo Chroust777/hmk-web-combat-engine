@@ -1145,3 +1145,15 @@ table.hmk-project-resources :is(th, td) {
 [data-herbal-potion-unavailable][hidden] {
   display: none !important;
 }
+
+[data-alchemy-start] > fieldset[data-alchemy-dose] {
+  min-width: 0;
+  border: 1px solid #000;
+}
+
+.hmk-alchemy-start-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}

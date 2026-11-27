@@ -423,7 +423,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.170';
+const APP_VERSION='94.171';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -4586,7 +4586,7 @@ function characterCraftPanel(clock,maker,discipline){
   <div class="hc-fields">${alchemyWorkshopFields(c)}</div>
   ${alchemyDoseFields(c,ml,true)}
   
-  <button type="submit">Zahájit přípravu v čase GM (bez posunu)</button>${projectDraftCancelHTML}</form>`}).join('')}
+  <div class="hmk-alchemy-start-actions"><button type="submit">Zahájit přípravu v čase GM (bez posunu)</button>${projectDraftCancelHTML}</div></form>`}).join('')}
  </section>
  <section data-craft-procedure="invent" data-label="Vynalézt elixír (HMK str. 267–268)">${alchemyWorkshopAccess('invent')}
  <details open><summary>Pravidla pro vlastní receptury (HMK str. 267–268)</summary><p class="hc-hint">Při ML100+ určete nový elixír před první přípravou: název, jeden z 35 principů, imbibed/applied, instantaneous/temporary a přesný popis účinku potvrzený GM. Nový vynálezce má −3 SV, dokud jej poprvé úspěšně nedokončí. Poučený alchymista má −1 SV do svého prvního úspěchu. Tyto postihy snižují až Preparation SV, <strong>nikoli Alchemy EML</strong>. Mechanické účinky unikátního elixíru zůstávají bez samostatně podložených pravidel neaktivní.</p></details>
@@ -4623,7 +4623,7 @@ function characterCraftPanel(clock,maker,discipline){
  ${pendingAlchemy.map(row=>{const a=row.calendarAlchemyStart,actor=character(a.actorId),proofs=projectJournal().filter(j=>alchemyRollBelongsToPreparation(j,row)&&j.skillTestProof.gmModifiers?.[0]===a.sunsignModifier&&!projectJournal().some(x=>x.calendarAlchemyFinish?.skillId===j.id));
   return `<article class="hc-event" data-project-calendar-record="${esc(row.id)}"><strong>${esc(actor?.name||a.actorId)} · ${esc(a.elixirName)} · ${a.workshopStars} ★</strong><p>${a.assistantPlan?.length?'Pomocníci: '+a.assistantPlan.map(h=>esc(character(h.actorId)?.name||h.actorId)+' (Alchemy '+h.ml+')').join(', ')+'. ':''}${a.durationDays} dní · zahájeno ${esc(displayCampaignMinute(a.minute))} · Preparation Roll přesně ${esc(displayCampaignMinute(a.dueMinute))} · Sunsign GM ${a.sunsignModifier>=0?'+':''}${a.sunsignModifier}. ${clock.minute<a.dueMinute?'Čeká na GM hodiny.':clock.minute>a.dueMinute?'CHYBA TERMÍNU: GM čas již přeskočil splatnost.':'Příprava splatná.'}</p>
  ${!discipline?projectCancelButton(row):''}
- ${clock.minute<a.dueMinute?`<form data-alchemy-abort><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="startId" value="${esc(row.id)}"><label>Důvod přerušení / narušení koncentrace<input name="reason" minlength="3" maxlength="240" required></label><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje přerušení a zničení rozpracovaného elixíru</label><button type="submit">Ukončit a znehodnotit přípravu (bez posunu času)</button></form>`:''}
+ ${clock.minute<a.dueMinute?`<form data-alchemy-abort><input type="hidden" name="actorId" value="${esc(a.actorId)}"><input type="hidden" name="startId" value="${esc(row.id)}"><label>Důvod přerušení / narušení koncentrace<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Ukončit a znehodnotit přípravu (bez posunu času)</button></form>`:''}
  ${clock.minute===a.dueMinute?proofs.map(proof=>{const t=proof.skillTestProof,r=t.a||t.result,sv=r.sv+(a.uniqueElixir?inventionSVPenalty({journal:projectJournal(),campaignId:campaignKey(clock),actorId:a.actorId,startId:row.id}):0),count=sv>=5?Math.min(5,sv-4):0;
   const willML=availableMasteries(actor).find(x=>x.name==='Will')?.ml??0;
   const shockML=availableMasteries(actor).find(x=>x.name==='Shock')?.ml??0;
@@ -8980,7 +8980,7 @@ function projectQualifications(actor){
   // since the DP needed to reach it depends on Skill Base and mastery boosts.
   const minDP=row?.baseSM===0&&!row.subskillOf&&(currentML===0||row.totalDP>0)?1:0;
   const currentDP=row?.totalDP;
-  return {name,minML,currentML,currentDP,minDP,missingML:Math.max(0,minML-currentML),
+  return {name,actorName:actor.name,minML,currentML,currentDP,minDP,missingML:Math.max(0,minML-currentML),
    missingDP:minDP?Math.max(0,minDP-(currentDP??0)):0};
  };
 }
@@ -8991,8 +8991,8 @@ function projectQualificationStatus(lookup,requirements=[]){
  return {blocked:groups.some(({rows})=>rows.length&&!rows.some(row=>!row.missingML&&!row.missingDP)),
   html:groups.length?`<div class="hmk-specialty-facts" aria-label="Požadavky na dovednosti">${groups.map(({label,rows})=>
    `<div>${label?`<p><strong>${esc(label)}</strong></p>`:''}${rows.map(row=>
-    `<p><strong>${esc(row.name)} · min. ML ${row.minML}${row.minDP?` · otevření ${row.minDP} DP`:''}</strong>
-    <span>Postava: ML ${row.currentML}${Number.isFinite(row.currentDP)?` · ${row.currentDP} DP`:''}. ${[
+    `<p><strong>${esc(row.name)} · min. ML ${row.minML}${row.minDP?` · otevření ${row.minDP} DP`:''} |</strong>
+    <span>${esc(row.actorName)}: ML ${row.currentML}${Number.isFinite(row.currentDP)?` · ${row.currentDP} DP`:''}. ${[
      row.missingML?`Chybí ${row.missingML} ML`:'',row.missingDP?`chybí ${row.missingDP} DP`:''
     ].filter(Boolean).join(' · ')||'Splněno'}</span></p>`).join('')}</div>`).join('')}</div>`:''};
 }
@@ -23208,7 +23208,8 @@ document.addEventListener('submit',e=>{
     data.journal.push(...rows);
    }))notice='Alchemy · počet zahájených dávek: '+count+'.';
   }else if(f.matches('[data-alchemy-abort]')){
-   const proof=createAlchemyAbort({journal:projectJournal(),campaignId,minute,actorId,startId:v.startId,reason:v.reason,gmConfirmed:!!v.gmConfirmed});
+   const proof=createAlchemyAbort({journal:projectJournal(),campaignId,minute,actorId,startId:v.startId,reason:v.reason,gmConfirmed:true});
+   if(!uiConfirm('Ukončit přípravu a znehodnotit rozpracovaný elixír?'))return;
    if(mutate(()=>data.journal.push({id:uuid(),characterId:actorId,calendarCampaignId:campaignId,campaignMinute:minute,createdAt:stamp(),title:'Alchemy · přerušena',body:'HMK 268 · '+proof.reason+'; rozpracovaný elixír znehodnocen',calendarAlchemyAbort:proof})))notice='Alchemy přerušena; čas GM beze změny.';
   }else{
    const start=projectJournal().find(x=>x.id===v.startId)?.calendarAlchemyStart;
