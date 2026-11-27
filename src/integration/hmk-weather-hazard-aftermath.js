@@ -118,7 +118,7 @@ export function startTrekkingWeatherExposureTreatment({state,sourceId,round=1,
   treatment:h.kind==='cold'?'Warming':'Compress',coolWater:!!coolWater,hr:h.hr}};
 }
 export function advanceTrekkingWeatherExposure({state,actor,sourceId,round=1,
- method='advance',elapsedMinutes,roll,fireshieldBonus=0,gmConfirmed=false,
+ method='advance',elapsedMinutes,roll,fireshieldBonus=0,iceshieldBonus=0,gmConfirmed=false,
  removedFromHazard=false,treatmentConfirmed=false,coolWater=false}={}){
  const s=structuredClone(state);validateCombatState(s);
  need(actor?.id&&gmConfirmed===true&&['advance','healing'].includes(method)&&
@@ -143,14 +143,16 @@ export function advanceTrekkingWeatherExposure({state,actor,sourceId,round=1,
  need(int(end,1,200)&&int(will,1,200),'Pro Exposure Course/Healing musí být doloženo END a WIL');
  need(int(fireshieldBonus,0,30)&&fireshieldBonus%5===0&&
   (!fireshieldBonus||h.kind==='heat'&&method==='advance'),'Fireshield bonus patří pouze k Heat Exposure Advance.');
- const hb=healingBase({endurance:end,will}),eml=hb*(method==='advance'?h.hr:5)+fireshieldBonus,sl=successLevel(roll,eml);
+ need(int(iceshieldBonus,0,30)&&iceshieldBonus%5===0&&
+  (!iceshieldBonus||h.kind==='cold'&&method==='advance'),'Iceshield bonus patří pouze k Cold Exposure Advance.');
+ const hb=healingBase({endurance:end,will}),eml=hb*(method==='advance'?h.hr:5)+fireshieldBonus+iceshieldBonus,sl=successLevel(roll,eml);
  const outcome=method==='advance'?exposureAdvance({healingRate:h.hr,sl}):exposureHealing({healingRate:h.hr,sl});
  h.lastElapsedMinutes=elapsedMinutes;h.lastActualElapsedMinutes=elapsedMinutes;h.sequence=idx;
  applyStatus(s,h,outcome.healingRate);
  if(outcome.defeated){h.active=false;}
  if(outcome.skipNext){h.lastElapsedMinutes+=dueMinutes;}
  s.events.push({id,type:'skill-weather-course',round,details:{sourceId,kind:h.kind,
-  method,elapsedMinutes,roll,healingIntervalMinutes:method==='healing'?dueMinutes:null,hb,eml,...(fireshieldBonus?{fireshieldBonus}:{}),sl:slText[sl],fromHR:h.hr-outcome.delta,
+  method,elapsedMinutes,roll,healingIntervalMinutes:method==='healing'?dueMinutes:null,hb,eml,...(fireshieldBonus?{fireshieldBonus}:{}),...(iceshieldBonus?{iceshieldBonus}:{}),sl:slText[sl],fromHR:h.hr-outcome.delta,
   toHR:h.hr,skipNext:!!outcome.skipNext,gmConfirmed:true,rulePage:185}});
  s.lastRound=round;validateCombatState(s);
  return {state:s,report:{method,kind:h.kind,hb,eml,sl:slText[sl],

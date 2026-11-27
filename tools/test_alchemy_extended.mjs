@@ -4,10 +4,12 @@ import {createExtendedAlchemyImbibing,createAlchemyPhysicImbibing,activeAlchemyP
  activeAlchemyPhysicTargets,validateAlchemyImbibingJournal} from '../src/integration/hmk-alchemy-imbibing.js';
 import {createAlchemyVialBinding,createAlchemyVialEmpty} from '../src/integration/hmk-alchemy-vial-ledger.js';
 import {createAlchemyDecay,alchemyElixirStrength,validateAlchemyDecayJournal} from '../src/integration/hmk-alchemy-decay.js';
-import {fireshieldProtection,quiescenceUses,mindsalveRollPlan,startExtendedAlchemy,advanceExtendedAlchemy,
+import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPlan,startExtendedAlchemy,advanceExtendedAlchemy,
  pendingExtendedAlchemy,applyExtendedAlchemyInteractions,settleExtendedAlchemy,requireExtendedAlchemyTime,
  validateExtendedAlchemy,assertExtendedAlchemyAppendOnly} from '../src/integration/hmk-alchemy-extended.js';
 import {previewAreaCohort} from '../src/integration/hmk-area-cohort-preview.js';
+import {prepareTrekkingWeatherTest,advanceTrekkingWeatherExposure} from '../src/integration/hmk-weather-hazard-aftermath.js';
+import {prepareColdWaterShock,prepareExposureSkinInjuries} from '../src/integration/hmk-weather-trauma-completion.js';
 import {prepareMundaneFireStrike} from '../src/integration/hmk-mundane-fire-smoke.js';
 import {evaluateTrekkingWeatherRoll} from '../src/integration/hmk-trekking-weather-roll.js';
 import {episodeWeatherExposure} from '../src/integration/hmk-episode-travel-detail.js';
@@ -136,3 +138,43 @@ assert.equal(validateAlchemyDecayJournal([...dormant.journal,row('q-old-decay','
 const freed=drink({name:'Physic',useId:'q-physic',baseAS:8,actor:dormant.actor,prior:dormant.journal});
 assert.deepEqual(quiescenceUses(freed.journal,campaignId,actorId,minute),[]);
 console.log('PASS Mindsalve, Fireshield, Poison and Quiescence: rule outcomes, clock, effects, Physic and historical replay');
+
+const ice=drink({name:'Iceshield',useId:'ice',baseAS:10,d100:95});
+assert.equal(ice.actor.hmk.healthState.fatigue.weariness,50);
+const iceContext={journal:ice.journal,campaignId,minute,actorId};
+const iceShield=iceshieldProtection(iceContext);
+assert.equal(iceShield.av,4);
+assert.equal(iceShield.advanceBonus,20);
+assert.equal(fireshieldProtection(iceContext).av,0);
+assert.equal(iceshieldProtection({...iceContext,auralShockLevels:1}).av,0);
+const iceHazard={kind:'cold',areaAV:2,roll:4};
+assert.equal(evaluateTrekkingWeatherRoll({...iceHazard,iceshieldAV:iceShield.av}).exposed,false);
+assert.equal(evaluateTrekkingWeatherRoll(iceHazard).exposed,true);
+assert.equal(episodeWeatherExposure({...iceHazard,iceshieldAV:iceShield.av}).tn,4);
+assert.throws(()=>episodeWeatherExposure({...iceHazard,kind:'heat',iceshieldAV:iceShield.av}),/pouze proti Cold/);
+const water={actor:clean,state:clean.hmk.healthState,sourceId:'ice-water',condition:'coolWater',
+ d6s:[1,1,1],enduranceD100:81,gmConfirmed:true,originMinute:100};
+const without=prepareColdWaterShock(water).report;
+const withIce=prepareColdWaterShock({...water,iceshieldBonus:iceShield.advanceBonus}).report;
+assert.equal(withIce.endEML,without.endEML+20);
+assert.notEqual(withIce.sl,without.sl);
+const cold=prepareTrekkingWeatherTest({state:clean.hmk.healthState,sourceId:'frost-watch',kind:'cold',
+ originalSL:'CF',coldCondition:'dry',weatherHazardConfirmed:true,gmConfirmed:true}).state;
+const exposed=cold.environmentalHazards[0];
+const advance={state:cold,actor:clean,sourceId:'frost-watch',elapsedMinutes:exposed.periodMinutes,roll:48,gmConfirmed:true};
+assert.equal(advanceTrekkingWeatherExposure({...advance,iceshieldBonus:20}).report.eml,
+ advanceTrekkingWeatherExposure(advance).report.eml+20);
+const frost=prepareExposureSkinInjuries({actor:clean,state:cold,inventory:[],sourceId:'frost-watch',
+ iceshieldAV:4,originMinute:100,windD20:10,durationD20:12,
+ rows:[{location:'tx',av:4}],allLocationsReviewed:true,gmConfirmed:true});
+assert.equal(frost.report.iceshieldAV,4);
+assert.equal(frost.report.wounds.length,0);
+const guarded=previewAreaCohort({id:'protected-frost',timelineId:'test-combat',round:1,aspect:'frost',strikeImpact:3,
+ targetIds:[actorId],characters:[fireTarget],states:{[actorId]:clean.hmk.healthState},inventory:[],
+ frostProtection:{[actorId]:iceShield.av},rollsByTarget:{[actorId]:{shockD100:null}}});
+assert.equal(guarded.results[actorId].areaAV,4);
+const nextIce=drink({name:'Iceshield',useId:'second-ice',baseAS:6,d100:83,prior:ice.journal,actor:ice.actor});
+assert.equal(nextIce.actor.hmk.healthState.fatigue.weariness,130);
+const iceCleared=drink({name:'Physic',useId:'ice-physic',baseAS:8,actor:ice.actor,prior:ice.journal});
+assert.equal(iceshieldProtection({...iceContext,journal:iceCleared.journal}).av,0);
+console.log('PASS Iceshield: protection, Cold Hazard cap, Cold Shock, Exposure Advance, Frostbite, Area, Profusion and Physic');

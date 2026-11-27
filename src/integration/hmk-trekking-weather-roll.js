@@ -6,17 +6,18 @@ const valid=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const must=(ok,message)=>{if(!ok)throw Error(message);};
 export const WEATHER_ROLL_FORMAT='hmk-trekking-weather-roll-v1';
 export function evaluateTrekkingWeatherRoll({kind,areaAV,gearAV=0,shelterAV=0,fireFS=0,
- continuousSleet=false,resting=false,shadedRest=false,nativeHotClimate=false,fireshieldAV=0,roll,origin='manual'}={}){
+ continuousSleet=false,resting=false,shadedRest=false,nativeHotClimate=false,fireshieldAV=0,iceshieldAV=0,roll,origin='manual'}={}){
  must(['cold','heat'].includes(kind),'Chybí doložený Cold/Heat Hazard');
  must(valid(areaAV,0,99)&&valid(roll,1,12),'Je nutná ověřená Area AV a fyzický hod kostkou');
  must(['manual','cryptographic-software-die'].includes(origin),'Neznámý původ hodu');
  must(valid(fireshieldAV,0,6)&&(kind==='heat'||fireshieldAV===0),'Fireshield platí pouze pro Heat Hazard.');
+ must(valid(iceshieldAV,0,6)&&(kind==='cold'||iceshieldAV===0),'Iceshield platí pouze pro Cold Hazard.');
  let av,sides,exposed;
  if(kind==='cold'){
   must(valid(gearAV,0,2)&&[0,2,3].includes(shelterAV)&&valid(fireFS,0,20)&&
    typeof continuousSleet==='boolean'&&resting===false&&shadedRest===false&&nativeHotClimate===false,
    'Neplatné ochranné podmínky Cold Hazard');
-  av=Math.min(areaAV,4)+gearAV+shelterAV+fireFS;
+  av=Math.min(areaAV+iceshieldAV,4)+gearAV+shelterAV+fireFS;
   sides=continuousSleet?10:6;
   exposed=roll>av;
  }else{
@@ -29,7 +30,7 @@ export function evaluateTrekkingWeatherRoll({kind,areaAV,gearAV=0,shelterAV=0,fi
  }
  must(roll<=sides,'Hod přesahuje skutečnou kostku Weather Hazard d'+sides);
  return {format:WEATHER_ROLL_FORMAT,kind,areaAV,gearAV,shelterAV,fireFS,continuousSleet,
-  resting,shadedRest,nativeHotClimate,...(fireshieldAV?{fireshieldAV}:{}),av,sides,roll,origin,exposed,requiresEndurance:exposed,
+  resting,shadedRest,nativeHotClimate,...(fireshieldAV?{fireshieldAV}:{}),...(iceshieldAV?{iceshieldAV}:{}),av,sides,roll,origin,exposed,requiresEndurance:exposed,
   rulePage:149};
 }
 export function weatherRollEvidence(journal=[],sourceId,actorId,campaignId){

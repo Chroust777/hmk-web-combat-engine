@@ -21,7 +21,7 @@ import {decorateNoncombatRollQueue93913} from './src/integration/hmk-noncombat-r
 import {ANIMAL_WORK_POLICY93914,createAnimalTrainingWork93914,trainingLedgerDue93914,validateAnimalTrainingWork93914,assertAnimalTrainingWorkAppendOnly93914} from './src/integration/hmk-animal-training-work-93914.js';
 import {assertFiniteState93897} from './src/integration/hmk-finite-state-93897.js';
 import {TRAVEL_RIDING_FORMAT_93823,recordedTravelRide93823} from './src/integration/hmk-travel-riding-93823.js';
-import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js?v=94.158';
+import {episodeTravelAnimalRoles} from './src/integration/hmk-episode-travel-detail.js?v=94.159';
 import {travelOccupancy93956,travelOccupancyContext93956,travelCompanionAssignment93956,travelWheeledOccupants93956} from './src/integration/hmk-mixed-transport-93859.js?v=93.956';
 import {startSharedTimeWindow93767,addSharedTimeGroup93767,confirmSharedTimeWindow93767} from './src/integration/hmk-shared-time-window-93767.js';
 import {planSharedWindow93771,sharedDailyWindowLimit93771} from './src/integration/hmk-shared-planner-93771.js';
@@ -81,11 +81,11 @@ import {accidentAgilityML93864,inspectAccidentAgility93864,validateAccidentAgili
 import {previewSwimmingDanger,prepareSwimmingConsequence,prepareSeriousInjuryAggravation} from './src/integration/hmk-skill-environment-consequences.js';
 import {asphyxiaCapacity,asphyxiaDeathCountdown} from './src/rules/ailments.js';
 import {successValue as swimmingWillSuccessValue} from './src/rules/tests.js';
-import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,resolveBalmTraumaCourse,resolveBalmBloodLossRecovery,resolveBalmInjuryRecovery,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.158';
+import {prepareTrekkingWeatherTest,startTrekkingWeatherExposureTreatment,advanceTrekkingWeatherExposure,resolveBalmExposureRecovery,resolveBalmTraumaCourse,resolveBalmBloodLossRecovery,resolveBalmInjuryRecovery,knowsExposureBalm} from './src/integration/hmk-weather-hazard-aftermath.js?v=94.159';
 import {prepareGMShockStateChange,gmStandingEligibility} from './src/integration/hmk-gm-shock-state-93826.js';
 import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProcedure,openConcurrentProcedures,concurrentTreatmentBlockers,concurrentTreatmentBlockerText} from './src/integration/hmk-concurrent-procedures.js';
 import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
-import {prepareColdWaterShock,prepareExposureSkinInjuries,previewExposureSkinLocation,verifiedHumanLocationShock} from './src/integration/hmk-weather-trauma-completion.js?v=94.118';
+import {prepareColdWaterShock,prepareExposureSkinInjuries,previewExposureSkinLocation,verifiedHumanLocationShock} from './src/integration/hmk-weather-trauma-completion.js?v=94.159';
 import {prepareMundaneFireStrike,prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from './src/integration/hmk-mundane-fire-smoke.js?v=94.158';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse} from './src/integration/hmk-poison-course.js?v=94.158';
 import {herbalPoisonProfile,prepareHerbalPoisonExposure,validateHerbalPoisonExposureJournal,assertHerbalPoisonExposureAppendOnly} from './src/integration/hmk-herbal-poison-exposure.js';
@@ -260,8 +260,8 @@ import {isTravelEpisodeReceipt} from './src/integration/hmk-episode-calendar-sco
 import {passiveWeatherResistance,verifyPassiveWeatherResistance} from './src/integration/hmk-weather-passive-93820.js';
 import {validateEquipmentTimeInventory93844} from './src/integration/hmk-equipment-time-work-93844.js';
 import {applyEquipmentDamage93845} from './src/integration/hmk-equipment-gm-93845.js';
-import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingAwareness,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.158';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS,DEVIATION_COMPASS_LABELS} from './src/integration/hmk-episode-travel-detail.js?v=94.158';
+import {EPISODE_FORMAT,EPISODE_TRACKING_BEARING_POLICY_93904,calculateTimeEpisode,lastTimeEpisodeCarry,episodeTimeline,assertTimeEpisodeAppendOnly,validateTimeEpisodes,calculateEpisodeForaging,lastForagingCarry,episodeSkillProof,episodeWeatherContextKey,episodeMovementContext,lastEpisodeBefore,participantNavigationEvidence,lostRecoveryBearingTarget,slowestEpisodeConveyance,EPISODE_MIXED_PACE_93945,EPISODE_PARTICIPANT_NAVIGATION_93945,mayReuseEpisodeSkill,computeEpisodeOrientation,computeEpisodeTracking,episodeTrackingAwareness,episodeTrackingConditionsFromContext,episodeNavigationState,episodeEncounterByMinutes,calculateEpisodeMinuteRecovery,lastTimeEpisodeDistanceFraction,pendingTrackingCFBearing,episodeMinuteDelay,lastEquipmentSlowCarry,lastEpisodeTravelDelayCarry,participantTravelDelayCarry,TREK_PARTICIPANT_DELAY_944,TREK_PARTICIPANT_INCIDENT_944,foragingShortNextWatch93876} from './src/integration/hmk-time-episodes.js?v=94.159';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals,EPISODE_DAYLIGHT_HOURS,DEVIATION_COMPASS_LABELS} from './src/integration/hmk-episode-travel-detail.js?v=94.159';
 import {truncateEpisodeBeforeEncounter} from './src/integration/hmk-episode-event-pause.js';
 import {TREK_ENCOUNTER_GM_FORMAT,encounterGMResolution,validateEncounterGMJournal,assertEncounterGMAppendOnly} from './src/integration/hmk-trekking-encounter-gm.js';
 import {weatherSkinComplexion} from './src/integration/hmk-weather-skin-coverage.js';
@@ -277,7 +277,7 @@ import {WEATHER_SHIFT_FORMAT,latestWeatherShift,createWeatherShift,validateWeath
 import {runningTravelForWeatherChange,splitRunningTravelOnWeatherChange} from './src/integration/hmk-trekking-weather-travel-split.js';
 import {latestTrekDayPlan,validateTrekDayHistory,assertTrekDayAppendOnly} from './src/integration/hmk-trekking-day-planner.js';
 import {trekkingSkillLinkForNewProof,validateTrekLinkedEvidence,TREK_TEST_SKILLS,trekkingModeHardLimit} from './src/integration/hmk-trekking-handoff.js';
-import {certifyTrekkingWeatherRoll,weatherRollEvidence} from './src/integration/hmk-trekking-weather-roll.js?v=94.158';
+import {certifyTrekkingWeatherRoll,weatherRollEvidence} from './src/integration/hmk-trekking-weather-roll.js?v=94.159';
 import {assessTrekkingReadiness} from './src/integration/hmk-trekking-readiness.js';
 import {eligibleTrekOrientationReuse,mayReuseTrekMovement} from './src/integration/hmk-trekking-orienteering-continuation.js';
 import {previewTrekCorrection,createTrekCorrection,latestTrekCorrection,effectiveTrekSource} from './src/integration/hmk-trekking-correction.js';
@@ -285,7 +285,7 @@ import {createWildernessProof,foragingResources,requiredWildernessWatch,FORAGING
 import {supplyLots,availableSupplyLots,createSupplyUse,allocateForagingRations,validateSupplyJournal,assertSupplyJournalAppendOnly,supplyBalances} from './src/integration/hmk-foraging-supply-ledger.js';
 import {createForagingCarry,createForagingCarryEat,foragedCarriedFood,projectForagedFoodInventory,validateForagingCarriedJournal} from './src/integration/hmk-foraging-carried-food.js';
 import {createMundaneHerbalCraft,mundaneCraftCandidates,validateMundaneHerbalJournal,assertMundaneHerbalAppendOnly} from './src/integration/hmk-herbal-mundane.js';
-import {elixirHelp,herbalPotionHelp} from './src/integration/hmk-craft-item-help.js?v=94.032';
+import {elixirHelp,elixirReference,herbalPotionHelp} from './src/integration/hmk-craft-item-help.js?v=94.159';
 import {CANONICAL_ALCHEMY_ELIXIRS,MAX_ALCHEMY_PREPARATIONS,alchemyRollBelongsToPreparation,alchemySunsignModifier,inventionSVPenalty,pendingAlchemyPreparations,createAlchemyStart,createAlchemyFinish,createAlchemyAbort,applyAlchemyDissolution,requireAlchemyGMTimeMayAdvance,validateAlchemyJournal,assertAlchemyAppendOnly} from './src/integration/hmk-alchemy-preparation.js?v=94.148';
 import {PERFUMERY_GOODS,AGRICULTURE_ACRES,WEATHER_SKILLS,WEATHER_DETAIL,EMBALMING_CLIMATES,fieldCraftRoll,perfumeryBatch,perfumeryMarket,weatherForecast,regionalWind,embalmingState,fieldCashSettlement,perfumerySale,planDalmorvrinRepair,finishDalmorvrinRepair} from './src/integration/hmk-field-craft.js?v=94.041';
 import {TIMBER_SPECIES,TIMBER_PHASES,startTimberWork,timberWork,planTimberRound,resolveTimberRound,cancelTimberWork,validateTimberWork,assertTimberWorkAppendOnly,timberHarvest} from './src/integration/hmk-timbercraft-work.js?v=94.041';
@@ -293,14 +293,14 @@ import {alchemyDoseProof,startingDoseProofFromCharacter,assertAlchemyStartingDos
 import {startAlchemyIdentification,resolveAlchemyExamination,pendingAlchemyExaminations,validateAlchemyExaminations,assertAlchemyExaminationsAppendOnly} from './src/integration/hmk-alchemy-examination.js?v=94.039';
 import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlchemyDecay,requireAlchemyDecayGMTimeMayAdvance,validateAlchemyDecayJournal,assertAlchemyDecayAppendOnly} from './src/integration/hmk-alchemy-decay.js?v=94.158';
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
-import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly,createAlchemyHealingImbibing,createAlchemyVerityImbibing,applyAlchemyVerityAural,createVerityProfusionIll,applyVerityProfusionAural,validateVerityProfusionJournal,assertVerityProfusionAppendOnly,createExtendedAlchemyImbibing} from './src/integration/hmk-alchemy-imbibing.js?v=94.158';
+import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly,createAlchemyHealingImbibing,createAlchemyVerityImbibing,applyAlchemyVerityAural,createVerityProfusionIll,applyVerityProfusionAural,validateVerityProfusionJournal,assertVerityProfusionAppendOnly,createExtendedAlchemyImbibing} from './src/integration/hmk-alchemy-imbibing.js?v=94.159';
 import {prepareAlchemyHealingUse,advanceAlchemyHealingRecovery,alchemyHealingRollPlan,pendingAlchemyHealing,assertAlchemyHealingMayAdvance,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed,prepareAlchemyHealingInteractions,closeResolvedAlchemyHealing} from './src/integration/hmk-alchemy-healing-recovery.js?v=94.158';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
 import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {eruditionSkillEvidence,applyEruditionSkillResult} from './src/integration/hmk-alchemy-erudition-skill.js';
 import {footpadSkillEvidence,footpadMastery} from './src/integration/hmk-alchemy-footpad-skill.js';
 import {footpadAcousticState,createFootpadAcousticObservation,validateFootpadAcousticJournal,assertFootpadAcousticAppendOnly} from './src/integration/hmk-alchemy-footpad-acoustics.js';
-import {fireshieldProtection,quiescenceUses,mindsalveRollPlan,startExtendedAlchemy,pendingExtendedAlchemy,advanceExtendedAlchemy,applyExtendedAlchemyInteractions,settleExtendedAlchemy,requireExtendedAlchemyTime,validateExtendedAlchemy,assertExtendedAlchemyAppendOnly,projectAlchemyDormancy} from './src/integration/hmk-alchemy-extended.js?v=94.158';
+import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPlan,startExtendedAlchemy,pendingExtendedAlchemy,advanceExtendedAlchemy,applyExtendedAlchemyInteractions,settleExtendedAlchemy,requireExtendedAlchemyTime,validateExtendedAlchemy,assertExtendedAlchemyAppendOnly,projectAlchemyDormancy} from './src/integration/hmk-alchemy-extended.js?v=94.159';
 import {verityStatus,createVerityReveal,validateVerityRevealJournal,assertVerityRevealAppendOnly} from './src/integration/hmk-alchemy-verity.js?v=94.158';
 import {egosightTouchContext,createEgosightTouch,validateEgosightTouchJournal,assertEgosightTouchAppendOnly} from './src/integration/hmk-alchemy-egosight.js';
 import {createAlchemyAcidApplication,alchemyAcidContactState,createAlchemyAcidRound,validateAlchemyAcidJournal,assertAlchemyAcidAppendOnly} from './src/integration/hmk-alchemy-acid-applied.js';
@@ -419,7 +419,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.158';
+const APP_VERSION='94.159';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -1153,10 +1153,12 @@ function installCalendarDiceControls(form,kind,sourceId,actorId){
 }
 let pendingTrekHandoff=null; // UI-only context; the journal proof is the authority after save.
 let pendingTrackingAwarenessId=null; // UI navigation only; the persisted source link is authoritative.
-function alchemyFireProtection(actor){
+function alchemyFireProtection(actor){return alchemyShieldProtection(actor,fireshieldProtection);}
+function alchemyIceProtection(actor){return alchemyShieldProtection(actor,iceshieldProtection);}
+function alchemyShieldProtection(actor,protection){
  const clock=data.campaignClock;
  if(!clock||!actor||!clock.characterIds?.includes(actor.id))return {av:0,advanceBonus:0,sources:[]};
- return fireshieldProtection({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,
+ return protection({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,
   actorId:actor.id,auralShockLevels:actor.hmk?.arcane?.auralShockLevels??0});
 }
 function extendedAlchemyRows(rows){
@@ -4344,11 +4346,34 @@ function alchemyWorkshopAccess(mode){
 const alchemyElixirSelections=new Map();
 const herbalPotionSelections=new Map();
 const alchemyDoseSuffix=index=>index===0?'':'-'+index;
+function alchemyElixirDescriptionHTML(name,{showEffect=true}={}){
+ const entry=elixirReference(name);
+ if(!entry)return '';
+ return `${showEffect?`<p>${esc(entry.effect)}</p>`:''}
+  <p><strong>Použití</strong> · ${esc(entry.use)}<br>
+   <strong>Trvání</strong> · ${esc(entry.duration)}<br>
+   <strong>${esc(entry.adverseLabel)}</strong> · ${esc(entry.adverse)}
+   ${entry.exempt?'<br>Tento elixír nevyvolává Profusion ani se do něj nezapočítává.':''}</p>
+  <p class="hc-hint">${entry.supported?'Použití je dostupné u hotové dávky.':'Výroba je dostupná. Pravidlový účinek zatím vyhodnocuje GM.'}
+  · HMK ${entry.sourcePage}</p>`;
+}
+function alchemyCatalogueHTML(){
+ return `<details data-alchemy-catalogue><summary>Katalog elixírů · ${CANONICAL_ALCHEMY_ELIXIRS.length}</summary>
+  <p class="hc-hint">AS je aktuální síla elixíru. Základní AS je síla před úpravou za vypití.
+   CF je kritický neúspěch, AV je hodnota ochrany, HR je míra hojení a HP interval mezi hody na zotavení.
+   Skladované dávky podléhají Decay po 30 dnech. Jedna dávka se použije celá do konce jediného kola.</p>
+  ${CANONICAL_ALCHEMY_ELIXIRS.map(({name,principle,convocation})=>
+   `<details data-alchemy-entry="${esc(name)}">
+    <summary>${esc(name)} · ${esc(principle)} (${esc(convocation)})</summary>
+    ${alchemyElixirDescriptionHTML(name)}
+   </details>`).join('')}
+ </details>`;
+}
 function alchemyElixirField(actorId,suffix=''){
  const selection=alchemyElixirSelections.get(actorId)??CANONICAL_ALCHEMY_ELIXIRS[0].name;
  return `<label>Druh elixíru<select name="elixirName${suffix}" data-alchemy-elixir-picker required>
   ${CANONICAL_ALCHEMY_ELIXIRS.map(elixir=>`<option value="${esc(elixir.name)}" ${elixir.name===selection?'selected':''}>${esc(elixir.name)} · ${esc(elixir.principle)} (${esc(elixir.convocation)}) · ML ${alchemyPreparationML.create}+</option>`).join('')}
- </select></label><p class="hc-hint" data-alchemy-elixir-help aria-live="polite">${esc(elixirHelp[selection])}</p>`;
+ </select></label><div class="hc-hint" data-alchemy-elixir-help aria-live="polite">${alchemyElixirDescriptionHTML(selection)}</div>`;
 }
 function herbalPotionPreparation(actorId,reservations,reservationHTML){
  const groups=new Map();
@@ -4585,11 +4610,11 @@ function characterCraftPanel(clock,maker,discipline){
   ${r.level==='CF'?`<div class="hc-fields"><label>Will SR d10 (Will Index ${Math.floor(willML/10)})<input type="number" name="cfWillD10" min="1" max="10" required></label><label>Pokud Will SR neuspěje: Alchemical Dissolution d100<input type="number" name="dissolutionD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-will>⚄ Generovat Will SR d10</button> <button type="button" class="hc-small" data-alchemy-roll-dissolution>⚄ Generovat Dissolution d100 (jen po neúspěšném Will SR)</button><div class="hc-fields"><label>Crucial Dissolution (d100 končí 5/0): skutečný Shock d100<input type="number" name="crucialShockD100" min="1" max="100"></label></div><button type="button" class="hc-small" data-alchemy-roll-shock>⚄ Generovat Crucial Shock d100 (jen 5/0)</button><p class="hc-hint">Will SR → Dissolution d100 → případný Shock d100 proti ověřenému Shock ML ${shockML} − Fatigue (včetně nové Aural Weakness). SHK 8 upraví původní Shock SL. Při následném STN/INC/UNC zůstává povinný původní Shock Recovery.</p>`:''}
   <div class="hc-fields">${Array.from({length:count},(_,i)=>`<label>Augmentation d10 #${i+1} (TN ${a.workshopStars})<input type="number" name="aug${i}" min="1" max="10" ${r.level==='CF'?'':'required'}></label>`).join('')}</div>${count?'<button type="button" class="hc-small" data-alchemy-roll-augment>⚄ Generovat Augmentation d10</button>':''}<label class="hc-check"><input type="checkbox" name="gmContinuityConfirmed" required> GM potvrzuje nepřerušenou přípravu, koncentraci a skutečnou účast všech předem zapsaných pomocníků po nezbytnou pracovní dobu</label><button type="submit">Zapsat Preparation Roll · bez vytvoření inventáře</button></form>`}).join('')||`<button type="button" class="secondary" data-character-craft-sv="Alchemy" data-craft-source="${esc(row.id)}">Provést Preparation Roll</button>`:''}</article>`}).join('')}
  <h4>Elixir Decay · HMK 268 (30 dní)</h4>
-<p class="hc-hint" data-craft-rule>Každých 30 dní od dokončení: d10 proti aktuální AS; úspěch −1 AS, neúspěch −2 AS. Při AS 0 enchantment zaniká. Hody ukládají neměnný důkaz; GM musí zastavit společné hodiny na splatnosti. Samotná AS neimplikuje fyzickou lahvičku ani účinek. Naplnění vyžaduje zvláštní GM důkaz.</p>
+<p class="hc-hint" data-craft-rule>Každých 30 dní od dokončení: d10 proti aktuální AS; úspěch −1 AS, neúspěch −2 AS. Quiescence má pokles obrácený (−2 při úspěchu, −1 při neúspěchu). Při AS 0 účinek zaniká. Hody ukládají neměnný důkaz; GM musí zastavit společné hodiny na splatnosti. Samotná AS neimplikuje fyzickou lahvičku ani účinek. Naplnění vyžaduje zvláštní GM důkaz.</p>
  ${makerElixirs.map(x=>`<p class="hc-hint"><strong>${esc(x.elixirName)}</strong> · ${esc(character(x.actorId)?.name||x.actorId)} · dokončeno ${esc(displayCampaignMinute(x.completedMinute))} · AS ${x.initialAS} → <strong>${x.currentAS}</strong>${x.dispersed?' · obsah vyprázdněn':x.expires?' · ENCHANTMENT LOST':' · další d10 '+esc(displayCampaignMinute(x.nextDueMinute))} · ${x.period} kontrol</p>`).join('')}
  ${alchemyDecayDue.map(x=>`<form data-alchemy-decay><strong>${clock.minute>x.nextDueMinute?'Zmeškaný Decay – konzervativní oprava':'Decay splatný'} · ${esc(x.elixirName)} · AS ${x.currentAS}</strong><input type="hidden" name="finishId" value="${esc(x.finishId)}"><input type="hidden" name="actorId" value="${esc(x.actorId)}"><input type="hidden" name="dueMinute" value="${x.nextDueMinute}"><p class="hc-hint">Splatnost ${esc(displayCampaignMinute(x.nextDueMinute))}; zápis dnes ${esc(displayCampaignMinute(clock.minute))}. ${clock.minute>x.nextDueMinute?'Dnešní hod nelze vydávat za původní historický hod. Zpětné GM vyhodnocení je možné pouze u dosud nepoužitého elixíru bez pozdějších závislých záznamů.':'Řádný hod přesně v termínu.'}</p><label>Decay d10<input name="d10" type="number" min="1" max="10" required></label><button type="button" data-alchemy-roll-decay class="hc-small">⚄ Generovat d10</button><label class="hc-check"><input type="checkbox" name="gmConfirmed" required> GM potvrzuje skutečně zadaný hod d10</label>${clock.minute>x.nextDueMinute?'<label class="hc-check"><input type="checkbox" name="gmMissedConfirmed" required> GM schvaluje nynější zpětné vyhodnocení zmeškané splatnosti (nikoli zpětné falšování času zápisu)</label>':''}<button type="submit">${clock.minute>x.nextDueMinute?'Opravit zmeškaný Decay':'Zapsat Decay Roll'} · bez posunu času</button></form>`).join('')}
  <h4>Darkvision · vypití a podání (HMK 269–270)</h4>
-<p class="hc-hint" data-craft-rule>První dokončená větev použití elixíru: Darkvision. Imbibing d100 používá skutečné Aura či Alchemy ML příjemce bez postihů za Fatigue a Impairment. F/CF upravuje AS. Profusion: u další dávky se rozšiřují neúspěšné CF výsledky; skutečné CF vyvolá samostatný Ill Effect každého aktivního Darkvision. Každý má vlastní HP d6 a zotavení. Při CF je doložena i citlivost na světlo (HR5, HP d6 dní); léčení vyžaduje skutečný d6 pro HP a v každém termínu d100 proti HB × HR podle existující Exposure Healing tabulky. Dočasný efekt zůstává po vypití v kalendáři a dále podléhá 30denním Decay Rolls. Žádný společný čas se neposouvá.</p>
+<p class="hc-hint" data-craft-rule>Imbibing d100 používá skutečné Aura či Alchemy ML příjemce bez postihů za Fatigue a Impairment. F/CF upravuje AS. Profusion: u další dávky se rozšiřují neúspěšné CF výsledky; skutečné CF vyvolá samostatný Ill Effect každého aktivního Darkvision. Každý má vlastní HP d6 a zotavení. Při CF je doložena i citlivost na světlo (HR5, HP d6 dní); léčení vyžaduje skutečný d6 pro HP a v každém termínu d100 proti HB × HR podle existující Exposure Healing tabulky. Dočasný efekt zůstává po vypití v kalendáři a dále podléhá 30denním Decay Rolls. Žádný společný čas se neposouvá.</p>
  ${onlyMaker.map(c=>{const effects=activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute),shock=c.hmk?.arcane?.auralShockLevels??0;return effects.map(x=>`<p class="hc-hint">${esc(c.name)} · Darkvision AS ${x.state.currentAS} · ${shock>0?`<strong>Aural Shock ${esc(shock)}: prospěch z vidění ve tmě pozastaven (HMK 270)</strong>; AS a Decay běží dál`:`vidění i v úplné tmě do <strong>${x.state.currentAS*5} ft</strong>`} · původ ${esc(x.useId)}${x.illEffect?' · CF: citlivost na světlo; léčení v samostatném panelu':''}</p>`).join('')}).join('')}
 <h4>Darkvision · CF citlivost na světlo · HP d6 dní / HR5</h4>
 <p class="hc-hint" data-craft-rule>HMK 270–271: postih mimo stín/pološero je polovina původní AS × 5. Úplné uzdravení při HR6; další testy po d6 dnech od skutečného CF. Success +1 HR, Critical Success +2 HR; CF znamená přeskočit další periodu. Doba pouze podle kalendáře GM.</p>
@@ -4616,6 +4641,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
   const a=alchemyDoseProof(x),bind=alchemyVialBinding(data.journal,campaignKey(clock),x.id),state=bind?alchemyVialState(data.journal,campaignKey(clock),x.id,clock.minute):null;
   if(bind){const target=data.inventory.find(v=>v.id===state?.vialId);
    return `<article class="hc-event"><strong>${esc(a.elixirName)} · AS ${alchemyStates.find(z=>z.finishId===x.id)?.currentAS??a.baseAS}</strong> · nádoba ${esc(state?.vialId)} · ${esc(character(state?.ownerId)?.name||state?.ownerId)} · ${esc(state?.slot)} · ${state?.full?'plná 0,5 lb':'vyprázdněná 0,25 lb'}
+    ${elixirReference(a.elixirName)?`<details data-alchemy-dose-reference><summary>Účinek a použití</summary>${alchemyElixirDescriptionHTML(a.elixirName)}</details>`:''}
     ${state?.full&&['Eruption','Fumebomb','Weakness'].includes(a.elixirName)&&
     alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&
     target?.characterId===state.ownerId&&['carried','none'].includes(state.slot)&&
@@ -4640,8 +4666,8 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
     ${state?.full&&a.elixirName==='Healing'&&alchemyStates.some(z=>z.finishId===x.id&&z.currentAS>0)&&
      target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?
      alchemyHealingUsePanel(x.id,state.ownerId,participants):''}
-    ${state?.full&&a.elixirName==='Physic'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-physic><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Physic · ${esc(c.name)}</strong><p>HMK 270/273: Physic nepodléhá Profusion. Výsledná AS se odečte od všech doložených aktivních Darkvision, Erudition, Footpad, Egosight, Healing, Verity, Fireshield, Mindsalve, Poison a Quiescence příjemce. Pokud existuje jiný elixír s nedoloženým koncem (např. Poison či Quiescence), operace se bezpečně odmítne bez spotřeby lahvičky. CF s účinnou AS zapisuje současně Aural Shock 1 a Weakness 5 do původního Combat State; příjemce čeká na standardní Aural Recovery.</p><label>Imbibing d100 proti Aura/Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ Generovat d100</button>${activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>`<label>CF · povinný HP d6 za aktivní Darkvision (${esc(source.useId)}, základní AS ${source.asBefore})<input name="physicHp_${esc(source.useId)}" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-alchemy-roll-profusion data-roll-target="physicHp_${esc(source.useId)}">⚄ d6</button>`).join('')}<p class="hc-hint">CF s kladnou AS vyvolá Aural Shock 1 a také vedlejší účinky dříve aktivních elixírů. Samostatný Healing Period d6 se hází za každý aktivní Darkvision.</p><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplné vypití nebo podání do jednoho kola, bez posunu kalendáře</label><button type="submit">Zapsat Physic a změny AS bez nového inventáře</button></form>`:''}).join(''):''}
-    ${state?.full&&['Mindsalve','Fireshield','Poison','Quiescence'].includes(a.elixirName)&&alchemyStates.some(z=>z.finishId===x.id&&z.currentAS>0)&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{
+    ${state?.full&&a.elixirName==='Physic'&&alchemyStates.find(z=>z.finishId===x.id)?.currentAS>0&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{const candidates=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');return candidates.length?`<form data-alchemy-physic><input type="hidden" name="finishId" value="${esc(x.id)}"><input type="hidden" name="actorId" value="${esc(state.ownerId)}"><input type="hidden" name="targetId" value="${esc(c.id)}"><strong>Vypít Physic · ${esc(c.name)}</strong><p>HMK 270/273: Physic nepodléhá Profusion. Výsledná AS se odečte od všech doložených aktivních Darkvision, Erudition, Footpad, Egosight, Healing, Verity, Fireshield, Iceshield, Mindsalve, Poison a Quiescence příjemce. Pokud existuje jiný elixír s nedoloženým koncem (např. Poison či Quiescence), operace se bezpečně odmítne bez spotřeby lahvičky. CF s účinnou AS zapisuje současně Aural Shock 1 a Weakness 5 do původního Combat State; příjemce čeká na standardní Aural Recovery.</p><label>Imbibing d100 proti Aura/Alchemy<select name="testSkill">${candidates.map(m=>`<option value="${esc(m.name)}">${esc(m.name)} ML ${m.ml}</option>`).join('')}</select></label><label>Skutečný d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ Generovat d100</button>${activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>`<label>CF · povinný HP d6 za aktivní Darkvision (${esc(source.useId)}, základní AS ${source.asBefore})<input name="physicHp_${esc(source.useId)}" type="number" min="1" max="6"></label><button type="button" class="hc-small" data-alchemy-roll-profusion data-roll-target="physicHp_${esc(source.useId)}">⚄ d6</button>`).join('')}<p class="hc-hint">CF s kladnou AS vyvolá Aural Shock 1 a také vedlejší účinky dříve aktivních elixírů. Samostatný Healing Period d6 se hází za každý aktivní Darkvision.</p><label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplné vypití nebo podání do jednoho kola, bez posunu kalendáře</label><button type="submit">Zapsat Physic a změny AS bez nového inventáře</button></form>`:''}).join(''):''}
+    ${state?.full&&['Mindsalve','Fireshield','Poison','Quiescence','Iceshield'].includes(a.elixirName)&&alchemyStates.some(z=>z.finishId===x.id&&z.currentAS>0)&&target?.characterId===state.ownerId&&target?.slot===state.slot&&['carried','none'].includes(state.slot)?participants.map(c=>{
      const skills=availableMasteries(c).filter(m=>m.name==='Aura'||m.name==='Alchemy');
      if(!skills.length||c.hmk?.healthState?.shock==='KIA')return '';
      const plan=a.elixirName==='Mindsalve'?mindsalveRollPlan(c):[];
@@ -4653,7 +4679,7 @@ ${data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&j.calendarAl
       <label>d100<input name="d100" type="number" min="1" max="100" required></label><button type="button" class="hc-small" data-alchemy-roll-imbibing>⚄ d100</button>
       ${plan.map((item,i)=>`<label>${esc(item.trait)} · okamžitý Will d100 <input name="mind${i}" type="number" min="1" max="100"></label>`).join('')}
       ${a.elixirName==='Poison'?Array.from({length:4},(_,i)=>`<label>Symptom ${i+1} · d10<input name="symptom${i}" type="number" min="1" max="10"></label>`).join(''):''}
-      ${['Fireshield','Mindsalve'].includes(a.elixirName)?activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>
+      ${['Fireshield','Iceshield','Mindsalve'].includes(a.elixirName)?activeDarkvision(data.journal,campaignKey(clock),c.id,clock.minute).map(source=>
        `<label>Při účinném CF · HP d6 pro aktivní Darkvision<input name="extendedHp_${esc(source.useId)}" type="number" min="1" max="6"></label>`).join(''):''}
       <label class="hc-check"><input name="confirmed" type="checkbox" required> GM potvrzuje úplné vypití nebo podání během jednoho kola.</label>
       <button type="submit">Zapsat vypití</button></form></details>`;
@@ -9918,9 +9944,9 @@ function characterProjectsChapter(actor){
     <li>Vyberte běžný elixír nebo známou recepturu. Vlastní recepturu lze vynalézt při ML 100+. Vyberte dílnu a určete dobu přípravy.</li>
     <li>V termínu otevřete dávku vpravo a proveďte Preparation Roll. Výsledek určí, zda dávka vznikne a jakou má sílu AS.</li>
     <li>Hotovou tekutou nebo plynnou dávku uložte do volné lahvičky v inventáři. Pak ji lze použít podle druhu elixíru.</li>
-    <li>U Darkvision, Egosight a Footpad následuje vypití nebo podání. U Acid vyberte způsob použití. Dostupné akce se zobrazí vpravo u dávky nebo u aktivního účinku.</li>
+    <li>V katalogu zjistíte, zda dávku vypít, podat nebo použít na cíl. Dostupné akce se zobrazí vpravo u dávky nebo u aktivního účinku.</li>
     <li>V kalendářním termínu proveďte Decay. Pro Detect, Reveal nebo Dispel otevřete Magické zdroje vpravo a pokračujte s oprávněným sesilatelem v Combat.</li>
-   </ol></section>`);
+   </ol>${alchemyCatalogueHTML()}</section>`);
   if(sp.id==='special-herblore')available.push(projectRulesHTML([
    'Pro výrobu je potřeba osvojená Herblore. HMK pro bylinné lektvary neurčuje další minimální ML.',
    'Získejte odpovídající bylinu při Foraging. U nálezu určete potenci d10. Bez konzervace klesá po intervalech 2d6 dní.',
@@ -10019,7 +10045,7 @@ document.addEventListener('change',event=>{
  if(field.matches?.('[data-alchemy-elixir-picker]')){
   if(field.name==='elixirName'&&view==='sheet')alchemyElixirSelections.set(selected,field.value);
   const help=field.closest('label')?.nextElementSibling;
-  if(help?.matches('[data-alchemy-elixir-help]'))help.textContent=elixirHelp[field.value]??'';
+  if(help?.matches('[data-alchemy-elixir-help]'))help.innerHTML=alchemyElixirDescriptionHTML(field.value);
   return;
  }
  if(field.matches?.('[data-character-project-procedure]')&&view==='sheet'&&activeSheetSection==='projects'){
@@ -12897,7 +12923,7 @@ function hmkSpecialBranchesPanel(chars){
  <details class="encounter-details"><summary>Area Fire/Frost · skutečný zásah jednoho cíle</summary><p class="tiny">Každý cíl musí mít samostatně ověřenou Area AV podle nasazené zbroje, Dodge a Shock d100. Opakovaný zásah do stejné Area lokace vyžaduje potvrzený Compound Injury d10.</p>
  <form id="hmk-area-form"><div class="field-grid">${actor('targetId','Zasažená postava')}
  <label>Aspekt<select name="aspect"><option value="fire">Fire</option><option value="frost">Frost</option></select></label>
- ${field('strikeImpact','Area Strike Impact',10,'number')}${field('areaAV','Ověřená Area AV na cíli',0,'number')}${field('dodgeML','Area Dodge EML (prázdné = bez Evade)','','number')}${field('dodgeRoll','Skutečný Dodge d100 (prázdné = bez Evade)','','number')}${field('compoundD10','Compound Injury d10 při další Area ráně (jinak prázdné)','','number')}${field('shockML','Shock EML po Fatigue',65,'number')}${field('shockRoll','Skutečný Shock d100','','number')}${guard}</div><button type="submit" disabled title="Area potřebuje ověřený vícecílový průchod, tento volný zápis je blokován">Potvrdit Area Injury</button></form></details>
+ ${field('strikeImpact','Area Strike Impact',10,'number')}${field('areaAV','Ověřená Area AV výstroje',0,'number')}${field('dodgeML','Area Dodge EML (prázdné = bez Evade)','','number')}${field('dodgeRoll','Skutečný Dodge d100 (prázdné = bez Evade)','','number')}${field('compoundD10','Compound Injury d10 při další Area ráně (jinak prázdné)','','number')}${field('shockML','Shock EML po Fatigue',65,'number')}${field('shockRoll','Skutečný Shock d100','','number')}${guard}</div><button type="submit" disabled title="Area potřebuje ověřený vícecílový průchod, tento volný zápis je blokován">Potvrdit Area Injury</button></form></details>
  <details class="encounter-details"><summary>Mounted Combat · Control, Grope retest a Rider Impact</summary>
  <form id="hmk-mount-control-form"><h4>Mounted Control Roll</h4><div class="field-grid">${actor('targetId','Jezdec')}${field('ridingML','Riding ML',70,'number')}${field('mountInitiativeML','Initiative ML zvířete',60,'number')}${field('roll','Skutečný Control d100','','number')}${field('retestRoll','Grope Retest d100 (jen při F/CF)','','number')}${guard}</div><button type="submit" disabled title="Control vyhodnoťte v řízeném Mounted Combat průvodci">Zapsat Control tohoto kola</button></form>
  <form id="hmk-mount-charge-form"><h4>Rider Impact po přímém pohybu koně</h4><div class="field-grid">${actor('targetId','Jezdec')}${field('mountRiderImpact','Rider Impact příslušného zvířete',8,'number')}${field('straightDistanceFt','Skutečně ujetá přímá vzdálenost v ft',70,'number')}${guard}</div><button type="submit" disabled title="Rider Impact vyžaduje ověřený pohyb zvířete">Zapsat bonus a dobu účinnosti</button></form></details>
@@ -16424,7 +16450,7 @@ const HSK_SKIN_HELP=Object.freeze({
  wind:'HMK str. 185, Frostbite: vždy jeden samostatný d20 pro sílu větru při skutečně hrozícím omrznutí. 1–3 = bezvětří, interval 120 min; 4–17 = běžný vítr, 60 min; 18–20 = vichřice, 30 min. Výsledek můžeš zadat z fyzické kostky nebo tlačítkem d20.',
  duration:'HMK str. 185, Frostbite: další nezávislý d20 určí dobu působení mrazu: 1–12 = 60 min; 13–17 = 120 min; 18–19 = 180 min; 20 = 240 min. Schválená minutová adaptace dobu zastropuje skutečnými minutami původní epizody. Nezadává se ručně odhad minut.',
  location:'HMK str. 185: výchozí vystavené lokace vybírá aplikace ze skutečně oblečené výbavy a ochrany F AV (pro mráz) nebo doloženého fyzického pokrytí (pro slunce). GM upraví jen nestandardní skutečnou expozici. Končetiny se vyhodnocují na obou stranách samostatně.',
- av:'HMK str. 185: u Frostbite AV automaticky vychází z právě oblečené ověřené výbavy v inventáři. AV0: 1 Injury Level za každý interval; AV1–3: 1 Injury Level za dva intervaly; AV4+ bez zranění z Frostbite. Jestli ochrana nesouhlasí, oprav nejprve inventář; toto číslo nepřepisuj.',
+ av:'HMK str. 185: u Frostbite AV automaticky vychází z ověřené oblečené výbavy a případného účinného Iceshield. AV0: 1 Injury Level za každý interval; AV1–3: 1 Injury Level za dva intervaly; AV4+ bez zranění z Frostbite. Jestli ochrana nesouhlasí, oprav nejprve inventář; toto číslo nepřepisuj.',
  skin:'HMK str. 185, Sunburn: každá skutečně slunci vystavená anatomická lokace má vlastní d10. Výsledek se porovná s TN pleti: Very Light 10, Light 7, Medium 4, Dark 2, Very Dark 1. Při zásahu stejný d10 určí M1 (1–6) nebo S2 (7–10). Při Frostbite se tento d10 vůbec nehází.',
  shock:'HMK str. 167 a 185: Shock d100 se provede pouze po skutečném vzniku zranění v této konkrétní lokaci. Pořadí hodů je jedna rána, její Shock, pak další rána. Když žádné zranění nevznikne, pole se uzamkne a Shock se nehází.',
  compound:'HMK Injury Sequence: Compound d10 je vyžadován pouze tehdy, když se nová rána slučuje s existujícím kompatibilním nezhojeným zraněním téže lokace a strany. Jinak je pole nedostupné a hod se neprovádí.',
@@ -16438,12 +16464,13 @@ const hskSkinTip=key=>''; // Explanation belongs on the field: no second icon or
  */
 function hskSkinCoveragePlan(actor,kind){
  const worn=data.inventory.filter(x=>x.characterId===actor.id&&x.slot==='worn');
+ const iceAV=kind==='frostbite'?alchemyIceProtection(actor).av:0;
  const bad=worn.filter(x=>x.snapshot?.category!=='armor'||x.quantity!==1||!equipmentUsable(x));
  const report=[];
  for(const [location,label,group,limb] of HSK_SKIN_LOCATIONS){
   const armour=resolveLiveCombatArmour({inventory:data.inventory,targetId:actor.id,location,aspect:'f',direction:'front',mode:'auto',rigidStatus:'unknown'});
   const known=bad.length===0&&armour?.ready&&Number.isSafeInteger(armour.armourValue);
-  const fAV=known?armour.armourValue:null;
+  const fAV=known?armour.armourValue+iceAV:null;
   const covered=(armour?.inventoryIds||[]).some(id=>{
    const item=data.inventory.find(i=>i.id===id);
    return item?.snapshot?.properties?.coveredLocations?.includes(location);
@@ -16536,7 +16563,7 @@ function hskSkinAddLocation(form,code,side){
  if([...form.querySelectorAll('[data-weather-skin-row]')].some(r=>r.dataset.skinRowId===rowId))return;
  const frost=kind==='frostbite';
  const armour=frost?resolveLiveCombatArmour({inventory:data.inventory,targetId:actor.id,location:code,aspect:'f',direction:'front',mode:'auto',rigidStatus:'unknown'}):null;
- const av=frost&&armour?.ready?armour.armourValue:null;
+ const av=frost&&armour?.ready?armour.armourValue+alchemyIceProtection(actor).av:null;
  const compatible=hskSkinCompatible(actor,code,side,kind);
  const panel=document.createElement('section');panel.className='hc-weather-skin-row';
  panel.dataset.weatherSkinRow='';panel.dataset.skinRowId=rowId;panel.dataset.skinLocation=code;panel.dataset.skinSide=side||'';
@@ -18828,7 +18855,8 @@ document.addEventListener('submit',async event=>{
   const physicalDice=['d6_1','d6_2','d6_3','enduranceD100'].map(name=>form.elements.namedItem(name));
   const rolls=physicalDice.map(field=>Number(field.value));
   const input={actor,state:old,sourceId,round:Math.max(1,combatClock.round||1,old.lastRound||0),
-   originMinute:clock?.minute??0,condition,d6s:rolls.slice(0,3),enduranceD100:rolls[3],gmConfirmed:true};
+   originMinute:clock?.minute??0,condition,d6s:rolls.slice(0,3),enduranceD100:rolls[3],
+   iceshieldBonus:alchemyIceProtection(actor).advanceBonus,gmConfirmed:true};
   const preview=prepareColdWaterShock(input);
   const campaignId=campaignKey(clock),revision=JSON.stringify(old);
   form.dataset.immersionFatePending='yes';
@@ -19364,6 +19392,7 @@ document.addEventListener('submit',event=>{
    windD20:none?null:toNumber(form.elements.namedItem('windD20')?.value),durationD20:none?null:toNumber(form.elements.namedItem('durationD20')?.value),
    complexion:form.elements.namedItem('complexion')?.value||null,
    maximumExposureMinutes,originMinute:data.campaignClock?.minute??0,
+   iceshieldAV:form.dataset.weatherSkinKind==='frostbite'?alchemyIceProtection(actor).av:0,
    gmConfirmed:true,allLocationsReviewed:true});
   if(!mutate(()=>{
    if(data.journal.some(x=>x.skillTestProof?.type==='skill-weather-skin'&&x.skillTestProof.sourceId===sourceId))throw Error('Dvojí zápis kožního traumatu');
@@ -19462,6 +19491,7 @@ document.addEventListener('submit',event=>{
    round:Math.max(1,combatClock.round||1,orig.lastRound||0),method,
    elapsedMinutes,roll:Number(form.elements.namedItem('roll').value),
    fireshieldBonus:h.kind==='heat'&&method==='advance'?alchemyFireProtection(actor).advanceBonus:0,
+   iceshieldBonus:h.kind==='cold'&&method==='advance'?alchemyIceProtection(actor).advanceBonus:0,
    gmConfirmed:true,removedFromHazard:!!h.treatmentStarted,
    treatmentConfirmed:!!h.treatmentStarted,
    coolWater:h.kind==='heat'&&!!h.treatmentStarted&&h.healingIntervalMinutes===5});
@@ -22331,11 +22361,12 @@ document.addEventListener('submit',e=>{
 function extendedAlchemyHealthHTML(actors,clock){
  const campaignId=campaignKey(clock);
  return actors.map(actor=>{
-  const protection=alchemyFireProtection(actor),dormant=quiescenceUses(data.journal,campaignId,actor.id,clock.minute).length;
+  const protection=alchemyFireProtection(actor),ice=alchemyIceProtection(actor),dormant=quiescenceUses(data.journal,campaignId,actor.id,clock.minute).length;
   const pending=pendingExtendedAlchemy(actor,clock,data.journal,campaignId);
-  if(!pending.length&&!protection.av&&!dormant)return '';
+  if(!pending.length&&!protection.av&&!ice.av&&!dormant)return '';
   return `<section class="panel hc-calendar" data-alchemy-extended-panel><h4>Alchemy · ${esc(actor.name)}</h4>
    ${protection.av?`<p>Fireshield · Fire AV +${protection.av}, Heat Hazard Area AV −${protection.av}, Heat Exposure Advance +${protection.advanceBonus}.</p>`:''}
+   ${ice.av?`<p>Iceshield · Frost AV +${ice.av} · Cold Shock a Cold Exposure Advance +${ice.advanceBonus}.</p>`:''}
    ${dormant?'<p>Quiescence · duše je v klidu a tělo je nehybné.</p>':''}
    ${pending.map(source=>{
     const mind=source.elixirName==='Mindsalve',onset=source.course?.status==='incubating';
@@ -22454,7 +22485,7 @@ function prepareAlchemyConcurrentCF({journal,proof,useId,targetId,campaignId,min
     title:'Alchemy CF · '+name+' Aural Shock',body:'HMK 269/'+ill.sourcePages.at(-1)+' · zdroj '+effect.sourceUseId+' · Aural Shock +1, Weakness +5',
     ['calendarAlchemy'+name+'ProfusionIll']:ill};
    rows.push(row);simulated.push(row);
-  }else if(!['healing-weakness','mindsalve-weakness','fireshield-weariness'].includes(effect.kind))throw Error('Alchemy CF: neznámý nebo nedoložený druh Ill Effect');
+  }else if(!['healing-weakness','mindsalve-weakness','fireshield-weariness','iceshield-weariness'].includes(effect.kind))throw Error('Alchemy CF: neznámý nebo nedoložený druh Ill Effect');
  }
  const healing=prepareAlchemyHealingInteractions({state,journal,trigger:proof,triggerId:useId});
  state=healing.state;
@@ -23844,6 +23875,7 @@ document.addEventListener('submit',e=>{
   if(!verifiedAreaAV.ready)throw Error('Area AV z oblečené výstroje není ověřena: '+verifiedAreaAV.reason);
   const coldProof=kind==='cold'?resolveColdHazardEquipment({inventory:data.inventory,actorId:actor.id,gearId:String(fd.get('coldGearId')||''),shelterId:String(fd.get('coldShelterId')||''),fireFS:Number(fd.get('fireFS'))}):null;
   const input={kind,areaAV:verifiedAreaAV.value,roll,fireshieldAV:kind==='heat'?alchemyFireProtection(actor).av:0,
+   iceshieldAV:kind==='cold'?alchemyIceProtection(actor).av:0,
    origin:form.elements.namedItem('roll').dataset.weatherAuto===String(roll)?'cryptographic-software-die':'manual',
    ...(kind==='cold'?{gearAV:coldProof.gearAV,shelterAV:coldProof.shelterAV,
      fireFS:coldProof.fireFS,continuousSleet:source.calendarTrekProof.weatherWatch.continuous===true&&source.calendarTrekProof.weatherWatch.precipitation==='sleet'}:
@@ -26812,7 +26844,8 @@ document.addEventListener('submit',e=>{
     r=applyConfirmedManeuverConsequence({...a,kind:v.kind,ml:ctx.ml,roll:n('roll'),hasLegs:ctx.hasLegs});
    }
    else if(f.id==='hmk-grab-take-form')r=applyConfirmedGrabTakeTransfer({...a,inventory:data.inventory,attackerId:state.pendingGrabTake?.toActorId,targetId:target.id,itemId:v.itemId,targetHandedness:target.hmk?.handedness});
-   else if(f.id==='hmk-area-form')r=applyConfirmedAreaStrike({...a,aspect:v.aspect,strikeImpact:n('strikeImpact'),areaAV:n('areaAV'),dodgeML:n('dodgeML'),dodgeRoll:n('dodgeRoll'),shockML:n('shockML'),shockRoll:n('shockRoll'),compoundD10:n('compoundD10')});
+   else if(f.id==='hmk-area-form')r=applyConfirmedAreaStrike({...a,aspect:v.aspect,strikeImpact:n('strikeImpact'),
+    areaAV:n('areaAV')+(v.aspect==='frost'?alchemyIceProtection(target).av:alchemyFireProtection(target).av),dodgeML:n('dodgeML'),dodgeRoll:n('dodgeRoll'),shockML:n('shockML'),shockRoll:n('shockRoll'),compoundD10:n('compoundD10')});
    else if(f.id==='hmk-mount-control-form')r=applyConfirmedMountedControl({...a,ridingML:n('ridingML'),mountInitiativeML:n('mountInitiativeML'),roll:n('roll'),retestRoll:n('retestRoll')});
    else if(f.id==='hmk-mount-charge-form')r=applyConfirmedMountedCharge({...a,mountRiderImpact:n('mountRiderImpact'),straightDistanceFt:n('straightDistanceFt')});
    else throw Error('Nepovolená alternativní zapisovací cesta');
@@ -32939,6 +32972,7 @@ function episodePreviewFromForm(form,clock){
     fireFS:Number(field('whFire')||0)}):null;
    let item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
     fireshieldAV:hazard==='heat'?alchemyFireProtection(character(id)).av:0,
+    iceshieldAV:hazard==='cold'?alchemyIceProtection(character(id)).av:0,
     protection:coldProof?coldProof.gearAV+coldProof.shelterAV:0,fireStrength:coldProof?.fireFS??0,
     continuousSleet:hazard==='cold'&&!!precipitation?.continuous&&seasonWeather.hasPrecipitation&&seasonWeather.precipitationRoll===seasonWeather.precipitationTN,
     resting:['rest','sleep','winded'].includes(kind),shade:!!field('whShade'),tropicalNative:!!field('whNative'),
@@ -32955,6 +32989,7 @@ function episodePreviewFromForm(form,clock){
      passive=passiveWeatherResistance(character(id),Number(passiveRaw),true);
      item=episodeWeatherExposure({kind:hazard,areaAV:area.value,
     fireshieldAV:hazard==='heat'?alchemyFireProtection(character(id)).av:0,
+    iceshieldAV:hazard==='cold'?alchemyIceProtection(character(id)).av:0,
       protection:coldProof?coldProof.gearAV+coldProof.shelterAV:0,fireStrength:coldProof?.fireFS??0,
       continuousSleet:hazard==='cold'&&!!precipitation?.continuous&&seasonWeather.hasPrecipitation&&seasonWeather.precipitationRoll===seasonWeather.precipitationTN,
       resting:['rest','sleep','winded'].includes(kind),shade:!!field('whShade'),tropicalNative:!!field('whNative'),

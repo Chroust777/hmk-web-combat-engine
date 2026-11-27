@@ -5,16 +5,16 @@
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.158';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
-import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.158';
+import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.159';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
 const whole=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
 const originOK=o=>['manual','cryptographic-software-die'].includes(o);
 const relevant=(j,c)=>j.calendarCampaignId===c;
-const newElixirNames=['Mindsalve','Fireshield','Poison','Quiescence'];
+const newElixirNames=['Mindsalve','Fireshield','Poison','Quiescence','Iceshield'];
 const fullImbibingNames=['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity',...newElixirNames];
-const additionalTemporary=['Fireshield','Quiescence'];
+const additionalTemporary=['Fireshield','Quiescence','Iceshield'];
 
 export function activeAdditionalTemporary(journal,campaignId,targetId,minute,name){
  return journal.filter(row=>relevant(row,campaignId)&&row.campaignMinute<=minute&&
@@ -93,7 +93,8 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
   ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute),
   ...activeVerity(journal,campaignId,targetId,minute),
   ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Fireshield'),
-  ...activeAdditionalInstant(journal,campaignId,targetId,minute,'Mindsalve')];
+  ...activeAdditionalInstant(journal,campaignId,targetId,minute,'Mindsalve'),
+  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Iceshield')];
  const seen=new Set(live.map(x=>x.useId));
  ok(seen.size===live.length,'Profusion: duplicitní aktivní zdroj');
  for(const row of journal){
@@ -499,7 +500,7 @@ export function createExtendedAlchemyImbibing({journal=[],inventory=[],campaignI
  const modifier={CF:-2,F:-1,S:0,CS:1}[sl]*(exempt?-1:1)||0,finalAS=Math.max(0,dose.currentAS+modifier);
  const critical=sl==='CF'&&finalAS>0&&!exempt;
  const illEffect=critical?{
-  kind:elixirName==='Mindsalve'?'mindsalve-weakness':'fireshield-weariness',
+  kind:elixirName==='Mindsalve'?'mindsalve-weakness':elixirName.toLowerCase()+'-weariness',
   amount:dose.currentAS*5
  }:null;
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,emptyId,vialId:vial.vialId,

@@ -1,8 +1,8 @@
 /** HMK 149, 185–186, 189, 269–273. Source-linked recovery for the
- * Mindsalve and Poison doses, with Fireshield and Quiescence projections. */
+ * Mindsalve and Poison doses, with thermal shields and Quiescence projections. */
 import {DAY_MINUTES} from './hmk-campaign-calendar.js';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
-import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.158';
+import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.159';
 import {activeFearSources,updateFearSource} from './hmk-concurrent-fear.js';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse,endAlchemicalPoison} from './hmk-poison-course.js?v=94.158';
 import {psycheStressRecovery} from '../rules/mental-trauma.js';
@@ -16,9 +16,12 @@ const names=['CF','F','S','CS'];
 const toxin=(state,useId)=>state?.toxinCourses?.find(course=>course.alchemicalSource?.useId===useId);
 const livingCourse=course=>['incubating','active'].includes(course?.status);
 
-export function fireshieldProtection({journal=[],campaignId,minute,actorId,auralShockLevels=0}){
+export function fireshieldProtection(context){return thermalShieldProtection('Fireshield',context);}
+export function iceshieldProtection(context){return thermalShieldProtection('Iceshield',context);}
+function thermalShieldProtection(elixir,{journal=[],campaignId,minute,actorId,auralShockLevels=0}){
+
  if(auralShockLevels>0)return {av:0,advanceBonus:0,sources:[]};
- const candidates=activeAdditionalTemporary(journal,campaignId,actorId,minute,'Fireshield')
+ const candidates=activeAdditionalTemporary(journal,campaignId,actorId,minute,elixir)
   .filter(source=>source.state.nextDueMinute>minute);
  const as=Math.max(0,...candidates.map(source=>source.state.currentAS));
  const av=Math.round(as/2);
@@ -149,7 +152,7 @@ export function startExtendedAlchemy({actor,proof,useId,journal,mindRolls=[],sym
    onsetMinutes:0,periodMinutes:0,initialHR:Math.max(0,Math.min(6,10-finalAS)),symptomD10s,
    transmission:'digested',gmConfirmed:true,actualExposureConfirmed:true,alchemicalSource:{useId,as:finalAS}});
   out.state=rounds.state;receipt.active=true;receipt.elapsedRounds=0;receipt.hr=rounds.course.hr;
- }else if(finalAS>0&&elixirName==='Fireshield'){
+ }else if(finalAS>0&&['Fireshield','Iceshield'].includes(elixirName)){
   receipt.weariness=proof.illEffect?.amount??0;state.fatigue.weariness+=receipt.weariness;
  }
  return {...out,rows:[receiptRow(actor,out,receipt,useId+':extended:start')]};
@@ -212,11 +215,11 @@ export function applyExtendedAlchemyInteractions({actor,journal,trigger,triggerI
  const {campaignId,minute}=trigger;
  const effects=trigger.profusionIllEffects??[];
  const targets=trigger.physicEffects??[];
- for(const effect of effects.filter(effect=>effect.kind==='fireshield-weariness')){
+ for(const effect of effects.filter(effect=>['fireshield-weariness','iceshield-weariness'].includes(effect.kind))){
   const use=journal.find(row=>row.id===effect.sourceUseId)?.calendarAlchemyImbibing;
-  check(use?.elixirName==='Fireshield'&&effect.amount===use.asBefore*5,'nedoložená Fireshield Weariness.');
+  check(use?.elixirName?.toLowerCase()+'-weariness'===effect.kind&&effect.amount===use.asBefore*5,'nedoložený zdroj Weariness.');
   out.state.fatigue.weariness+=effect.amount;
-  const receipt={campaignId,minute,useId:effect.sourceUseId,elixirName:'Fireshield',actorId:actor.id,
+  const receipt={campaignId,minute,useId:effect.sourceUseId,elixirName:use.elixirName,actorId:actor.id,
    phase:'interaction',triggerId,weariness:effect.amount,active:false};
   rows.push(receiptRow(actor,out,receipt,triggerId+':extended:'+effect.sourceUseId));
  }
@@ -273,7 +276,7 @@ export function requireExtendedAlchemyTime({actors,clock,journal,campaignId,afte
 
 export function validateExtendedAlchemy(journal,actors,branches,activeCampaign){
  const prior=[];
- const tracked=new Set(['Mindsalve','Poison','Fireshield','Quiescence']);
+ const tracked=new Set(['Mindsalve','Poison','Fireshield','Quiescence','Iceshield']);
  for(const row of journal){
   const p=row.calendarAlchemyExtendedRecovery;
   if(p){
@@ -283,14 +286,15 @@ export function validateExtendedAlchemy(journal,actors,branches,activeCampaign){
     p.campaignId===row.calendarCampaignId&&p.actorId===row.characterId&&p.minute===row.campaignMinute&&p.healthEventId===row.id&&
     (earlier?earlier.minute<=p.minute&&p.phase!=='start':p.phase==='start'&&p.minute===use.minute&&p.asAfter===use.finalAS),
     'poškozený doklad účinku elixíru.');
-   if(earlier&&p.elixirName!=='Fireshield')check((earlier.active||p.phase==='end'&&earlier.weakness>0)&&p.asBefore===earlier.asAfter,'nesouhlasí předchozí stav dávky.');
+   const shield=['Fireshield','Iceshield'].includes(p.elixirName);
+   if(earlier&&!shield)check((earlier.active||p.phase==='end'&&earlier.weakness>0)&&p.asBefore===earlier.asAfter,'nesouhlasí předchozí stav dávky.');
    if(p.phase==='interaction'){
     const trigger=prior.find(x=>x.id===p.triggerId)?.calendarAlchemyImbibing;
     const effect=trigger?.profusionIllEffects?.find(x=>x.sourceUseId===p.useId);
     const reduction=trigger?.physicEffects?.find(x=>x.sourceUseId===p.useId);
     check(trigger?.targetId===p.actorId&&trigger.minute===p.minute&&
-     ((p.elixirName==='Fireshield'&&effect?.kind==='fireshield-weariness'&&effect.amount===p.weariness)||
-      (p.elixirName!=='Fireshield'&&(effect||reduction)&&p.asAfter===(reduction?.asAfter??earlier?.asAfter))),
+     ((shield&&effect?.kind===p.elixirName.toLowerCase()+'-weariness'&&effect.amount===p.weariness)||
+      (!shield&&(effect||reduction)&&p.asAfter===(reduction?.asAfter??earlier?.asAfter))),
      'poškozený doklad souběhu.');
    }
    if(p.phase==='daily')check(p.minute===earlier.nextMinute&&whole(p.dailyRoll,1,10)&&
@@ -310,7 +314,7 @@ export function validateExtendedAlchemy(journal,actors,branches,activeCampaign){
    'chybí počáteční doklad účinku elixíru.');
   for(const item of [...(use.profusionIllEffects??[]),...(use.physicEffects??[])]){
    const name=rows.get(item.sourceUseId)?.calendarAlchemyImbibing?.elixirName;
-   if(['mindsalve-weakness','fireshield-weariness'].includes(item.kind)||['Mindsalve','Poison'].includes(name))
+   if(['mindsalve-weakness','fireshield-weariness','iceshield-weariness'].includes(item.kind)||['Mindsalve','Poison'].includes(name))
     check(rows.get(row.id+':extended:'+item.sourceUseId)?.calendarAlchemyExtendedRecovery?.triggerId===row.id,
      'chybí samostatný doklad souběhu elixíru.');
   }

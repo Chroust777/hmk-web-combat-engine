@@ -38,7 +38,7 @@ function prepared({state,actor,sourceId,round,gmConfirmed}){
  * The caller must separately initiate the subsequent ongoing Cold Exposure.
  */
 export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6s,enduranceD100,
- gmConfirmed=false,originMinute=null,fate=null}={}){
+ gmConfirmed=false,originMinute=null,iceshieldBonus=0,fate=null}={}){
  const s=prepared({state,actor,sourceId,round,gmConfirmed}),id='skill-cold-shock:'+sourceId;
  requireIt(!s.events.some(e=>e.id===id),'Cold Shock tohoto ponoření už byl vyhodnocen');
  requireIt(['coolWater','coldWater','freezingWater'].includes(condition),'Studený šok vyžaduje doložené ponoření do chladné vody');
@@ -50,7 +50,8 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
  // do not silently erase that obligation.
  const end=actor.hmk?.attributes?.end;
  requireIt(integer(end,1,200),'Chybí doložený END atribut');
- const endEML=end*5-combatFatigueTotals(s).total;
+ requireIt(integer(iceshieldBonus,0,30)&&iceshieldBonus%5===0,'Neplatný bonus Iceshield pro Cold Shock.');
+ const endEML=end*5-combatFatigueTotals(s).total+iceshieldBonus;
  const originalSL=named(successLevel(enduranceD100,endEML));
  let sl=originalSL;
  if(fate){
@@ -86,7 +87,7 @@ export function prepareColdWaterShock({actor,state,sourceId,round=1,condition,d6
   }
   if(carryShock==='KIA'){s.shockFollowup=null;s.extendedShock=null;s.coma=null;for(const w of s.wounds)w.nextAdvanceRound=null;}
  }
- const report={condition,immersionRounds:d6s.reduce((a,b)=>a+b,0),d6s,enduranceD100,endEML,
+ const report={condition,immersionRounds:d6s.reduce((a,b)=>a+b,0),d6s,enduranceD100,endEML,...(iceshieldBonus?{iceshieldBonus}:{}),
   sl,...(fate?{originalSL,fateProof:fate}:{}),base,index,modifier,shock:stateName,carryoverShock:carryShock,effectiveShock:s.shock,
   previousShock:oldShock,parallelCourseSource:parallel?sourceId:null,previousCoursePreserved:parallel||(!newIsStronger&&!!(s.shockFollowup||s.extendedShock||s.coma)),
   ...(supersededFollowup?{supersededFollowup,reason:'HMK p169: only the most severe current Shock State has a native Shock Reroll'}:{}),rulePage:185};
@@ -154,12 +155,13 @@ export function previewExposureSkinLocation({kind,av=null,windD20=null,durationD
  * Whole collection commits together or not at all. */
 export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,round=1,
  windD20=null,durationD20=null,complexion=null,rows=[],maximumExposureMinutes=null,originMinute=null,gmConfirmed=false,
- allLocationsReviewed=false}={}){
+ allLocationsReviewed=false,iceshieldAV=0}={}){
  let s=prepared({actor,state,sourceId,round,gmConfirmed});
  requireIt(integer(originMinute,0,1000000000),'Kožní Weather následky vyžadují skutečnou kalendářovou minutu');
  requireIt(Array.isArray(inventory)&&allLocationsReviewed===true,
   'GM musí potvrdit kompletní seznam vystavených míst a aktuální zbroj');
  const hazard=s.environmentalHazards?.find(h=>h.sourceId===sourceId&&h.skinPending);
+ requireIt(integer(iceshieldAV,0,6)&&(!iceshieldAV||hazard?.skinPending==='frostbite'),'Iceshield nepůsobí proti Sunburn.');
  requireIt(hazard&&['frostbite','sunburn'].includes(hazard.skinPending),
   'Nevyřešená Frostbite/Sunburn z původního Weather Hazard neexistuje');
  const id='skill-weather-skin:'+sourceId;
@@ -177,7 +179,7 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
   const key=where+':'+(side||'-');requireIt(!visited.has(key),'Jedna lokace smí být uvedena jen jednou');visited.add(key);
   if(hazard.skinPending==='frostbite'){
    const armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:where,aspect:'f',direction:'front',mode:'auto',rigidStatus:'unknown'});
-   requireIt(armour.ready&&armour.armourValue===r.av,
+   requireIt(armour.ready&&armour.armourValue+iceshieldAV===r.av,
     'Frostbite AV pro '+key+' se musí shodovat s ověřenou skutečnou ochrannou hodnotou; bez toho nelze automaticky potvrdit ránu');
   }
   if(!r.il){requireIt(r.shockD100==null&&r.compoundD10==null,'Bez Injury Level není dovoleno házet Shock/Compound');continue;}
@@ -226,7 +228,7 @@ export function prepareExposureSkinInjuries({actor,inventory,state,sourceId,roun
  }
  const live=s.environmentalHazards.find(h=>h.sourceId===sourceId);
  const skinKind=live.skinPending;live.skinPending=null;live.skinResolved=true;live.skinWounds=wounds.map(x=>x.woundId);
- const report={kind:skinKind,sourceId,windD20,durationD20,complexion,
+ const report={kind:skinKind,sourceId,...(iceshieldAV?{iceshieldAV}:{}),windD20,durationD20,complexion,
   periodMinutes:provided.period,durationMinutes:provided.duration,
   ...(maximumExposureMinutes!==null?{episodeMaxExposureMinutes:maximumExposureMinutes,
    ...(skinKind==='frostbite'?{sampledDurationMinutes:provided.sampledDuration}:{referenceWatchMinutes:240})}:{}),
