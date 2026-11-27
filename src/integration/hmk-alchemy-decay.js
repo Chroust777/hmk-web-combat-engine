@@ -55,7 +55,7 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
   if(use?.finishId===finishId){
    requireTrue(!imbibingId&&emptied&&as>0&&use.asBefore===as&&
     use.finalAS===Math.max(0,as+use.modifier)&&
-    use.temporary===(use.finalAS>0&&use.elixirName!=='Physic'),
+    use.temporary===(use.finalAS>0&&!['Physic','Healing'].includes(use.elixirName)),
     'Alchemy Decay: neplatná změna AS po vypití');
    as=use.finalAS;imbibingId=row.id;activeTemporary=use.temporary;
   }

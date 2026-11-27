@@ -1,0 +1,290 @@
+/** HMK pp.183, 269–270, 272. Healing recovery for anatomical wounds and anaemia.
+ * Both the original trauma list and every daily result are recorded in the
+ * character's health events. No natural recovery timer is advanced here.
+ */
+import {DAY_MINUTES,getCampaignAnchor} from './hmk-campaign-calendar.js';
+import {openConcurrentProcedures} from './hmk-concurrent-procedures.js';
+import {createAlchemyHealingImbibing} from './hmk-alchemy-imbibing.js';
+import {createAlchemyVialEmpty} from './hmk-alchemy-vial-ledger.js';
+import {availableMasteries} from './hmk-skill-test-engine.js';
+import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
+import {applyConfirmedBloodLossHealing,applyConfirmedInjuryHealing,injuryArcaneHealingRate} from './hmk-healing-persistence.js';
+import {concurrentShockSources,projectConcurrentShock} from './hmk-concurrent-shock-projection.js';
+
+const integer=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
+const check=(condition,message)=>{if(!condition)throw Error('Healing: '+message);};
+const die=(proof,faces)=>integer(proof?.value,1,faces)&&['manual','cryptographic-software-die'].includes(proof.origin);
+const eventType='alchemy-healing-recovery';
+const key=({kind,sourceId})=>kind+'::'+sourceId;
+const rowsFor=(state,campaignId,useId)=>state.events.filter(event=>event.type===eventType&&
+ event.details.campaignId===campaignId&&event.details.useId===useId);
+
+function anchorFor(clock,actorId,trauma){
+ return getCampaignAnchor(clock,trauma.kind==='injury'?'wound':'blood-loss',actorId,
+  trauma.kind==='injury'?trauma.sourceId:null);
+}
+function activeTraumas(state,clock,actorId,initial){
+ const current=initial??[...state.wounds.filter(wound=>!wound.healed).map(wound=>({kind:'injury',sourceId:wound.id})),
+  ...(state.bloodLoss.bp?[{kind:'blood-loss',sourceId:getCampaignAnchor(clock,'blood-loss',actorId)?.eventId}]:[])];
+ return current.filter(trauma=>trauma.kind==='injury'?
+  state.wounds.some(wound=>wound.id===trauma.sourceId&&!wound.healed):
+  state.bloodLoss.bp>0&&(!initial||anchorFor(clock,actorId,trauma)?.eventId===trauma.sourceId));
+}
+function requireHandledTrauma(state){
+ check(!state.extendedShock&&!state.coma?.active&&!state.asphyxiaComaPending&&
+  !state.sleepDeprivation?.activeWeariness&&!state.herbalSoporific&&!state.herbalParalysis&&
+  concurrentShockSources(state).length===0&&
+  !state.wounds.some(wound=>wound.healing?.infected)&&
+  !(state.environmentalHazards??[]).some(hazard=>hazard.active)&&
+  !(state.diseaseCourses??[]).some(course=>course.status==='active')&&
+  !(state.toxinCourses??[]).some(course=>course.status==='active'),
+  'tento krok zatím neumí vyhodnotit všechny přítomné druhy traumatu.');
+}
+function overlapRows(journal,campaignId,actorId,minute,state){
+ const keys=new Set();
+ for(const row of journal){
+  const proof=row.skillTestProof;
+  if(row.calendarCampaignId!==campaignId||row.characterId!==actorId||row.campaignMinute!==minute)continue;
+  if(proof?.type==='arcane-balm-injury'||proof?.type==='arcane-balm-blood-loss'){
+   const kind=proof.type==='arcane-balm-injury'?'injury':'blood-loss';
+   const eventType=kind==='injury'?'injury-healing-roll':'blood-loss-healing';
+   if(state.events.some(event=>event.id===proof.report?.eventId&&event.type===eventType&&
+    event.details?.arcaneRecovery?.sourceId===proof.sourceId&&event.details.arcaneRecovery.minute===minute))
+    keys.add(key({kind,sourceId:proof.sourceId}));
+  }
+ }
+ for(const event of state.events){
+  const p=event.details;
+  if(event.type===eventType&&p.campaignId===campaignId&&p.minute===minute)
+   for(const trauma of p.rolled)keys.add(key(trauma));
+ }
+ return keys;
+}
+function eligibleTraumaRolls(traumas,state,clock,actorId){
+ const infected=state.wounds.some(wound=>wound.healing?.infected);
+ const procedures=openConcurrentProcedures(clock);
+ return traumas.filter(trauma=>trauma.kind!=='injury'||!infected&&!procedures.some(proc=>
+  proc.characterId===actorId&&proc.woundId===trauma.sourceId));
+}
+function recoverTraumas({actor,state,clock,campaignId,traumas,rolls,id,round,journal}){
+ let next=state;
+ const overlap=overlapRows(journal,campaignId,actor.id,clock.minute,state);
+ const eligible=eligibleTraumaRolls(traumas,state,clock,actor.id);
+ const needed=eligible.filter(trauma=>!overlap.has(key(trauma)));
+ check(Array.isArray(rolls)&&rolls.length===needed.length&&
+  needed.every(trauma=>rolls.filter(roll=>key(roll)===key(trauma)&&die(roll,100)).length===1),
+  'doložte právě jeden d100 pro každé trauma bez souběžného magického hodu.');
+ const {end:endurance,wil:will}=actor.hmk?.attributes??{};
+ const applied=[];
+ for(const trauma of needed){
+  const anchor=anchorFor(clock,actor.id,trauma);
+  check(anchor&&anchor.minute<=clock.minute,'chybí časový počátek traumatu.');
+  const day=Math.floor((clock.minute-anchor.minute)/DAY_MINUTES);
+  const dice=rolls.find(roll=>key(roll)===key(trauma));
+  const common={state:next,round,eventId:id+':'+(applied.length+1),endurance,roll:dice.value,
+   arcaneFreeRoll:true,gmConfirmed:true};
+  const action=trauma.kind==='injury'?applyConfirmedInjuryHealing({...common,woundId:trauma.sourceId,
+   daySinceInjury:day,will,herbalContext:{journal,campaignId,minute:clock.minute,
+    targetId:actor.id,woundOnsetMinute:anchor.minute}}):
+   applyConfirmedBloodLossHealing({...common,daySinceBloodLoss:day});
+  next=action.state;
+  const evidence=next.events.at(-1);
+  evidence.details.alchemyHealing={recoveryId:id,minute:clock.minute,origin:dice.origin,sourcePage:272};
+  applied.push({...trauma,d100:dice.value,origin:dice.origin,sl:evidence.details.sl});
+ }
+ return {state:next,rolled:applied,overlapped:eligible.filter(trauma=>overlap.has(key(trauma)))};
+}
+function requireContext({state,actor,clock,campaignId,useId,gmConfirmed}){
+ validateCombatState(state);
+ check((clock?.campaignId??'legacy:'+clock?.events?.[0]?.id)===campaignId&&Number.isSafeInteger(clock?.minute)&&clock?.characterIds?.includes(actor?.id)&&
+  typeof useId==='string'&&useId&&state.shock!=='KIA'&&gmConfirmed===true,
+  'chybí živý příjemce, kampaň nebo potvrzení GM.');
+}
+function record(state,round,id,details){
+ check(!state.events.some(event=>event.id===id),'tato kontrola je již zapsaná.');
+ state.events.push({id,type:eventType,round,details});state.lastRound=round;
+ validateCombatState(state);
+ return {state,receipt:details};
+}
+
+export function startAlchemyHealingRecovery({actor,clock,campaignId,useId,
+ state=actor?.hmk?.healthState??initialCombatState(),imbibing,rolls=[],journal=[],gmConfirmed=false}={}){
+ requireContext({state,actor,clock,campaignId,useId,gmConfirmed});
+ check(rowsFor(state,campaignId,useId).length===0,'tato dávka již působila.');
+ const delta={CF:-2,F:-1,S:0,CS:1}[imbibing?.sl];
+ check(imbibing?.elixirName==='Healing'&&imbibing.campaignId===campaignId&&imbibing.minute===clock.minute&&
+  imbibing.targetId===actor.id&&integer(imbibing.baseAS,1,11)&&integer(imbibing.asBefore,1,imbibing.baseAS)&&
+  imbibing.finalAS===Math.max(0,imbibing.asBefore+delta),
+  'chybí odpovídající výsledek vypití.');
+ check(Array.isArray(rolls),'chybí seznam léčebných hodů.');
+ const id=useId+':healing:0',round=Math.max(1,state.lastRound);
+ const result={campaignId,useId,actorId:actor.id,minute:clock.minute,day:0,asBefore:imbibing.finalAS,
+  asAfter:imbibing.finalAS,weakness:0,traumas:[],rolled:[],overlapped:[],nextMinute:null};
+ let next=structuredClone(state);
+ if(!imbibing.finalAS){
+  check(rolls.length===0,'neúčinná dávka nemá žádné léčebné hody.');
+  return record(next,round,id,result);
+ }
+ requireHandledTrauma(state);
+ result.traumas=activeTraumas(state,clock,actor.id,null);
+ check(result.traumas.every(trauma=>anchorFor(clock,actor.id,trauma)),'chybí kalendářový počátek traumatu.');
+ check(eligibleTraumaRolls(result.traumas,state,clock,actor.id).length===result.traumas.length,
+  'nejdřív dokončete probíhající ošetření rány.');
+ check(state.wounds.every(wound=>wound.healed||injuryArcaneHealingRate(wound)!==null),
+  'přítomná rána potřebuje jiný postup než Injury Healing Roll.');
+ result.removed={windedness:next.fatigue.windedness,weariness:next.fatigue.weariness,
+  bleeding:next.wounds.filter(wound=>wound.bleeding).map(wound=>wound.id),shock:next.shock};
+ next.fatigue.windedness=0;next.fatigue.weariness=0;
+ for(const wound of next.wounds){
+  if(wound.bleeding){wound.bleeding=false;wound.nextAdvanceRound=null;}
+ }
+ next.shock='NONE';next.shockOriginRound=null;next.shockFollowup=null;next.bloodShockPending=false;
+ if(next.concurrentShockProjection)projectConcurrentShock(next);
+ if(imbibing.sl==='CF'){
+  result.weakness=imbibing.baseAS*5;
+  next.fatigue.otherWeakness+=result.weakness;
+ }
+ const recovered=recoverTraumas({actor,state:next,clock,campaignId,traumas:result.traumas,rolls,id,round,journal});
+ next=recovered.state;result.rolled=recovered.rolled;result.overlapped=recovered.overlapped;
+ const remaining=activeTraumas(next,clock,actor.id,result.traumas);
+ if(remaining.length)result.nextMinute=clock.minute+DAY_MINUTES;
+ else if(result.traumas.length&&result.weakness){
+  next.fatigue.otherWeakness-=result.weakness;result.weakness=0;
+ }
+ return record(next,round,id,result);
+}
+
+export function advanceAlchemyHealingRecovery({actor,clock,campaignId,useId,
+ state=actor?.hmk?.healthState??initialCombatState(),dailyRoll=null,rolls=[],journal=[],gmConfirmed=false}={}){
+ requireContext({state,actor,clock,campaignId,useId,gmConfirmed});
+ check(Array.isArray(rolls),'chybí seznam léčebných hodů.');
+ const history=rowsFor(state,campaignId,useId),previous=history.at(-1)?.details;
+ check(previous?.nextMinute===clock.minute&&previous.actorId===actor.id,'denní kontrola není právě splatná.');
+ const traumas=history[0].details.traumas,remaining=activeTraumas(state,clock,actor.id,traumas);
+ const day=previous.day+1,id=useId+':healing:'+day,round=Math.max(1,state.lastRound);
+ const result={campaignId,useId,actorId:actor.id,minute:clock.minute,day,asBefore:previous.asAfter,
+  asAfter:previous.asAfter,weakness:previous.weakness,dailyRoll,rolled:[],overlapped:[],nextMinute:null};
+ let next=structuredClone(state);
+ if(!remaining.length){
+  check(dailyRoll===null&&rolls.length===0,'původní traumata už jsou zahojená, žádný hod se neprovádí.');
+  next.fatigue.otherWeakness-=Math.min(result.weakness,next.fatigue.otherWeakness);
+  result.weakness=0;
+  return record(next,round,id,result);
+ }
+ check(die(dailyRoll,10),'vyžaduje se skutečný denní d10.');
+ result.asAfter--;
+ result.success=dailyRoll.value<=result.asBefore;
+ if(result.success){
+  const released=Math.min(5,result.weakness,next.fatigue.otherWeakness);
+  result.weakness-=released;next.fatigue.otherWeakness-=released;
+  const recovered=recoverTraumas({actor,state:next,clock,campaignId,traumas:remaining,rolls,id,round,journal});
+  next=recovered.state;result.rolled=recovered.rolled;result.overlapped=recovered.overlapped;
+ }else check(rolls.length===0,'neúspěšný denní d10 nevytváří léčebné hody.');
+ if(activeTraumas(next,clock,actor.id,traumas).length){
+  if(result.asAfter>0)result.nextMinute=clock.minute+DAY_MINUTES;
+ }else{
+  next.fatigue.otherWeakness-=Math.min(result.weakness,next.fatigue.otherWeakness);
+  result.weakness=0;
+ }
+ return record(next,round,id,result);
+}
+
+/** Prepare the health update and both vial receipts for one atomic commit. */
+export function prepareAlchemyHealingUse({actor,maker,clock,campaignId,useId,emptyId,finishId,testSkill,imbibingRoll,
+ journal=[],inventory=[],rolls=[],gmConfirmed=false}={}){
+ const state=actor?.hmk?.healthState??initialCombatState();
+ requireContext({state,actor,clock,campaignId,useId,gmConfirmed});
+ check(clock.characterIds.includes(maker?.id)&&!['KIA','INC','UNC','STN'].includes(maker.hmk?.healthState?.shock),
+  'lahvičku musí podat člen kampaně schopný provést akci.');
+ check(typeof emptyId==='string'&&emptyId&&emptyId!==useId&&!journal.some(row=>[emptyId,useId].includes(row.id)),
+  'chybí nové identifikátory pro vypití a prázdnou lahvičku.');
+ check(die(imbibingRoll,100)&&['Aura','Alchemy'].includes(testSkill),
+  'nutný skutečný Aura nebo Alchemy d100 příjemce.');
+ const ml=availableMasteries(actor).find(skill=>skill.name===testSkill)?.ml;
+ check(ml,'příjemce nemá doložené Aura nebo Alchemy ML.');
+ const {minute}=clock;
+ const imbibing=createAlchemyHealingImbibing({journal,inventory,campaignId,minute,
+  actorId:maker.id,targetId:actor.id,finishId,testSkill,ml,d100:imbibingRoll.value,
+  origin:imbibingRoll.origin,emptyId,gmConfirmed});
+ const empty=createAlchemyVialEmpty({journal,inventory,campaignId,minute,actorId:maker.id,finishId,
+  reason:'Healing · vypití či podání',confirmedByGM:true});
+ const recovery=startAlchemyHealingRecovery({actor,clock,campaignId,useId,state,imbibing,rolls,journal,gmConfirmed});
+ return {imbibing,empty,...recovery};
+}
+
+
+export function alchemyHealingRollPlan({actor,clock,campaignId,useId=null,journal=[]}){
+ const state=actor?.hmk?.healthState??initialCombatState();
+ const history=useId?rowsFor(state,campaignId,useId):[];
+ const previous=history.at(-1)?.details;
+ const remaining=activeTraumas(state,clock,actor.id,history[0]?.details.traumas);
+ const overlap=overlapRows(journal,campaignId,actor.id,clock.minute,state);
+ return {dailyTN:previous?.asAfter??null,remaining,
+  rolls:eligibleTraumaRolls(remaining,state,clock,actor.id).filter(trauma=>!overlap.has(key(trauma)))};
+}
+export function pendingAlchemyHealing(characters,clock,campaignId){
+ return characters.flatMap(actor=>{
+  if(!clock.characterIds?.includes(actor.id)||actor.hmk?.healthState?.shock==='KIA')return [];
+  const sources=new Map();
+  for(const event of actor.hmk?.healthState?.events??[]){
+   if(event.type===eventType&&event.details.campaignId===campaignId)
+    sources.set(event.details.useId,event.details);
+  }
+  return [...sources.values()].filter(source=>source.nextMinute!==null).map(source=>({...source,actor}));
+ });
+}
+export function assertAlchemyHealingMayAdvance(characters,clock,campaignId,targetMinute){
+ const missed=pendingAlchemyHealing(characters,clock,campaignId).find(source=>source.nextMinute<targetMinute);
+ check(!missed,'nejprve vyhodnoťte denní zotavení u postavy '+missed?.actor.name+' v minutě '+missed?.nextMinute+'.');
+}
+
+export function validateAlchemyHealingRecovery(journal,characters,branches={},activeCampaignId=null){
+ const rows=new Map(journal.map(row=>[row.id,row]));
+ const actors=new Map(characters.map(actor=>[actor.id,actor]));
+ const starts=new Set();
+ const previous=new Map();
+ for(const row of journal){
+  const receipt=row.calendarAlchemyHealingRecovery;
+  if(!receipt)continue;
+  const {campaignId,useId,actorId,minute,day,asBefore,asAfter,dailyRoll,success,nextMinute}=receipt;
+  const use=rows.get(useId)?.calendarAlchemyImbibing;
+  const old=previous.get(useId);
+  check(use?.elixirName==='Healing'&&use.targetId===actorId&&use.campaignId===campaignId&&
+   row.calendarCampaignId===campaignId&&row.characterId===actorId&&row.campaignMinute===minute&&
+   row.id===useId+':healing:'+day,'poškozený původ dokladu léčení.');
+  if(!old){
+   check(day===0&&minute===use.minute&&asBefore===use.finalAS&&asAfter===asBefore,
+    'poškozený počátek léčení.');
+   starts.add(useId);
+  }else{
+   check(day===old.day+1&&minute===old.nextMinute&&asBefore===old.asAfter&&
+    (dailyRoll===null?asAfter===asBefore&&nextMinute===null:
+     die(dailyRoll,10)&&asAfter===asBefore-1&&success===(dailyRoll.value<=asBefore)),
+    'poškozený denní hod nebo pokles AS.');
+  }
+  check(nextMinute===null||asAfter>0&&nextMinute===minute+DAY_MINUTES,'poškozený další termín léčení.');
+  const actor=(campaignId!==activeCampaignId&&branches[campaignId]?.[actorId])||actors.get(actorId);
+  const state=actor?.hmk?.healthState;
+  const event=state?.events.find(entry=>entry.id===row.id&&entry.type===eventType);
+  check(event&&JSON.stringify(event.details)===JSON.stringify(receipt),'doklad nesouhlasí s historií zdraví.');
+  previous.set(useId,receipt);
+ }
+ for(const row of journal){
+  if(row.calendarAlchemyImbibing?.elixirName==='Healing')check(starts.has(row.id),'chybí počáteční doklad léčení.');
+ }
+ return true;
+}
+
+
+export function assertAlchemyHealingRecoveryAppendOnly(before,after){
+ const current=new Map(after.map(row=>[row.id,row]));
+ for(const old of before){
+  if(old.calendarAlchemyHealingRecovery)
+   check(JSON.stringify(current.get(old.id))===JSON.stringify(old),'uložený doklad zotavení nelze změnit ani odstranit.');
+ }
+}
+
+export function healingArcaneRollAlreadyUsed(state,campaignId,minute,trauma){
+ return state.events.some(event=>event.type===eventType&&event.details.campaignId===campaignId&&
+  event.details.minute===minute&&event.details.rolled.some(roll=>key(roll)===key(trauma)));
+}
