@@ -415,7 +415,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.141';
+const APP_VERSION='94.143';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -23362,7 +23362,7 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   form=q('form[data-hmk-writing-finish-591]').find(f=>f.elements.namedItem('origin')?.value===sourceId);
   break;
  case 'weather-shock':form=byHidden('form[data-parallel-cold-reroll]')||byHidden('form[data-weather-shock-followup]');break;
- case 'weather-onset':form=byHidden('form[data-skill-weather-onset]');break;
+ case 'weather-onset':form=byHidden('form[data-skill-cold-shock],form[data-skill-weather-onset]');break;
  case 'weather-course':form=byHidden('form[data-skill-weather-course]');choose(form,'elapsedMinutes',elapsedText);break;
  case 'weather-skin':form=byHidden('form[data-skill-weather-skin]');break;
  case 'sleep-deprivation':form=q('form[data-hmk-sleepless-day]')[0]||null;break;
@@ -23402,7 +23402,10 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
   const careTarget=['treatment','frost-amputation'].includes(kind)?
    ['healerId','physicianRoll'].map(name=>form.elements.namedItem(name)).find(node=>
     node&&!node.disabled&&!node.closest('[hidden]')&&!String(node.value||'').trim()):null;
-  const rollInput=(writingCritical?form.querySelector('[data-hmk-chain-value-93918]:not([disabled])'):null)||
+  const weatherOnsetTarget=kind==='weather-onset'?(
+   form.querySelector('input:is([name="d6_1"],[name="d6_2"],[name="d6_3"],[name="enduranceD100"]):not(:disabled):not([readonly])')||
+   form.querySelector('button[type="submit"]:not(:disabled)')):null;
+  const rollInput=weatherOnsetTarget||(writingCritical?form.querySelector('[data-hmk-chain-value-93918]:not([disabled])'):null)||
    (careTarget?.type!=='hidden'?careTarget:null)||
    ((kind==='skill-critical'||kind==='skill-injury')?
     form.querySelector('select:is([name="activity"],[name="itemId"],[name="targetId"]):not([disabled]),input[name="impactDie"]:not([disabled])'):null)||
@@ -23429,9 +23432,10 @@ function focusCalendarRuleAction(actor,kind,sourceId,elapsedText,{healerId}={}){
    form.querySelector('input:not([type="hidden"]):is([name="roll"],[name="courseD100"],[name="followRoll"],[name="enduranceD10"],[name="physicianRoll"])'));
   // Calendar/Travel rule links must land on the REAL original input and
   // visibly mark it, not merely open a whole module without a target.
-  if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding','aural-recovery','skill-critical','skill-injury','brew-mature','script-reading','script-copy','writing-completion'].includes(kind)&&rollInput&&!rollInput.disabled){
+  if(['treatment','frost-amputation','healing','infection','grim','blood-loss','coma','extended-shock','weather-onset','weather-skin','injury-morale','injury-mishap','weather-shock','bleeding','aural-recovery','skill-critical','skill-injury','brew-mature','script-reading','script-copy','writing-completion'].includes(kind)&&rollInput&&!rollInput.disabled){
    for(const old of document.querySelectorAll('.hmk-medical-required-target'))old.classList.remove('hmk-medical-required-target');
-   if(!rollInput.matches('[data-hmk-chain-value-93918]'))
+   if(!rollInput.matches('[data-hmk-chain-value-93918]')&&
+     !(weatherOnsetTarget===rollInput&&rollInput.closest('label')?.classList.contains('hmk-simple-current-93915')))
     (rollInput.closest('label')||rollInput).classList.add('hmk-medical-required-target');
   }
   rollInput?.scrollIntoView({block:'center',behavior:'instant'});
