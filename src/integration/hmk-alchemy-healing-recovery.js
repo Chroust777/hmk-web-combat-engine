@@ -4,7 +4,7 @@
  */
 import {DAY_MINUTES,getCampaignAnchor,getCampaignEpisodeAnchor} from './hmk-campaign-calendar.js';
 import {openConcurrentProcedures} from './hmk-concurrent-procedures.js';
-import {createAlchemyHealingImbibing} from './hmk-alchemy-imbibing.js';
+import {createAlchemyHealingImbibing} from './hmk-alchemy-imbibing.js?v=94.155';
 import {createAlchemyVialEmpty} from './hmk-alchemy-vial-ledger.js';
 import {availableMasteries} from './hmk-skill-test-engine.js';
 import {initialCombatState,validateCombatState,applyExtendedShockCourse,applyComaCourse} from './persistent-combat-state.js';
@@ -23,8 +23,9 @@ const integer=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const check=(condition,message)=>{if(!condition)throw Error('Healing: '+message);};
 const die=(proof,faces)=>integer(proof?.value,1,faces)&&['manual','cryptographic-software-die'].includes(proof.origin);
 const eventType='alchemy-healing-recovery';
+const interactionType='alchemy-healing-interaction';
 const key=({kind,sourceId})=>kind+'::'+sourceId;
-const rowsFor=(state,campaignId,useId)=>state.events.filter(event=>event.type===eventType&&
+const rowsFor=(state,campaignId,useId)=>state.events.filter(event=>(event.type===eventType||event.type===interactionType)&&
  event.details.campaignId===campaignId&&event.details.useId===useId);
 
 function anchorFor(clock,actorId,{kind,sourceId},state){
@@ -303,7 +304,7 @@ export function pendingAlchemyHealing(characters,clock,campaignId){
   if(!clock.characterIds?.includes(actor.id)||actor.hmk?.healthState?.shock==='KIA')return [];
   const sources=new Map();
   for(const event of actor.hmk?.healthState?.events??[]){
-   if(event.type===eventType&&event.details.campaignId===campaignId)
+   if((event.type===eventType||event.type===interactionType)&&event.details.campaignId===campaignId)
     sources.set(event.details.useId,event.details);
   }
   return [...sources.values()].filter(source=>source.nextMinute!==null).map(source=>({...source,actor}));
@@ -314,21 +315,70 @@ export function assertAlchemyHealingMayAdvance(characters,clock,campaignId,targe
  check(!missed,'nejprve vyhodnoťte denní zotavení u postavy '+missed?.actor.name+' v minutě '+missed?.nextMinute+'.');
 }
 
+function healingInteraction(previous,trigger,use,triggerId){
+ const effect=trigger.profusionIllEffects?.find(effect=>effect.sourceUseId===previous.useId&&effect.kind==='healing-weakness');
+ const reduction=trigger.elixirName==='Physic'?trigger.physicEffects?.find(effect=>effect.sourceUseId===previous.useId):null;
+ if(!effect&&!reduction)return null;
+ check(previous.nextMinute!==null&&previous.nextMinute>=trigger.minute&&previous.asAfter>0&&
+  previous.actorId===trigger.targetId&&previous.campaignId===trigger.campaignId&&use?.elixirName==='Healing',
+  'souběh vyžaduje aktivní Healing tohoto příjemce.');
+ if(effect)check(trigger.sl==='CF'&&trigger.finalAS>0&&effect.baseAS===use.asBefore&&effect.weakness===use.asBefore*5,
+  'poškozený doklad Weakness ze souběhu.');
+ if(reduction)check(reduction.finishId===use.finishId&&reduction.asBefore===previous.asAfter&&
+  reduction.asAfter===Math.max(0,previous.asAfter-trigger.finalAS),'poškozený doklad snížení AS.');
+ const asAfter=reduction?.asAfter??previous.asAfter;
+ const weaknessAdded=effect?.weakness??0;
+ return {campaignId:previous.campaignId,useId:previous.useId,actorId:previous.actorId,minute:trigger.minute,
+  day:previous.day,asBefore:previous.asAfter,asAfter,weakness:previous.weakness+weaknessAdded,weaknessAdded,
+  nextMinute:asAfter>0?previous.nextMinute:null,triggerId};
+}
+
+export function prepareAlchemyHealingInteractions({state,journal,trigger,triggerId}){
+ const sourceIds=new Set([...(trigger.profusionIllEffects??[]).filter(effect=>effect.kind==='healing-weakness').map(effect=>effect.sourceUseId),
+  ...(trigger.physicEffects??[]).map(effect=>effect.sourceUseId)]);
+ const rows=[];
+ let next=state;
+ for(const useId of sourceIds){
+  const use=journal.find(row=>row.id===useId)?.calendarAlchemyImbibing;
+  if(use?.elixirName!=='Healing')continue;
+  const previous=next&&rowsFor(next,trigger.campaignId,useId).at(-1)?.details;
+  check(previous,'chybí zdravotní historie aktivního Healing.');
+  const receipt=healingInteraction(previous,trigger,use,triggerId);
+  const id=triggerId+':healing-interaction:'+useId;
+  check(receipt&&!next.events.some(event=>event.id===id),'tento souběh již byl započítán.');
+  next=structuredClone(next);
+  next.fatigue.otherWeakness+=receipt.weaknessAdded;
+  const round=Math.max(1,next.lastRound);
+  next.events.push({id,type:interactionType,round,details:receipt});next.lastRound=round;
+  validateCombatState(next);
+  rows.push({id,characterId:receipt.actorId,calendarCampaignId:receipt.campaignId,campaignMinute:receipt.minute,
+   calendarAlchemyHealingInteraction:receipt});
+ }
+ return {state:next,rows};
+}
+
 export function validateAlchemyHealingRecovery(journal,characters,branches={},activeCampaignId=null){
  const rows=new Map(journal.map(row=>[row.id,row]));
  const actors=new Map(characters.map(actor=>[actor.id,actor]));
  const starts=new Set();
- const previous=new Map();
+ const previous=new Map(),interactions=new Set(),seenUses=new Set();
  for(const row of journal){
-  const receipt=row.calendarAlchemyHealingRecovery;
+  if(row.calendarAlchemyImbibing)seenUses.add(row.id);
+  const interaction=row.calendarAlchemyHealingInteraction;
+  const receipt=interaction??row.calendarAlchemyHealingRecovery;
   if(!receipt)continue;
   const {campaignId,useId,actorId,minute,day,asBefore,asAfter,dailyRoll,success,nextMinute}=receipt;
   const use=rows.get(useId)?.calendarAlchemyImbibing;
   const old=previous.get(useId);
-  check(use?.elixirName==='Healing'&&use.targetId===actorId&&use.campaignId===campaignId&&
+  check(seenUses.has(useId)&&use?.elixirName==='Healing'&&use.targetId===actorId&&use.campaignId===campaignId&&
    row.calendarCampaignId===campaignId&&row.characterId===actorId&&row.campaignMinute===minute&&
-   row.id===useId+':healing:'+day,'poškozený původ dokladu léčení.');
-  if(!old){
+   row.id===(interaction?interaction.triggerId+':healing-interaction:'+useId:useId+':healing:'+day),'poškozený původ dokladu léčení.');
+  if(interaction){
+   const trigger=rows.get(interaction.triggerId)?.calendarAlchemyImbibing;
+   check(seenUses.has(interaction.triggerId)&&trigger&&old&&JSON.stringify(healingInteraction(old,trigger,use,interaction.triggerId))===JSON.stringify(interaction)&&
+    !interactions.has(row.id),'poškozený nebo duplicitní souběh Healing.');
+   interactions.add(row.id);
+  }else if(!old){
    check(day===0&&minute===use.minute&&asBefore===use.finalAS&&asAfter===asBefore,
     'poškozený počátek léčení.');
    starts.add(useId);
@@ -338,15 +388,21 @@ export function validateAlchemyHealingRecovery(journal,characters,branches={},ac
      die(dailyRoll,10)&&asAfter===asBefore-1&&success===(dailyRoll.value<=asBefore)),
     'poškozený denní hod nebo pokles AS.');
   }
-  check(nextMinute===null||asAfter>0&&nextMinute===minute+DAY_MINUTES,'poškozený další termín léčení.');
+  check(interaction||nextMinute===null||asAfter>0&&nextMinute===minute+DAY_MINUTES,'poškozený další termín léčení.');
   const actor=(campaignId!==activeCampaignId&&branches[campaignId]?.[actorId])||actors.get(actorId);
   const state=actor?.hmk?.healthState;
-  const event=state?.events.find(entry=>entry.id===row.id&&entry.type===eventType);
+  const event=state?.events.find(entry=>entry.id===row.id&&entry.type===(interaction?interactionType:eventType));
   check(event&&JSON.stringify(event.details)===JSON.stringify(receipt),'doklad nesouhlasí s historií zdraví.');
   previous.set(useId,receipt);
  }
  for(const row of journal){
-  if(row.calendarAlchemyImbibing?.elixirName==='Healing')check(starts.has(row.id),'chybí počáteční doklad léčení.');
+  const trigger=row.calendarAlchemyImbibing;
+  if(trigger?.elixirName==='Healing')check(starts.has(row.id),'chybí počáteční doklad léčení.');
+  if(!trigger)continue;
+  for(const {sourceUseId} of [...(trigger.physicEffects??[]),...(trigger.profusionIllEffects??[])]){
+   if(rows.get(sourceUseId)?.calendarAlchemyImbibing?.elixirName==='Healing')
+    check(interactions.has(row.id+':healing-interaction:'+sourceUseId),'chybí doklad souběhu aktivního Healing.');
+  }
  }
  return true;
 }
@@ -355,7 +411,7 @@ export function validateAlchemyHealingRecovery(journal,characters,branches={},ac
 export function assertAlchemyHealingRecoveryAppendOnly(before,after){
  const current=new Map(after.map(row=>[row.id,row]));
  for(const old of before){
-  if(old.calendarAlchemyHealingRecovery)
+  if(old.calendarAlchemyHealingRecovery||old.calendarAlchemyHealingInteraction)
    check(JSON.stringify(current.get(old.id))===JSON.stringify(old),'uložený doklad zotavení nelze změnit ani odstranit.');
  }
 }

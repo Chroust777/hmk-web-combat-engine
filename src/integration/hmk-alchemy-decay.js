@@ -62,7 +62,7 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
   // Instantaneous Physic (HMK p.273) reduces AS of each already active
   // temporary imbibed dose (including Footpad). The receipt is replayed in append order;
   // earlier Decay and Imbibing proofs are never edited or replaced.
-  if(use?.elixirName==='Physic'&&use.finishId!==finishId){
+  if(use?.elixirName==='Physic'&&use.finishId!==finishId&&proof.elixirName!=='Healing'){
    const effects=use.physicEffects??[];
    const e=effects.find(x=>x.finishId===finishId);
    if(e){

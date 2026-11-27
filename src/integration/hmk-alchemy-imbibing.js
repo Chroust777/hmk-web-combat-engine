@@ -2,21 +2,31 @@
  * First implemented canonical effect: Darkvision. Other elixirs stay disabled
  * until their specific health/astral/skill consequences are integrated.
  */
-import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
+import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.155';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
-import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js';
+import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.155';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
 const whole=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
 const originOK=o=>['manual','cryptographic-software-die'].includes(o);
 const relevant=(j,c)=>j.calendarCampaignId===c;
-function healedDoseEnded(journal,use,minute){
- const last=journal.findLast(row=>row.calendarCampaignId===use.calendarCampaignId&&row.campaignMinute<=minute&&
-  row.calendarAlchemyHealingRecovery?.useId===use.id)?.calendarAlchemyHealingRecovery;
- return last?.nextMinute===null;
+function latestHealingReceipt(journal,use,minute){
+ return journal.findLast(row=>row.calendarCampaignId===use.calendarCampaignId&&row.campaignMinute<=minute&&
+  (row.calendarAlchemyHealingInteraction??row.calendarAlchemyHealingRecovery)?.useId===use.id);
 }
+function activeHealing(journal,campaignId,targetId,minute){
+ return journal.flatMap(use=>{
+  const proof=use.calendarAlchemyImbibing;
+  if(!relevant(use,campaignId)||use.campaignMinute>minute||proof?.targetId!==targetId||proof.elixirName!=='Healing')return [];
+  const row=latestHealingReceipt(journal,use,minute);
+  const last=row?.calendarAlchemyHealingInteraction??row?.calendarAlchemyHealingRecovery;
+  return last?.nextMinute!=null&&last.asAfter>0?[{...proof,useId:use.id,
+   state:{currentAS:last.asAfter,nextDueMinute:null}}]:[];
+ });
+}
+const decayCurrent=(source,minute)=>source.elixirName==='Healing'||source.state.nextDueMinute>minute;
 export function activeDarkvision(journal=[],campaignId,targetId,minute=1e9){
  return journal.filter(j=>relevant(j,campaignId)&&j.calendarAlchemyImbibing?.targetId===targetId&&
   j.calendarAlchemyImbibing?.elixirName==='Darkvision'&&j.campaignMinute<=minute)
@@ -58,7 +68,7 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
  const live=[...activeDarkvision(journal,campaignId,targetId,minute),
   ...activeErudition(journal,campaignId,targetId,minute),
   ...activeFootpad(journal,campaignId,targetId,minute),
-  ...activeEgosight(journal,campaignId,targetId,minute)];
+  ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute)];
  const seen=new Set(live.map(x=>x.useId));
  ok(seen.size===live.length,'Profusion: duplicitní aktivní zdroj');
  for(const row of journal){
@@ -66,7 +76,7 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
   if(row.calendarCampaignId!==campaignId||row.campaignMinute>minute||proof?.targetId!==targetId)continue;
   const profile=canonicalProfusionProfile(proof.elixirName);
   ok(profile.use==='Imbibed','Profusion: Applied elixír nesmí mít Imbibing důkaz');
-  if(profile.exempt||seen.has(row.id)||!(proof.finalAS>0)||proof.elixirName==='Healing'&&healedDoseEnded(journal,row,minute))continue;
+  if(profile.exempt||seen.has(row.id)||!(proof.finalAS>0)||proof.elixirName==='Healing'&&latestHealingReceipt(journal,row,minute))continue;
   // A previously applied Instantaneous effect may still remain (Healing etc).
   // Without its canonical lifetime/recovery evidence, NEVER assume it ended.
   // A previous Temporary effect might have decayed/been dispelled; the four
@@ -95,7 +105,7 @@ export function activeAlchemyPhysicTargets(journal=[],campaignId,targetId,minute
  const live=[...activeDarkvision(journal,campaignId,targetId,minute),
   ...activeErudition(journal,campaignId,targetId,minute),
   ...activeFootpad(journal,campaignId,targetId,minute),
-  ...activeEgosight(journal,campaignId,targetId,minute)];
+  ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute)];
  const knownNames=new Set(['Darkvision','Erudition','Footpad','Egosight']);
  const seen=new Set();
  for(const source of live){
@@ -108,7 +118,7 @@ export function activeAlchemyPhysicTargets(journal=[],campaignId,targetId,minute
    proof?.targetId!==targetId)continue;
   const profile=canonicalProfusionProfile(proof.elixirName);
   ok(profile.use==='Imbibed','Physic: Applied účinek nesmí mít důkaz požití');
-  if(proof.elixirName==='Physic'||!(proof.finalAS>0)||proof.elixirName==='Healing'&&healedDoseEnded(journal,row,minute))continue;
+  if(proof.elixirName==='Physic'||!(proof.finalAS>0)||proof.elixirName==='Healing'&&latestHealingReceipt(journal,row,minute))continue;
   if(knownNames.has(proof.elixirName))continue; // their AS/expiry is replayed above
   throw Error('Physic: nelze ověřit trvání účinku '+proof.elixirName+
    ' (včetně elixírů vyňatých z Profusion); není bezpečné odečíst AS všech účinků');
@@ -139,7 +149,7 @@ export function createAlchemyFootpadImbibing({journal=[],inventory=[],campaignId
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Footpad: chybí skutečná nesená lahvička ve vlastnictví podávajícího');
  const others=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
- ok(others.every(x=>x.state.nextDueMinute>minute),'Footpad: nejdříve vyřešte splatný Decay');
+ ok(others.every(x=>decayCurrent(x,minute)),'Footpad: nejdříve vyřešte splatný Decay');
  const profusion=classifyProfusionImbibing(d100,ml,others.length);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
@@ -171,7 +181,7 @@ export function createAlchemyEgosightImbibing({journal=[],inventory=[],campaignI
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Egosight: chybí fyzická lahvička příslušného vlastníka');
  const others=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
- ok(others.every(x=>x.state.nextDueMinute>minute),'Egosight: nejprve vyhodnoťte splatný Decay');
+ ok(others.every(x=>decayCurrent(x,minute)),'Egosight: nejprve vyhodnoťte splatný Decay');
  const profusion=classifyProfusionImbibing(d100,ml,others.length);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
@@ -232,14 +242,15 @@ export function createAlchemyEruditionImbibing({journal=[],inventory=[],campaign
  const otherVision=cohort.filter(x=>x.elixirName==='Darkvision');
  const footpadSources=cohort.filter(x=>x.elixirName==='Footpad');
  const egosightSources=cohort.filter(x=>x.elixirName==='Egosight');
- const otherCount=current.length+otherVision.length+footpadSources.length+egosightSources.length;
+ const healing=cohort.filter(x=>x.elixirName==='Healing');
+ const otherCount=cohort.length;
  const profusion=classifyProfusionImbibing(d100,ml,otherCount);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
 
  // A CF affects the newly swallowed Erudition AND every already active
  // enchantment. Each secondary effect gets an independently replayable proof.
- const affected=level==='CF'&&finalAS>0?concurrentAlchemyIllEffects([...otherVision,...current,...footpadSources,...egosightSources]):[];
+ const affected=level==='CF'&&finalAS>0?concurrentAlchemyIllEffects([...otherVision,...current,...footpadSources,...egosightSources,...healing]):[];
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Erudition',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
   testSkill,ml,d100,origin,otherActiveElixirs:otherCount,profusionCF:profusion.profusionCF,
@@ -277,7 +288,7 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
   emptyId,vialId:vial.vialId,elixirName:'Darkvision',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',testSkill,ml,d100,origin,
   otherActiveElixirs:others,profusionCF:profusion.profusionCF,
   ...(others>0?{profusionIllEffects:level==='CF'&&finalAS>0?[
-   ...concurrentAlchemyIllEffects([...cohort.filter(x=>x.elixirName==='Darkvision'),...existingErudition,...footpadSources,...egoSources])]:[]}:{}),
+   ...concurrentAlchemyIllEffects([...cohort.filter(x=>x.elixirName==='Darkvision'),...existingErudition,...footpadSources,...egoSources,...cohort.filter(x=>x.elixirName==='Healing')])]:[]}:{}),
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,
   temporary:finalAS>0,darkvisionFeet:finalAS*5,
   // CF light sensitivity is a real adverse effect; do not invent a recovery roll.
@@ -311,7 +322,7 @@ export function createAlchemyPhysicImbibing({journal=[],inventory=[],campaignId,
  const level=classifyProfusionImbibing(d100,ml,0).adjusted;
  const delta={CF:-2,F:-1,S:0,CS:1}[level],finalAS=Math.max(0,state.currentAS+delta);
  const affected=activeAlchemyPhysicTargets(journal,campaignId,targetId,minute);
- ok(affected.every(x=>x.state.nextDueMinute>minute),
+ ok(affected.every(x=>decayCurrent(x,minute)),
   'Physic: nejprve vyhodnoťte všechny splatné alchymistické Decay Rolls');
  const physicEffects=finalAS>0?affected
   .map(x=>({finishId:x.finishId,sourceUseId:x.useId,asBefore:x.state.currentAS,
@@ -420,7 +431,7 @@ export function createAlchemyHealingImbibing({journal=[],inventory=[],campaignId
   inventory.some(item=>item.id===vial.vialId&&item.characterId===actorId&&item.slot===vial.slot&&item.quantity===1),
   'Healing: chybí skutečná nádoba v držení podávajícího');
  const active=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
- ok(active.every(source=>source.state.nextDueMinute>minute),'Healing: nejprve vyhodnoťte splatný Decay');
+ ok(active.every(source=>decayCurrent(source,minute)),'Healing: nejprve vyhodnoťte splatný Decay');
  const {adjusted:sl,profusionCF}=classifyProfusionImbibing(d100,ml,active.length);
  const modifier={CF:-2,F:-1,S:0,CS:1}[sl],finalAS=Math.max(0,dose.currentAS+modifier);
  const illEffects=sl==='CF'&&finalAS>0?concurrentAlchemyIllEffects(active):[];

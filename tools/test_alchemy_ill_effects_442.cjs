@@ -57,7 +57,9 @@ for(const name of ['Darkvision','Erudition','Footpad','Egosight']){
   {sourceUseId:src.useId,kind:'aural-shock',levels:1,weakness:5,
    ...(['Footpad','Egosight'].includes(name)?{sourceElixir:name}:{})});
 }
-fail(()=>E.supportedAlchemyConcurrentIllEffect({elixirName:'Healing',asBefore:7,useId:'a'}),/nelze/);
+eq(E.supportedAlchemyConcurrentIllEffect({elixirName:'Healing',asBefore:7,useId:'a'}),
+ {sourceUseId:'a',kind:'healing-weakness',baseAS:7,weakness:35});
+fail(()=>E.supportedAlchemyConcurrentIllEffect({elixirName:'Mindsalve',asBefore:7,useId:'a'}),/nelze/);
 fail(()=>E.supportedAlchemyConcurrentIllEffect({elixirName:'Darkvision',asBefore:7}),/nelze/);
 const snap=JSON.stringify(E.CANONICAL_ALCHEMY_ILL_EFFECTS);
 for(let i=0;i<5;i++)E.planAlchemyIllEffect({elixirName:'Physic',baseAS:7});

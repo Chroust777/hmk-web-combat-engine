@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import {advanceCampaignCalendar,anchorCampaignOrigin,createCampaignCalendar,DAY_MINUTES} from '../src/integration/hmk-campaign-calendar.js';
 import {initialCombatState,validateCombatState} from '../src/integration/persistent-combat-state.js';
-import {startAlchemyHealingRecovery,advanceAlchemyHealingRecovery,prepareAlchemyHealingUse,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed} from '../src/integration/hmk-alchemy-healing-recovery.js';
+import {startAlchemyHealingRecovery,advanceAlchemyHealingRecovery,prepareAlchemyHealingUse,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed,prepareAlchemyHealingInteractions,pendingAlchemyHealing} from '../src/integration/hmk-alchemy-healing-recovery.js';
 
-import {validateAlchemyImbibingJournal,activeAlchemyProfusionCohort,activeAlchemyPhysicTargets} from '../src/integration/hmk-alchemy-imbibing.js';
+import {validateAlchemyImbibingJournal,activeAlchemyProfusionCohort,activeAlchemyPhysicTargets,createAlchemyPhysicImbibing,createAlchemyFootpadImbibing} from '../src/integration/hmk-alchemy-imbibing.js';
 import {alchemyElixirStrength} from '../src/integration/hmk-alchemy-decay.js';
-import {createAlchemyVialBinding,alchemyVialState} from '../src/integration/hmk-alchemy-vial-ledger.js';
+import {createAlchemyVialBinding,createAlchemyVialEmpty,alchemyVialState} from '../src/integration/hmk-alchemy-vial-ledger.js';
 import {PRINTED_VIAL} from '../src/integration/hmk-herbal-vial-ledger.js';
 
 const actor={id:'patient',hmk:{attributes:{end:16,wil:16}}},campaignId='campaign',useId='dose';
@@ -129,8 +129,62 @@ assert.equal(alchemyElixirStrength(saved,campaignId,dose.id,clock.minute).nextDu
 assert.equal(healingArcaneRollAlreadyUsed(prepared.state,campaignId,clock.minute,{kind:'injury',sourceId:'old'}),true);
 assert.throws(()=>validateAlchemyHealingRecovery(saved.slice(0,-1),actors),/chybí počáteční doklad/);
 assert.throws(()=>assertAlchemyHealingRecoveryAppendOnly(saved,saved.slice(0,-1)),/nelze změnit ani odstranit/);
-assert.throws(()=>activeAlchemyProfusionCohort(saved,campaignId,actor.id,clock.minute),/Healing/);
-assert.throws(()=>activeAlchemyPhysicTargets(saved,campaignId,actor.id,clock.minute),/Healing/);
+assert.equal(activeAlchemyProfusionCohort(saved,campaignId,actor.id,clock.minute)[0].useId,use.useId);
+assert.equal(activeAlchemyPhysicTargets(saved,campaignId,actor.id,clock.minute)[0].state.currentAS,9);
+
+function consume({elixirName,baseAS,d100,create,prior=saved,state=prepared.state,tag=elixirName}){
+ const finishId=tag+'-finish',triggerId=tag+'-use',emptyId=tag+'-empty',vialId=tag+'-vial';
+ const carried=[{...inventory[0],id:vialId}];
+ const filled=[...prior,event(finishId,'calendarAlchemyFinish',{...dose.calendarAlchemyFinish,elixirName,baseAS})];
+ const bound=createAlchemyVialBinding({...vialContext,finishId,inventory:carried,journal:filled,vialId,
+  confirmedByGM:true,storageAtCompletionConfirmed:true,liquidConfirmed:true,material:'glass',corkConfirmed:true});
+ const journal=[...filled,event(tag+'-bound','calendarAlchemyVialBinding',bound)];
+ const params={journal,inventory:carried,campaignId,minute:clock.minute,actorId:actor.id,finishId};
+ const trigger=create({...params,targetId:actor.id,testSkill:'Aura',ml:75,d100,origin:'manual',emptyId,gmConfirmed:true});
+ const empty=createAlchemyVialEmpty({...params,reason:elixirName+' consumed',confirmedByGM:true});
+ const interaction=prepareAlchemyHealingInteractions({state,journal,trigger,triggerId});
+ const persisted=[...journal,event(emptyId,'calendarAlchemyVialEmpty',empty),event(triggerId,'calendarAlchemyImbibing',trigger),
+  ...interaction.rows];
+ const recipients=[{...actors[0],hmk:{...actors[0].hmk,healthState:interaction.state}}];
+ assert.equal(validateAlchemyImbibingJournal(persisted),true);
+ assert.equal(validateAlchemyHealingRecovery(persisted,recipients),true);
+ assert.throws(()=>validateAlchemyHealingRecovery(persisted.slice(0,-1),recipients),/chybí doklad souběhu/);
+ assert.throws(()=>validateAlchemyHealingRecovery([...persisted.slice(0,-2),persisted.at(-1),persisted.at(-2)],recipients),/poškozený nebo duplicitní souběh/);
+ return {...interaction,proof:trigger,journal:persisted,actors:recipients,receipt:interaction.rows[0].calendarAlchemyHealingInteraction};
+}
+const profusion=consume({elixirName:'Footpad',baseAS:6,d100:83,create:createAlchemyFootpadImbibing});
+assert.equal(profusion.proof.sl,'CF');
+assert.equal(profusion.proof.profusionCF,true);
+assert.equal(profusion.receipt.weaknessAdded,40);
+assert.equal(profusion.state.fatigue.otherWeakness,prepared.state.fatigue.otherWeakness+40);
+assert.equal(profusion.receipt.asAfter,9);
+assert.equal(profusion.receipt.nextMinute,prepared.receipt.nextMinute);
+const reduced=consume({elixirName:'Physic',baseAS:6,d100:11,create:createAlchemyPhysicImbibing});
+assert.equal(reduced.proof.sl,'S');
+assert.equal(reduced.receipt.asAfter,3);
+assert.equal(reduced.receipt.nextMinute,prepared.receipt.nextMinute);
+const projected=pendingAlchemyHealing(reduced.actors,clock,campaignId)[0];
+assert.equal(projected.asAfter,3);
+const afterPhysic=advanceAlchemyHealingRecovery({...context,actor:reduced.actors[0],useId:use.useId,
+ clock:time(clock,1),state:reduced.state,dailyRoll:r10(4),rolls:[]});
+assert.equal(afterPhysic.receipt.success,false);
+assert.equal(afterPhysic.receipt.asBefore,3);
+assert.equal(afterPhysic.receipt.asAfter,2);
+assert.equal(validateAlchemyHealingRecovery([...reduced.journal,event(use.useId+':healing:1','calendarAlchemyHealingRecovery',
+ afterPhysic.receipt,time(clock,1).minute)],[{...reduced.actors[0],hmk:{...reduced.actors[0].hmk,healthState:afterPhysic.state}}]),true);
+const dispelled=consume({elixirName:'Physic',baseAS:6,d100:11,create:createAlchemyPhysicImbibing,tag:'second',
+ prior:reduced.journal,state:reduced.state});
+assert.equal(dispelled.receipt.asAfter,0);
+assert.equal(dispelled.receipt.nextMinute,null);
+assert.deepEqual(pendingAlchemyHealing(dispelled.actors,clock,campaignId),[]);
+assert.deepEqual(activeAlchemyProfusionCohort(dispelled.journal,campaignId,actor.id,clock.minute),[]);
+const exempt=consume({elixirName:'Physic',baseAS:6,d100:83,create:createAlchemyPhysicImbibing});
+assert.equal(exempt.proof.sl,'F');
+assert.equal(exempt.proof.profusionCF,false);
+const critical=consume({elixirName:'Physic',baseAS:6,d100:85,create:createAlchemyPhysicImbibing});
+assert.equal(critical.receipt.weaknessAdded,40);
+assert.equal(critical.receipt.asAfter,5);
+console.log('PASS Healing: active Profusion, per-dose Weakness, partial and full Physic, daily threshold and journal replay');
 const exhausted={...initialRow,calendarAlchemyHealingRecovery:{...prepared.receipt,nextMinute:null}};
 assert.equal(activeAlchemyProfusionCohort([...closed,useRow,exhausted],campaignId,actor.id,clock.minute).length,0);
 console.log('PASS Healing: verified vial and emptiness proof, provenance, instant mitigation, failed magic without damage, daily AS, CF weakness, Balm overlap, original wounds only, reload');
