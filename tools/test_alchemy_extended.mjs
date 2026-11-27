@@ -9,7 +9,7 @@ import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPla
  validateExtendedAlchemy,assertExtendedAlchemyAppendOnly} from '../src/integration/hmk-alchemy-extended.js';
 import {warmthProtection,createWarmthProximity,validateWarmthProximityJournal,assertWarmthProximityAppendOnly} from '../src/integration/hmk-alchemy-warmth.js';
 import {soulcloakStatus,createSoulcloakDefence,validateSoulcloakJournal,assertSoulcloakAppendOnly} from '../src/integration/hmk-alchemy-soulcloak.js';
-import {exsiccationSources,activeExsiccationAreas,createExsiccationBreath,validateExsiccationJournal,assertExsiccationAppendOnly} from '../src/integration/hmk-alchemy-exsiccation.js';
+import {elixirBreathSources,activeElixirBreathAreas,createElixirBreath,validateElixirBreathJournal,assertElixirBreathAppendOnly} from '../src/integration/hmk-alchemy-exsiccation.js';
 import {applyAlchemyExsiccationAural,createExsiccationProfusionIll,applyExsiccationProfusionAural,validateExsiccationProfusionJournal} from '../src/integration/hmk-alchemy-imbibing.js';
 import {historicalHMKCalendarEntries} from '../src/integration/hmk-calendar-history.js';
 import {previewAreaCohort} from '../src/integration/hmk-area-cohort-preview.js';
@@ -274,20 +274,20 @@ console.log('PASS Soulcloak: True Sight, journal replay, duplicate defence, Aura
 
 const dry=drink({name:'Exsiccation',useId:'dry'});
 const dryContext={journal:dry.journal,campaignId,actorId,minute,useId:'dry',auralShockLevels:0,gmConfirmed:true,waterReference:'Rainwater'};
-const breath=createExsiccationBreath(dryContext);
+const breath=createElixirBreath(dryContext);
 assert.equal(breath.asBefore,6);
 assert.equal(breath.asAfter,5);
 assert.equal(breath.radiusFeet,5);
 assert.equal(breath.endMinute,minute+6);
 const dryJournal=[...dry.journal,row('dry-breath','calendarAlchemyExsiccationBreath',breath)];
-assert.equal(exsiccationSources({...dryContext,journal:dryJournal})[0].state.currentAS,5);
-assert.deepEqual(activeExsiccationAreas({...dryContext,journal:dryJournal,minute:minute+5}),[breath]);
-assert.deepEqual(activeExsiccationAreas({...dryContext,journal:dryJournal,minute:minute+6}),[]);
-assert.deepEqual(activeExsiccationAreas({...dryContext,journal:dryJournal,auralShockLevels:1}),[]);
-assert.throws(()=>createExsiccationBreath({...dryContext,auralShockLevels:1}),/Aural Shock/);
-assert.throws(()=>createExsiccationBreath({...dryContext,journal:dryJournal}),/již byl/);
-assert.doesNotThrow(()=>validateExsiccationJournal(dryJournal));
-assert.throws(()=>assertExsiccationAppendOnly(dryJournal,dry.journal),/odstranit/);
+assert.equal(elixirBreathSources({...dryContext,journal:dryJournal})[0].state.currentAS,5);
+assert.deepEqual(activeElixirBreathAreas({...dryContext,journal:dryJournal,minute:minute+5}),[breath]);
+assert.deepEqual(activeElixirBreathAreas({...dryContext,journal:dryJournal,minute:minute+6}),[]);
+assert.deepEqual(activeElixirBreathAreas({...dryContext,journal:dryJournal,auralShockLevels:1}),[]);
+assert.throws(()=>createElixirBreath({...dryContext,auralShockLevels:1}),/Aural Shock/);
+assert.throws(()=>createElixirBreath({...dryContext,journal:dryJournal}),/již byl/);
+assert.doesNotThrow(()=>validateElixirBreathJournal(dryJournal));
+assert.throws(()=>assertElixirBreathAppendOnly(dryJournal,dry.journal),/odstranit/);
 const harshDry=drink({name:'Exsiccation',useId:'dry-cf',d100:95});
 const exsiccationShock=applyAlchemyExsiccationAural({proof:harshDry.proof,eventId:'dry-cf',state:harshDry.actor.hmk.healthState});
 assert.equal(exsiccationShock.arcane.auralShockLevels,1);
@@ -298,5 +298,23 @@ const afterIll=applyExsiccationProfusionAural({journal:trigger.journal,proof:ill
 assert.equal(afterIll.arcane.auralShockLevels,1);
 assert.equal(validateExsiccationProfusionJournal([...trigger.journal,row('dry-prof','calendarAlchemyExsiccationProfusionIll',ill)]),true);
 const wetAgain=drink({name:'Physic',useId:'dry-physic',prior:dryJournal,actor:dry.actor,baseAS:8});
-assert.deepEqual(activeExsiccationAreas({...dryContext,journal:wetAgain.journal}),[]);
+assert.deepEqual(activeElixirBreathAreas({...dryContext,journal:wetAgain.journal}),[]);
 console.log('PASS Exsiccation: radius, duration, expenditure, Aural Shock, Profusion, history and Physic');
+
+const shadow=drink({name:'Shadowbreath',useId:'shadow',d100:95});
+assert.equal(shadow.proof.sourcePages.at(-1),274);
+assert.equal(shadow.actor.hmk.healthState.fatigue.weariness,30);
+const shadowContext={journal:shadow.journal,campaignId,actorId,minute,useId:'shadow',elixirName:'Shadowbreath',
+ auralShockLevels:0,gmConfirmed:true};
+const darkness=createElixirBreath(shadowContext);
+assert.deepEqual(darkness.sourcePages,[270,274]);
+assert.equal(darkness.radiusFeet,5);
+assert.equal(darkness.asAfter,3);
+const darkJournal=[...shadow.journal,row('shadow-breath','calendarAlchemyShadowbreath',darkness)];
+assert.doesNotThrow(()=>validateElixirBreathJournal(darkJournal));
+assert.deepEqual(activeElixirBreathAreas({...shadowContext,journal:darkJournal,minute:minute+3}),[darkness]);
+assert.deepEqual(activeElixirBreathAreas({...shadowContext,journal:darkJournal,minute:minute+4}),[]);
+assert.deepEqual(activeElixirBreathAreas({...shadowContext,journal:darkJournal,elixirName:'Exsiccation'}),[]);
+const physicShadow=drink({name:'Physic',useId:'shadow-physic',actor:shadow.actor,prior:darkJournal});
+assert.deepEqual(activeElixirBreathAreas({...shadowContext,journal:physicShadow.journal}),[]);
+console.log('PASS Shadowbreath: moving area, expiry, AS consumption, CF and Physic');

@@ -1,6 +1,6 @@
 /** HMK 273–274. The imbiber's own Warmth needs no proximity proof. Other
  * recipients use current combat coordinates or a same-minute GM witness. */
-import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.169';
+import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.170';
 
 const check=(condition,message)=>{if(!condition)throw Error('Warmth: '+message);};
 const live=actor=>actor&&actor.hmk?.healthState?.shock!=='KIA';

@@ -5,7 +5,7 @@ import {isCompletedSkillTest,skillTestEvidenceHTML} from './hmk-skill-result-evi
 import {calendarEventDestination} from './hmk-calendar-event-routing.js?v=94.110';
 import {displayCampaignMinute,campaignCalendarAgenda} from './hmk-campaign-calendar.js?v=94.140';
 import {passiveHMKCalendarMilestones} from './hmk-calendar-campaign-lifecycle.js';
-import {historicalHMKCalendarEntries} from './hmk-calendar-history.js?v=94.169';
+import {historicalHMKCalendarEntries} from './hmk-calendar-history.js?v=94.170';
 import {calendarActorActivities} from './hmk-calendar-activities.js';
 import {calendarNutritionConditionActivities} from './hmk-nutrition-activity.js';
 import {calendarVisibleHistory,calendarVisibleActivities} from './hmk-calendar-timeline-visibility.js';

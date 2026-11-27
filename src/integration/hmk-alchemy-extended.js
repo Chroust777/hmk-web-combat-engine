@@ -2,7 +2,7 @@
  * Mindsalve and Poison doses, with thermal shields and Quiescence projections. */
 import {DAY_MINUTES} from './hmk-campaign-calendar.js';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
-import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.169';
+import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.170';
 import {activeFearSources,updateFearSource} from './hmk-concurrent-fear.js';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse,endAlchemicalPoison} from './hmk-poison-course.js?v=94.158';
 import {psycheStressRecovery} from '../rules/mental-trauma.js';
@@ -152,7 +152,7 @@ export function startExtendedAlchemy({actor,proof,useId,journal,mindRolls=[],sym
    onsetMinutes:0,periodMinutes:0,initialHR:Math.max(0,Math.min(6,10-finalAS)),symptomD10s,
    transmission:'digested',gmConfirmed:true,actualExposureConfirmed:true,alchemicalSource:{useId,as:finalAS}});
   out.state=rounds.state;receipt.active=true;receipt.elapsedRounds=0;receipt.hr=rounds.course.hr;
- }else if(finalAS>0&&['Fireshield','Iceshield','Warmth','Soulcloak'].includes(elixirName)){
+ }else if(finalAS>0&&['Fireshield','Iceshield','Warmth','Soulcloak','Shadowbreath'].includes(elixirName)){
   receipt.weariness=proof.illEffect?.amount??0;state.fatigue.weariness+=receipt.weariness;
  }
  return {...out,rows:[receiptRow(actor,out,receipt,useId+':extended:start')]};
@@ -215,7 +215,7 @@ export function applyExtendedAlchemyInteractions({actor,journal,trigger,triggerI
  const {campaignId,minute}=trigger;
  const effects=trigger.profusionIllEffects??[];
  const targets=trigger.physicEffects??[];
- for(const effect of effects.filter(effect=>['fireshield-weariness','iceshield-weariness','warmth-weariness','soulcloak-weariness'].includes(effect.kind))){
+ for(const effect of effects.filter(effect=>['fireshield-weariness','iceshield-weariness','warmth-weariness','soulcloak-weariness','shadowbreath-weariness'].includes(effect.kind))){
   const use=journal.find(row=>row.id===effect.sourceUseId)?.calendarAlchemyImbibing;
   check(use?.elixirName?.toLowerCase()+'-weariness'===effect.kind&&effect.amount===use.asBefore*5,'nedoložený zdroj Weariness.');
   out.state.fatigue.weariness+=effect.amount;
@@ -276,7 +276,7 @@ export function requireExtendedAlchemyTime({actors,clock,journal,campaignId,afte
 
 export function validateExtendedAlchemy(journal,actors,branches,activeCampaign){
  const prior=[];
- const tracked=new Set(['Mindsalve','Poison','Fireshield','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation']);
+ const tracked=new Set(['Mindsalve','Poison','Fireshield','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation','Shadowbreath']);
  for(const row of journal){
   const p=row.calendarAlchemyExtendedRecovery;
   if(p){
@@ -286,7 +286,7 @@ export function validateExtendedAlchemy(journal,actors,branches,activeCampaign){
     p.campaignId===row.calendarCampaignId&&p.actorId===row.characterId&&p.minute===row.campaignMinute&&p.healthEventId===row.id&&
     (earlier?earlier.minute<=p.minute&&p.phase!=='start':p.phase==='start'&&p.minute===use.minute&&p.asAfter===use.finalAS),
     'poškozený doklad účinku elixíru.');
-   const wearinessElixir=['Fireshield','Iceshield','Warmth','Soulcloak'].includes(p.elixirName);
+   const wearinessElixir=['Fireshield','Iceshield','Warmth','Soulcloak','Shadowbreath'].includes(p.elixirName);
    if(earlier&&!wearinessElixir)check((earlier.active||p.phase==='end'&&earlier.weakness>0)&&p.asBefore===earlier.asAfter,'nesouhlasí předchozí stav dávky.');
    if(p.phase==='interaction'){
     const trigger=prior.find(x=>x.id===p.triggerId)?.calendarAlchemyImbibing;
@@ -314,7 +314,7 @@ export function validateExtendedAlchemy(journal,actors,branches,activeCampaign){
    'chybí počáteční doklad účinku elixíru.');
   for(const item of [...(use.profusionIllEffects??[]),...(use.physicEffects??[])]){
    const name=rows.get(item.sourceUseId)?.calendarAlchemyImbibing?.elixirName;
-   if(['mindsalve-weakness','fireshield-weariness','iceshield-weariness','warmth-weariness','soulcloak-weariness'].includes(item.kind)||['Mindsalve','Poison'].includes(name))
+   if(['mindsalve-weakness','fireshield-weariness','iceshield-weariness','warmth-weariness','soulcloak-weariness','shadowbreath-weariness'].includes(item.kind)||['Mindsalve','Poison'].includes(name))
     check(rows.get(row.id+':extended:'+item.sourceUseId)?.calendarAlchemyExtendedRecovery?.triggerId===row.id,
      'chybí samostatný doklad souběhu elixíru.');
   }

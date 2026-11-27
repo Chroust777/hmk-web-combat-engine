@@ -1,6 +1,6 @@
 /** HMK pp.270, 274. Resolve the Soulcloak defence for an attested True
  * Sight attempt, without adjudicating the True Sight roll itself. */
-import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.169';
+import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.170';
 
 const check=(condition,message)=>{if(!condition)throw Error('Soulcloak: '+message);};
 

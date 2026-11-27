@@ -2,19 +2,19 @@
  * First implemented canonical effect: Darkvision. Other elixirs stay disabled
  * until their specific health/astral/skill consequences are integrated.
  */
-import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.169';
+import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.170';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
-import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.169';
+import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.170';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
 const whole=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
 const originOK=o=>['manual','cryptographic-software-die'].includes(o);
 const relevant=(j,c)=>j.calendarCampaignId===c;
-const newElixirNames=['Mindsalve','Fireshield','Poison','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation'];
+const newElixirNames=['Mindsalve','Fireshield','Poison','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation','Shadowbreath'];
 const fullImbibingNames=['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity',...newElixirNames];
-const additionalTemporary=['Fireshield','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation'];
+const additionalTemporary=['Fireshield','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation','Shadowbreath'];
 
 export function activeAdditionalTemporary(journal,campaignId,targetId,minute,name){
  return journal.filter(row=>relevant(row,campaignId)&&row.campaignMinute<=minute&&
@@ -97,7 +97,8 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
   ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Iceshield'),
   ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Warmth'),
   ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Soulcloak'),
-  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Exsiccation')];
+  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Exsiccation'),
+  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Shadowbreath')];
  const seen=new Set(live.map(x=>x.useId));
  ok(seen.size===live.length,'Profusion: duplicitní aktivní zdroj');
  for(const row of journal){
@@ -512,7 +513,7 @@ export function createExtendedAlchemyImbibing({journal=[],inventory=[],campaignI
   testSkill,ml,d100,origin,otherActiveElixirs:others.length,profusionCF:roll.profusionCF,sl,
   asBefore:dose.currentAS,modifier,finalAS,temporary:finalAS>0&&additionalTemporary.includes(elixirName),
   ...(critical&&others.length?{profusionIllEffects:concurrentAlchemyIllEffects(others)}:{}),
-  illEffect,consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,elixirName==='Exsiccation'?271:elixirName==='Fireshield'?272:['Warmth','Soulcloak'].includes(elixirName)?274:273]};
+  illEffect,consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,elixirName==='Exsiccation'?271:elixirName==='Fireshield'?272:['Warmth','Soulcloak','Shadowbreath'].includes(elixirName)?274:273]};
 }
 
 export function validateAlchemyImbibingJournal(journal=[]){

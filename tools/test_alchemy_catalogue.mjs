@@ -20,6 +20,7 @@ assert.equal(elixirReference('Iceshield').supported,true);
 assert.equal(elixirReference('Warmth').supported,true);
 assert.equal(elixirReference('Soulcloak').supported,true);
 assert.equal(elixirReference('Exsiccation').supported,true);
+assert.equal(elixirReference('Shadowbreath').supported,true);
 assert.match(elixirReference('Mindsalve').adverse,/5 Weakness/);
 assert.match(elixirReference('Eruption').effect,/d4 \+ AS/);
 assert.match(elixirReference('Quiescence').duration,/úspěch ubere 2 AS/);
