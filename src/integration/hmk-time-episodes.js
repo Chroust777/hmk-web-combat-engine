@@ -15,7 +15,7 @@ import {createOrienteeringContext,adjustedOrienteeringSV} from './hmk-trekking-o
 import {allocateTrekModes} from './hmk-trekking-correction.js';
 import {assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 import {trackingModifiers,trackingOutcome} from './hmk-trekking-wilderness-tasks.js';
-import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js?v=94.159';
+import {episodeEncounterSurprise,episodeEncounterDistance,episodeHazardFollowup,episodeTrackingFollowup,episodeAnimalScentTracking93936,episodeWeatherExposure,episodeWeatherFatigueUnits,episodeLightIntervals} from './hmk-episode-travel-detail.js?v=94.160';
 import {validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {validateTransportMassEvidence93816} from './hmk-transport-passengers-93816.js';
 import {incidentMinutes93863} from './hmk-incident-window-93863.js';
@@ -1192,7 +1192,7 @@ export function validateTimeEpisodes(journal=[]){
     must(e.memberIds.includes(w.id)&&!safeAtStart.includes(w.id)&&e.weatherHazards.includes(w.kind)&&!w.pending,
      'Weather Hazard se vztahuje na cizí nebo bezpečně krytou postavu či nemá doložený hod.');
     const expected=episodeWeatherExposure({kind:w.kind,areaAV:w.areaAV,roll:w.roll,
-     protection:w.protection,fireStrength:w.fireStrength,continuousSleet:w.continuousSleet,fireshieldAV:w.fireshieldAV,iceshieldAV:w.iceshieldAV,
+     protection:w.protection,fireStrength:w.fireStrength,continuousSleet:w.continuousSleet,fireshieldAV:w.fireshieldAV,iceshieldAV:w.iceshieldAV,warmthAV:w.warmthAV,
      resting:w.resting,shade:w.shade,tropicalNative:w.tropicalNative,endLevel:w.endLevel});
     if(w.passiveResistance!==undefined){
      must(w.exposed===true&&w.proofId===null&&verifyPassiveWeatherResistance(w.passiveResistance)&&

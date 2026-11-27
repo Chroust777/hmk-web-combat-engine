@@ -77,7 +77,7 @@ const penaltyTargets={
  'hearing-per-awareness':'Perception a Awareness při naslouchání'
 };
 const supportedUse=new Set(['Acid','Darkvision','Egosight','Erudition','Eruption','Fireshield','Footpad','Fumebomb',
- 'Healing','Iceshield','Mending','Mindsalve','Object Aegis','Physic','Poison','Quiescence','Verity','Weakness']);
+ 'Healing','Iceshield','Mending','Mindsalve','Object Aegis','Physic','Poison','Quiescence','Verity','Warmth','Weakness']);
 function adverseEffect(name,profile){
  switch(profile.kind){
   case 'not-imbibed':return appliedRisk[name];

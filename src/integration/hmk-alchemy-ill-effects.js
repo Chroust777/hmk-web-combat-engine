@@ -70,12 +70,12 @@ export function planAlchemyIllEffect({elixirName,baseAS,stage='on-cf'}={}){
  */
 export function supportedAlchemyConcurrentIllEffect(source){
  const name=source?.elixirName,baseAS=source?.asBefore;
- if(!['Darkvision','Erudition','Footpad','Egosight','Healing','Verity','Mindsalve','Fireshield','Iceshield'].includes(name)||
+ if(!['Darkvision','Erudition','Footpad','Egosight','Healing','Verity','Mindsalve','Fireshield','Iceshield','Warmth'].includes(name)||
   typeof source?.useId!=='string'||!source.useId)
   throw Error('Alchemy Ill Effects: aktivní zdroj nelze mechanicky doložit');
  const plan=planAlchemyIllEffect({elixirName:name,baseAS});
  if(name==='Healing')return {sourceUseId:source.useId,kind:'healing-weakness',baseAS,weakness:plan.amount};
- if(['Mindsalve','Fireshield','Iceshield'].includes(name))return {sourceUseId:source.useId,
+ if(['Mindsalve','Fireshield','Iceshield','Warmth'].includes(name))return {sourceUseId:source.useId,
   kind:name==='Mindsalve'?'mindsalve-weakness':name.toLowerCase()+'-weariness',baseAS,amount:plan.amount};
  if(name==='Darkvision')return {sourceUseId:source.useId,kind:'vision-light-penalty',
   baseAS,penalty:plan.penalty};

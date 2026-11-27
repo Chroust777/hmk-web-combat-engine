@@ -6,7 +6,7 @@
  * supported environmental conditions and actual d100; both physical dice
  * and the derived SL/health consequence are retained as immutable evidence.
  */
-import {evaluateTrekkingWeatherRoll} from './hmk-trekking-weather-roll.js';
+import {evaluateTrekkingWeatherRoll} from './hmk-trekking-weather-roll.js?v=94.160';
 import {trekRegisteredAnimalHealth,validateTrekAnimalHealthProof} from './hmk-trekking-animal-health.js';
 import {prepareTrekkingWeatherTest} from './hmk-weather-hazard-aftermath.js';
 import {successLevel} from '../rules/tests.js';

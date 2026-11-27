@@ -7,6 +7,7 @@ import {createAlchemyDecay,alchemyElixirStrength,validateAlchemyDecayJournal} fr
 import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPlan,startExtendedAlchemy,advanceExtendedAlchemy,
  pendingExtendedAlchemy,applyExtendedAlchemyInteractions,settleExtendedAlchemy,requireExtendedAlchemyTime,
  validateExtendedAlchemy,assertExtendedAlchemyAppendOnly} from '../src/integration/hmk-alchemy-extended.js';
+import {warmthProtection,createWarmthProximity,validateWarmthProximityJournal,assertWarmthProximityAppendOnly} from '../src/integration/hmk-alchemy-warmth.js';
 import {previewAreaCohort} from '../src/integration/hmk-area-cohort-preview.js';
 import {prepareTrekkingWeatherTest,advanceTrekkingWeatherExposure} from '../src/integration/hmk-weather-hazard-aftermath.js';
 import {prepareColdWaterShock,prepareExposureSkinInjuries} from '../src/integration/hmk-weather-trauma-completion.js';
@@ -178,3 +179,49 @@ assert.equal(nextIce.actor.hmk.healthState.fatigue.weariness,130);
 const iceCleared=drink({name:'Physic',useId:'ice-physic',baseAS:8,actor:ice.actor,prior:ice.journal});
 assert.equal(iceshieldProtection({...iceContext,journal:iceCleared.journal}).av,0);
 console.log('PASS Iceshield: protection, Cold Hazard cap, Cold Shock, Exposure Advance, Frostbite, Area, Profusion and Physic');
+
+const warm=drink({name:'Warmth',useId:'warmth',baseAS:6,d100:95});
+assert.equal(warm.proof.finalAS,4);
+assert.equal(warm.proof.sourcePages.at(-1),274);
+assert.equal(warm.actor.hmk.healthState.fatigue.weariness,30);
+const companion={...structuredClone(clean),id:'escort'};
+const nearbyContext={journal:warm.journal,campaignId,minute,sourceActorId:actorId,nearbyIds:[companion.id],gmConfirmed:true};
+const facts=createWarmthProximity(nearbyContext);
+assert.throws(()=>createWarmthProximity({...nearbyContext,nearbyIds:[actorId]}),/seznam/);
+assert.throws(()=>createWarmthProximity({...nearbyContext,gmConfirmed:false}),/GM/);
+const noted=[...warm.journal,row('near','calendarAlchemyWarmthProximity',facts)];
+assert.doesNotThrow(()=>validateWarmthProximityJournal(noted));
+assert.throws(()=>assertWarmthProximityAppendOnly(noted,warm.journal),/odstranit/);
+const atWarm={actorId,campaignId,minute,journal:noted,characters:[warm.actor,companion],memberIds:[actorId,companion.id]};
+const ownHeat=warmthProtection(atWarm);
+assert.equal(ownHeat.av,2);
+assert.equal(ownHeat.advanceBonus,10);
+const ally={...atWarm,actorId:companion.id};
+assert.equal(warmthProtection({...ally,journal:warm.journal}).av,0);
+assert.deepEqual(warmthProtection(ally),{av:1,advanceBonus:5,sources:[{useId:'warmth',sourceActorId:actorId,as:4}]});
+assert.equal(warmthProtection({...ally,minute:minute+1}).av,0);
+const empty=createWarmthProximity({...nearbyContext,journal:noted,nearbyIds:[]});
+assert.equal(warmthProtection({...ally,journal:[...noted,row('new-near','calendarAlchemyWarmthProximity',empty)]}).av,0);
+const positions=[{id:actorId,x:0,y:0},{id:companion.id,x:3,y:4}];
+assert.equal(warmthProtection({...ally,spatialUnits:positions}).av,1);
+assert.equal(warmthProtection({...ally,spatialUnits:[positions[0],{...positions[1],y:4.01}]}).av,0);
+assert.equal(warmthProtection({...ally,spatialUnits:[positions[0]]}).av,0);
+const shocked=structuredClone(warm.actor);
+shocked.hmk.arcane.auralShockLevels=1;
+assert.equal(warmthProtection({...ally,characters:[shocked,companion]}).av,0);
+const warmCF=drink({name:'Fireshield',useId:'triggers-warmth',baseAS:6,d100:83,prior:noted,actor:warm.actor});
+assert.equal(warmCF.proof.profusionCF,true);
+assert.equal(warmCF.actor.hmk.healthState.fatigue.weariness,90);
+const coldPhysic=drink({name:'Physic',useId:'warmth-physic',baseAS:8,actor:warm.actor,prior:noted});
+assert.equal(warmthProtection({...ally,journal:coldPhysic.journal}).av,0);
+assert.equal(evaluateTrekkingWeatherRoll({...iceHazard,warmthAV:ownHeat.av}).exposed,false);
+assert.equal(episodeWeatherExposure({...iceHazard,warmthAV:ownHeat.av}).tn,4);
+assert.equal(prepareColdWaterShock({...water,warmthBonus:ownHeat.advanceBonus}).report.endEML,without.endEML+10);
+assert.equal(advanceTrekkingWeatherExposure({...advance,warmthBonus:5}).report.eml,
+ advanceTrekkingWeatherExposure(advance).report.eml+5);
+const warmFrost=prepareExposureSkinInjuries({actor:clean,state:cold,inventory:[],sourceId:'frost-watch',
+ warmthAV:1,originMinute:100,windD20:10,durationD20:1,
+ rows:[{location:'tx',av:1}],allLocationsReviewed:true,gmConfirmed:true});
+assert.equal(warmFrost.report.warmthAV,1);
+assert.equal(warmFrost.report.wounds.length,0);
+console.log('PASS Warmth: own and nearby protection, 5-ft combat boundary, GM witness, expiry, weather, Profusion and Physic');
