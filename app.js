@@ -421,7 +421,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.166';
+const APP_VERSION='94.167';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -11361,7 +11361,6 @@ function stableHubAnimalHTML(a,campaignId){
  <p>Animalcraft (HMK 65): základní ML zvířete neznamená automaticky získaný MB. Výcvik vyžaduje původní SV, skutečné hody a pravidlový čas. ${training.length?`Potvrzené doklady: ${training.map(t=>esc(t.title)).join(' · ')}`:'Výcvik zatím není pro tuto identitu doložen.'}</p>
  <p><strong>Skutečně aktivovaný výcvik:</strong> ${trainingState.boosts} MB · ${trainingState.sourceId?'ověřený kalendářní doklad':'žádný úplný kalendářní doklad'}. Zvlášť se ověřuje uplynutí alespoň ${training.length?'příslušného počtu':'šesti'} měsíců; až pak se MB používají v bojových náhledech.</p>
  ${!dead&&training.length?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><input type="hidden" name="type" value="training-activate"><label>Dokončený výcvik<select name="trainingProofId">${training.map((t,i)=>`<option value="${esc(t.id)}">Výcvik ${i+1} · ${t.skillTestProof?.finalBoosts??0} MB · ${t.skillTestProof?.months??6} měs.</option>`).join('')}</select></label><p class="hc-hint">Čas se převezme ze skutečného začátku a dokončení výcviku v kalendáři; nelze jej ručně změnit.</p><label>Doložený kalendářní podklad<input name="reason" minlength="3" maxlength="240" required></label><button type="submit">Aktivovat již dokončený výcvik v boji</button></form>`:''}
- ${p.events.length?`<details><summary>Kompletní časový registr stáje (${p.events.length})</summary><ol>${p.events.map(j=>`<li>minuta ${j.campaignMinute} · ${esc(j.stableHub574.type)} · ${esc(j.stableHub574.reason)}</li>`).join('')}</ol></details>`:''}
  <p>Veterinární rány, Shock, léčení, Frostbite a amputace se nezdvojují: jsou propojené s originálními doklady v Combat · Bestiář.</p>
  ${!dead?`<form data-hmk-stable-event class="hc-fields"><input type="hidden" name="animalId" value="${esc(a.id)}"><label>Vyřadit ze stáje<select name="type"><option value="sale">Prodat</option><option value="release">Opustit / darovat (bez hotovosti)</option></select></label><label>Skutečně sjednaná prodejní cena (d; nulová možná)<input name="priceD" type="number" min="0" max="1000000" value="0" step="1"></label><label>Komu / kde / jak (GM potvrdí skutečnou událost)<input name="reason" required minlength="3" maxlength="240"></label><button type="submit" class="secondary">Potvrdit trvalé vyřazení z vlastnictví</button></form>`:`<p>Vyřazeno v čase ${p.exit.minute} · ${esc(p.exit.reason)}. Stará identita a všechny zdravotní a finanční doklady zůstávají čitelné.</p>`}
  </section></div></details>`;
