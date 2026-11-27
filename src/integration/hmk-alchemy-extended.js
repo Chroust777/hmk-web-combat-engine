@@ -2,7 +2,7 @@
  * Mindsalve and Poison doses, with thermal shields and Quiescence projections. */
 import {DAY_MINUTES} from './hmk-campaign-calendar.js';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
-import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.164';
+import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.169';
 import {activeFearSources,updateFearSource} from './hmk-concurrent-fear.js';
 import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse,endAlchemicalPoison} from './hmk-poison-course.js?v=94.158';
 import {psycheStressRecovery} from '../rules/mental-trauma.js';
@@ -276,7 +276,7 @@ export function requireExtendedAlchemyTime({actors,clock,journal,campaignId,afte
 
 export function validateExtendedAlchemy(journal,actors,branches,activeCampaign){
  const prior=[];
- const tracked=new Set(['Mindsalve','Poison','Fireshield','Quiescence','Iceshield','Warmth','Soulcloak']);
+ const tracked=new Set(['Mindsalve','Poison','Fireshield','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation']);
  for(const row of journal){
   const p=row.calendarAlchemyExtendedRecovery;
   if(p){

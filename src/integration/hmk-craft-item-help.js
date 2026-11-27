@@ -76,7 +76,7 @@ const penaltyTargets={
  'shock-roll':'Shock Rolls',
  'hearing-per-awareness':'Perception a Awareness při naslouchání'
 };
-const supportedUse=new Set(['Acid','Darkvision','Egosight','Erudition','Eruption','Fireshield','Footpad','Fumebomb',
+const supportedUse=new Set(['Acid','Darkvision','Egosight','Erudition','Eruption','Exsiccation','Fireshield','Footpad','Fumebomb',
  'Healing','Iceshield','Mending','Mindsalve','Object Aegis','Physic','Poison','Quiescence','Soulcloak','Verity','Warmth','Weakness']);
 function adverseEffect(name,profile){
  switch(profile.kind){

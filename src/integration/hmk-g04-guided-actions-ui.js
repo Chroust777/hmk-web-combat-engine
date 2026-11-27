@@ -1,4 +1,4 @@
-import {actorFireshieldAV} from './hmk-alchemy-extended.js?v=94.164';
+import {actorFireshieldAV} from './hmk-alchemy-extended.js?v=94.169';
 /** G04: two conservative in-panel wizards for the existing Combat screen.
  * All numbers marked "roll" originate from GM input. No RNG, no alternate write.
  * Area supports proven Doom Flame casting with independently verified proactive Evade;

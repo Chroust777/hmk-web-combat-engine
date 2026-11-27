@@ -70,7 +70,7 @@ export function planAlchemyIllEffect({elixirName,baseAS,stage='on-cf'}={}){
  */
 export function supportedAlchemyConcurrentIllEffect(source){
  const name=source?.elixirName,baseAS=source?.asBefore;
- if(!['Darkvision','Erudition','Footpad','Egosight','Healing','Verity','Mindsalve','Fireshield','Iceshield','Warmth','Soulcloak'].includes(name)||
+ if(!['Darkvision','Erudition','Footpad','Egosight','Healing','Verity','Mindsalve','Fireshield','Iceshield','Warmth','Soulcloak','Exsiccation'].includes(name)||
   typeof source?.useId!=='string'||!source.useId)
   throw Error('Alchemy Ill Effects: aktivní zdroj nelze mechanicky doložit');
  const plan=planAlchemyIllEffect({elixirName:name,baseAS});
@@ -82,5 +82,5 @@ export function supportedAlchemyConcurrentIllEffect(source){
  if(plan.kind!=='aural-shock'||plan.levels!==1)
   throw Error('Alchemy Ill Effects: zdroj nemá očekávaný Aural Shock');
  return {sourceUseId:source.useId,kind:'aural-shock',levels:plan.levels,
-  weakness:plan.weakness,...(['Footpad','Egosight','Verity'].includes(name)?{sourceElixir:name}:{})};
+  weakness:plan.weakness,...(['Footpad','Egosight','Verity','Exsiccation'].includes(name)?{sourceElixir:name}:{})};
 }

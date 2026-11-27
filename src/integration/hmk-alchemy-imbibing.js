@@ -2,19 +2,19 @@
  * First implemented canonical effect: Darkvision. Other elixirs stay disabled
  * until their specific health/astral/skill consequences are integrated.
  */
-import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.164';
+import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.169';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
-import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.164';
+import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.169';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
 const whole=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
 const originOK=o=>['manual','cryptographic-software-die'].includes(o);
 const relevant=(j,c)=>j.calendarCampaignId===c;
-const newElixirNames=['Mindsalve','Fireshield','Poison','Quiescence','Iceshield','Warmth','Soulcloak'];
+const newElixirNames=['Mindsalve','Fireshield','Poison','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation'];
 const fullImbibingNames=['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity',...newElixirNames];
-const additionalTemporary=['Fireshield','Quiescence','Iceshield','Warmth','Soulcloak'];
+const additionalTemporary=['Fireshield','Quiescence','Iceshield','Warmth','Soulcloak','Exsiccation'];
 
 export function activeAdditionalTemporary(journal,campaignId,targetId,minute,name){
  return journal.filter(row=>relevant(row,campaignId)&&row.campaignMinute<=minute&&
@@ -96,7 +96,8 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
   ...activeAdditionalInstant(journal,campaignId,targetId,minute,'Mindsalve'),
   ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Iceshield'),
   ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Warmth'),
-  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Soulcloak')];
+  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Soulcloak'),
+  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Exsiccation')];
  const seen=new Set(live.map(x=>x.useId));
  ok(seen.size===live.length,'Profusion: duplicitní aktivní zdroj');
  for(const row of journal){
@@ -435,6 +436,7 @@ export function applyAlchemyEruditionAural({state=null,arcane=null,proof,eventId
 }
 /** Original Combat State remains authoritative (no invented combat round). */
 export function applyAlchemyEgosightAural(input){return applySensoryImbibingAural('Egosight',271,input)}
+export function applyAlchemyExsiccationAural(input){return applySensoryImbibingAural('Exsiccation',271,input)}
 export function applyAlchemyVerityAural(input){return applySensoryImbibingAural('Verity',274,input)}
 function applySensoryImbibingAural(elixirName,sourcePage,{state=null,arcane=null,proof,eventId}={}){
  ok(proof?.format===ALCHEMY_IMBIBING_FORMAT&&proof.elixirName===elixirName&&proof.sl==='CF'&&
@@ -501,7 +503,7 @@ export function createExtendedAlchemyImbibing({journal=[],inventory=[],campaignI
  const roll=classifyProfusionImbibing(d100,ml,others.length),sl=roll.adjusted;
  const modifier={CF:-2,F:-1,S:0,CS:1}[sl]*(exempt?-1:1)||0,finalAS=Math.max(0,dose.currentAS+modifier);
  const critical=sl==='CF'&&finalAS>0&&!exempt;
- const illEffect=critical?{
+ const illEffect=critical&&elixirName==='Exsiccation'?{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true}:critical?{
   kind:elixirName==='Mindsalve'?'mindsalve-weakness':elixirName.toLowerCase()+'-weariness',
   amount:dose.currentAS*5
  }:null;
@@ -510,7 +512,7 @@ export function createExtendedAlchemyImbibing({journal=[],inventory=[],campaignI
   testSkill,ml,d100,origin,otherActiveElixirs:others.length,profusionCF:roll.profusionCF,sl,
   asBefore:dose.currentAS,modifier,finalAS,temporary:finalAS>0&&additionalTemporary.includes(elixirName),
   ...(critical&&others.length?{profusionIllEffects:concurrentAlchemyIllEffects(others)}:{}),
-  illEffect,consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,elixirName==='Fireshield'?272:['Warmth','Soulcloak'].includes(elixirName)?274:273]};
+  illEffect,consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,elixirName==='Exsiccation'?271:elixirName==='Fireshield'?272:['Warmth','Soulcloak'].includes(elixirName)?274:273]};
 }
 
 export function validateAlchemyImbibingJournal(journal=[]){
@@ -648,9 +650,11 @@ export function applyEruditionProfusionAural({journal=[],state=null,arcane=null,
  return appendSecondaryAlchemyAural({state,arcane,proof,eventId,sourcePage:269});
 }
 /** Profusion requires one auditable Aural Shock proof per older Egosight dose. */
-const sensoryProfusionTypes={Egosight:{active:activeEgosight,sourcePage:271},Verity:{active:activeVerity,sourcePage:274}};
+const sensoryProfusionTypes={Egosight:{active:activeEgosight,sourcePage:271},Verity:{active:activeVerity,sourcePage:274},
+ Exsiccation:{active:(...args)=>activeAdditionalTemporary(...args,'Exsiccation'),sourcePage:271}};
 const sensoryProfusionField=name=>'calendarAlchemy'+name+'ProfusionIll';
 export function createEgosightProfusionIll(input){return createSensoryProfusionIll('Egosight',input)}
+export function createExsiccationProfusionIll(input){return createSensoryProfusionIll('Exsiccation',input)}
 export function createVerityProfusionIll(input){return createSensoryProfusionIll('Verity',input)}
 function createSensoryProfusionIll(elixirName,{journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const {active,sourcePage}=sensoryProfusionTypes[elixirName];
@@ -671,6 +675,7 @@ function createSensoryProfusionIll(elixirName,{journal=[],campaignId,minute,trig
   elixirName,illEffect:{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true},sourcePages:[269,270,sourcePage]};
 }
 export function applyEgosightProfusionAural(input){return applySensoryProfusionAural('Egosight',input)}
+export function applyExsiccationProfusionAural(input){return applySensoryProfusionAural('Exsiccation',input)}
 export function applyVerityProfusionAural(input){return applySensoryProfusionAural('Verity',input)}
 function applySensoryProfusionAural(elixirName,{journal=[],state=null,arcane=null,proof,eventId}={}){
  const expected=createSensoryProfusionIll(elixirName,{...proof,journal});
@@ -679,6 +684,7 @@ function applySensoryProfusionAural(elixirName,{journal=[],state=null,arcane=nul
  return appendSecondaryAlchemyAural({state,arcane,proof,eventId,sourcePage:sensoryProfusionTypes[elixirName].sourcePage});
 }
 export function validateEgosightProfusionJournal(journal){return validateSensoryProfusionJournal('Egosight',journal)}
+export function validateExsiccationProfusionJournal(journal){return validateSensoryProfusionJournal('Exsiccation',journal)}
 export function validateVerityProfusionJournal(journal){return validateSensoryProfusionJournal('Verity',journal)}
 function validateSensoryProfusionJournal(elixirName,journal=[]){
  const field=sensoryProfusionField(elixirName);
@@ -701,6 +707,7 @@ function validateSensoryProfusionJournal(elixirName,journal=[]){
  return true;
 }
 export function assertEgosightProfusionAppendOnly(before,after){return assertSensoryProfusionAppendOnly('Egosight',before,after)}
+export function assertExsiccationProfusionAppendOnly(before,after){return assertSensoryProfusionAppendOnly('Exsiccation',before,after)}
 export function assertVerityProfusionAppendOnly(before,after){return assertSensoryProfusionAppendOnly('Verity',before,after)}
 function assertSensoryProfusionAppendOnly(elixirName,before=[],after=[]){
  const field=sensoryProfusionField(elixirName);

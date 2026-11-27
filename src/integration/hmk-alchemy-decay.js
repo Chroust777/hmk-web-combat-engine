@@ -108,6 +108,13 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
     defence.asAfter===as-Number(defence.blocked),'Soulcloak: nesouhlasí doložený úbytek AS.');
    as=defence.asAfter;
   }
+  const breath=row.calendarAlchemyExsiccationBreath;
+  if(breath?.finishId===finishId){
+   requireTrue(proof.elixirName==='Exsiccation'&&activeTemporary&&as>0&&breath.useId===imbibingId&&
+    breath.asBefore===as&&breath.asAfter===as-1&&row.campaignMinute<dueMinute,
+    'Exsiccation: nesouhlasí doložený úbytek AS.');
+   as=breath.asAfter;
+  }
   const d=row.calendarAlchemyDecay;
   if(!d||d.finishId!==finishId)continue;
   requireTrue(as>0&&(!emptied||activeTemporary),'Alchemy Decay: prázdný nebo zaniklý elixír nelze degradovat');
