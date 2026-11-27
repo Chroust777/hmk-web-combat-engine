@@ -1,4 +1,4 @@
-import {projectAlchemyDormancy} from './hmk-alchemy-extended.js?v=94.158';
+import {projectAlchemyDormancy} from './hmk-alchemy-extended.js?v=94.164';
 /** HMK v1.2 pp.160, 182, 200–203, 251, 254.
  * Deliberately bounded authoritative Neutral spellfire writer. It can commit
  * actual F/CF and bounded S/CS Detect/Reveal/Dispel after true spellstart

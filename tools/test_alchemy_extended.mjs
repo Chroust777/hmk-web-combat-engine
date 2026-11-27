@@ -8,6 +8,8 @@ import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPla
  pendingExtendedAlchemy,applyExtendedAlchemyInteractions,settleExtendedAlchemy,requireExtendedAlchemyTime,
  validateExtendedAlchemy,assertExtendedAlchemyAppendOnly} from '../src/integration/hmk-alchemy-extended.js';
 import {warmthProtection,createWarmthProximity,validateWarmthProximityJournal,assertWarmthProximityAppendOnly} from '../src/integration/hmk-alchemy-warmth.js';
+import {soulcloakStatus,createSoulcloakDefence,validateSoulcloakJournal,assertSoulcloakAppendOnly} from '../src/integration/hmk-alchemy-soulcloak.js';
+import {historicalHMKCalendarEntries} from '../src/integration/hmk-calendar-history.js';
 import {previewAreaCohort} from '../src/integration/hmk-area-cohort-preview.js';
 import {prepareTrekkingWeatherTest,advanceTrekkingWeatherExposure} from '../src/integration/hmk-weather-hazard-aftermath.js';
 import {prepareColdWaterShock,prepareExposureSkinInjuries} from '../src/integration/hmk-weather-trauma-completion.js';
@@ -225,3 +227,45 @@ const warmFrost=prepareExposureSkinInjuries({actor:clean,state:cold,inventory:[]
 assert.equal(warmFrost.report.warmthAV,1);
 assert.equal(warmFrost.report.wounds.length,0);
 console.log('PASS Warmth: own and nearby protection, 5-ft combat boundary, GM witness, expiry, weather, Profusion and Physic');
+
+const cloak=drink({name:'Soulcloak',useId:'cloak',d100:95});
+assert.equal(cloak.proof.finalAS,4);
+assert.equal(cloak.actor.hmk.healthState.fatigue.weariness,30);
+assert.equal(cloak.proof.sourcePages.at(-1),274);
+const cloakContext={journal:cloak.journal,campaignId,actorId,minute,auralShockLevels:0,
+ attemptReference:'First True Sight',origin:'manual',gmConfirmed:true};
+const misses=createSoulcloakDefence({...cloakContext,d10:5});
+assert.equal(misses.blocked,false);
+assert.equal(misses.asAfter,4);
+assert.throws(()=>createSoulcloakDefence({...cloakContext,d10:4,auralShockLevels:1}),/Aural Shock/);
+const blocked=createSoulcloakDefence({...cloakContext,d10:4});
+assert.equal(blocked.blocked,true);
+assert.equal(blocked.asAfter,3);
+const cloakJournal=[...cloak.journal,row('sc-try','calendarAlchemySoulcloakDefence',blocked)];
+assert.equal(soulcloakStatus({...cloakContext,journal:cloakJournal}).state.currentAS,3);
+assert.equal(activeAlchemyProfusionCohort(cloakJournal,campaignId,actorId,minute)[0].state.currentAS,3);
+assert.throws(()=>createSoulcloakDefence({...cloakContext,journal:cloakJournal,d10:4}),/už byl/);
+assert.throws(()=>createSoulcloakDefence({...cloakContext,campaignId:'another',d10:1}),/chybí/);
+assert.doesNotThrow(()=>validateSoulcloakJournal(cloakJournal));
+const cloakHistory=historicalHMKCalendarEntries(clock,[{...cloak.actor,name:'QA'}],[cloakJournal.at(-1)]).find(x=>x.kind==='alchemy-soulcloak-defence');
+assert.match(cloakHistory.note,/d10 \(4\).*AS 4 → 3.*automaticky selhal/);
+const altered=structuredClone(cloakJournal);
+altered.at(-1).calendarAlchemySoulcloakDefence.asAfter=1;
+assert.throws(()=>validateSoulcloakJournal(altered),/změněn/);
+assert.throws(()=>assertSoulcloakAppendOnly(cloakJournal,altered),/nelze/);
+const dueCloak=soulcloakStatus({...cloakContext,journal:cloakJournal}).state.nextDueMinute;
+assert.equal(soulcloakStatus({...cloakContext,minute:dueCloak}),null);
+const cloakDecay=createAlchemyDecay({...cloakContext,finishId:cloak.finishId,journal:cloakJournal,minute:dueCloak,d10:10});
+assert.equal(cloakDecay.asBefore,3);assert.equal(cloakDecay.asAfter,1);
+const decayed=[...cloakJournal,row('sc-decay','calendarAlchemyDecay',cloakDecay,dueCloak)];
+assert.equal(validateAlchemyDecayJournal(decayed),true);
+const depleted=createSoulcloakDefence({...cloakContext,journal:decayed,minute:dueCloak,attemptReference:'Last True Sight',d10:1});
+const depletedJournal=[...decayed,row('sc-last','calendarAlchemySoulcloakDefence',depleted,dueCloak)];
+assert.equal(soulcloakStatus({...cloakContext,journal:depletedJournal,minute:dueCloak}),null);
+assert.doesNotThrow(()=>validateSoulcloakJournal(depletedJournal));
+const anotherCloak=drink({name:'Soulcloak',useId:'second-cloak',baseAS:6,d100:83,prior:cloakJournal,actor:cloak.actor});
+assert.equal(anotherCloak.actor.hmk.healthState.fatigue.weariness,90);
+assert.equal(soulcloakStatus({...cloakContext,journal:anotherCloak.journal}).state.currentAS,4);
+const suppressed=drink({name:'Physic',useId:'cloak-physic',baseAS:8,actor:cloak.actor,prior:cloakJournal});
+assert.equal(soulcloakStatus({...cloakContext,journal:suppressed.journal}),null);
+console.log('PASS Soulcloak: True Sight, journal replay, duplicate defence, Aural Shock, CF/Profusion, Decay and Physic');

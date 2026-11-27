@@ -1,4 +1,4 @@
-import {fireshieldProtection} from './hmk-alchemy-extended.js?v=94.158';
+import {fireshieldProtection} from './hmk-alchemy-extended.js?v=94.164';
 /** HârnMaster v1.2 pp.268–269,271–272,274.
  * Strict NON-WRITING stage for Eruption / Fumebomb / Weakness.
  * A valid preflight is not a completed throw, battle action, or persistence

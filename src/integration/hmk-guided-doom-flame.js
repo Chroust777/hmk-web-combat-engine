@@ -1,4 +1,4 @@
-import {actorFireshieldAV} from './hmk-alchemy-extended.js?v=94.158';
+import {actorFireshieldAV} from './hmk-alchemy-extended.js?v=94.164';
 import {classifySpellMisfire,applyMisfireCombatTrauma,applyMisfireArcaneTrauma} from './hmk-spell-misfire-effects.js';
 /** HMK 2024 pp.7, 22, 200–202, 227: verified Doom Flame area source.
  * Restricted supported case: primary Peleahn, normal audible cant and gesture,

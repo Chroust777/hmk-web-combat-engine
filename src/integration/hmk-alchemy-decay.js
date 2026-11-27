@@ -100,6 +100,14 @@ export function alchemyElixirStrength(journal=[],campaignId,finishId,minute=1e9)
     'Alchemy Dispel: neplatný historický důkaz ukončení enchantmentu');
    as=0;activeTemporary=false;
   }
+  const defence=row.calendarAlchemySoulcloakDefence;
+  if(defence?.finishId===finishId){
+   requireTrue(proof.elixirName==='Soulcloak'&&activeTemporary&&as>0&&
+    defence.useId===imbibingId&&defence.asBefore===as&&row.campaignMinute<dueMinute&&
+    integer(defence.d10,1,10)&&defence.blocked===(defence.d10<=as)&&
+    defence.asAfter===as-Number(defence.blocked),'Soulcloak: nesouhlasí doložený úbytek AS.');
+   as=defence.asAfter;
+  }
   const d=row.calendarAlchemyDecay;
   if(!d||d.finishId!==finishId)continue;
   requireTrue(as>0&&(!emptied||activeTemporary),'Alchemy Decay: prázdný nebo zaniklý elixír nelze degradovat');
