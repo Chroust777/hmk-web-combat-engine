@@ -39,7 +39,7 @@ fail(()=>A.createAlchemyStart(starters([], 'A',0,{...formula,title:'Healing'})),
 fail(()=>A.createAlchemyStart(starters([], 'A',0,{...formula,mode:'known'})),/obeznámen|vlastní recept/);
 fail(()=>A.createAlchemyStart(starters(J,'B',0,formula)),/autor ani parametry/);
 fail(()=>A.createAlchemyStart(starters(J,'A',0,{...formula,effect:'Totally different'})),/autor ani parametry/);
-fail(()=>A.createAlchemyStart(starters(J,'A',1,formula)),/připravuje/);
+eq(A.createAlchemyStart(starters(J,'A',1,formula)).minute,1);
 fail(()=>A.createAlchemyStart(starters(J,'B',0,other,'C',80)),/úspěšně|obeznámen/);
 fail(()=>A.createAlchemyStart(starters(J,'A',0,other)),/vlastní recept/);
 const p=skill();J.push(row('skillA','C',st.dueMinute,'A','skillTestProof',p));

@@ -29,8 +29,8 @@ bad(()=>A.createAlchemyStart(args([{actorId:'B',ml:39}])),/ML40/);
 bad(()=>A.createAlchemyStart(args([{actorId:'B',ml:50},{actorId:'B',ml:60}])),/ML40/);
 bad(()=>A.createAlchemyStart(args([{actorId:'A',ml:60}])),/ML40/);
 bad(()=>A.createAlchemyStart(args([{actorId:'B',ml:50},{actorId:'C',ml:50},{actorId:'D',ml:50}])),/nejvýše dva/);
-bad(()=>A.createAlchemyStart(args([{actorId:'B',ml:50}],'C',J.slice(0,1),'B',1,80)),/již připravuje/);
-bad(()=>A.createAlchemyStart(args([], 'C',J.slice(0,1),'B',1,80)),/již připravuje/);
+bad(()=>A.createAlchemyStart(args([{actorId:'B',ml:50}],'C',J.slice(0,1),'B',1,80)),/již asistuje/);
+bad(()=>A.createAlchemyStart(args([], 'C',J.slice(0,1),'B',1,80)),/již asistuje/);
 bad(()=>A.createAlchemyStart(args([{actorId:'B',ml:70}],'C',J.slice(0,1),'D',1,80)),/přidělen/);
 // Campaign separation; an Assistant in campaign C can operate in independent campaign D.
 const isolated=A.createAlchemyStart(args([{actorId:'B',ml:50}],'D',J.slice(0,1),'D',1,80));eq(isolated.assistantPlan.length,1);

@@ -17,7 +17,7 @@ eq(al.validateAlchemyJournal(A),true);eq(al.pendingAlchemyPreparations(A,'C').le
 fail(()=>al.createAlchemyAbort({journal:A,campaignId:'C',minute:1400,actorId:'A',startId:'start',reason:'Again',gmConfirmed:true}),/už byla uzavřena/);
 fail(()=>al.createAlchemyAbort({journal:J,campaignId:'C',minute:start.dueMinute,actorId:'A',startId:'start',reason:'Late',gmConfirmed:true}),/před konečným/);
 fail(()=>al.assertAlchemyAppendOnly(A,J),/nelze smazat/);
-fail(()=>al.createAlchemyStart({...startOpts,journal:J}),/již připravuje/);
+eq(al.createAlchemyStart({...startOpts,journal:J}).durationDays,start.durationDays);
 fail(()=>al.createAlchemyStart({...startOpts,alchemyML:59}),/ML 60/);
 fail(()=>al.createAlchemyStart({...startOpts,wealth:9}),/Wealth/);
 fail(()=>al.createAlchemyStart({...startOpts,timeD6:[1,3,7]}),/3d6/);
