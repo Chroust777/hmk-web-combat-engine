@@ -415,7 +415,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.145';
+const APP_VERSION='94.146';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -7606,7 +7606,8 @@ function journalBodyLocationsHTML(c){
     'Anatomická lokace: '+name+'.'+(isLimb?' Strana: '+(readableSide(w)==='L'?'levá':readableSide(w)==='R'?'pravá':'nedoložená')+'.':''),
     w.healed?'Stav: zhojeno (zůstává v historii; trvalé následky se řeší samostatně).':
       health.infected?'Stav: aktivní infekce; její průběh blokuje Healing ostatních ran.':
-      health.treated?'Stav: ošetřeno, pokračuje Healing.':'Stav: nová/neošetřená rána, čeká na Treatment.',
+      treatmentWasDeferred(w)?'Stav: bez ošetření, pokračuje Healing.':
+       health.treated?'Stav: ošetřeno, pokračuje Healing.':'Stav: nová/neošetřená rána, čeká na Treatment.',
     'HMK v1.2, str. 167–170, 180–182.'].filter(Boolean).join(' ');
   };
   const woundMarkup=w=>{
@@ -27367,6 +27368,9 @@ function physicianCourseStars965(patient,manual=0){
  const {best}=extendedShockAidContext965(patient);
  return Math.max(manual,best?.skillTestProof.a.svTier.stars||0);
 }
+function treatmentWasDeferred(wound){
+ return wound.healing?.untreated===true&&!wound.healing.treatments?.length;
+}
 function gmWoundManagementPanel(c,{inlineBlood=false}={}){
  const live=persistentStateOf(c),open=live.wounds.filter(w=>!w.healed),allowed=!combatInitiativeSequence?.order?.includes(c.id);
  const locations=JOURNAL_ANATOMICAL_LOCATIONS.map(([code,name])=>`<option value="${esc(code)}">${esc(name)} (${esc(code)})</option>`).join('');
@@ -27387,9 +27391,11 @@ function gmWoundManagementPanel(c,{inlineBlood=false}={}){
   const environmental=hskIsEnvironmentalWound(c,w.id);
   const shockPending=environmental&&isNoncombatMedicalOrigin(live.shockFollowup?.domain);
   const blood=inlineBlood&&activeNoncombatBleeder966(w,live)?hskWeatherBleedingCarePanel(c.id,w.id):'';
-  const mayChoose=inlineBlood&&!upcoming&&environmental&&treatmentReady&&!shockPending&&!combatInitiativeSequence&&
-   (!w.healing||(w.id===resumeWound))&&!!data.campaignClock;
-  const healers=mayChoose?availableWoundTreatmentHealers966(c,w):[];
+  const deferred=treatmentWasDeferred(w)&&!(w.aspect==='frost'&&w.severity==='G');
+  const canChoose=inlineBlood&&!upcoming&&environmental&&treatmentReady&&!shockPending&&!combatInitiativeSequence&&
+   (!w.healing||w.id===resumeWound||deferred)&&!!data.campaignClock;
+  const healers=canChoose?availableWoundTreatmentHealers966(c,w):[];
+  const mayChoose=canChoose&&(!deferred||healers.length>0);
   const healerChoice=healers.length?`<label>Léčitel pro ošetření rány
    <select data-wound-treatment-healer><option value="">Vyberte léčitele…</option>${healers.map(h=>
     `<option value="${esc(h.id)}">${esc(h.name)} · Physician ML ${h.ml}${h.self?' · vlastní ošetření':''}</option>`).join('')}</select></label>`:'';
@@ -27514,6 +27520,10 @@ function openWoundMedicalStep(actor,woundId,{healerId}={}){
  const bleed=bleeding.find(x=>x.id===w.id)||bleeding.find(x=>x.id===(bloodTerm?.sourceId||bloodTerm?.woundId))||bleeding[0];
  const mishap=unresolvedInjuryMishaps(state)[0],morale=dueInjuryMorale(state)[0];
  const frost=weather&&w.aspect==='frost'&&w.severity==='G';
+ const lateTreatment=weather&&!frost&&treatmentWasDeferred(w)&&healerId&&
+  !agenda?.due?.some(event=>event.characterId===actor.id&&
+   ['grim','healing'].includes(event.kind))&&
+  availableWoundTreatmentHealers966(actor,w).some(healer=>healer.id===healerId);
  let kind=frost?'frost-amputation':'treatment',source=w.id;
  if(bleed){kind='bleeding';source=bleed.id;}
  else if(state.extendedShock||state.coma?.active){
@@ -27527,9 +27537,9 @@ function openWoundMedicalStep(actor,woundId,{healerId}={}){
  else if(state.wounds.some(x=>x.healing?.infected)){
   const infection=available.find(x=>x.kind==='infection');
   kind='infection';source=infection?.woundId||infection?.sourceId||w.id;
- }else if(w.healing?.grimWound&&nextOf('grim',w.id)&&
+ }else if(!lateTreatment&&w.healing?.grimWound&&nextOf('grim',w.id)&&
    (nextOf('grim',w.id).minute<=(nextOf('healing',w.id)?.minute??Infinity))){kind='grim';}
- else if(w.healing?.treated&&w.healing.nextHealingDay!=null){kind='healing';}
+ else if(!lateTreatment&&w.healing?.treated&&w.healing.nextHealingDay!=null){kind='healing';}
  const scheduled=nextOf(kind,source);
  const event=scheduled||{kind,sourceId:source};
  const inHealth=noncombatHealthDestination(event,state);
