@@ -1147,3 +1147,54 @@ table.hmk-project-resources :is(th, td) {
 [data-herbal-potion-unavailable][hidden] {
   display: none !important;
 }
+
+.hmk-alchemy-picker {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hmk-alchemy-elixir-field > .hmk-alchemy-native-picker {
+    display: none;
+  }
+  .hmk-alchemy-elixir-field > .hmk-alchemy-picker {
+    display: block;
+    padding: 0;
+    border: 1px solid #8f7652;
+    border-radius: .45rem;
+    background: var(--paper-soft, #f3eddf);
+    color: var(--page-ink, #332817);
+  }
+  .hmk-alchemy-picker > summary {
+    padding: .5rem .75rem;
+    cursor: pointer;
+  }
+  .hmk-alchemy-picker > summary > span {
+    margin-inline-end: .4rem;
+  }
+  .hmk-alchemy-picker-options {
+    max-height: min(17rem, 42vh);
+    overflow-y: scroll;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+    border-top: 1px solid #8f7652;
+    border-radius: 0 0 .45rem .45rem;
+  }
+  .hmk-alchemy-picker-options > button {
+    display: block;
+    width: 100%;
+    min-height: 2rem;
+    margin: 0;
+    padding: .4rem .75rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    text-align: start;
+  }
+  .hmk-alchemy-picker-options > button:is(:hover, :focus-visible, [aria-pressed="true"]) {
+    background: #e5d7bc;
+  }
+  .hmk-alchemy-picker-options > button:focus-visible {
+    outline-offset: -2px;
+  }
+}
