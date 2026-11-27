@@ -7,6 +7,7 @@
 import {completeParalysis} from './hmk-paralysis-sequela.js';
 export function verifiedDeadlyHelplessReason(state){
  if(!state||typeof state!=='object'||state.shock==='KIA')return null;
+ if(state.alchemyDormancy?.length)return 'quiescence';
  if(completeParalysis(state))return 'complete-paralysis';
  if(state.shock==='UNC')return 'unconscious';
  if(state.coma?.active===true)return 'coma-unconscious';

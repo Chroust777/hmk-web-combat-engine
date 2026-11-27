@@ -79,6 +79,7 @@ export function inferredArms(actor,inventory,name,state){
 export function automaticSkillContext({actor,inventory=[],name,combatRound=null,combatTimelineId=null,gearPolicy='advisory',manualENC=null,manualBulk=null,manualPerception=null,sensoryBasis=null,blindnessDecision=null,visionBasis=null}={}){
  if(!Array.isArray(inventory))throw Error('Chybí potvrzený inventář');
  const base=recordedActor(actor);const state=base.state;
+ if(state.alchemyDormancy?.length)throw Error('Quiescence: postava nemůže provést samostatný Skill Test.');
  if(completeParalysis(state))throw Error('HMK str.184: úplně paralyzovaná postava nemůže provést samostatný Skill Test.');
  const disabled=blockedLimbs(state);
  const armActivity=['Climbing','Swimming','Archery','Slings','Throwing','Melee','Dexterity','Legerdemain','Acrobatics','Dancing','Jumping','Stealth','Riding'];

@@ -2,7 +2,7 @@
  * ONLY from already saved Area combat proofs and live Initiative positions.
  * The original journal and battle map remain authoritative; no smoke store.
  */
-import {fumebombSegmentObscured,fumebombSmokeActive} from './hmk-alchemy-area-preflight.js';
+import {fumebombSegmentObscured,fumebombSmokeActive} from './hmk-alchemy-area-preflight.js?v=94.158';
 const requireValid=(yes,msg)=>{if(!yes)throw Error('Fumebomb LOS: '+msg)};
 const validPoint=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
 export function activeFumebombCircles({journal=[],sequence,campaignId}={}){

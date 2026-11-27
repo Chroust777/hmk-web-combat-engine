@@ -263,7 +263,7 @@ export function episodeAnimalScentTracking93936({animalId,name,breed,awarenessML
 /** Printed p.149 Cold/Heat Hazard Rolls; the GM supplies actual Area AV,
  * protective shelter and genuine dice. Exposure must be committed in the
  * existing Health/Trauma system; an episode receipt cannot mutate injuries. */
-export function episodeWeatherExposure({kind,areaAV,roll,protection=0,fireStrength=0,
+export function episodeWeatherExposure({kind,areaAV,roll,protection=0,fireStrength=0,fireshieldAV=0,
  continuousSleet=false,resting=false,shade=false,tropicalNative=false,endLevel=null}={}){
  requireTrue(['cold','heat'].includes(kind)&&Number.isInteger(areaAV)&&areaAV>=0&&areaAV<=20&&
   Number.isInteger(protection)&&protection>=0&&protection<=5&&
@@ -276,6 +276,7 @@ export function episodeWeatherExposure({kind,areaAV,roll,protection=0,fireStreng
   'Heat Hazard: stín d10 je dovolen pouze při odpočinku.');
  requireTrue(kind!=='heat'||(protection===0&&fireStrength===0&&!continuousSleet),
   'Heat Hazard: ochrana proti chladu ani oheň nesmějí být použity pro vedro.');
+ requireTrue(Number.isSafeInteger(fireshieldAV)&&fireshieldAV>=0&&fireshieldAV<=6&&(kind==='heat'||!fireshieldAV),'Fireshield platí pouze proti Heat.');
  let faces,tn,trigger;
  if(kind==='cold'){
   faces=continuousSleet?10:6;
@@ -284,7 +285,7 @@ export function episodeWeatherExposure({kind,areaAV,roll,protection=0,fireStreng
  }else{
   faces=shade?10:resting?6:4;
   if(tropicalNative)faces={4:6,6:8,10:12}[faces];
-  tn=Math.max(1,areaAV);
+  tn=Math.max(0,Math.max(1,areaAV)-fireshieldAV);
   trigger=(n)=>n<=tn;
  }
  requireTrue(roll===null||die(roll,faces),'Weather Hazard: skutečný hod neodpovídá velikosti kostky.');
@@ -292,7 +293,7 @@ export function episodeWeatherExposure({kind,areaAV,roll,protection=0,fireStreng
  const effects={cold:{CF:'cold-exposure-frostbite',F:'cold-exposure',S:'fatigue-5',CS:'none'},
   heat:{CF:'heat-exposure-HR4-sunburn',F:'heat-exposure-HR5',S:'fatigue-10',CS:'fatigue-5'}};
  return {format:'hmk-episode-weather-exposure-v1',kind,areaAV,protection,fireStrength,
-  continuousSleet,resting,shade,tropicalNative,faces,tn,roll,exposed,
+  continuousSleet,resting,shade,tropicalNative,...(fireshieldAV?{fireshieldAV}:{}),faces,tn,roll,exposed,
   endLevel,effect:exposed===null?'pending':!exposed?'none':endLevel===null?'pending-endurance':effects[kind][endLevel],
   sourcePage:149};
 }

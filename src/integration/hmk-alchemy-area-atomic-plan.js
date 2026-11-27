@@ -4,7 +4,7 @@
  * one existing combatRuntime commit. This is not a save or a second database.
  * No changes escape if a later victim, Morale test or due event rejects.
  */
-import {stageAlchemyAreaThrownSource} from './hmk-alchemy-area-thrown-source.js';
+import {stageAlchemyAreaThrownSource} from './hmk-alchemy-area-thrown-source.js?v=94.158';
 import {createAlchemyVialEmpty,validateAlchemyVialJournal} from './hmk-alchemy-vial-ledger.js';
 import {validateEncounterSequence,recordScheduledHitCommit,finishEncounterTurn} from './encounter-turn-sequence.js';
 import {validateCombatState} from './persistent-combat-state.js';

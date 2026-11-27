@@ -59,7 +59,11 @@ for(const name of ['Darkvision','Erudition','Footpad','Egosight']){
 }
 eq(E.supportedAlchemyConcurrentIllEffect({elixirName:'Healing',asBefore:7,useId:'a'}),
  {sourceUseId:'a',kind:'healing-weakness',baseAS:7,weakness:35});
-fail(()=>E.supportedAlchemyConcurrentIllEffect({elixirName:'Mindsalve',asBefore:7,useId:'a'}),/nelze/);
+eq(E.supportedAlchemyConcurrentIllEffect({elixirName:'Mindsalve',asBefore:7,useId:'a'}),
+ {sourceUseId:'a',kind:'mindsalve-weakness',baseAS:7,amount:35});
+eq(E.supportedAlchemyConcurrentIllEffect({elixirName:'Fireshield',asBefore:7,useId:'a'}),
+ {sourceUseId:'a',kind:'fireshield-weariness',baseAS:7,amount:35});
+fail(()=>E.supportedAlchemyConcurrentIllEffect({elixirName:'Warmth',asBefore:7,useId:'a'}),/nelze/);
 fail(()=>E.supportedAlchemyConcurrentIllEffect({elixirName:'Darkvision',asBefore:7}),/nelze/);
 const snap=JSON.stringify(E.CANONICAL_ALCHEMY_ILL_EFFECTS);
 for(let i=0;i<5;i++)E.planAlchemyIllEffect({elixirName:'Physic',baseAS:7});

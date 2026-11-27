@@ -5,7 +5,7 @@
  * later commit this AND all victim states and the vial together.
  */
 import {createAlchemicalAreaThrownVial} from './hmk-alchemy-acid-thrown.js';
-import {previewAlchemyAreaBlast} from './hmk-alchemy-area-preflight.js';
+import {previewAlchemyAreaBlast} from './hmk-alchemy-area-preflight.js?v=94.158';
 import {validateEncounterSequence} from './encounter-turn-sequence.js';
 import {availableMasteries} from './hmk-skill-test-engine.js';
 import {effectiveSpatialBarriers,pathCrossesClosedBarrier} from './hmk-guided-spatial-barriers.js';

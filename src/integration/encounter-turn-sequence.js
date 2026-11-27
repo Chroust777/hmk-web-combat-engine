@@ -711,13 +711,13 @@ export function finishEncounterTurn(sequence,states,{action='pass',durationRound
  // A combatant disabled by an earlier priority shot may have an incapable
  // turn; a pre-existing compulsory Pass still takes precedence.
  if(s.round===1&&s.cursor<(s.initialCrossbowPriority?.length||0)){
-  const incapable=['INC','UNC','KIA'].includes(s.entryShock)||
+  const incapable=!!p.alchemyDormancy?.length||['INC','UNC','KIA'].includes(s.entryShock)||
    s.entryAlertness==='unaware'||s.entryMorale==='catatonic';
   requireValid(action==='attack'||(incapable&&action==='incapacitated')||
    (s.entryForcedPass===true&&action==='pass'),
    'HMK str.161: před řádným IR lze vykonat pouze deklarovaný úvodní výstřel kuše');
  }
- const helpless=completeParalysis(p)||['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||p.morale?.state==='catatonic'||
+ const helpless=!!p.alchemyDormancy?.length||completeParalysis(p)||['INC','UNC','KIA'].includes(p.shock)||p.coma?.active||p.morale?.state==='catatonic'||
   p.fear?.state==='catatonic'||s.entryFear==='catatonic';
  if(!helpless&&['afraid','terrified'].includes(p.fear?.state))
   requireValid(['pass','move'].includes(action),

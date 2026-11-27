@@ -6,7 +6,7 @@
  * This is a read-only projector for the future one-screen encounter wizard.
  * It does not advance time or mutate the current initiative sequence.
  */
-import {validateEncounterSequence,finishEncounterTurn,dueEncounterEvents,dueEndTurnEvents} from './encounter-turn-sequence.js';
+import {validateEncounterSequence,finishEncounterTurn,dueEncounterEvents,dueEndTurnEvents} from './encounter-turn-sequence.js?v=94.158';
 const PLAYER_ACTIONS=['attack','charge','evade','grope','incant','move','pass','ready','concentrate-start','concentrate-hold','concentrate-abandon'];
 
 export function guidedTurnChoices(sequence,states){

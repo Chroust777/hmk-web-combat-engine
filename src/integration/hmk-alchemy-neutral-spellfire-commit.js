@@ -1,3 +1,4 @@
+import {projectAlchemyDormancy} from './hmk-alchemy-extended.js?v=94.158';
 /** HMK v1.2 pp.160, 182, 200–203, 251, 254.
  * Deliberately bounded authoritative Neutral spellfire writer. It can commit
  * actual F/CF and bounded S/CS Detect/Reveal/Dispel after true spellstart
@@ -227,6 +228,7 @@ function prepareNeutralSpellfireOutcome({document,id,casterId,spell,finishId,
    timelineId:sequence.timelineId,round:commitment.completionRound,spellstartId:spellstart.id,
    physicalDice:[{faces:100,value:castingD100,source:'GM-entered-physical-die'},
     ...(critical?[{faces:100,value:misfireD100,source:'GM-entered-physical-die'}]:[])]}});
+ if(success&&spell==='Dispel'&&targetKind!=='Ward')projectAlchemyDormancy(out);
  validateNeutralAlchemyHistory(out);
  validateNeutralAlchemyCombatLinks(out);
  check(js(document)===saved,'zdrojová kampaň nesmí být změněna');

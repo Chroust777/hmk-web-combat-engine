@@ -1,3 +1,4 @@
+import {fireshieldProtection} from './hmk-alchemy-extended.js?v=94.158';
 /** HârnMaster v1.2 pp.268–269,271–272,274.
  * Strict NON-WRITING stage for Eruption / Fumebomb / Weakness.
  * A valid preflight is not a completed throw, battle action, or persistence
@@ -8,7 +9,7 @@ import {alchemyElixirStrength} from './hmk-alchemy-decay.js';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {validateEncounterSequence} from './encounter-turn-sequence.js';
 import {validateCombatState,applyConfirmedAlchemyFumebombShock,applyConfirmedAlchemyWeakness} from './persistent-combat-state.js';
-import {previewAreaCohort} from './hmk-area-cohort-preview.js';
+import {previewAreaCohort} from './hmk-area-cohort-preview.js?v=94.158';
 import {registerSpecialMorale,resolveSpecialMorale} from './hmk-guided-special-morale.js';
 import {strengthImpactModifier} from '../rules/weapon-modes.js';
 import {strengthEncumbranceModifier} from '../rules/encumbrance.js';
@@ -94,7 +95,9 @@ export function previewAlchemyAreaBlast({sequence,characters=[],inventory=[],jou
    const stateMap=Object.fromEntries(characters.map(c=>[c.id,c.hmk?.healthState]));
    const result=previewAreaCohort({id:sourceId,timelineId:seq.timelineId,round:seq.round,
     aspect:'fire',strikeImpact,targetIds:areaIds,characters,states:stateMap,inventory,
-    rollsByTarget,sequence:seq,method});
+    rollsByTarget,sequence:seq,method,fireProtection:Object.fromEntries(areaIds.map(actorId=>[actorId,
+     fireshieldProtection({journal,campaignId,minute,actorId,
+      auralShockLevels:characters.find(actor=>actor.id===actorId)?.hmk?.arcane?.auralShockLevels??0}).av]))});
    Object.assign(results,result.results);Object.assign(stagedStates,result.stagedStates);
   }
   check(Array.isArray(threatenedOpponentIds)&&new Set(threatenedOpponentIds).size===threatenedOpponentIds.length&&

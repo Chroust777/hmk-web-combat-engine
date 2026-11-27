@@ -7,7 +7,7 @@
  */
 import {validateEncounterSequence} from './encounter-turn-sequence.js';
 import {validateCombatState,dueInjuryMorale} from './persistent-combat-state.js';
-import {previewAreaCohort,assertAreaCohortUnchanged} from './hmk-area-cohort-preview.js';
+import {previewAreaCohort,assertAreaCohortUnchanged} from './hmk-area-cohort-preview.js?v=94.158';
 import {persistVerifiedCombatSnapshot} from './verified-combat-storage.js';
 const check=(v,m)=>{if(!v)throw Error(m)};
 const clone=structuredClone;
@@ -17,7 +17,7 @@ const integer=(v,a,b)=>Number.isSafeInteger(v)&&v>=a&&v<=b;
 /** Only a SOURCE PRODUCER (not a generic UI form) may append this event.
  * The present release has no source producer; consequently this module
  * cannot make an unsupported Area attack writable on its own. */
-export function prepareSourceBoundAreaCohort({sequence,sourceEventId,characters,states,inventory,rollsByTarget,method='weighted'}={}){
+export function prepareSourceBoundAreaCohort({sequence,sourceEventId,characters,states,inventory,rollsByTarget,fireProtection,method='weighted'}={}){
  const seq=validateEncounterSequence(sequence);
  check(typeof sourceEventId==='string'&&sourceEventId.length>0,'Chybí autoritativní Area source event');
  const matches=seq.log.filter(x=>x.type==='area-source-resolved'&&x.eventId===sourceEventId&&x.timelineId===seq.timelineId&&x.round===seq.round);
@@ -48,7 +48,7 @@ export function prepareSourceBoundAreaCohort({sequence,sourceEventId,characters,
  }));
  const preview=previewAreaCohort({id:sourceEventId,timelineId:seq.timelineId,round:seq.round,
   aspect:src.aspect,strikeImpact:src.strikeImpact,targetIds:src.targetIds,characters,states,
-  inventory,rollsByTarget,sequence:seq,method});
+  inventory,rollsByTarget,sequence:seq,fireProtection,method});
  const characterWitnesses=Object.fromEntries(src.targetIds.map(id=>{
   const match=characters.filter(x=>x.id===id);
   check(match.length===1,`Neznámá postava ${id}`);

@@ -1,3 +1,4 @@
+import {actorFireshieldAV} from './hmk-alchemy-extended.js?v=94.158';
 /** G04: two conservative in-panel wizards for the existing Combat screen.
  * All numbers marked "roll" originate from GM input. No RNG, no alternate write.
  * Area supports proven Doom Flame casting with independently verified proactive Evade;
@@ -5,7 +6,7 @@
  */
 import {awaitingPelahnBonus,persistPelahnExtraPass,persistPelahnExtraMove,persistPelahnTotalReleaseSource,preparePelahnBonusMelee,persistPelahnExtraMelee,preparePelahnBonusMissile,persistPelahnExtraMissile,persistPelahnBonusIncantStart} from './hmk-pelahn-live-initiative.js';
 import {prepareGuidedPyre,guidedPyreRequirement,submitGuidedPyreDie,persistGuidedPyre,persistGuidedPyreTotalReleaseSource} from './hmk-guided-pyre.js';
-import {prepareDoomFlameSource,doomFlameRequirement,submitDoomFlameDie,resolveDoomFlameCohort,persistGuidedDoomFlame,persistFailedDoomFlame,persistDoomFlameFormMisfire} from './hmk-guided-doom-flame.js';
+import {prepareDoomFlameSource,doomFlameRequirement,submitDoomFlameDie,resolveDoomFlameCohort,persistGuidedDoomFlame,persistFailedDoomFlame,persistDoomFlameFormMisfire} from './hmk-guided-doom-flame.js?v=94.158';
 import {assertFumebombLineOfSight} from './hmk-alchemy-area-los.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {prepareMountedRideBy,finalizeMountedRideBy,persistMountedRideBy} from './hmk-mounted-ride-by.js';
@@ -253,7 +254,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
    if(req.kind==='failed')return `<section class="panel">${common}<p>HMK str. 202: Casting F, kouzlo nemá účinek. Kouzelník získá 15 Fatigue (CL VI), žádný Impact ani Shock hod.</p><form id="hmk-g04-area-failure">${btn('Atomicky uložit neúspěšné seslání')}</form></section>`;
    return `<section class="panel">${common}<p>Vyhodnoťte každý zasažený cíl. Impact ${s.strikeImpact}; koule má poloměr ${s.radius} ft. Již uloženou Evade lze doložit z prostorového zápisu (zpravidla z předchozího kola); jedna proaktivní Evade je povolena jen s úplnou mapou, potvrzeným pohybem a budoucím spotřebovaným IR.</p>
     <form id="hmk-g04-area-commit">${s.targetIds.map(id=>{
-     let av='neznámá',needs=true;try{const a=resolveVerifiedAreaProtection({inventory:document.inventory,targetId:id,method:'weighted'});av=a.areaAV;needs=s.strikeImpact>a.areaAV;}catch{}
+     let av='neznámá',needs=true;try{const a=resolveVerifiedAreaProtection({inventory:document.inventory,targetId:id,method:'weighted'});av=a.areaAV+actorFireshieldAV(document,id);needs=s.strikeImpact>av;}catch{}
      return `<fieldset><legend>${esc(combatants.find(c=>c.id===id)?.name??id)} · Area AV ${esc(av)}</legend><label>Evade skutečně doložena?<select required name="evade_${esc(id)}"><option value="no">Ne – GM potvrzuje žádnou Evade</option><option value="recorded">Ano – uložená Evade aktuálního/předchozího kola</option><option value="proactive">Proaktivní Evade – skutečná trasa nyní, spotřebuje příští IR (max. 1 cíl)</option></select></label><label>Proaktivní Evade: skutečná trasa x,y;x,y (prázdné pro jiné volby)<input name="path_${esc(id)}" placeholder="40,0;55,0"></label><label><input type="checkbox" name="witness_${esc(id)}" value="yes">GM přímo ověřil, že tento cíl viděl přilétající Doom Flame</label><label>U zaznamenané nebo proaktivní Evade, pokud cíl zůstane zasažen: fyzický Dodge d100<input type="number" min="1" max="100" name="dodge_${esc(id)}"></label>${needs?`<label>Skutečný Shock d100 (nevyžaduje se po proaktivním úniku mimo oblast)<input type="number" min="1" max="100" name="shock_${esc(id)}"></label>`:'<p>Bez účinného Impact: Shock d100 se neháže.</p>'}<label>Případný Compound d10 (jen je-li vyžadován) <input type="number" min="1" max="10" name="compound_${esc(id)}"></label></fieldset>`;
     }).join('')}<details><summary>Proaktivní Evade: faktická mapa GM (vyplnit jen při nové Evade)</summary><p>Všech šest okolností je povinných pro KAŽDOU postavu, pokud někdo právě pohybem uniká kouli. Souřadnice se berou výhradně z aktuální Initiative. Žádná hodnota se nehádá.</p>${combatants.map(c=>`<fieldset><legend>${esc(c.name||c.id)}</legend>${['foe','threatens','aware','helpless','concentrating','reachImpeded'].map(n=>`<label>${n}<select name="pro_map_${esc(c.id)}_${n}"><option value="">Potvrďte GM…</option><option value="yes">Ano</option><option value="no">Ne</option></select></label>`).join('')}<label>Skutečný Reach ft <input name="pro_map_${esc(c.id)}_reach" type="number" min="0" step="1"></label></fieldset>`).join('')}</details>${btn('Ověřit všechny cíle a atomicky uložit')}</form></section>`;
   }
@@ -579,7 +580,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
      if(!affected.has(id))continue;
      if(mode==='no')declined.push(id);
      const a=resolveVerifiedAreaProtection({inventory:document.inventory,targetId:id,method:'weighted'});
-     rolls[id]={shockD100:draft.stage.strikeImpact>a.areaAV?positive(v['shock_'+id]):null,
+     rolls[id]={shockD100:draft.stage.strikeImpact>a.areaAV+actorFireshieldAV(document,id)?positive(v['shock_'+id]):null,
       dodgeD100:mode==='no'?null:positive(v['dodge_'+id]),
       compoundD10:v['compound_'+id]?positive(v['compound_'+id],1,10):null};
     }

@@ -1,3 +1,4 @@
+import {actorFireshieldAV} from './hmk-alchemy-extended.js?v=94.158';
 import {classifySpellMisfire,applyMisfireCombatTrauma,applyMisfireArcaneTrauma} from './hmk-spell-misfire-effects.js';
 /** HMK 2024 pp.7, 22, 200–202, 227: verified Doom Flame area source.
  * Restricted supported case: primary Peleahn, normal audible cant and gesture,
@@ -8,7 +9,7 @@ import {classifySpellMisfire,applyMisfireCombatTrauma,applyMisfireArcaneTrauma} 
 import {successLevel,SL} from '../rules/tests.js';
 import {combatFatigueTotals,validateCombatState,dueInjuryMorale} from './persistent-combat-state.js';
 import {validateEncounterSequence,currentEncounterActor,recordScheduledHitCommit,finishEncounterTurn} from './encounter-turn-sequence.js';
-import {prepareSourceBoundAreaCohort,finalizeSourceBoundAreaCohort} from './hmk-area-atomic-cohort.js';
+import {prepareSourceBoundAreaCohort,finalizeSourceBoundAreaCohort} from './hmk-area-atomic-cohort.js?v=94.158';
 import {persistVerifiedCombatSnapshot} from './verified-combat-storage.js';
 import {previewProactiveDoomFlameEvade} from './hmk-proactive-area-evade.js';
 const cp=structuredClone,js=JSON.stringify;
@@ -227,7 +228,8 @@ export function resolveDoomFlameCohort({stage,document,rollsByTarget,noEvadeTarg
    {faces:4,value:stage.fireD4,source:'GM-entered-physical-die'}]};
  sourceSeq.log.push(event);
  const args={sequence:sourceSeq,sourceEventId:stage.id,characters:document.characters,
-  states,inventory:document.inventory,rollsByTarget,method};
+  states,inventory:document.inventory,rollsByTarget,method,
+  fireProtection:Object.fromEntries(affectedIds.map(id=>[id,actorFireshieldAV(document,id)]))};
  const cohortStage=prepareSourceBoundAreaCohort(args);
  const cohortPlan=finalizeSourceBoundAreaCohort({stage:cohortStage,...args});
  const afterStates={...states,...cohortPlan.states};

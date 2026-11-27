@@ -6,10 +6,11 @@ const valid=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const must=(ok,message)=>{if(!ok)throw Error(message);};
 export const WEATHER_ROLL_FORMAT='hmk-trekking-weather-roll-v1';
 export function evaluateTrekkingWeatherRoll({kind,areaAV,gearAV=0,shelterAV=0,fireFS=0,
- continuousSleet=false,resting=false,shadedRest=false,nativeHotClimate=false,roll,origin='manual'}={}){
+ continuousSleet=false,resting=false,shadedRest=false,nativeHotClimate=false,fireshieldAV=0,roll,origin='manual'}={}){
  must(['cold','heat'].includes(kind),'Chybí doložený Cold/Heat Hazard');
  must(valid(areaAV,0,99)&&valid(roll,1,12),'Je nutná ověřená Area AV a fyzický hod kostkou');
  must(['manual','cryptographic-software-die'].includes(origin),'Neznámý původ hodu');
+ must(valid(fireshieldAV,0,6)&&(kind==='heat'||fireshieldAV===0),'Fireshield platí pouze pro Heat Hazard.');
  let av,sides,exposed;
  if(kind==='cold'){
   must(valid(gearAV,0,2)&&[0,2,3].includes(shelterAV)&&valid(fireFS,0,20)&&
@@ -22,13 +23,13 @@ export function evaluateTrekkingWeatherRoll({kind,areaAV,gearAV=0,shelterAV=0,fi
   must(gearAV===0&&shelterAV===0&&fireFS===0&&continuousSleet===false&&
    typeof resting==='boolean'&&typeof shadedRest==='boolean'&&typeof nativeHotClimate==='boolean'&&
    (!shadedRest||resting),'Shade vyžaduje skutečný odpočinek bez pohybu');
-  av=Math.max(areaAV,1);
+  av=Math.max(0,Math.max(areaAV,1)-fireshieldAV);
   sides=(shadedRest?10:resting?6:4)+(nativeHotClimate?2:0);
   exposed=roll<=av;
  }
  must(roll<=sides,'Hod přesahuje skutečnou kostku Weather Hazard d'+sides);
  return {format:WEATHER_ROLL_FORMAT,kind,areaAV,gearAV,shelterAV,fireFS,continuousSleet,
-  resting,shadedRest,nativeHotClimate,av,sides,roll,origin,exposed,requiresEndurance:exposed,
+  resting,shadedRest,nativeHotClimate,...(fireshieldAV?{fireshieldAV}:{}),av,sides,roll,origin,exposed,requiresEndurance:exposed,
   rulePage:149};
 }
 export function weatherRollEvidence(journal=[],sourceId,actorId,campaignId){

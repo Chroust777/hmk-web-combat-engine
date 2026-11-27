@@ -26,7 +26,7 @@ export function trekPersonHealthSnapshot({id,name,healthState}={}){
   check(anatomy,(name||id)+': neznámá lokace závažné rány ('+w.location+'); nelze spolehlivě odvodit Injured Mode.');
   return {id:w.id,location:w.location,severity:w.severity,zone:anatomy.zone};
  });
- const shock=healthState.shock;
+ const shock=healthState.alchemyDormancy?.length&&healthState.shock!=='KIA'?'UNC':healthState.shock;
  check(['NONE','STN','INC','UNC','KIA'].includes(shock), (name||id)+': neznámý Shock.');
  const comaActive=healthState.coma?.active===true;
  const extendedShockActive=!!healthState.extendedShock;

@@ -8,7 +8,7 @@
  * from the current character model, so Move/Evade/Charge/Incant are NOT
  * claimed supported by this adapter. They need independent world-state data.
  */
-import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
+import {guidedTurnChoices} from './hmk-guided-turn-choices.js?v=94.158';
 import {finishEncounterTurn,validateEncounterSequence,currentEncounterActor,dueEndTurnEvents} from './encounter-turn-sequence.js';
 import {applyConfirmedSpecialAftermath,recordConfirmedMoraleSurrender} from './persistent-combat-state.js';
 const assert=(ok,message)=>{if(!ok)throw Error(message)};

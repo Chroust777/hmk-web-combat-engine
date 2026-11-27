@@ -270,6 +270,7 @@ export function campaignCalendarAgenda(clock,characters=[],journal=[],inventory=
   // never assigned a guessed start from their combat round.
   for(const t of s.toxinCourses??[]){
    if(!['incubating','active'].includes(t.status))continue;
+   if(t.alchemicalSource)continue; // Exact rounds are handled by the alchemy agenda.
    const anchor=getCampaignEpisodeAnchor(clock,'poison',c.id,t.id);
    if(!anchor){unknown.push({characterId:c.id,name:c.name,kind:'poison',description:'Poison '+t.sourceId+' · chybí potvrzená expozice v minutách',reason:'Ukotvěte historickou expozici v Kalendáři'});continue;}
    const minutes=t.status==='incubating'?t.onsetMinutes:t.elapsedMinutes+t.periodMinutes;

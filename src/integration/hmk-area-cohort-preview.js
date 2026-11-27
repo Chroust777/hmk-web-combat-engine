@@ -23,7 +23,7 @@ function verifiedML(character,name){
 /** Inputs named physical rolls are only previews. No source is inferred from
  * an arbitrary impact value, regardless of the strength of the dice proof. */
 export function previewAreaCohort({id,timelineId,round,aspect,strikeImpact,
- targetIds,characters,states,inventory,rollsByTarget,sequence=null,method='weighted'}={}){
+ targetIds,characters,states,inventory,rollsByTarget,sequence=null,fireProtection=null,method='weighted'}={}){
  assert(typeof id==='string'&&id&&typeof timelineId==='string'&&timelineId&&valid(round,1,9999),
   'Chybí identita Area zdroje nebo kolo');
  assert(['fire','frost'].includes(aspect)&&valid(strikeImpact,0,999),
@@ -45,7 +45,10 @@ export function previewAreaCohort({id,timelineId,round,aspect,strikeImpact,
   const armour=resolveVerifiedAreaProtection({inventory,targetId,method});
   assert(armour.ready,`Area zbroj ${targetId}: ${armour.reason}`);
   const roll=rollsByTarget[targetId];
-  const needsShock=strikeImpact>armour.areaAV;
+  const shield=aspect==='fire'?(fireProtection?.[targetId]??0):0;
+  assert(valid(shield,0,6),'Neplatný Fireshield AV.');
+  const areaAV=armour.areaAV+shield;
+  const needsShock=strikeImpact>areaAV;
   assert(roll&&typeof roll==='object'&&
    (needsShock?valid(roll.shockD100,1,100):roll.shockD100==null),
    needsShock?`Chybí fyzický Shock d100 pro ${targetId}`:
@@ -96,10 +99,10 @@ export function previewAreaCohort({id,timelineId,round,aspect,strikeImpact,
   }
   // Even a successful target preview cannot create a persisted Area source.
   const out=applyConfirmedAreaStrike({state:current,round,eventId:`${id}:area:${targetId}`,
-   strikeImpact,areaAV:armour.areaAV,aspect,dodgeML,dodgeRoll:dodge,
+   strikeImpact,areaAV,aspect,dodgeML,dodgeRoll:dodge,
    shockML,shockRoll:roll.shockD100??null,compoundD10:roll.compoundD10??null,gmConfirmed:true});
   newStates[targetId]=out.state;
-  results[targetId]={result:out.result,areaAV:armour.areaAV,baseShockML,fatigue,shockEML:shockML,dodgeML,
+  results[targetId]={result:out.result,areaAV,...(shield?{fireshieldAV:shield}:{}),baseShockML,fatigue,shockEML:shockML,dodgeML,
    evadeSourceEventId,physicalDice:[...(dodge===null?[]:[{id:'evadeDodgeD100',faces:100,value:dodge}]),
     ...(roll.compoundD10==null?[]:[{id:'compoundD10',faces:10,value:roll.compoundD10}]),
     ...(needsShock?[{id:'shockD100',faces:100,value:roll.shockD100}]:[])]};

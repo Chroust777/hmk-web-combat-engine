@@ -103,6 +103,9 @@ export function validateCombatState(s){
 
  requireCond(s&&s.format==='hmk-character-health-v1'&&!Array.isArray(s),'Neznámý formát bojového stavu');
  requireCond(own(SHOCK,s.shock),'Neznámý Shock State');
+ if(s.alchemyDormancy!==undefined)requireCond(Array.isArray(s.alchemyDormancy)&&s.alchemyDormancy.length>0&&
+  new Set(s.alchemyDormancy).size===s.alchemyDormancy.length&&s.alchemyDormancy.every(id=>typeof id==='string'&&id),
+  'Quiescence: poškozený stav nehybnosti.');
  requireCond(s.bloodLoss&&whole(s.bloodLoss.bp,0,4)&&s.bloodLoss.weaknessFatigue===s.bloodLoss.bp*5,'Neplatné Blood Loss Points / weakness');
  requireCond(s.bloodShockPending===undefined||typeof s.bloodShockPending==='boolean','Neplatný příznak Blood Shock');
  requireCond(s.fatigue&&['windedness','weariness','otherWeakness'].every(k=>whole(s.fatigue[k],0,99999)),'Neplatný trvalý Fatigue');
@@ -152,7 +155,11 @@ export function validateCombatState(s){
    requireCond(t&&typeof t.id==='string'&&t.id.startsWith('poison:')&&!ids.has(t.id)&&
     typeof t.sourceId==='string'&&t.id==='poison:'+t.sourceId&&
     ['digested','vector','contact'].includes(t.transmission)&&
-    (t.herbalSource?
+    (t.alchemicalSource?
+      (!t.herbalSource&&typeof t.alchemicalSource.useId==='string'&&t.sourceId==='alchemy:'+t.alchemicalSource.useId&&
+       whole(t.alchemicalSource.as,1,13)&&t.initialHR===Math.max(0,Math.min(6,10-t.alchemicalSource.as))&&
+       t.onsetMinutes===0&&t.periodMinutes===0&&whole(t.elapsedRounds,0,10001)):
+      (t.herbalSource?
       (typeof t.herbalSource.applicationId==='string'&&t.herbalSource.applicationId.length>=3&&
        [1,2,3].includes(t.herbalSource.potency)&&whole(t.herbalSource.sv,1,14)&&
        t.sourceId==='herb:'+t.herbalSource.applicationId&&t.transmission==='digested'&&
@@ -163,7 +170,7 @@ export function validateCombatState(s){
         whole(t.herbalSource.onsetRounds,1,14)&&t.herbalSource.onsetRounds===15-t.herbalSource.sv&&
         typeof t.herbalSource.timelineId==='string'&&t.herbalSource.timelineId.length>=3:
         t.onsetMinutes===(15-t.herbalSource.sv)*(t.herbalSource.potency===1?60:1))):
-      whole(t.onsetMinutes,10,60))&&whole(t.periodMinutes,10,60)&&whole(t.initialHR,1,5)&&
+      whole(t.onsetMinutes,10,60))&&whole(t.periodMinutes,10,60)&&whole(t.initialHR,1,5))&&
     Array.isArray(t.symptomD10s)&&t.symptomD10s.length===4&&t.symptomD10s.every(n=>whole(n,1,10))&&
     Array.isArray(t.symptoms)&&t.symptoms.length===4&&t.symptoms.every(x=>typeof x==='string'&&x.length>0)&&
     whole(t.hr,0,6)&&['incubating','active','defeated','dead'].includes(t.status)&&
@@ -908,6 +915,8 @@ export function unresolvedInjuryMishaps(state){validateCombatState(state);return
 export function specialActionReadiness(state,{role='attacker',defence='block'}={}){
  validateCombatState(state);
  if(state.shock==='KIA')return {ready:false,reason:'KIA: postava je mrtvá'};
+ if(state.alchemyDormancy?.length)return {ready:role==='defender'&&defence==='ignore',
+  reason:'Quiescence: tělo nemůže jednat ani se aktivně bránit.'};
  const fear=state.fear?.state;
  if(fear==='catatonic')return {ready:false,reason:'Fear CF0: postava nemůže jednat ani se bránit'};
  if(['afraid','terrified'].includes(fear)&&role==='attacker')return {ready:false,reason:'Fear: pouze Pass nebo pohyb od zdroje'};

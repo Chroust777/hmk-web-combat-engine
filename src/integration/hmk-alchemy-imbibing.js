@@ -2,16 +2,38 @@
  * First implemented canonical effect: Darkvision. Other elixirs stay disabled
  * until their specific health/astral/skill consequences are integrated.
  */
-import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.155';
+import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.158';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
-import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.157';
+import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.158';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
 const whole=(n,lo,hi)=>Number.isSafeInteger(n)&&n>=lo&&n<=hi;
 const originOK=o=>['manual','cryptographic-software-die'].includes(o);
 const relevant=(j,c)=>j.calendarCampaignId===c;
+const newElixirNames=['Mindsalve','Fireshield','Poison','Quiescence'];
+const fullImbibingNames=['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity',...newElixirNames];
+const additionalTemporary=['Fireshield','Quiescence'];
+
+export function activeAdditionalTemporary(journal,campaignId,targetId,minute,name){
+ return journal.filter(row=>relevant(row,campaignId)&&row.campaignMinute<=minute&&
+  row.calendarAlchemyImbibing?.targetId===targetId&&row.calendarAlchemyImbibing?.elixirName===name&&
+  typeof row.calendarAlchemyImbibing.finishId==='string'&&row.calendarAlchemyImbibing.finalAS>0)
+  .map(row=>({useId:row.id,...row.calendarAlchemyImbibing,
+   state:alchemyElixirStrength(journal,campaignId,row.calendarAlchemyImbibing.finishId,minute)}))
+  .filter(source=>source.state.activeTemporary&&source.state.imbibingId===source.useId);
+}
+function activeAdditionalInstant(journal,campaignId,targetId,minute,name){
+ return journal.flatMap(row=>{
+  const proof=row.calendarAlchemyImbibing;
+  if(!relevant(row,campaignId)||row.campaignMinute>minute||proof?.targetId!==targetId||proof?.elixirName!==name)return [];
+  const last=journal.findLast(entry=>relevant(entry,campaignId)&&entry.campaignMinute<=minute&&
+   entry.calendarAlchemyExtendedRecovery?.useId===row.id)?.calendarAlchemyExtendedRecovery;
+  return last?.active&&last.asAfter>0?[{...proof,useId:row.id,state:{currentAS:last.asAfter,nextDueMinute:null}}]:[];
+ });
+}
+
 function latestHealingReceipt(journal,use,minute){
  return journal.findLast(row=>row.calendarCampaignId===use.calendarCampaignId&&row.campaignMinute<=minute&&
   (row.calendarAlchemyHealingInteraction??row.calendarAlchemyHealingRecovery)?.useId===use.id);
@@ -26,7 +48,7 @@ function activeHealing(journal,campaignId,targetId,minute){
    state:{currentAS:last.asAfter,nextDueMinute:null}}]:[];
  });
 }
-const decayCurrent=(source,minute)=>source.elixirName==='Healing'||source.state.nextDueMinute>minute;
+const decayCurrent=(source,minute)=>['Healing','Mindsalve','Poison'].includes(source.elixirName)||source.state.nextDueMinute>minute;
 export function activeDarkvision(journal=[],campaignId,targetId,minute=1e9){
  return journal.filter(j=>relevant(j,campaignId)&&j.calendarAlchemyImbibing?.targetId===targetId&&
   j.calendarAlchemyImbibing?.elixirName==='Darkvision'&&j.campaignMinute<=minute)
@@ -69,7 +91,9 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
   ...activeErudition(journal,campaignId,targetId,minute),
   ...activeFootpad(journal,campaignId,targetId,minute),
   ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute),
-  ...activeVerity(journal,campaignId,targetId,minute)];
+  ...activeVerity(journal,campaignId,targetId,minute),
+  ...activeAdditionalTemporary(journal,campaignId,targetId,minute,'Fireshield'),
+  ...activeAdditionalInstant(journal,campaignId,targetId,minute,'Mindsalve')];
  const seen=new Set(live.map(x=>x.useId));
  ok(seen.size===live.length,'Profusion: duplicitní aktivní zdroj');
  for(const row of journal){
@@ -82,7 +106,7 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
   // Without its canonical lifetime/recovery evidence, NEVER assume it ended.
   // A previous Temporary effect might have decayed/been dispelled; the
   // supported finders above do reconstruct those lifetimes from the journal.
-  if(['Darkvision','Erudition','Footpad','Egosight','Verity'].includes(proof.elixirName))continue;
+  if(['Darkvision','Erudition','Footpad','Egosight','Verity',...newElixirNames].includes(proof.elixirName))continue;
   throw Error('Profusion: účinek elixíru '+proof.elixirName+
    ' nemá dosud doložené ukončení; nelze bezpečně vyhodnotit souběh ani CF');
  }
@@ -107,8 +131,10 @@ export function activeAlchemyPhysicTargets(journal=[],campaignId,targetId,minute
   ...activeErudition(journal,campaignId,targetId,minute),
   ...activeFootpad(journal,campaignId,targetId,minute),
   ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute),
-  ...activeVerity(journal,campaignId,targetId,minute)];
- const knownNames=new Set(['Darkvision','Erudition','Footpad','Egosight','Verity']);
+  ...activeVerity(journal,campaignId,targetId,minute),
+  ...additionalTemporary.flatMap(name=>activeAdditionalTemporary(journal,campaignId,targetId,minute,name)),
+  ...['Mindsalve','Poison'].flatMap(name=>activeAdditionalInstant(journal,campaignId,targetId,minute,name))];
+ const knownNames=new Set(['Darkvision','Erudition','Footpad','Egosight','Verity',...newElixirNames]);
  const seen=new Set();
  for(const source of live){
   ok(!seen.has(source.useId),'Physic: duplicitní účinný zdroj');
@@ -121,7 +147,12 @@ export function activeAlchemyPhysicTargets(journal=[],campaignId,targetId,minute
   const profile=canonicalProfusionProfile(proof.elixirName);
   ok(profile.use==='Imbibed','Physic: Applied účinek nesmí mít důkaz požití');
   if(proof.elixirName==='Physic'||!(proof.finalAS>0)||proof.elixirName==='Healing'&&latestHealingReceipt(journal,row,minute))continue;
-  if(knownNames.has(proof.elixirName))continue; // their AS/expiry is replayed above
+  if(knownNames.has(proof.elixirName)){
+   if(['Poison','Mindsalve'].includes(proof.elixirName)){
+    if(journal.some(entry=>relevant(entry,campaignId)&&entry.campaignMinute<=minute&&
+     entry.calendarAlchemyExtendedRecovery?.useId===row.id))continue;
+   }else if(!additionalTemporary.includes(proof.elixirName)||typeof proof.finishId==='string')continue;
+  } // Their AS/expiry is replayed above.
   throw Error('Physic: nelze ověřit trvání účinku '+proof.elixirName+
    ' (včetně elixírů vyňatých z Profusion); není bezpečné odečíst AS všech účinků');
  }
@@ -449,6 +480,36 @@ export function createAlchemyHealingImbibing({journal=[],inventory=[],campaignId
   consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,272]};
 }
 
+export function createExtendedAlchemyImbibing({journal=[],inventory=[],campaignId,minute,actorId,targetId,finishId,
+ testSkill,ml,d100,origin,emptyId,gmConfirmed=false}={}){
+ ok(gmConfirmed===true&&typeof campaignId==='string'&&campaignId&&whole(minute,0,1e9)&&actorId&&targetId&&emptyId&&
+  ['Aura','Alchemy'].includes(testSkill)&&whole(ml,1,1000)&&whole(d100,1,100)&&originOK(origin),
+  'Alchemy: chybí ověřený příjemce, Aura/Alchemy ML, d100 nebo potvrzení podání.');
+ const dose=alchemyElixirStrength(journal,campaignId,finishId,minute),elixirName=dose.elixirName;
+ ok(newElixirNames.includes(elixirName)&&dose.currentAS>0&&!dose.imbibingId&&!dose.expires&&dose.nextDueMinute>minute,
+  'Alchemy: dávka není dostupná nebo má splatný Decay.');
+ const vial=alchemyVialState(journal,campaignId,finishId,minute);
+ ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
+  inventory.some(item=>item.id===vial.vialId&&item.characterId===actorId&&item.quantity===1&&item.slot===vial.slot),
+  'Alchemy: nutná skutečná nesená lahvička podávajícího.');
+ const exempt=canonicalProfusionProfile(elixirName).exempt;
+ const others=exempt?[]:activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
+ ok(others.every(source=>decayCurrent(source,minute)),'Alchemy: nejprve vyhodnoťte splatný Decay.');
+ const roll=classifyProfusionImbibing(d100,ml,others.length),sl=roll.adjusted;
+ const modifier={CF:-2,F:-1,S:0,CS:1}[sl]*(exempt?-1:1)||0,finalAS=Math.max(0,dose.currentAS+modifier);
+ const critical=sl==='CF'&&finalAS>0&&!exempt;
+ const illEffect=critical?{
+  kind:elixirName==='Mindsalve'?'mindsalve-weakness':'fireshield-weariness',
+  amount:dose.currentAS*5
+ }:null;
+ return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,emptyId,vialId:vial.vialId,
+  elixirName,consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
+  testSkill,ml,d100,origin,otherActiveElixirs:others.length,profusionCF:roll.profusionCF,sl,
+  asBefore:dose.currentAS,modifier,finalAS,temporary:finalAS>0&&additionalTemporary.includes(elixirName),
+  ...(critical&&others.length?{profusionIllEffects:concurrentAlchemyIllEffects(others)}:{}),
+  illEffect,consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,elixirName==='Fireshield'?272:273]};
+}
+
 export function validateAlchemyImbibingJournal(journal=[]){
  const prior=[];
  for(const row of journal){
@@ -465,7 +526,7 @@ export function validateAlchemyImbibingJournal(journal=[]){
    const state=alchemyVialState(beforeEmpty,p.campaignId,p.finishId,p.minute);
    const item=state&&{id:state.vialId,characterId:state.ownerId,slot:state.slot,quantity:1};
    ok(item&&item.characterId===p.actorId,'Alchemy Imbibing: nesprávný vlastník nádoby');
-   const create=p.elixirName==='Healing'?createAlchemyHealingImbibing:p.elixirName==='Physic'?createAlchemyPhysicImbibing:p.elixirName==='Erudition'?createAlchemyEruditionImbibing:p.elixirName==='Footpad'?createAlchemyFootpadImbibing:p.elixirName==='Egosight'?createAlchemyEgosightImbibing:p.elixirName==='Verity'?createAlchemyVerityImbibing:createAlchemyDarkvisionImbibing;
+   const create=p.elixirName==='Healing'?createAlchemyHealingImbibing:p.elixirName==='Physic'?createAlchemyPhysicImbibing:p.elixirName==='Erudition'?createAlchemyEruditionImbibing:p.elixirName==='Footpad'?createAlchemyFootpadImbibing:p.elixirName==='Egosight'?createAlchemyEgosightImbibing:p.elixirName==='Verity'?createAlchemyVerityImbibing:newElixirNames.includes(p.elixirName)?createExtendedAlchemyImbibing:createAlchemyDarkvisionImbibing;
    const reproduced=create({journal:beforeEmpty,inventory:[item],campaignId:p.campaignId,
     minute:p.minute,actorId:p.actorId,targetId:p.targetId,finishId:p.finishId,testSkill:p.testSkill,
     ml:p.ml,d100:p.d100,origin:p.origin,emptyId:p.emptyId,gmConfirmed:p.gmConfirmed});
@@ -490,7 +551,7 @@ export function assertAlchemyImbibingAppendOnly(before=[],after=[]){
 export function createDarkvisionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Physic','Erudition','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
+ ok(fullImbibingNames.includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
   'Profusion: chybí skutečný účinný Critical Failure Imbibing');
  const known=p.profusionIllEffects?.find(x=>x.sourceUseId===sourceUseId);
  ok(!!known&&sourceUseId!==triggerUseId,'Profusion: předchozí aktivní elixír nebyl v CF důkazu');
@@ -543,7 +604,7 @@ export function assertDarkvisionProfusionAppendOnly(before=[],after=[]){
 export function createEruditionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&p.targetId===targetId&&
+ ok(fullImbibingNames.includes(p?.elixirName)&&p.targetId===targetId&&
   p.sl==='CF'&&p.finalAS>0,'Erudition Profusion: chybí účinné CF Imbibing');
  const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock')||[];
  ok(known.length===1&&known[0].levels===1&&known[0].weakness===5&&sourceUseId!==triggerUseId,
@@ -593,7 +654,7 @@ function createSensoryProfusionIll(elixirName,{journal=[],campaignId,minute,trig
  const field=sensoryProfusionField(elixirName);
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&
+ ok(fullImbibingNames.includes(p?.elixirName)&&
   p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,elixirName+' Profusion: chybí účinné spouštěcí CF');
  const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock'&&x.sourceElixir===elixirName)||[];
  ok(known.length===1&&known[0].levels===1&&known[0].weakness===5&&sourceUseId!==triggerUseId,
@@ -649,7 +710,7 @@ function assertSensoryProfusionAppendOnly(elixirName,before=[],after=[]){
 export function createFootpadProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&p.targetId===targetId&&
+ ok(fullImbibingNames.includes(p?.elixirName)&&p.targetId===targetId&&
   p.sl==='CF'&&p.finalAS>0,'Footpad Profusion: chybí účinný spouštěcí CF');
  const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock'&&x.sourceElixir==='Footpad')||[];
  ok(known.length===1&&known[0].levels===1&&known[0].weakness===5&&sourceUseId!==triggerUseId,

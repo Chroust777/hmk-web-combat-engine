@@ -48,13 +48,18 @@ function applyOutcome(s,t,nextHR,round){
 function push(s,id,type,round,details){check(!s.events.some(x=>x.id===id),'Duplicitní Poison událost '+id);
  s.events.push({id,type,round,details});s.lastRound=round;validateCombatState(s);return s;}
 export function preparePoisonStart({actor,state,round=1,sourceId,transmission,
- onsetMinutes,periodMinutes,initialHR,symptomD10s,standardLethal=true,herbalSource=null,
+ onsetMinutes,periodMinutes,initialHR,symptomD10s,standardLethal=true,herbalSource=null,alchemicalSource=null,
  actualExposureConfirmed=false,gmConfirmed=false}={}){
  const s=prepare(actor,state,round);
  check(gmConfirmed===true&&actualExposureConfirmed===true&&isGoodId(sourceId),
   'Poison: GM musí potvrdit konkrétní skutečnou expozici a jednoznačný klíč');
  check(['digested','vector','contact'].includes(transmission),'Poison: potvrďte skutečnou cestu přenosu');
- if(herbalSource!==null){
+ if(alchemicalSource!==null){
+  check(!herbalSource&&typeof alchemicalSource.useId==='string'&&sourceId==='alchemy:'+alchemicalSource.useId&&
+   int(alchemicalSource.as,1,13)&&initialHR===Math.max(0,Math.min(6,10-alchemicalSource.as))&&
+   transmission==='digested'&&onsetMinutes===0&&periodMinutes===0,
+   'Alchemy Poison vyžaduje doloženou AS a nástup i Course po jednom kole.');
+ }else if(herbalSource!==null){
   check(herbalSource&&typeof herbalSource.applicationId==='string'&&herbalSource.applicationId.length>=3&&
    int(herbalSource.potency,1,3)&&int(herbalSource.sv,1,14)&&
    sourceId==='herb:'+herbalSource.applicationId&&transmission==='digested'&&
@@ -68,30 +73,32 @@ export function preparePoisonStart({actor,state,round=1,sourceId,transmission,
   check(int(periodMinutes,10,60),'Herbal Poison: GM musí doložit Course period 10–60 minut podle HMK 186');
  }else check(int(onsetMinutes,10,60)&&int(periodMinutes,10,60),
   'Pro standardní toxin jsou potřebné GM potvrzené časy 10–60 minut (p.186)');
- check(int(initialHR,1,5)&&fourDice(symptomD10s),'Poison: potvrďte HR1–5 a čtyři skutečné d10 symptomů (p.183)');
+ check(int(initialHR,alchemicalSource?0:1,alchemicalSource?6:5)&&fourDice(symptomD10s),'Poison: potvrďte HR1–5 a čtyři skutečné d10 symptomů (p.183)');
  check(standardLethal===true,'Alternativní Poison výsledek (paralysis apod.) vyžaduje jiný doložený průchod GM');
  noOtherObstacles(s);
  const id='poison:'+sourceId.trim();check(!s.events.some(x=>x.id===id),'Stejná expozice toxinu již existuje');
  const course={id,sourceId:sourceId.trim(),transmission,onsetMinutes,periodMinutes,initialHR,
   symptoms:symptomD10s.map(sym),symptomD10s:[...symptomD10s],hr:initialHR,
   status:'incubating',elapsedMinutes:0,sequence:0,weaknessApplied:0,shockApplied:'NONE',
-  standardLethal:true,...(herbalSource?{herbalSource:structuredClone(herbalSource)}:{})};
+  standardLethal:true,...(alchemicalSource?{alchemicalSource:{...alchemicalSource},elapsedRounds:0}:{}),...(herbalSource?{herbalSource:structuredClone(herbalSource)}:{})};
  s.toxinCourses=[...(s.toxinCourses||[]),course];
  push(s,id,'poison-start',round,{sourceId:course.sourceId,transmission,
   onsetMinutes,periodMinutes,initialHR,symptomD10s:[...symptomD10s],symptoms:course.symptoms,
-  ...(herbalSource?{herbalSource:structuredClone(herbalSource)}:{}),rulePages:herbalSource?[75,183,184,186]:[183,184,186]});
+  ...(alchemicalSource?{alchemicalSource:{...alchemicalSource}}:{}),...(herbalSource?{herbalSource:structuredClone(herbalSource)}:{}),rulePages:herbalSource?[75,183,184,186]:[183,184,186]});
  return {state:s,course:structuredClone(course),report:{id,phase:'incubating',onsetMinutes,periodMinutes}};
 }
-export function preparePoisonOnset({actor,state,sourceId,round=1,elapsedMinutes,gmConfirmed=false}={}){
+export function preparePoisonOnset({actor,state,sourceId,round=1,elapsedMinutes,elapsedRounds=null,gmConfirmed=false}={}){
  const s=prepare(actor,state,round);check(gmConfirmed===true&&isGoodId(sourceId),'Potvrďte GM a původní toxin');
  const t=entry(s,sourceId);check(t.status==='incubating','Poison: nástup již proběhl');
+ check(!t.alchemicalSource||elapsedRounds===1,'Alchemy Poison: nástup je přesně jedno kolo po vypití.');
  check(elapsedMinutes===t.onsetMinutes,'Poison: nástup vyžaduje doložené uplynutí '+t.onsetMinutes+' minut; mezikroky nesmí zmizet');
  noOtherObstacles(s,t.id);t.elapsedMinutes=elapsedMinutes;
+ if(t.alchemicalSource)t.elapsedRounds=elapsedRounds;
  const effects=applyOutcome(s,t,t.hr,round);
- push(s,t.id+':onset','poison-onset',round,{elapsedMinutes,hr:t.hr,conditions:effects,symptoms:[...t.symptoms]});
+ push(s,t.id+':onset','poison-onset',round,{elapsedMinutes,...(t.alchemicalSource?{elapsedRounds}:{}),hr:t.hr,conditions:effects,symptoms:[...t.symptoms]});
  return {state:s,course:structuredClone(t),report:{phase:'onset',...effects,elapsedMinutes}};
 }
-export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes,
+export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes,elapsedRounds=null,
  courseD100,physicianSV=0,physicianConfirmed=false,gmConfirmed=false,arcaneEventId=null,herbalContext=null}={}){
  const s=prepare(actor,state,round);check(gmConfirmed===true&&isGoodId(sourceId),'Potvrďte GM a toxin');
  const t=entry(s,sourceId);
@@ -102,6 +109,8 @@ export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes
  check(!arcane||typeof arcaneEventId==='string'&&arcaneEventId.length>0&&
   Number.isSafeInteger(elapsedMinutes)&&elapsedMinutes>=t.elapsedMinutes,
   'Arcane Recovery potřebuje doložený čas po poslední zdravotní kontrole.');
+ check(arcane||!t.alchemicalSource||elapsedRounds===t.elapsedRounds+1,
+  'Alchemy Poison: Course je splatný přesně v následujícím kole.');
  check(arcane||elapsedMinutes===t.elapsedMinutes+t.periodMinutes,
   'Poison: další Course je splatný přesně po '+t.periodMinutes+' minutách; žádné tiché přeskočení');
  const hb=profile(actor),baseEML=hb*t.hr+physicianSV;
@@ -119,12 +128,20 @@ export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes
  const rawEML=baseEML+antivenin.bonus,
   sl=successLevel(courseD100,rawEML),course=ailmentCourse({healingRate:t.hr,sl,arcaneRecovery:arcane});
  const beforeHR=t.hr, failureIgnored=course.arcaneFailureIgnored===true;
- if(!arcane){t.elapsedMinutes=elapsedMinutes;t.sequence++;}
+ if(!arcane){t.elapsedMinutes=elapsedMinutes;t.sequence++;if(t.alchemicalSource)t.elapsedRounds=elapsedRounds;}
  const effects=failureIgnored?{hr:t.hr,shock:s.shock,weakness:t.weaknessApplied,status:t.status}:
   applyOutcome(s,t,course.healingRate,round);
  push(s,arcaneEventId??t.id+':course:'+t.sequence,arcane?'alchemy-healing-poison':'poison-course',round,
-  {elapsedMinutes,beforeHR,afterHR:t.hr,hb,rawEML,courseD100,sl:names[sl],
+  {elapsedMinutes,...(t.alchemicalSource?{elapsedRounds:t.elapsedRounds}:{}),beforeHR,afterHR:t.hr,hb,rawEML,courseD100,sl:names[sl],
    physicianSV,physicianConfirmed,baseEML,antivenin,delta:course.delta,conditions:effects,rulePages:[75,183,184,186],...(arcane?{arcaneFreeRoll:true,failureIgnored,sourceId:t.sourceId}:{})});
  return {state:s,course:structuredClone(t),report:{phase:'course',beforeHR,...effects,hb,rawEML,
   courseD100,sl:names[sl],physicianSV,baseEML,antivenin,elapsedMinutes,nextDueMinutes:t.status==='active'?t.elapsedMinutes+t.periodMinutes:null}};
+}
+
+export function endAlchemicalPoison({actor,state,sourceId,eventId,round}){
+ const s=prepare(actor,state,round),t=entry(s,sourceId);
+ check(t.alchemicalSource&&['active','incubating'].includes(t.status),'Physic: Poison už nepůsobí.');
+ const effects=applyOutcome(s,t,6,round);
+ push(s,eventId,'alchemy-poison-dispelled',round,{sourceId,conditions:effects});
+ return s;
 }

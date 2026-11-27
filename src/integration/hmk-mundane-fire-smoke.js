@@ -44,8 +44,9 @@ export function prepareMundaneFireStrike({actor,inventory,state,sourceId,round=1
  fireSize,impactD4,fullRound=false,grabAndHold=false,contactHand=false,
  handSide=null,zoneD10=null,locationD10=null,direction='front',
  areaAVMethod='weighted',areaEvadeNotAttempted=false,
- shockD100=null,compoundD10=null,gmConfirmed=false}={}){
+ shockD100=null,compoundD10=null,fireshieldAV=0,gmConfirmed=false}={}){
  requireIt(gmConfirmed===true&&validSource(sourceId)&&Array.isArray(inventory),'Potvrďte GM, inventář a jednoznačný klíč události');
+ requireIt(integer(fireshieldAV,0,6),'Neplatný Fireshield AV.');
  const s=roundState(actor,state,round),id='mundane-fire:'+sourceId.trim();
  requireIt(!s.events.some(x=>x.id===id),'Tento zdroj požáru již byl zapsán (duplicita)');
  pendingGuard(s);
@@ -64,6 +65,7 @@ export function prepareMundaneFireStrike({actor,inventory,state,sourceId,round=1
   requireIt(['weighted','quick'].includes(areaAVMethod),'Chybná metoda Area AV');
   armour=resolveVerifiedAreaProtection({inventory,targetId:actor.id,method:areaAVMethod});
   requireIt(armour.ready,'Area Fire AV není ověřena: '+(armour.reason||'chybí ochrana'));
+  if(fireshieldAV)armour={...armour,areaAV:armour.areaAV+fireshieldAV,fireshieldAV};
   const needsShock=strikeImpact>armour.areaAV;
   requireIt(needsShock?integer(shockD100,1,100):isNone(shockD100),'Area Fire: Shock d100 jen při účinném Impact');
   const existing=s.wounds.filter(w=>!w.healed&&w.location==='area'&&compoundCompatible({...w,area:true},{location:'area',aspect:'fire',area:true}));
@@ -93,6 +95,7 @@ export function prepareMundaneFireStrike({actor,inventory,state,sourceId,round=1
   armour=resolveLiveCombatArmour({inventory,targetId:actor.id,location:loc.location,
    aspect:'f',direction,mode:'auto',rigidStatus:'unknown'});
   requireIt(armour.ready,'Fire AV není ověřena: '+(armour.reason||loc.location));
+  if(fireshieldAV)armour={...armour,armourValue:armour.armourValue+fireshieldAV,fireshieldAV};
   const effective=strikeImpact-armour.armourValue;
   const base=injuryFromEffectiveImpact({effectiveImpact:effective,aspect:'fire'});
   const olds=s.wounds.filter(w=>!w.healed&&w.location===loc.location&&
