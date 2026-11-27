@@ -8,7 +8,7 @@ import {scheduleHMKActivity} from './hmk-calendar-activities.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {totalFatigue} from '../rules/fatigue.js';
 import {prepareAnimalWeariness} from './hmk-trekking-animal-fatigue.js';
-import {trekPartyModes} from './hmk-trekking-party-modes.js';
+import {trekPartyModes} from './hmk-trekking-party-modes.js?v=94.145';
 import {animalTrekInputFromSnapshot} from './hmk-trekking-animal-load.js';
 import {animalDoubleTimeTimeline} from './hmk-trekking-animal-timeline.js';
 import {assertCertifiedAnimalWeatherTransition} from './hmk-trekking-animal-weather.js';

@@ -6,7 +6,7 @@ import {validateTrekCorrections,effectiveTrekSource} from './hmk-trekking-correc
  * Geographic facts and previously rolled skill outcomes MUST come from
  * actual inputs: never invent terrain, orientation, encounters or injuries.
  */
-import {validateTrekPartySnapshot} from './hmk-trekking-party-modes.js';
+import {validateTrekPartySnapshot} from './hmk-trekking-party-modes.js?v=94.145';
 import {assertTrackingBearingWatch} from './hmk-tracking-bearing-handoff.js';
 import {createOrienteeringContext,adjustedOrienteeringSV,assertOrienteeringModes} from './hmk-trekking-orienteering.js';
 const assert=(yes,msg)=>{if(!yes)throw Error(msg)};

@@ -12,6 +12,7 @@ import {animalTrekLoad,validateAnimalTrekLoadProof} from './hmk-trekking-animal-
 const check=(v,msg)=>{if(!v)throw Error(msg);};
 const int=n=>Number.isSafeInteger(n)&&n>=0;
 const serious=w=>!w.healed&&['S','G'].includes(w.severity);
+const mobilityZone=zone=>['head','torso','legs'].includes(zone);
 /** One canonical human mobility derivation for both Trekking Routine and
  * Calendar Time Episodes. HMK 145: only head, torso and leg wounds cause
  * Injured / immobility; fatigue includes weakness from blood loss (HMK 176).
@@ -29,13 +30,18 @@ export function trekPersonHealthSnapshot({id,name,healthState}={}){
  check(['NONE','STN','INC','UNC','KIA'].includes(shock), (name||id)+': neznámý Shock.');
  const comaActive=healthState.coma?.active===true;
  const extendedShockActive=!!healthState.extendedShock;
- const immobile=seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone));
+ // A healed stump still records the loss of the limb.
+ const severedLegs=['left','right'].map(side=>(healthState.wounds||[]).find(w=>
+  w.amputation?.severed===true&&w.side===side&&hmkHumanLocationSymbols(w.location)?.zone==='legs'));
+ const bilateralLegAmputation=severedLegs.every(Boolean)?severedLegs.map(({id,location,side})=>({id,location,side})):null;
+ const immobile=!!bilateralLegAmputation||seriousWounds.some(w=>w.severity==='G'&&mobilityZone(w.zone));
  // A non-grievous wound alone cannot prove that a patient is conscious.
  // The patient can accompany a cart/wagon only after an explicit GM transport declaration.
  const cannotSelfMove=immobile||fatigue>=40||shock!=='NONE'||comaActive||extendedShockActive||
   healthState.asphyxiaComaPending?.active===true;
  return {id,name,fatigue,seriousWounds,shock,comaActive,extendedShockActive,cannotSelfMove,
-  injured:seriousWounds.some(w=>['head','torso','legs'].includes(w.zone)),immobile};
+  ...(bilateralLegAmputation?{bilateralLegAmputation}:{}),
+  injured:seriousWounds.some(w=>mobilityZone(w.zone)),immobile};
 }
 /** v93.865: live eligibility for an ACTIVE transport operator, never for a
  * passive patient.  In particular prone by itself does not imply a Grievous
@@ -50,7 +56,8 @@ export function trekTravelOperatorEligibility({id,name,healthState}={}){
  if(health.comaActive||health.extendedShockActive||healthState?.asphyxiaComaPending?.active===true)
   reasons.push('Coma nebo probíhající zdravotní bezvědomí');
  if(health.fatigue>=40)reasons.push('Fatigue 40 nebo více');
- if(health.immobile)reasons.push('Grievous rána brání samostatnému pohybu');
+ if(health.immobile)reasons.push(health.bilateralLegAmputation?
+  'amputace obou dolních končetin vyžaduje převoz':'Grievous rána brání samostatnému pohybu');
  if(healthState?.posture?.prone===true)reasons.push('postava je prone a dosud nevstala');
  if(completeParalysis(healthState)||[...blockedLimbs(healthState)].some(x=>x.endsWith('-leg')))
   reasons.push('doložená paralýza brání pohybu');
@@ -96,6 +103,8 @@ export function trekPartyModes({memberIds,guideId,characters=[],inventory=[],con
  check(!members.some(x=>x.shock==='KIA'),'Zemřelá postava není aktivním členem cestovní epizody.');
  check(!members.some(x=>x.id===guideId&&(x.shock!=='NONE'||x.comaActive||x.extendedShockActive)),
   'Průvodce ve Shock nebo Coma nemůže vykonávat Orienteering. Zvolte aktivního průvodce.');
+ check(!members.some(x=>x.id===guideId&&x.immobile),
+  'Průvodce bez schopnosti samostatného pohybu vyžaduje převoz. Zvolte aktivního průvodce.');
  check(!needTransport.length||['cart','wagon','mount'].includes(conveyance),
   needTransport.map(x=>x.name).join(', ')+': nemůže se pohybovat vlastní silou; zvolte doložený převoz na zajištěném koni či vozidle.');
  check(transportedMemberIds.length===needTransport.length&&needTransport.every(x=>transportedMemberIds.includes(x.id)),
@@ -159,8 +168,13 @@ export function validateTrekPartySnapshot(p){
   (p.bovineSlow===undefined||(typeof p.bovineSlow==='boolean'&&p.bovineSlow===
     (['cart','wagon'].includes(p.conveyance)&&animals.some(a=>(a.encCalculation?.breed??a.health?.breed)==='bovine'))))&&
   p.forcedSlow===Number(p.wearied)+Number(p.injured)+Number(p.bovineSlow===true)&&
-  p.members.every(m=>m.injured===m.seriousWounds.some(w=>['head','torso','legs'].includes(w.zone))&&
-   m.immobile===m.seriousWounds.some(w=>w.severity==='G'&&['head','torso','legs'].includes(w.zone))&&
+  p.members.every(m=>m.injured===m.seriousWounds.some(w=>mobilityZone(w.zone))&&
+   (m.bilateralLegAmputation===undefined||
+    (Array.isArray(m.bilateralLegAmputation)&&m.bilateralLegAmputation.length===2&&
+     m.bilateralLegAmputation.every((w,i)=>w&&typeof w.id==='string'&&w.id&&
+      w.side===['left','right'][i]&&hmkHumanLocationSymbols(w.location)?.zone==='legs')&&
+     m.bilateralLegAmputation[0].id!==m.bilateralLegAmputation[1].id))&&
+   m.immobile===(!!m.bilateralLegAmputation||m.seriousWounds.some(w=>w.severity==='G'&&mobilityZone(w.zone)))&&
    m.loaded===(p.conveyance==='foot'&&(m.modifiedENC!==null?m.modifiedENC>=10:m.minimumENC!==null&&m.minimumENC>=10))&&
    m.loadUnresolved===(p.conveyance==='foot'&&m.modifiedENC===null&&!m.loaded))&&
   typeof p.manualLoaded==='boolean'&&p.loaded===(p.manualLoaded||p.members.some(m=>m.loaded)||animals.some(a=>a.loaded))&&
