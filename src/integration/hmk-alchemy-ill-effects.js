@@ -64,13 +64,13 @@ export function planAlchemyIllEffect({elixirName,baseAS,stage='on-cf'}={}){
   gmTraitChoiceRequired:true,sourcePage:profile.sourcePage});
  throw Error('Alchemy Ill Effects: dosud neimplementovaný pravidlový typ');
 }
-/** Used by the four ACTUALLY IMPLEMENTED imbibed source types only.
+/** Used by implemented imbibed source types only.
  * Historical proofs retain their v93.441 fields and ordering; this function
  * checks that the emitted source-specific shape is still canonical.
  */
 export function supportedAlchemyConcurrentIllEffect(source){
  const name=source?.elixirName,baseAS=source?.asBefore;
- if(!['Darkvision','Erudition','Footpad','Egosight','Healing'].includes(name)||
+ if(!['Darkvision','Erudition','Footpad','Egosight','Healing','Verity'].includes(name)||
   typeof source?.useId!=='string'||!source.useId)
   throw Error('Alchemy Ill Effects: aktivní zdroj nelze mechanicky doložit');
  const plan=planAlchemyIllEffect({elixirName:name,baseAS});
@@ -80,5 +80,5 @@ export function supportedAlchemyConcurrentIllEffect(source){
  if(plan.kind!=='aural-shock'||plan.levels!==1)
   throw Error('Alchemy Ill Effects: zdroj nemá očekávaný Aural Shock');
  return {sourceUseId:source.useId,kind:'aural-shock',levels:plan.levels,
-  weakness:plan.weakness,...(['Footpad','Egosight'].includes(name)?{sourceElixir:name}:{})};
+  weakness:plan.weakness,...(['Footpad','Egosight','Verity'].includes(name)?{sourceElixir:name}:{})};
 }

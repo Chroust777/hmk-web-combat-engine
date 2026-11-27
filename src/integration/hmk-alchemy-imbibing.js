@@ -5,7 +5,7 @@
 import {alchemyElixirStrength} from './hmk-alchemy-decay.js?v=94.155';
 import {alchemyVialState} from './hmk-alchemy-vial-ledger.js';
 import {classifyProfusionImbibing,canonicalProfusionProfile} from './hmk-alchemy-profusion.js';
-import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.155';
+import {supportedAlchemyConcurrentIllEffect,planAlchemyIllEffect} from './hmk-alchemy-ill-effects.js?v=94.157';
 import {initialCombatState,validateCombatState} from './persistent-combat-state.js';
 export const ALCHEMY_IMBIBING_FORMAT='hmk-alchemy-imbibing-v1';
 const ok=(x,m)=>{if(!x)throw Error(m)};
@@ -68,7 +68,8 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
  const live=[...activeDarkvision(journal,campaignId,targetId,minute),
   ...activeErudition(journal,campaignId,targetId,minute),
   ...activeFootpad(journal,campaignId,targetId,minute),
-  ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute)];
+  ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute),
+  ...activeVerity(journal,campaignId,targetId,minute)];
  const seen=new Set(live.map(x=>x.useId));
  ok(seen.size===live.length,'Profusion: duplicitní aktivní zdroj');
  for(const row of journal){
@@ -79,9 +80,9 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
   if(profile.exempt||seen.has(row.id)||!(proof.finalAS>0)||proof.elixirName==='Healing'&&latestHealingReceipt(journal,row,minute))continue;
   // A previously applied Instantaneous effect may still remain (Healing etc).
   // Without its canonical lifetime/recovery evidence, NEVER assume it ended.
-  // A previous Temporary effect might have decayed/been dispelled; the four
+  // A previous Temporary effect might have decayed/been dispelled; the
   // supported finders above do reconstruct those lifetimes from the journal.
-  if(['Darkvision','Erudition','Footpad','Egosight'].includes(proof.elixirName))continue;
+  if(['Darkvision','Erudition','Footpad','Egosight','Verity'].includes(proof.elixirName))continue;
   throw Error('Profusion: účinek elixíru '+proof.elixirName+
    ' nemá dosud doložené ukončení; nelze bezpečně vyhodnotit souběh ani CF');
  }
@@ -90,7 +91,7 @@ export function activeAlchemyProfusionCohort(journal=[],campaignId,targetId,minu
 /** HMK v1.2 pp.270,273: Physic is NOT Profusion.  In particular,
  * Poison and Quiescence are exempt from Profusion, yet Physic affects any
  * elixir actually affecting the imbiber (including Poison's lingering
- * enchantment).  Only four Temporary lifecycles can currently be verified
+ * enchantment).  Only supported lifecycles are verified
  * end-to-end.  For any other imbibed source whose continuing effect cannot
  * be established, fail BEFORE any vial, combat state, or journal mutation;
  * never mistake a Profusion exemption for an immunity to Physic.
@@ -105,8 +106,9 @@ export function activeAlchemyPhysicTargets(journal=[],campaignId,targetId,minute
  const live=[...activeDarkvision(journal,campaignId,targetId,minute),
   ...activeErudition(journal,campaignId,targetId,minute),
   ...activeFootpad(journal,campaignId,targetId,minute),
-  ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute)];
- const knownNames=new Set(['Darkvision','Erudition','Footpad','Egosight']);
+  ...activeEgosight(journal,campaignId,targetId,minute),...activeHealing(journal,campaignId,targetId,minute),
+  ...activeVerity(journal,campaignId,targetId,minute)];
+ const knownNames=new Set(['Darkvision','Erudition','Footpad','Egosight','Verity']);
  const seen=new Set();
  for(const source of live){
   ok(!seen.has(source.useId),'Physic: duplicitní účinný zdroj');
@@ -124,6 +126,14 @@ export function activeAlchemyPhysicTargets(journal=[],campaignId,targetId,minute
    ' (včetně elixírů vyňatých z Profusion); není bezpečné odečíst AS všech účinků');
  }
  return live;
+}
+/** HMK p.274: persistent illusion detection. */
+export function activeVerity(journal=[],campaignId,targetId,minute=1e9){
+ return journal.filter(row=>relevant(row,campaignId)&&
+  row.calendarAlchemyImbibing?.targetId===targetId&&row.calendarAlchemyImbibing?.elixirName==='Verity'&&row.campaignMinute<=minute)
+  .map(row=>({useId:row.id,...row.calendarAlchemyImbibing,
+   state:alchemyElixirStrength(journal,campaignId,row.calendarAlchemyImbibing.finishId,minute)}))
+  .filter(source=>source.state.activeTemporary&&source.state.imbibingId===source.useId);
 }
 /** HMK v1.2 p.272 Footpad: temporary sound-muffling enchantment. */
 export function activeFootpad(journal=[],campaignId,targetId,minute=1e9){
@@ -165,34 +175,36 @@ export function createAlchemyFootpadImbibing({journal=[],inventory=[],campaignId
 /** HMK 269–271: Egosight shares the original Imbibing/Profusion/Decay/vial routine.
  * Artefact lore is recorded SEPARATELY by the GM after touching an artefact.
  */
-export function createAlchemyEgosightImbibing({journal=[],inventory=[],campaignId,minute,actorId,targetId,finishId,
+export function createAlchemyEgosightImbibing(input){return createSensoryImbibing('Egosight',271,input)}
+export function createAlchemyVerityImbibing(input){return createSensoryImbibing('Verity',274,input)}
+function createSensoryImbibing(elixirName,sourcePage,{journal=[],inventory=[],campaignId,minute,actorId,targetId,finishId,
  testSkill,ml,d100,origin,emptyId,gmConfirmed=false}={}){
- ok(gmConfirmed===true,'Egosight: GM musí potvrdit úplné podání do jednoho kola');
+ ok(gmConfirmed===true,elixirName+': GM musí potvrdit úplné podání do jednoho kola');
  ok(typeof campaignId==='string'&&campaignId&&whole(minute,0,1e9)&&typeof actorId==='string'&&actorId&&
   typeof targetId==='string'&&targetId&&typeof emptyId==='string'&&emptyId,
-  'Egosight: neplatná kampaň, čas nebo postava');
+  elixirName+': neplatná kampaň, čas nebo postava');
  ok(['Aura','Alchemy'].includes(testSkill)&&whole(ml,1,1000)&&whole(d100,1,100)&&originOK(origin),
-  'Egosight: povinný skutečný Aura/Alchemy d100 a jeho původ');
+  elixirName+': povinný skutečný Aura/Alchemy d100 a jeho původ');
  const state=alchemyElixirStrength(journal,campaignId,finishId,minute);
- ok(state.elixirName==='Egosight'&&state.currentAS>0&&!state.dispersed&&!state.activeTemporary&&!state.expires&&
-  state.nextDueMinute>minute,'Egosight: chybí nepoužitá dávka nebo je splatný Decay');
+ ok(state.elixirName===elixirName&&state.currentAS>0&&!state.dispersed&&!state.activeTemporary&&!state.expires&&
+  state.nextDueMinute>minute,elixirName+': chybí nepoužitá dávka nebo je splatný Decay');
  const vial=alchemyVialState(journal,campaignId,finishId,minute);
  ok(vial?.full&&vial.ownerId===actorId&&['none','carried'].includes(vial.slot)&&
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
-  'Egosight: chybí fyzická lahvička příslušného vlastníka');
+  elixirName+': chybí fyzická lahvička příslušného vlastníka');
  const others=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
- ok(others.every(x=>decayCurrent(x,minute)),'Egosight: nejprve vyhodnoťte splatný Decay');
+ ok(others.every(x=>decayCurrent(x,minute)),elixirName+': nejprve vyhodnoťte splatný Decay');
  const profusion=classifyProfusionImbibing(d100,ml,others.length);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
  const affected=level==='CF'&&finalAS>0?concurrentAlchemyIllEffects(others):[];
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,emptyId,
-  vialId:vial.vialId,elixirName:'Egosight',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
+  vialId:vial.vialId,elixirName,consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
   testSkill,ml,d100,origin,otherActiveElixirs:others.length,profusionCF:profusion.profusionCF,
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,temporary:finalAS>0,
   ...(affected.length?{profusionIllEffects:affected}:{}),
   illEffect:level==='CF'&&finalAS>0?{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true}:null,
-  consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,271]};
+  consumedWithinRoundConfirmed:true,gmConfirmed:true,sourcePages:[269,270,sourcePage]};
 }
 /** Use existing shared Aural Shock and Combat State; do not create a health subsystem. */
 export function applyAlchemyFootpadAural({state=null,arcane=null,proof,eventId}={}){
@@ -238,11 +250,6 @@ export function createAlchemyEruditionImbibing({journal=[],inventory=[],campaign
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Erudition: dávku smí podat jen vlastník existující nesené lahvičky');
  const cohort=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
- const current=cohort.filter(x=>x.elixirName==='Erudition');
- const otherVision=cohort.filter(x=>x.elixirName==='Darkvision');
- const footpadSources=cohort.filter(x=>x.elixirName==='Footpad');
- const egosightSources=cohort.filter(x=>x.elixirName==='Egosight');
- const healing=cohort.filter(x=>x.elixirName==='Healing');
  const otherCount=cohort.length;
  const profusion=classifyProfusionImbibing(d100,ml,otherCount);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
@@ -250,7 +257,7 @@ export function createAlchemyEruditionImbibing({journal=[],inventory=[],campaign
 
  // A CF affects the newly swallowed Erudition AND every already active
  // enchantment. Each secondary effect gets an independently replayable proof.
- const affected=level==='CF'&&finalAS>0?concurrentAlchemyIllEffects([...otherVision,...current,...footpadSources,...egosightSources,...healing]):[];
+ const affected=level==='CF'&&finalAS>0?concurrentAlchemyIllEffects(cohort):[];
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Erudition',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',
   testSkill,ml,d100,origin,otherActiveElixirs:otherCount,profusionCF:profusion.profusionCF,
@@ -276,19 +283,16 @@ export function createAlchemyDarkvisionImbibing({journal=[],inventory=[],campaig
   inventory.some(x=>x.id===vial.vialId&&x.characterId===actorId&&x.slot===vial.slot&&x.quantity===1),
   'Alchemy: dávku musí podat skutečný vlastník držené existující nádoby');
  const cohort=activeAlchemyProfusionCohort(journal,campaignId,targetId,minute);
- const footpadSources=cohort.filter(x=>x.elixirName==='Footpad');
- const egoSources=cohort.filter(x=>x.elixirName==='Egosight');
  const others=cohort.length;
  const profusion=classifyProfusionImbibing(d100,ml,others);
  const level=profusion.adjusted,delta={CF:-2,F:-1,S:0,CS:1}[level];
  const finalAS=Math.max(0,state.currentAS+delta);
 
- const existingErudition=cohort.filter(x=>x.elixirName==='Erudition');
  return {format:ALCHEMY_IMBIBING_FORMAT,campaignId,minute,actorId,targetId,finishId,
   emptyId,vialId:vial.vialId,elixirName:'Darkvision',consumptionAction:actorId===targetId?'self-1-turn':'administered-1-round',testSkill,ml,d100,origin,
   otherActiveElixirs:others,profusionCF:profusion.profusionCF,
   ...(others>0?{profusionIllEffects:level==='CF'&&finalAS>0?[
-   ...concurrentAlchemyIllEffects([...cohort.filter(x=>x.elixirName==='Darkvision'),...existingErudition,...footpadSources,...egoSources,...cohort.filter(x=>x.elixirName==='Healing')])]:[]}:{}),
+   ...concurrentAlchemyIllEffects(cohort)]:[]}:{}),
   sl:level,asBefore:state.currentAS,modifier:delta,finalAS,
   temporary:finalAS>0,darkvisionFeet:finalAS*5,
   // CF light sensitivity is a real adverse effect; do not invent a recovery roll.
@@ -396,25 +400,27 @@ export function applyAlchemyEruditionAural({state=null,arcane=null,proof,eventId
  return {state:s,arcane:a,auralShockAdded:1,weaknessAdded:5};
 }
 /** Original Combat State remains authoritative (no invented combat round). */
-export function applyAlchemyEgosightAural({state=null,arcane=null,proof,eventId}={}){
- ok(proof?.format===ALCHEMY_IMBIBING_FORMAT&&proof.elixirName==='Egosight'&&proof.sl==='CF'&&
+export function applyAlchemyEgosightAural(input){return applySensoryImbibingAural('Egosight',271,input)}
+export function applyAlchemyVerityAural(input){return applySensoryImbibingAural('Verity',274,input)}
+function applySensoryImbibingAural(elixirName,sourcePage,{state=null,arcane=null,proof,eventId}={}){
+ ok(proof?.format===ALCHEMY_IMBIBING_FORMAT&&proof.elixirName===elixirName&&proof.sl==='CF'&&
   whole(proof.ml,1,1000)&&whole(proof.d100,1,100)&&originOK(proof.origin)&&
   classifyProfusionImbibing(proof.d100,proof.ml,proof.otherActiveElixirs).adjusted==='CF'&&
   whole(proof.otherActiveElixirs,0,100)&&whole(proof.asBefore,1,11)&&proof.modifier===-2&&
   proof.finalAS===Math.max(0,proof.asBefore-2)&&proof.finalAS>0&&
   proof.illEffect?.kind==='aural-shock'&&proof.illEffect.levels===planAlchemyIllEffect({elixirName:proof.elixirName,baseAS:proof.asBefore}).levels&&proof.illEffect.weakness===5&&
-  typeof eventId==='string'&&eventId.length>=3,'Egosight CF: nedoložený původní hod');
+  typeof eventId==='string'&&eventId.length>=3,elixirName+' CF: nedoložený původní hod');
  const s=structuredClone(state??initialCombatState()),a=structuredClone(arcane??{});
  validateCombatState(s);
- ok(s.shock!=='KIA'&&!s.events.some(e=>e.id===eventId),'Egosight CF: KIA nebo zdvojený zdravotní důkaz');
+ ok(s.shock!=='KIA'&&!s.events.some(e=>e.id===eventId),elixirName+' CF: KIA nebo zdvojený zdravotní důkaz');
  const before=a.auralShockLevels??0;
- ok(whole(before,0,98)&&whole(s.fatigue.otherWeakness,0,99994),'Egosight CF: překročené hodnoty');
+ ok(whole(before,0,98)&&whole(s.fatigue.otherWeakness,0,99994),elixirName+' CF: překročené hodnoty');
  a.auralShockLevels=before+1;s.fatigue.otherWeakness+=5;
- s.events.push({id:eventId,type:'hmk-alchemy-egosight-aural',round:Math.max(1,s.lastRound||1),
+ s.events.push({id:eventId,type:'hmk-alchemy-'+elixirName.toLowerCase()+'-aural',round:Math.max(1,s.lastRound||1),
   details:{sourceEventId:eventId,finishId:proof.finishId,targetId:proof.targetId,
    calendarCampaignId:proof.campaignId,calendarMinute:proof.minute,imbibingD100:proof.d100,
    diceOrigin:proof.origin,auralShock:1,weaknessAdded:5,auralBefore:before,
-   auralAfter:a.auralShockLevels,sourcePage:271,nonCombat:true}});
+   auralAfter:a.auralShockLevels,sourcePage,nonCombat:true}});
  validateCombatState(s);return {state:s,arcane:a,auralShockAdded:1,weaknessAdded:5};
 }
 export function createAlchemyHealingImbibing({journal=[],inventory=[],campaignId,minute,actorId,targetId,finishId,
@@ -459,7 +465,7 @@ export function validateAlchemyImbibingJournal(journal=[]){
    const state=alchemyVialState(beforeEmpty,p.campaignId,p.finishId,p.minute);
    const item=state&&{id:state.vialId,characterId:state.ownerId,slot:state.slot,quantity:1};
    ok(item&&item.characterId===p.actorId,'Alchemy Imbibing: nesprávný vlastník nádoby');
-   const create=p.elixirName==='Healing'?createAlchemyHealingImbibing:p.elixirName==='Physic'?createAlchemyPhysicImbibing:p.elixirName==='Erudition'?createAlchemyEruditionImbibing:p.elixirName==='Footpad'?createAlchemyFootpadImbibing:p.elixirName==='Egosight'?createAlchemyEgosightImbibing:createAlchemyDarkvisionImbibing;
+   const create=p.elixirName==='Healing'?createAlchemyHealingImbibing:p.elixirName==='Physic'?createAlchemyPhysicImbibing:p.elixirName==='Erudition'?createAlchemyEruditionImbibing:p.elixirName==='Footpad'?createAlchemyFootpadImbibing:p.elixirName==='Egosight'?createAlchemyEgosightImbibing:p.elixirName==='Verity'?createAlchemyVerityImbibing:createAlchemyDarkvisionImbibing;
    const reproduced=create({journal:beforeEmpty,inventory:[item],campaignId:p.campaignId,
     minute:p.minute,actorId:p.actorId,targetId:p.targetId,finishId:p.finishId,testSkill:p.testSkill,
     ml:p.ml,d100:p.d100,origin:p.origin,emptyId:p.emptyId,gmConfirmed:p.gmConfirmed});
@@ -484,7 +490,7 @@ export function assertAlchemyImbibingAppendOnly(before=[],after=[]){
 export function createDarkvisionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Physic','Erudition','Footpad','Egosight','Healing'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
+ ok(['Darkvision','Physic','Erudition','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,
   'Profusion: chybí skutečný účinný Critical Failure Imbibing');
  const known=p.profusionIllEffects?.find(x=>x.sourceUseId===sourceUseId);
  ok(!!known&&sourceUseId!==triggerUseId,'Profusion: předchozí aktivní elixír nebyl v CF důkazu');
@@ -537,7 +543,7 @@ export function assertDarkvisionProfusionAppendOnly(before=[],after=[]){
 export function createEruditionProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing'].includes(p?.elixirName)&&p.targetId===targetId&&
+ ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&p.targetId===targetId&&
   p.sl==='CF'&&p.finalAS>0,'Erudition Profusion: chybí účinné CF Imbibing');
  const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock')||[];
  ok(known.length===1&&known[0].levels===1&&known[0].weakness===5&&sourceUseId!==triggerUseId,
@@ -578,58 +584,72 @@ export function applyEruditionProfusionAural({journal=[],state=null,arcane=null,
  return appendSecondaryAlchemyAural({state,arcane,proof,eventId,sourcePage:269});
 }
 /** Profusion requires one auditable Aural Shock proof per older Egosight dose. */
-export function createEgosightProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
+const sensoryProfusionTypes={Egosight:{active:activeEgosight,sourcePage:271},Verity:{active:activeVerity,sourcePage:274}};
+const sensoryProfusionField=name=>'calendarAlchemy'+name+'ProfusionIll';
+export function createEgosightProfusionIll(input){return createSensoryProfusionIll('Egosight',input)}
+export function createVerityProfusionIll(input){return createSensoryProfusionIll('Verity',input)}
+function createSensoryProfusionIll(elixirName,{journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
+ const {active,sourcePage}=sensoryProfusionTypes[elixirName];
+ const field=sensoryProfusionField(elixirName);
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing'].includes(p?.elixirName)&&
-  p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,'Egosight Profusion: chybí účinné spouštěcí CF');
- const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock'&&x.sourceElixir==='Egosight')||[];
+ ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&
+  p.targetId===targetId&&p.sl==='CF'&&p.finalAS>0,elixirName+' Profusion: chybí účinné spouštěcí CF');
+ const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock'&&x.sourceElixir===elixirName)||[];
  ok(known.length===1&&known[0].levels===1&&known[0].weakness===5&&sourceUseId!==triggerUseId,
-  'Egosight Profusion: neexistuje jednoznačný původ');
+  elixirName+' Profusion: neexistuje jednoznačný původ');
  const earlier=journal.slice(0,journal.indexOf(trigger));
- ok(!!activeEgosight(earlier,campaignId,targetId,minute).find(x=>x.useId===sourceUseId),
-  'Egosight Profusion: předchozí dávka již není aktivní');
- ok(!journal.some(j=>j.calendarCampaignId===campaignId&&j.calendarAlchemyEgosightProfusionIll?.triggerUseId===triggerUseId&&
-  j.calendarAlchemyEgosightProfusionIll.sourceUseId===sourceUseId),'Egosight Profusion: duplicitní důkaz');
- return {format:'hmk-egosight-profusion-ill-v1',campaignId,minute,triggerUseId,sourceUseId,targetId,
-  elixirName:'Egosight',illEffect:{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true},sourcePages:[269,270,271]};
+ ok(!!active(earlier,campaignId,targetId,minute).find(x=>x.useId===sourceUseId),
+  elixirName+' Profusion: předchozí dávka již není aktivní');
+ ok(!journal.some(j=>j.calendarCampaignId===campaignId&&j[field]?.triggerUseId===triggerUseId&&
+  j[field].sourceUseId===sourceUseId),elixirName+' Profusion: duplicitní důkaz');
+ return {format:'hmk-'+elixirName.toLowerCase()+'-profusion-ill-v1',campaignId,minute,triggerUseId,sourceUseId,targetId,
+  elixirName,illEffect:{kind:'aural-shock',levels:1,weakness:5,recoveryPending:true},sourcePages:[269,270,sourcePage]};
 }
-export function applyEgosightProfusionAural({journal=[],state=null,arcane=null,proof,eventId}={}){
- const expected=createEgosightProfusionIll({...proof,journal});
+export function applyEgosightProfusionAural(input){return applySensoryProfusionAural('Egosight',input)}
+export function applyVerityProfusionAural(input){return applySensoryProfusionAural('Verity',input)}
+function applySensoryProfusionAural(elixirName,{journal=[],state=null,arcane=null,proof,eventId}={}){
+ const expected=createSensoryProfusionIll(elixirName,{...proof,journal});
  ok(JSON.stringify(expected)===JSON.stringify(proof)&&typeof eventId==='string'&&eventId.length>=3,
-  'Egosight Profusion: pozměněný historický důkaz');
- return appendSecondaryAlchemyAural({state,arcane,proof,eventId,sourcePage:271});
+  elixirName+' Profusion: pozměněný historický důkaz');
+ return appendSecondaryAlchemyAural({state,arcane,proof,eventId,sourcePage:sensoryProfusionTypes[elixirName].sourcePage});
 }
-export function validateEgosightProfusionJournal(journal=[]){
+export function validateEgosightProfusionJournal(journal){return validateSensoryProfusionJournal('Egosight',journal)}
+export function validateVerityProfusionJournal(journal){return validateSensoryProfusionJournal('Verity',journal)}
+function validateSensoryProfusionJournal(elixirName,journal=[]){
+ const field=sensoryProfusionField(elixirName);
  const prior=[];
- for(const row of journal){const p=row.calendarAlchemyEgosightProfusionIll;
+ for(const row of journal){const p=row[field];
   if(p){ok(p.campaignId===row.calendarCampaignId&&p.minute===row.campaignMinute&&p.targetId===row.characterId,
-   'Egosight Profusion: chybný kontext');
-   ok(JSON.stringify(createEgosightProfusionIll({...p,journal:prior}))===JSON.stringify(p),
-   'Egosight Profusion: pozměněný důkaz');}
+   elixirName+' Profusion: chybný kontext');
+   ok(JSON.stringify(createSensoryProfusionIll(elixirName,{...p,journal:prior}))===JSON.stringify(p),
+   elixirName+' Profusion: pozměněný důkaz');}
   prior.push(row);
  }
  for(const row of journal){const p=row.calendarAlchemyImbibing;
-  for(const x of (p?.profusionIllEffects||[]).filter(x=>x.sourceElixir==='Egosight')){
+  for(const x of (p?.profusionIllEffects||[]).filter(x=>x.sourceElixir===elixirName)){
    const hits=journal.filter(j=>j.calendarCampaignId===row.calendarCampaignId&&j.campaignMinute===row.campaignMinute&&
-    j.calendarAlchemyEgosightProfusionIll?.triggerUseId===row.id&&
-    j.calendarAlchemyEgosightProfusionIll.sourceUseId===x.sourceUseId);
-   ok(hits.length===1,'Egosight Profusion: chybí důkaz každého dříve aktivního zdroje');
+    j[field]?.triggerUseId===row.id&&
+    j[field].sourceUseId===x.sourceUseId);
+   ok(hits.length===1,elixirName+' Profusion: chybí důkaz každého dříve aktivního zdroje');
   }
  }
  return true;
 }
-export function assertEgosightProfusionAppendOnly(before=[],after=[]){
+export function assertEgosightProfusionAppendOnly(before,after){return assertSensoryProfusionAppendOnly('Egosight',before,after)}
+export function assertVerityProfusionAppendOnly(before,after){return assertSensoryProfusionAppendOnly('Verity',before,after)}
+function assertSensoryProfusionAppendOnly(elixirName,before=[],after=[]){
+ const field=sensoryProfusionField(elixirName);
  const byId=new Map(after.map(j=>[j.id,j]));
- for(const row of before)if(row.calendarAlchemyEgosightProfusionIll)
-  ok(JSON.stringify(byId.get(row.id))===JSON.stringify(row),'Egosight Profusion: důkaz nelze změnit');
+ for(const row of before)if(row[field])
+  ok(JSON.stringify(byId.get(row.id))===JSON.stringify(row),elixirName+' Profusion: důkaz nelze změnit');
  return true;
 }
 /** HMK pp.269, 272: independent, immutable Footpad secondary CF evidence. */
 export function createFootpadProfusionIll({journal=[],campaignId,minute,triggerUseId,sourceUseId,targetId}={}){
  const trigger=journal.find(j=>j.id===triggerUseId&&j.calendarCampaignId===campaignId&&j.campaignMinute===minute);
  const p=trigger?.calendarAlchemyImbibing;
- ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing'].includes(p?.elixirName)&&p.targetId===targetId&&
+ ok(['Darkvision','Erudition','Physic','Footpad','Egosight','Healing','Verity'].includes(p?.elixirName)&&p.targetId===targetId&&
   p.sl==='CF'&&p.finalAS>0,'Footpad Profusion: chybí účinný spouštěcí CF');
  const known=p.profusionIllEffects?.filter(x=>x.sourceUseId===sourceUseId&&x.kind==='aural-shock'&&x.sourceElixir==='Footpad')||[];
  ok(known.length===1&&known[0].levels===1&&known[0].weakness===5&&sourceUseId!==triggerUseId,
@@ -697,7 +717,7 @@ export function validateEruditionProfusionJournal(journal=[]){
  for(const row of journal){
   const p=row.calendarAlchemyImbibing;
   if(!p?.profusionIllEffects?.length)continue;
-  for(const x of p.profusionIllEffects.filter(x=>x.kind==='aural-shock'&&x.sourceElixir!=='Footpad'&&x.sourceElixir!=='Egosight')){
+  for(const x of p.profusionIllEffects.filter(x=>x.kind==='aural-shock'&&x.sourceElixir===undefined)){
    const matching=journal.filter(j=>j.calendarCampaignId===row.calendarCampaignId&&
     j.campaignMinute===row.campaignMinute&&j.calendarAlchemyEruditionProfusionIll?.triggerUseId===row.id&&
     j.calendarAlchemyEruditionProfusionIll.sourceUseId===x.sourceUseId);
