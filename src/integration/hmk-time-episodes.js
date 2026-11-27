@@ -22,6 +22,7 @@ import {incidentMinutes93863} from './hmk-incident-window-93863.js';
 import {validateDeferredEpisodeEvent93868} from './hmk-episode-interruption-93868.js';
 import {validateUniversalStop93869,effectiveActivityMinutes93869,validateUniversalStopResolutions93869} from './hmk-universal-window-interruption-93869.js';
 export const EPISODE_FORMAT='hmk-gm-time-episode-v1';
+export const DEFAULT_EPISODE_MAP_SCALE=400000;
 // HMK printed p.147: a Tracking CF grants one Bearing Mode in the next watch.
 // Earlier minute-episode receipts incorrectly treated it as an extra hazard die.
 // They remain replayable; only new receipts opt in to the correct calculation.
@@ -72,7 +73,7 @@ export function slowestEpisodeConveyance(topography,terrain,conveyance,hasWalker
 export function calculateTimeEpisode({minute,minutes,kind='travel',topography='flat',terrain='paved-road',conveyance='foot',
  progress=0,bearing=0,extraSlow=0,wearied=false,injured=false,loaded=false,continuousPrecipitation=false,progressD10=[],directionD10=[],
  enduranceByActor={},endRollByActor={},memberIds=[],weather=null,encounterRoll=null,encounterEnviron='rural',
- encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=25000,forcedWeatherRoll=false,
+ encounterResolved=false,encounterNight=false,encounterPercentile=null,encounterSubPercentile=null,previousCarry={},mapScale=DEFAULT_EPISODE_MAP_SCALE,forcedWeatherRoll=false,
  survivalCriticalFailure=false,survivalD10=null,doubleTime=false,loadBypass=false,encByActor={},dunesSlow=false,
   forcedBearing=0,trackingBearingPolicy=null,previousDistanceFraction=0,encounterLightMinutes=null,movementMinutes=null,inactiveByActor={},transportedMemberIds=[],walkingHandlerIds=[],waitingForComplication=false,mixedPacePolicy=null,hasOtherMounts=false}={}){
  must(trackingBearingPolicy===null||trackingBearingPolicy===EPISODE_TRACKING_BEARING_POLICY_93904,
