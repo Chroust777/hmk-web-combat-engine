@@ -420,7 +420,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.160';
+const APP_VERSION='94.161';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -4343,7 +4343,7 @@ function projectStartWithResources(requirements,startButton){
 }
 const alchemyPreparationML={create:60,invent:100,known:60};
 const alchemyStartingNeeds={
- create:'Běžný elixír: Alchemy ML 60+ a výběr elixíru z katalogu.',
+ create:'Běžný elixír: Alchemy ML 60+.',
  invent:'Nová receptura: Alchemy ML 100+, název, princip, způsob použití, trvání a popsaný účinek.',
  known:'Známý jedinečný elixír: Alchemy ML 60+ a přístup k doložené receptuře.'
 };
@@ -4374,18 +4374,6 @@ function alchemyElixirDescriptionHTML(name,{showEffect=true}={}){
    ${entry.exempt?'<br>Tento elixír nevyvolává Profusion ani se do něj nezapočítává.':''}</p>
   <p class="hc-hint">${entry.supported?'Použití je dostupné u hotové dávky.':'Výroba je dostupná. Pravidlový účinek zatím vyhodnocuje GM.'}
   · HMK ${entry.sourcePage}</p>`;
-}
-function alchemyCatalogueHTML(){
- return `<details data-alchemy-catalogue><summary>Katalog elixírů · ${CANONICAL_ALCHEMY_ELIXIRS.length}</summary>
-  <p class="hc-hint">AS je aktuální síla elixíru. Základní AS je síla před úpravou za vypití.
-   CF je kritický neúspěch, AV je hodnota ochrany, HR je míra hojení a HP interval mezi hody na zotavení.
-   Skladované dávky podléhají Decay po 30 dnech. Jedna dávka se použije celá do konce jediného kola.</p>
-  ${CANONICAL_ALCHEMY_ELIXIRS.map(({name,principle,convocation})=>
-   `<details data-alchemy-entry="${esc(name)}">
-    <summary>${esc(name)} · ${esc(principle)} (${esc(convocation)})</summary>
-    ${alchemyElixirDescriptionHTML(name)}
-   </details>`).join('')}
- </details>`;
 }
 function alchemyElixirField(actorId,suffix=''){
  const selection=alchemyElixirSelections.get(actorId)??CANONICAL_ALCHEMY_ELIXIRS[0].name;
@@ -4572,6 +4560,9 @@ function characterCraftPanel(clock,maker,discipline){
    <li><strong>Proveďte Preparation Roll.</strong> V termínu otevřete Alchemy Success Value. Použijte Herblore, Mineralogy, Mathematics SR a modifikátor Sunsign. Úspěšnou dávku může posílit Augmentation d10 podle kvality dílny.</li>
    <li><strong>Uložte dávku.</strong> Tekutý nebo plynný elixír přiřaďte k volné lahvičce Vial, 4 oz. Plná nádoba váží 0,5 lb. Chybějící lahvičku pořídíte u hotové dávky.</li>
   </ol>
+  <p class="hc-hint">AS je aktuální síla elixíru. Základní AS je síla před úpravou za vypití.
+   CF je kritický neúspěch, AV je hodnota ochrany, HR je míra hojení a HP interval mezi hody na zotavení.
+   Skladované dávky podléhají Decay po 30 dnech. Jedna dávka se použije celá do konce jediného kola.</p>
   <details><summary>Kritický neúspěch a Dissolution</summary>
    <p>Při kritickém neúspěchu proveďte Will SR d10. Pokud neuspěje, následuje Dissolution d100, které určí Aural Shock a Weakness. Při Crucial Dissolution (poslední číslice 5 nebo 0) pokračujte hodem na Shock se základním SHK 8. Případné zotavení se řeší v Combat.</p>
   </details>
@@ -9962,9 +9953,9 @@ function characterProjectsChapter(actor){
     <li>Vyberte běžný elixír nebo známou recepturu. Vlastní recepturu lze vynalézt při ML 100+. Vyberte dílnu a určete dobu přípravy.</li>
     <li>V termínu otevřete dávku vpravo a proveďte Preparation Roll. Výsledek určí, zda dávka vznikne a jakou má sílu AS.</li>
     <li>Hotovou tekutou nebo plynnou dávku uložte do volné lahvičky v inventáři. Pak ji lze použít podle druhu elixíru.</li>
-    <li>V katalogu zjistíte, zda dávku vypít, podat nebo použít na cíl. Dostupné akce se zobrazí vpravo u dávky nebo u aktivního účinku.</li>
+    <li>Dostupné akce se zobrazí vpravo u dávky nebo u aktivního účinku.</li>
     <li>V kalendářním termínu proveďte Decay. Pro Detect, Reveal nebo Dispel otevřete Magické zdroje vpravo a pokračujte s oprávněným sesilatelem v Combat.</li>
-   </ol>${alchemyCatalogueHTML()}</section>`);
+   </ol></section>`);
   if(sp.id==='special-herblore')available.push(projectRulesHTML([
    'Pro výrobu je potřeba osvojená Herblore. HMK pro bylinné lektvary neurčuje další minimální ML.',
    'Získejte odpovídající bylinu při Foraging. U nálezu určete potenci d10. Bez konzervace klesá po intervalech 2d6 dní.',
