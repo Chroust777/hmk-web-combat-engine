@@ -9,6 +9,7 @@ if(!GM_QA_WITHOUT_PASSWORD){
 }
 const root=document.documentElement;
 root.dataset.hmkGm=String(active);
+export function isGameMasterActive(){return active;}
 export function gmPageAttribute(view){return GM_PAGES.has(view)?'data-hmk-gm-page':'';}
 export function gmNavigationMarkup(){return `<div class="hmk-gm-navigation" aria-label="Režim GameMastera">
  <button type="button" data-hmk-gm-login${GM_QA_WITHOUT_PASSWORD?'':' aria-haspopup="dialog"'}>GameMaster</button>

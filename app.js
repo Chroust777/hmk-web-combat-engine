@@ -1,6 +1,6 @@
 import {deceasedCalendarActors,livingPersonalCalendarSources} from './src/integration/hmk-calendar-deceased.js';
 import {installChat} from './src/ui/chat.js?v=94.106';
-import {gmNavigationMarkup,gmPageAttribute} from './src/ui/gm-mode.js?v=94.134';
+import {gmNavigationMarkup,gmPageAttribute,isGameMasterActive} from './src/ui/gm-mode.js?v=94.152';
 import {atlasView,mountAtlasView,validateAtlasMarkers} from './src/ui/atlas-viewer.js?v=94.098';
 import {validateAtlasCartography} from './src/ui/atlas-cartography.js?v=94.098';
 import {SHIPWRIGHT_VESSELS,SHIPWRIGHT_REGIONS,shipwrightHomeStyle,shipwrightPlan,resolveShipwrightRoll,resolveShipwrightFactors,validateShipwright,assertShipwrightAppendOnly} from './src/integration/hmk-shipwright.js?v=94.000';
@@ -52,7 +52,7 @@ import {GENERATOR_TRAIT_GROUPS,GENERATOR_FOLKS,GENERATOR_OCCUPATION_PREFERENCES,
 import {isCreationOwned,assertLegacyMutationAllowed,inspectLegacySkillRecords} from './src/integration/hmk-sheet-legacy-authority.js';
 import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/hmk-character-sheet-audit.js';
 import {FAERIE_ARMOUR_ARTICLES,faerieArmourItem,FAERIE_CRAFTS,FAERIE_SPAN,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.012';
-import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery} from './src/integration/hmk-skill-test-engine.js?v=94.014';
+import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery,successValueTier} from './src/integration/hmk-skill-test-engine.js?v=94.014';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
 import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.046';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
@@ -418,7 +418,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.151';
+const APP_VERSION='94.152';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -8654,6 +8654,9 @@ function journalAddInventoryForm(){
  const catalog=allCatalogItems();
  return `<div class="hmk-inventory-add"><h4>Předmět z knihovny</h4><form id="add-inventory"><label>Předmět<select name="itemId" required><option value="">Vyberte…</option>${catalog.slice().sort((a,b)=>a.name.localeCompare(b.name,'cs',{sensitivity:'base'})||String(a.category).localeCompare(String(b.category))).map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.category)})</option>`).join('')}</select></label>${field('quantity','Počet',1,'number')}${numericField('currentWQ','Aktuální WQ (prázdné = katalog)','')}${field('condition','Stav / poznámka','')}${slotSelect('slot','carried')}<button type="submit" ${catalog.length?'':'disabled'}>Přiřadit předmět</button></form><p class="tiny muted">V inventáři vzniká kopie parametrů z knihovny.</p></div>`;
 }
+const SKILL_HISTORY_SV_HELP='Hvězdičky vyjadřují míru hodnoty výsledku (Success Value). '+
+ 'SV do 4 = 0 ★, SV 5 = 1 ★, SV 6 = 2 ★, SV 7 = 3 ★, SV 8 = 4 ★, SV 9 a více = 5 ★. '+
+ 'Konkrétní využití hvězdiček určuje vyhodnocovaná činnost (HMK str. 62).';
 function characterSkillHistory950(c,logs,{latest=5,gm=false,checks=[]}={}){
  const projectedIds=new Set(checks.filter(row=>!row.die).map(row=>row.entry.id));
  const rows=logs.flatMap(entry=>{
@@ -8663,12 +8666,15 @@ function characterSkillHistory950(c,logs,{latest=5,gm=false,checks=[]}={}){
    'secondary-mastery-value-test','skill-value-result','opposed-success-test','assistance-success-test','special-secondary-roll',
    'critical-followup','skill-critical-followup','opposed-tiebreak'].includes(proof.type))return [];
   const other=proof.opponentId===c.id&&proof.actorId!==c.id;
+  let die;
   let result=other?proof.b:proof.a??proof.primaryResult??proof.result;
   if(proof.type==='special-secondary-roll'&&!result?.level&&proof.outcome){
+   die='d10';
    const sr=proof.outcome;
    result={eml:sr.tn,roll:sr.rolls?.join(', '),level:Number.isInteger(sr.successes)?'Úspěchy: '+sr.successes:'—'};
   }
   if(proof.type==='opposed-tiebreak'){
+   die='d10';
    const attempts=proof.diceAttempts??[];
    const original=logs.find(row=>row.id===proof.originSkillTestId)?.skillTestProof;
    result={eml:(other?original?.b:original?.a)?.eml,
@@ -8678,21 +8684,31 @@ function characterSkillHistory950(c,logs,{latest=5,gm=false,checks=[]}={}){
   if(!result?.level)return [];
   // The shared resolver calculates an SV for several test modes. Only an
   // explicit Success Value test uses it as a result in the character journal.
-  const sv=['success-value-test','success-value-specific','secondary-mastery-value-test'].includes(proof.type)?result.sv:null;
+  const sv=['success-value-test','success-value-specific','secondary-mastery-value-test','skill-value-result'].includes(proof.type)?result.sv:null;
   const isFollowup=proof.type==='critical-followup'||proof.type==='skill-critical-followup';
   const followupSkill=isFollowup?proof.technique:null;
-  return [{entry,result,sv,name:followupSkill||(proof.skills?.[other?1:0]??proof.skill??entry.title)}];
+  return [{entry,result,sv,die,name:followupSkill||(proof.skills?.[other?1:0]??proof.skill??entry.title)}];
  });
- const hidden=gm?new Set():hiddenLogbookIds(data,c.id);
- if(!gm)rows.push(...checks);
- if(!gm)rows.sort((a,b)=>String(b.entry.createdAt??'').localeCompare(String(a.entry.createdAt??''))||
-  (b.entry.campaignMinute??-1)-(a.entry.campaignMinute??-1)||(b.order??0)-(a.order??0));
+ const hidden=hiddenLogbookIds(data,c.id);
+ rows.push(...checks);
+ rows.sort((a,b)=>{const campaign=(b.entry.campaignMinute??-1)-(a.entry.campaignMinute??-1);
+  const recorded=String(b.entry.createdAt??'').localeCompare(String(a.entry.createdAt??''));
+  return (gm?campaign||recorded:recorded||campaign)||(b.order??0)-(a.order??0);
+ });
  const visible=rows.filter(row=>!hidden.has(row.entry.id)),removed=rows.filter(row=>hidden.has(row.entry.id));
- const table=items=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Datum a čas</th><th>Test</th><th>${gm?'EML':'EML / TN'}</th><th>Hod</th><th>Výsledek</th>${gm?'':'<th>Akce</th>'}</tr></thead><tbody>${items.map(({entry,result,sv,name,stars,travel,die,episodeRoll})=>
-  `<tr><td>${esc(personalNoteGameMoment(entry))}</td><td>${journalTerm(name,chronicleSkillHelp953(name))}${travel?'<br><small>Cestování</small>':''}</td><td>${esc(result.eml??result.finalEML??'—')}</td><td>${die?esc(die)+' ':''}${esc(result.roll??'—')}</td><td>${esc(result.level)}${Number.isInteger(sv)?' · SV '+esc(sv):''}${Number.isInteger(stars)?' · '+stars+' ★':''}</td>${gm?'':episodeRoll?'<td>—</td>':`<td><button type="button" class="secondary hc-small" data-${hidden.has(entry.id)?'restore':'hide'}-log="${esc(entry.id)}">${hidden.has(entry.id)?'Obnovit':'Smazat ze zápisníku'}</button></td>`}</tr>`).join('')}</tbody></table></div>`;
+ const table=items=>`<div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Datum a čas</th><th>Test</th><th>EML / TN</th><th>Výsledek</th><th data-hmk-gm-only>Akce</th></tr></thead><tbody>${items.map(({entry,result,sv,name,stars,travel,die,episodeRoll})=>{
+  const roll=result.roll??result.d100;
+  const levelHelp=die==='d10'&&['S','F'].includes(result.level)?
+   (result.level==='S'?'Úspěch · hod d10 je roven nebo nižší než cílové číslo (TN).':'Neúspěch · hod d10 převýšil cílové číslo (TN).'):
+   SKILL_CHECK_LEVELS.includes(result.level)?MALNUTRITION_HELP_611[result.level]:null;
+  const svStars=Number.isInteger(sv)?Number.isInteger(stars)?stars:successValueTier(sv).stars:null;
+  return `<tr><td>${esc(personalNoteGameMoment(entry))}</td><td>${journalTerm(name,chronicleSkillHelp953(name))}${travel?'<br><small>Cestování</small>':''}</td>
+   <td>${esc(result.eml??result.finalEML??'—')}</td><td>${roll!=null&&roll!==''?esc((die??'d100')+' ('+roll+')')+' · ':''}${journalTerm(result.level,levelHelp)}${svStars===null?'':' · SV '+esc(sv)+' · '+journalTerm(svStars+' ★',SKILL_HISTORY_SV_HELP)}</td>
+   <td data-hmk-gm-only>${episodeRoll?'—':`<button type="button" class="secondary hc-small" data-${hidden.has(entry.id)?'restore':'hide'}-log="${esc(entry.id)}">${hidden.has(entry.id)?'Obnovit':'Smazat ze zápisníku'}</button>`}</td></tr>`;
+ }).join('')}</tbody></table></div>`;
  return `<details class="hc-personal-archive" data-personal-skill-history open><summary>Historie Skill Checků · posledních ${latest} hodů</summary>${visible.length?table(visible.slice(0,latest)):'<p>Žádné doložené testy.</p>'}
  ${visible.length>latest?`<details><summary>Příloha · starší Skill Checky</summary>${table(visible.slice(latest))}</details>`:''}
- ${removed.length?`<details><summary>Smazané ze zápisníku · obnovit</summary>${table(removed)}</details>`:''}</details>`;
+ ${removed.length?`<details data-hmk-gm-only><summary>Smazané ze zápisníku · obnovit</summary>${table(removed)}</details>`:''}</details>`;
 }
 function characterSkillStatistics(checks){
  const skills=summarizeLogbookSkillChecks(checks);
@@ -8701,13 +8717,13 @@ function characterSkillStatistics(checks){
   ${skills.length?`<p class="journal-minor">Doložené hody z celé historie postavy včetně cestování a položek skrytých ze zápisníku.</p>
   <div class="catalog-scroll"><table class="catalog-spec"><thead><tr><th>Dovednost</th>
   ${SKILL_CHECK_LEVELS.map(level=>`<th scope="col">${level}</th>`).join('')}
-  <th scope="col">SV ★ celkem</th><th scope="col">SV ★ podle počtu</th></tr></thead>
+  <th scope="col">${journalTerm('SV ★ celkem',SKILL_HISTORY_SV_HELP)}</th><th scope="col">${journalTerm('SV ★ podle počtu',SKILL_HISTORY_SV_HELP)}</th></tr></thead>
   <tbody>${skills.map(skill=>{
    const counts=[...skill.starsByCount].sort(([a],[b])=>a-b);
    return `<tr><th scope="row">${journalTerm(skill.name,chronicleSkillHelp953(skill.name))}</th>
    ${SKILL_CHECK_LEVELS.map(level=>`<td>${skill[level]}</td>`).join('')}
    <td>${counts.length?skill.starsTotal:'—'}</td>
-   <td>${counts.map(([stars,count])=>`<span style="white-space:nowrap">${stars} ★ × ${count}</span>`).join(' · ')||'—'}</td></tr>`;
+   <td>${counts.map(([stars,count])=>`<span style="white-space:nowrap">${journalTerm(stars+' ★',SKILL_HISTORY_SV_HELP)} × ${count}</span>`).join(' · ')||'—'}</td></tr>`;
   }).join('')}</tbody></table></div>`:'<p>Žádné doložené hody.</p>'}
  </details>`;
 }
@@ -8755,11 +8771,11 @@ function characterHealthHistory950(c,logs){
  const hidden=hiddenLogbookIds(data,c.id);
  const visible=rows.filter(row=>!hidden.has(row.id)),removed=rows.filter(row=>hidden.has(row.id));
  const list=(items,restore=false)=>items.map(row=>`<article class="journal-personal-note"><b>${esc(row.title)}</b> · <time>${esc(row.time)}</time>${row.html||`<p>${esc(row.text)}</p>`}
-  ${row.id.length<=300?`<button type="button" class="secondary hc-small" data-${restore?'restore':'hide'}-log="${esc(row.id)}">${restore?'Obnovit':'Smazat z historie'}</button>`:''}</article>`).join('');
+  ${row.id.length<=300?`<button type="button" class="secondary hc-small" data-hmk-gm-only data-${restore?'restore':'hide'}-log="${esc(row.id)}">${restore?'Obnovit':'Smazat z historie'}</button>`:''}</article>`).join('');
  return `<section class="panel panel--chapter" data-personal-health-history><details><summary>Historie zdravotních hodů, léčení a následků</summary>
  ${list(visible.slice(0,10))||'<p>Žádné doložené zdravotní události.</p>'}
  ${visible.length>10?`<details><summary>Archiv starších zdravotních záznamů</summary>${list(visible.slice(10))}</details>`:''}
- ${removed.length?`<details><summary>Smazané z historie · obnovit</summary>${list(removed,true)}</details>`:''}
+ ${removed.length?`<details data-hmk-gm-only><summary>Smazané z historie · obnovit</summary>${list(removed,true)}</details>`:''}
  </details></section>`;
 }
 const characterProjectSelections=new Map();
@@ -11468,11 +11484,12 @@ function gmHistoryView(){
  const actor=people.find(c=>c.id===gmChronicleActor953);
  const selector=`<label>Postava<select data-gm-chronicle-select><option value="">Vyberte postavu</option>
   ${people.map(c=>`<option value="${esc(c.id)}" ${c.id===actor?.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>`;
- const logs=actor?data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)&&historyBelongsToCharacter(j,actor.id)).reverse().sort((a,b)=>
-  (b.campaignMinute??-1)-(a.campaignMinute??-1)||String(b.createdAt||'').localeCompare(String(a.createdAt||''))):[];
+ const journal=actor?data.journal.filter(j=>j.calendarCampaignId===campaignKey(clock)):[];
+ const logs=actor?journal.filter(j=>historyBelongsToCharacter(j,actor.id)).reverse():[];
+ const checks=actor?characterLogbookSkillChecks(journal,actor.id):[];
  const content=actor?`<section class="hmk-gm-chronicle-person" data-gm-chronicle-person="${esc(actor.id)}">
   ${personalTimeEpisodeChronicleHTML(clock,actor.id,{gm:true})}
-  ${characterSkillHistory950(actor,logs,{latest:5,gm:true})}
+  ${characterSkillHistory950(actor,logs,{latest:5,gm:true,checks})}
   ${character(actor.id)?`<button type="button" class="secondary hc-small" data-gm-history-open="${esc(actor.id)}">Otevřít osobní zápisník ↗</button>`:''}</section>`:'';
  return journalChapterShell('GM · Historie činností',clock?.label||'Aktivní kampaň',
   `<section class="panel hmk-gm-chronicle-intro">${people.length?selector:'<p>V aktivní kampani zatím nejsou postavy s historií.</p>'}</section>${content}`,
@@ -25561,18 +25578,21 @@ document.addEventListener('change',event=>{
 document.addEventListener('click',e=>{
  const button=e.target.closest?.('[data-hide-log],[data-restore-log]');if(!button)return;
  e.preventDefault();e.stopImmediatePropagation();
- if(view!=='sheet'||!['notes','hazards'].includes(activeSheetSection)||!selected)return;
+ if(!isGameMasterActive())return;
+ const actorId=view==='gmhistory'?gmChronicleActor953:
+  view==='sheet'&&['notes','hazards'].includes(activeSheetSection)?selected:null;
+ if(!actorId)return;
  const id=button.dataset.hideLog||button.dataset.restoreLog;
- const actor=character(selected);
- const current=data.journal.some(j=>j.id===id&&historyBelongsToCharacter(j,selected));
+ const actor=character(actorId);
+ const current=data.journal.some(j=>j.id===id&&historyBelongsToCharacter(j,actorId));
  const account=data.campaignClock&&actor?.hmk?.campaignCashAccounts?.[campaignKey(data.campaignClock)];
  const cash=id.startsWith('cash-purchase:')?(account?.purchases||[]).some(p=>'cash-purchase:'+p.id===id):
   id.startsWith('cash-adjustment:')?(account?.adjustments||[]).some(p=>'cash-adjustment:'+p.id===id):false;
  const ownHealthEvent=activeSheetSection==='hazards'&&id.startsWith('health-event:')&&
   (persistentStateOf(actor).events||[]).some(e=>'health-event:'+e.id===id&&HEALTH_EVENT_LABELS_950[e.type]);
  if(!current&&!cash&&!ownHealthEvent)return alert('Položka nepatří vybrané postavě.');
- if(button.dataset.hideLog){if(!ask('Skrýt tuto položku z osobního logu? Pravidlový důkaz zůstane uložen a položku lze vrátit.'))return;mutate(()=>logbookHideEntry(data,selected,id));}
- else mutate(()=>logbookRestoreEntry(data,selected,id));
+ if(button.dataset.hideLog){if(!ask('Skrýt tuto položku z osobního logu? Pravidlový důkaz zůstane uložen a položku lze vrátit.'))return;mutate(()=>logbookHideEntry(data,actorId,id));}
+ else mutate(()=>logbookRestoreEntry(data,actorId,id));
 },true);
 document.addEventListener('click',e=>{
  const t=e.target.closest?.('[data-gm-history-open],[data-gm-history-procedure]');if(!t)return;
