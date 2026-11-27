@@ -415,7 +415,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.146';
+const APP_VERSION='94.147';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -4271,7 +4271,10 @@ function herbalPotionPreparation(actorId,reservations,reservationHTML){
   </select></label>
   <p class="hc-hint" data-herbal-potion-help aria-live="polite">${esc(herbalPotionHelp[selectedType])}</p>
   ${reservationHTML}
-  <p class="hc-hint" data-herbal-potion-unavailable ${available.some(({type})=>type===selectedType)?'hidden':''}>Vyhraďte účinnou dávku vybraného druhu, aby šlo zahájit přípravu.</p>
+  <div data-herbal-potion-unavailable ${available.some(({type})=>type===selectedType)?'hidden':''}>
+   <p class="hc-hint">Vyhraďte účinnou dávku vybraného druhu, aby šlo zahájit přípravu.</p>
+   <button type="button" disabled>Zahájit výrobu na 10 minut</button>
+  </div>
   ${[...groups.values()].map(group=>{
    const {row,status}=group[0],type=row.calendarForagingSupplyUse.herbName?.toLowerCase().trim();
    if(!EXOTIC_POTIONS.includes(type))return '';
@@ -5605,13 +5608,13 @@ function scriptCopyContext993(actor,source,method){
  const ctx=skillAutoFor(actor,method==='script'?source.script:'Drawing');
  return {scriptML,languageML,drawingML,modifier:ctx.modifier,slPenalty:ctx.trauma.slPenalty??0,forcedCF:ctx.trauma.injury?.forcedCF===true};
 }
-function scriptCopyHTML993(actor){
+function scriptCopyHTML993(actor,{preview=false}={}){
  if(!data.campaignClock)return '';
  const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute;
  const sources=projectJournal().filter(row=>row.calendarCampaignId===cid&&row.calendarSkillProjectComplete591?.kind==='writing')
   .map(row=>copySource(projectJournal(),row.id,cid)).filter(Boolean);
  const masteries=availableMasteries(actor);
- const eligible=sources.filter(source=>copyRetryAllowed(projectJournal(),cid,actor.id,source.id,
+ const eligible=preview?sources:sources.filter(source=>copyRetryAllowed(projectJournal(),cid,actor.id,source.id,
   masteries.find(x=>x.name===source.script)?.ml??0));
  const rows=copyRecords(projectJournal(),cid,actor.id).filter(row=>row.calendarScriptCopy.stage==='start');
  const options=n=>Array.from({length:n+1},(_,x)=>`<option value="${x}">${x} ★</option>`).join('');
@@ -5622,6 +5625,7 @@ function scriptCopyHTML993(actor){
  <label>Předloha<select name="sourceId" required>${eligible.map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.language)} · ${esc(x.script)}</option>`).join('')}</select></label>
  <label>Postup opisu<select name="method"><option value="script">Script (Language · Drawing)</option><option value="drawing">Drawing · −2 SV</option></select></label>
  ${projectResourcesHTML('Je potřeba doložená předloha, psací či kreslicí pomůcky a materiál pro opis.')}
+ ${preview?'<div data-project-action-requirements></div>':''}
  <button type="submit">Zahájit opis</button>${projectDraftCancelHTML}<output role="status"></output></form>`}
  ${rows.map(row=>{
   const source=sources.find(x=>x.id===row.calendarScriptCopy.sourceId);if(!source)return '';
@@ -5744,7 +5748,7 @@ function readingRegistrationHTML(actor){
   <button type="submit">Přidat do předloh kampaně</button><output role="status"></output>
  </form></details>`;
 }
-function readingHTML994(actor){
+function readingHTML994(actor,{preview=false}={}){
  if(!data.campaignClock)return '';
  const cid=campaignKey(data.campaignClock),now=data.campaignClock.minute,rows=readingRows(projectJournal(),cid,actor.id);
  const masteries=new Map(availableMasteries(actor).map(x=>[x.name,x.ml]));
@@ -5752,7 +5756,7 @@ function readingHTML994(actor){
   .map(row=>readingSource(projectJournal(),row.id,cid)).filter(Boolean);
  const active=rows.filter(row=>row.calendarScriptReading.stage==='start'&&!readingStages(rows,row).done)
   .map(row=>sources.find(x=>x.id===row.calendarScriptReading.sourceId)?.originalId);
- const eligible=sources.filter(source=>masteries.has(source.language)&&masteries.has(source.script)&&
+ const eligible=preview?sources:sources.filter(source=>masteries.has(source.language)&&masteries.has(source.script)&&
   !active.includes(source.originalId)&&readingCanStart(rows,source,masteries.get(source.language)));
  const numOptions=n=>Array.from({length:n+1},(_,i)=>`<option value="${i}">${i} ★</option>`).join('');
  return `<section class="hsk-timed-project-591" aria-label="Reading"><h3>Reading · HMK 83, 132</h3>
@@ -5762,7 +5766,7 @@ function readingHTML994(actor){
  <label>Počet stran 10″ × 14″<input name="pages" type="number" min="1" max="10000" step="1" value="${eligible[0].pages}" ${eligible[0].external||eligible[0].purpose==='cipher'?'readonly':''} required></label>
  <label data-reading-key ${eligible[0].purpose==='cipher'?'':'hidden'}>Klíč k šifře<select name="cipherKey" ${eligible[0].purpose==='cipher'?'':'disabled'}><option value="no">Pokus bez klíče</option><option value="yes">Klíč k této šifře je k dispozici</option></select></label>
  ${readingConditionField(eligible[0].condition,eligible[0].external)}
- ${projectResourcesHTML('Předloha, znalost použitého jazyka a písma a podmínky, ve kterých je text čitelný.')}<input type="hidden" name="readingDice"><button type="submit">Zahájit čtení</button>${projectDraftCancelHTML}<output role="status"></output></form>`:
+ ${projectResourcesHTML('Předloha, znalost použitého jazyka a písma a podmínky, ve kterých je text čitelný.')}<input type="hidden" name="readingDice">${preview?'<div data-project-action-requirements></div>':''}<button type="submit">Zahájit čtení</button>${projectDraftCancelHTML}<output role="status"></output></form>`:
  '<p>Vyžaduje dokončenou předlohu a znalost jejího jazyka a písma. Další pokus po dokončení vyžaduje +10 Language ML.</p>'}
  ${rows.filter(row=>row.calendarScriptReading.stage==='start').map(row=>{
   const p=row.calendarScriptReading,source=sources.find(x=>x.id===p.sourceId);
@@ -5997,7 +6001,8 @@ function writingRewriteChoices(actor){
  });
 }
 function writingPlanFields992(actor){
- const languages=availableMasteries(actor).filter(m=>writingScripts(m.name).length);
+ const known=availableMasteries(actor).filter(m=>writingScripts(m.name).length);
+ const languages=known.length?known:WRITING_LANGUAGES.map(name=>({name,ml:0}));
  return `<fieldset data-hmk-writing-plan>
  <legend>Jazyk, písmo a písař · HMK 83, 132</legend>
  <label>Zpracování<select name="writingRewrite"><option value="">Nové dílo</option>${writingRewriteChoices(actor).map(entry=>
@@ -6254,9 +6259,9 @@ function timedProjectResourcesHTML(kind){
  };
  return projectResourcesHTML(descriptions[kind]||'Pracoviště, nástroje a materiál pro zvolený výrobek.');
 }
-function timedSkillProjectsPanel591(actor,{kind=null}={}){
- if(!data.campaignClock)return '<section class="hsk-timed-project-591"><p>Časované projekty vyžadují aktivní kampaň s kalendářem.</p></section>';
- const now=data.campaignClock.minute,pending=pendingSkillProjects591(actor.id).filter(j=>!kind||j.calendarSkillProjectStart591.kind===kind);
+function timedSkillProjectsPanel591(actor,{kind=null,clock=data.campaignClock}={}){
+ if(!clock)return '<section class="hsk-timed-project-591"><p>Časované projekty vyžadují aktivní kampaň s kalendářem.</p></section>';
+ const now=clock.minute,pending=(data.campaignClock?pendingSkillProjects591(actor.id):[]).filter(j=>!kind||j.calendarSkillProjectStart591.kind===kind);
  return `<section class="hsk-timed-project-591 hsk-critical-next"><h3>Časované projekty · ${esc(TIMED_SKILL_LABELS_600[kind]||'HMK')}</h3><p class="hsk-project-classification">Patří do <strong>Success Value</strong>. Vlevo se zakládá projekt a sleduje herní čas; vpravo se v běžném panelu <strong>Success Value</strong> provede jeho původní d100. Následné Design d10 / Insight d10 mají navazující doklady, nikoli druhý SV hod.</p>
  <p>Nejdříve potvrď skutečný začátek projektu v kalendáři. Případné zkrácení práce se použije pouze tam, kde to pravidla výslovně stanovují; žádný čas se nekrátí odhadem. Hod před splatností není přípustný. Celodenní termín se zpřístupní od počátku cílového herního dne; hodinová práce je přesná na minutu. Splatný projekt zůstává otevřený až do potvrzeného výsledku. Běžný Skill Test mimo projekt není blokován.</p>
  <form data-hmk-project-start-591 ${kind==='jewelcraft'?'data-jewelcraft-work':kind==='brewing'?'data-brew-start':kind==='writing'?'data-writing-spread':''} class="hsk-form-grid"><label>Činnost<select name="kind">${MILLING_PROJECTS[kind]?`<option value="${kind}">${esc(MILLING_PROJECTS[kind].label)}</option>`:kind==='writing'?'<option value="writing">Writing Routine · HMK 132</option>':kind==='drawing'?'<option value="drawing">Drawing · HMK 69</option>':kind==='cookery'?'<option value="cookery">Cookery · HMK 68</option>':kind==='glassworking'?'<option value="glassworking">Glassworking · HMK 73</option>':isWorkshopCraft(kind)?`<option value="${kind}">${esc(TIMED_SKILL_LABELS_600[kind])}</option>`:kind==='jewelcraft'?'<option value="jewelcraft">Jewelcraft · HMK 76</option>':kind==='woodworking'?'<option value="woodworking">Woodworking · HMK 91</option>':CRAFT_WORK_600[kind]?`<option value="${esc(kind)}">${esc(CRAFT_LABELS_600[kind])}</option>`:'<option value="engineering">Engineering Design · HMK 70</option>'}</select></label>
@@ -6284,6 +6289,7 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
  kind==='breadBaking'?'<p class="tiny">Cookery Success Value určí kvalitu chleba. HMK pro samotný chléb neurčuje dobu pečení ani výtěžnost. Při podávání v rámci jídla použijte běžný projekt Cookery.</p>':''}
  ${kind==='engineering'?'<label><input type="checkbox" name="engineeringRandomTime"> Volitelný rozptyl konečné doby návrhu (±20 %, 2× d3 při Design Rollu)</label>':''}
  ${kind==='writing'?writingPlanFields992(actor):''}
+ ${kind==='writing'||isWorkshopCraft(kind)?'<div data-project-action-requirements></div>':''}
  ${kind==='brewing'?`<input type="hidden" name="brewAgingDice"><label data-brew-spirit-months hidden>Dodatečné zrání destilátu
  <select name="spiritMonths"><option value="0">Bez prodloužení</option>${[3,4,5,6].map(n=>`<option value="${n}">${n} měsíce navíc</option>`).join('')}</select></label>`:''}
  <p class="hsk-project-time-preview" data-hmk-project-time-preview-591 aria-live="polite"></p>${(TIMED_CRAFT_ITEMS_599[kind]||CRAFT_WORK_600[kind])?`<p class="tiny">Cena a doba vycházejí z pravidel pro zvolený výrobek. Tímto zápisem <strong>nevznikne inventární předmět</strong> a <strong>neodečtou se automaticky materiály ani peníze</strong>. Výrobce musí mít skutečné materiály a příslušné podmínky.</p>`:''}<button type="submit" class="secondary">Zapsat zahájení do kalendáře</button>${projectDraftCancelHTML}</form>
@@ -6303,17 +6309,20 @@ function timedSkillProjectsPanel591(actor,{kind=null}={}){
   const variant=variation?` · ${variation.pages} str. · doba ${variation.timePercent} %`:'';
   return `<div class="hsk-project-pending"><strong>${esc(p.projectName)}</strong>${variant} · ${esc(TIMED_SKILL_NAMES_600[p.kind]||p.kind)} · ${esc(isWorkshopCraft(p.kind)?FLETCHING_ITEMS[p.scope].name:p.craftItemName||p.scope)}<p>Začátek ${esc(displayCampaignMinute(p.startMinute))}. Nejčasnější možný test ${esc(displayCampaignMinute(p.earliestMinute))}${now<p.earliestMinute?' · zbývá '+esc(chronicleRemainingTime(p.earliestMinute-now)):''}. Základní dokončení ${esc(displayCampaignMinute(nowDue))}. ${linked?(p.kind==='brewing'?'SV kvality uložen; zrání čeká na potvrzení.':isWorkshopCraft(p.kind)?'SV uložen. Pokračujte výsledkem zakázky níže.':'SV již uložen.'):'Po skutečně uplynulé době proveď původní Success Value. Založení projektu není hod a nevytvoří inventář.'}</p>${faerieLink}</div>`;
  }).join('')||'<p class="tiny">Žádný otevřený projekt vybraného druhu.</p>'}</div>
- ${kind==='engineering'?engineeringFinishHTML(actor,now):kind==='brewing'?brewingFinishHTML995(actor,now):isWorkshopCraft(kind)?fletchingFinishHTML996(actor,now,kind):''}</section>`;
+ ${data.campaignClock?(kind==='engineering'?engineeringFinishHTML(actor,now):kind==='brewing'?brewingFinishHTML995(actor,now):isWorkshopCraft(kind)?fletchingFinishHTML996(actor,now,kind):''):''}</section>`;
 }
 function decorateTimedSkillProject591(root){
  refreshShipwrightForm(root.querySelector('[data-shipwright-project="start"]'));
  refreshConstructionForm(root.querySelector('[data-construction-project="start"]'));
+ for(const form of root.querySelectorAll('form[data-faerie-step="start"]'))refreshFaerieProjectRequirements(form);
+ for(const form of root.querySelectorAll('form[data-script-copy="start"],form[data-script-reading="start"]'))
+  refreshProjectTextSource(form);
  for(const create of root.querySelectorAll('[data-hmk-project-start-591]')){
   const kind=create.elements.namedItem('kind'),scope=create.elements.namedItem('scope'),preview=create.querySelector('[data-hmk-project-time-preview-591]');
   const update=()=>{
    const rewriteScope=refreshWritingPlan992(create);
    const isText=create.elements.namedItem('writingIntent')?.value==='text';
-   const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)&&(!item.kuzhan||isKuzhan996(character(selected)))).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD} d · ${craftDurationText600(item)}${item.agingDice?` práce · zrání ${item.agingBaseDays?item.agingBaseDays+' + ':''}${item.agingDice}d${item.agingFaces} dní`:''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name}${item.decorative?' [d]':''} · ${item.priceD} d · ${timedSkillBaseMinutes591(kind.value,key)/60} h`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
+   const labels=isWorkshopCraft(kind.value)?Object.entries(FLETCHING_ITEMS).filter(([key,item])=>workshopCraftItem(kind.value,key)).map(([key,item])=>[key,item.name+' · '+item.costD+' d · '+(item.months?item.months+' měs.':item.hours+' h')]):kind.value==='writing'?Object.entries(WRITING_WORK_MINUTES_591).filter(([key])=>!isText||key!=='missive').map(([key,minutes])=>[key,minutes===10?'10 minut':minutes/1440+' dní']):CRAFT_WORK_600[kind.value]?Object.entries(CRAFT_WORK_600[kind.value]).map(([key,item])=>[key,`${item.name} · náklad ${item.costD} d · ${craftDurationText600(item)}${item.agingDice?` práce · zrání ${item.agingBaseDays?item.agingBaseDays+' + ':''}${item.agingDice}d${item.agingFaces} dní`:''}`]):TIMED_CRAFT_ITEMS_599[kind.value]?Object.entries(TIMED_CRAFT_ITEMS_599[kind.value]).map(([key,item])=>[key,`${item.name}${item.decorative?' [d]':''} · ${item.priceD} d · ${timedSkillBaseMinutes591(kind.value,key)/60} h`]):Object.entries(ENGINEERING_DESIGN_DAYS).map(([key,days])=>[key,days+' dní']);
    const last=scope.value;
    if(scope.tagName==='SELECT'){
     scope.innerHTML=labels.map(([key,description])=>`<option value="${esc(key)}">${isWorkshopCraft(kind.value)||['ceramics','mineralogy'].includes(kind.value)?'':esc(key)+' · '}${esc(description)}</option>`).join('');
@@ -6342,7 +6351,13 @@ function decorateTimedSkillProject591(root){
     leverLabel.hidden=lever.disabled;
     leverLabel.style.display=lever.disabled?'none':'';
     if(lever.disabled)lever.checked=false;
-    const plan=fletchingPlan(scope.value,1,provider.value),now=data.campaignClock.minute;
+    const plan=fletchingPlan(scope.value,1,provider.value),now=data.campaignClock?.minute??0;
+    const maker=character(selected),assistant=provider.value?character(provider.value):null;
+    const otherSkills=assistant?['Metalcraft']:[];
+    refreshProjectActionRequirements(create,[
+     {actor:maker,skills:[projectSkill(TIMED_SKILL_NAMES_600[kind.value]),...item.secondary.filter(name=>!otherSkills.includes(name)).map(name=>projectSkill(name))]},
+     ...(assistant?[{actor:assistant,skills:[{skills:[projectSkill('Metalcraft')],label:'Výrobce hrotů · '+assistant.name}]}]:[])
+    ],{blocked:item.kuzhan&&!isKuzhan996(maker)||item.name==='Longknife'&&!isFaerieCrafter(maker)||!lever.disabled&&!lever.checked});
     const actor=character(selected),masteries=availableMasteries(actor);
     const requirements=item.secondary.map(name=>{
      const list=name==='Metalcraft'&&provider.value?availableMasteries(character(provider.value)):masteries;
@@ -6359,6 +6374,16 @@ function decorateTimedSkillProject591(root){
     if(!manual){preview.textContent='Potvrď tři d6 pro skutečnou dobu projektu.';return;}
    }
    if(kind.value==='writing'){
+    const actor=character(selected),writing=create.elements;
+    const plan={language:writing.writingLanguage.value,script:writing.writingScript.value,
+     purpose:writing.writingPurpose.value,intent:writing.writingIntent.value};
+    const test=writingRollSkills(plan),subject=writingFixedSubject(plan);
+    const scribe=writing.writingMode.value==='self'?actor:character(writing.writingScribe.value);
+    refreshProjectActionRequirements(create,[
+     {actor,skills:[...new Set([plan.language,test.primary,test.secondary,subject].filter(Boolean))].map(name=>projectSkill(name))},
+     ...(scribe?[{actor:scribe,skills:[...new Set([plan.language,plan.script,'Drawing'].filter(Boolean))].map(name=>
+      ({skills:[projectSkill(name)],label:'Písař · '+scribe.name}))}]:[])
+    ],{blocked:!plan.language||!plan.script||!writing.writingScribe.value});
     const spread=writingPageSpread(scope.value),choosePages=create.elements.namedItem('writingPagesRandom');
     choosePages.disabled=!spread||spread.min===spread.max;
     if(choosePages.disabled)choosePages.checked=false;
@@ -6386,7 +6411,7 @@ function decorateTimedSkillProject591(root){
     preview.textContent=(milling?'Výchozí roční potřeba '+milling.bushels.toLocaleString('cs-CZ')+' bušlů'+(milling.typicalWeightLb?' · v typickém dvoře přibližně 40 000 lb':'')+'. ':'')+(cost===null?'':'Materiál '+cost.toLocaleString('cs-CZ',{maximumFractionDigits:2})+' d · ')+'Pracovní doba '+label+'. Nejčasnější SV '+displayCampaignMinute(due)+(timing?.mode==='day'||glassDay?' · termín dle herního dne (od 00:00).':' · přesný čas.')+(kind.value==='brewing'?' Zrání se doloží samostatnými skutečnými hody při zahájení; SV hodnotí kvalitu po práci.':'')+' Záznam není automatickým zaplacením materiálu ani vytvořením výrobku.';
    }
   };
-  if(!create.dataset.timedInit591){create.dataset.timedInit591='yes';kind.addEventListener('change',update);scope.addEventListener('change',update);create.elements.namedItem('craftQuantity')?.addEventListener('input',update);if(scope.tagName==='INPUT')scope.addEventListener('input',update);create.querySelector('[data-hmk-writing-plan]')?.addEventListener('change',update);create.elements.namedItem('engineeringRandomTime')?.addEventListener('change',update);create.elements.namedItem('jewelTime')?.addEventListener('change',update);create.elements.namedItem('fletchingProvider')?.addEventListener('change',update);}
+  if(!create.dataset.timedInit591){create.dataset.timedInit591='yes';kind.addEventListener('change',update);scope.addEventListener('change',update);create.elements.namedItem('craftQuantity')?.addEventListener('input',update);if(scope.tagName==='INPUT')scope.addEventListener('input',update);create.querySelector('[data-hmk-writing-plan]')?.addEventListener('change',update);create.elements.namedItem('engineeringRandomTime')?.addEventListener('change',update);create.elements.namedItem('jewelTime')?.addEventListener('change',update);create.elements.namedItem('fletchingProvider')?.addEventListener('change',update);create.elements.namedItem('leverTraining')?.addEventListener('change',update);}
   update();
  }
  const primary=root.querySelector('#skill-value-form');if(!primary||!data.campaignClock||!selected)return;
@@ -6433,8 +6458,7 @@ function decorateTimedSkillProject591(root){
  const submit=primary.querySelector('button[type="submit"]');
  if(submit){submit.disabled=blocked;submit.title=blocked?'Vybraný projekt ještě nesplnil termín Success Value.':'';}
 }
-function constructionPanel(actor){
- const clock=data.campaignClock;
+function constructionPanel(actor,clock=data.campaignClock){
  if(!clock)return '<section class="hsk-critical-next"><h3>Construction · stavba</h3><p>Nejprve otevřete kampaň v Kalendáři.</p></section>';
  const cid=campaignKey(clock),journal=projectJournal();
  const designs=journal.filter(row=>row.calendarCampaignId===cid&&row.campaignMinute<=clock.minute&&
@@ -6479,7 +6503,7 @@ function constructionPanel(actor){
    <label data-construction-master-label>Zapojený mistr<select name="masterId"><option value="">Vyberte mistra</option>${masterOptions}</select></label>
    <label>Skupiny dělníků (počet, ML)<textarea name="groups" rows="3" placeholder="20, 68" required></textarea></label>
    <p>Jeden řádek na skupinu se stejným ML v hlavní dovednosti stavby. Například 20, 68 znamená 20 dělníků s ML 68.</p>
-   <p data-construction-base></p>${projectResourcesHTML('Podle stavby zajistěte pracoviště, nástroje, stavební materiál a uvedené skupiny dělníků. Některé stavby vyžadují dokončený návrh a mistra.')}
+   <p data-construction-base></p><div data-project-action-requirements></div>${projectResourcesHTML('Podle stavby zajistěte pracoviště, nástroje, stavební materiál a uvedené skupiny dělníků. Některé stavby vyžadují dokončený návrh a mistra.')}
    <p>Kalendář počítá od zahájení po 216 pracovních dnech 144 dní přestávky. Nákladový výsledek se zaznamená při hodu.</p>
    <button type="submit">Zapsat zahájení stavby</button>${projectDraftCancelHTML}<output role="status"></output>
   </form>${projects}</section>`;
@@ -6507,12 +6531,17 @@ function refreshConstructionForm(form){
  filter('designId','edifice',item.design);
  filter('masterId','skill',item.secondary);
  const note=form.querySelector('[data-construction-base]');
+ const actor=character(selected),master=character(form.elements.masterId.value);
+ refreshProjectActionRequirements(form,[{actor,skills:[projectSkill(item.primary)]},
+  ...(master&&item.secondary?[{actor:master,skills:[{skills:[projectSkill(item.secondary)],label:'Zapojený mistr · '+master.name}]}]:[])],
+  {blocked:!!(item.secondary&&!master||item.design&&!form.elements.designId.value)});
  note.textContent=`${item.primary} · ${item.workerMonths} dělnoměsíců · ${constructionMoney(item.costD)}.`+
+  (item.secondary?' Zapojený mistr musí mít '+item.secondary+' ML 1+.':'')+
   (item.design?' Návrh musí být dokončený před zahájením stavby.':'');
 }
 document.addEventListener('change',event=>{
  const field=event.target;
- if(field.name==='structure')refreshConstructionForm(field.closest('[data-construction-project="start"]'));
+ if(['structure','masterId','designId'].includes(field.name))refreshConstructionForm(field.closest('[data-construction-project="start"]'));
 });
 document.addEventListener('submit',event=>{
  const form=event.target,stage=form?.dataset?.constructionProject;
@@ -6527,6 +6556,8 @@ document.addEventListener('submit',event=>{
   if(stage==='start'){
    const structure=fields.structure.value,item=CONSTRUCTION_STRUCTURES[structure],title=fields.projectName.value.trim();
    if(!item||title.length<2||title.length>120)throw Error('Zadejte název a typ stavby.');
+   if(view==='sheet'&&activeSheetSection==='projects'&&projectQualifications(actor)(projectSkill(item.primary)).missingML)
+    throw Error('Postava potřebuje osvojenou dovednost '+item.primary+'.');
    const groups=parseConstructionGroups(fields.groups.value);
    const master=item.secondary?calendarMemberIds(clock,registryCharacters93813(data.characters)).find(p=>p.id===fields.masterId.value):null;
    row.title=title;
@@ -6561,8 +6592,7 @@ function parseConstructionGroups(value){
     return {count:Number(match[1]),ml:Number(match[2])};
    });
 }
-function shipwrightPanel(actor){
- const clock=data.campaignClock;
+function shipwrightPanel(actor,clock=data.campaignClock){
  if(!clock)return '<section class="panel"><h3>Shipwright · HMK 84</h3><p>Nejprve otevřete kampaň.</p></section>';
  const cid=campaignKey(clock);
  const masterML=availableMasteries(actor).find(skill=>skill.name==='Shipwright')?.ml??0;
@@ -6573,7 +6603,7 @@ function shipwrightPanel(actor){
   `<option value="${id}">${esc(ship.name)} · ${ship.length} ft · ${ship.workerMonths} dělnoměsíců · ${constructionMoney(ship.costD)}</option>`).join('');
  const entries=projectJournal().filter(row=>row.characterId===actor.id&&row.calendarCampaignId===cid&&row.calendarShipwrightStart);
  return `<section class="panel hsk-critical-next"><h3>Shipwright · stavba plavidel · HMK 84</h3>
- ${masterML>0?`<form data-shipwright-project="start" class="hsk-form-grid">
+ ${(masterML>0||activeSheetSection==='projects')?`<form data-shipwright-project="start" class="hsk-form-grid">
   <label>Typ plavidla<select name="vessel">${vessels}</select></label>
   <label>Název plavidla<input name="projectName" required minlength="2" maxlength="120"></label>
   <label>Domovský region mistra nebo kvalifikace z loděnice<select name="shipRegion" required><option value="">Vyberte</option>${regions}</select></label>
@@ -6701,19 +6731,20 @@ function faerieSecondarySkills(plan){
  if(plan.armour)return plan.armour==='scale'?['Hideworking','Metalcraft']:['Metalcraft','Mineralogy'];
  return Object.values(FLETCHING_ITEMS).find(item=>item.name==='Longknife').secondary;
 }
-function faeriecraftPanel(actor){
+function faeriecraftPanel(actor,{clock=data.campaignClock,preview=false}={}){
  const signed=n=>n>0?'+'+n:String(n);
- const clock=data.campaignClock,cid=campaignKey(clock),now=clock?.minute;
+ const cid=campaignKey(clock),now=clock?.minute;
  const title='<h3>Faeriecraft · HMK 93, 308</h3>';
  if(!actor||!clock)return '<section>'+title+'<p>Otevřete kalendář kampaně.</p></section>';
- if(!isFaerieCrafter(actor))return '<section>'+title+'<p>Faeriecraft je dostupný pouze postavám původu Ælrhin.</p></section>';
- if(!calendarMemberIds(clock,[actor]).length)return '<section>'+title+'<p>Vybraná postava musí být účastníkem kampaně.</p></section>';
+ if(!preview&&!isFaerieCrafter(actor))return '<section>'+title+'<p>Faeriecraft je dostupný pouze postavám původu Ælrhin.</p></section>';
+ if(!preview&&!calendarMemberIds(clock,[actor]).length)return '<section>'+title+'<p>Vybraná postava musí být účastníkem kampaně.</p></section>';
  const records=projectJournal().filter(x=>x.characterId===actor.id&&x.calendarCampaignId===cid&&x.calendarFaeriecraft?.stage==='start');
  const states=records.map(x=>faerieState(projectJournal(),x.id));
  const active=states.find(state=>faerieNext(state,now)),masteries=availableMasteries(actor);
  const workshops=projectJournal().filter(x=>x.characterId===actor.id&&x.calendarCampaignId===cid&&x.campaignMinute===now&&
   x.calendarSkillProjectStart591?.faerieLinked&&!faerieWorkshopState(projectJournal(),x.id));
- const crafts=masteries.filter(x=>x.ml>0&&Object.hasOwn(FAERIE_CRAFTS,x.name));
+ const crafts=preview?Object.keys(FAERIE_CRAFTS).map(name=>({name,ml:masteries.find(row=>row.name===name)?.ml??0})):
+  masteries.filter(x=>x.ml>0&&Object.hasOwn(FAERIE_CRAFTS,x.name));
  const spirit=masteries.find(x=>x.name==='Spirit'&&x.ml>0);
  const outer=(stage,id,contents,label,queue=false)=>'<form class="hsk-critical-next" '+(queue?'data-faerie-roll ':'')+'data-faerie-step="'+stage+'"><input type="hidden" name="projectId" value="'+esc(id)+'">'+contents+
   '<button type="submit">'+label+'</button>'+(stage==='start'?projectDraftCancelHTML:'')+'<output role="status" aria-live="polite"></output></form>';
@@ -6726,14 +6757,15 @@ function faeriecraftPanel(actor){
  if(!active){
   const linked=workshops.length&&spirit?'<h4>Zahájené dílenské zakázky v této minutě</h4>'+workshops.map(row=>
    outer('start',row.id,'<h5>'+esc(row.calendarSkillProjectStart591.projectName)+'</h5>'+projectResourcesHTML('Klidné místo pro reverie a vybavení navázané dílenské zakázky.')+entryFields,'Zahájit reverie pro tuto zakázku',true)).join(''):'';
-  html=linked+(!spirit||!crafts.length?'<p>Postava potřebuje osvojený Spirit a odpovídající řemeslo.</p>':
+  html=linked+(!preview&&(!spirit||!crafts.length)?'<p>Postava potřebuje osvojený Spirit a odpovídající řemeslo.</p>':
    outer('start','', '<label>Řemeslo<select name="craftSkill" required><option value="">Vyberte řemeslo</option>'+crafts.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+' · ML '+x.ml+'</option>').join('')+'</select></label>'+
     '<label>Konkrétní výrobek<input name="item" required minlength="2" maxlength="120"></label>'+
     '<label>Doložená doba výroby od zahájení (herní hodiny včetně přestávek)<input name="hours" type="number" min="1" max="166666" required></label>'+
     '<fieldset data-faerie-product="hartbow" hidden disabled><legend>Hartbow</legend><label>Druh luku<select name="bow"><option value="composite">Kompozitní luk</option><option value="longbow">Longbow</option></select></label><label>Základní Draw<input name="baseDraw" type="number" min="1" max="500" required></label></fieldset>'+
     '<fieldset data-faerie-product="longknife" hidden disabled><legend>Výrobek Weaponcraft</legend><label>Druh výrobku<select name="armourArticleId"><option value="">Vagorsereq (Longknife)</option>'+FAERIE_ARMOUR_ARTICLES.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+' · '+item.properties.weightLb+' lb</option>').join('')+'</select></label></fieldset>'+
     '<p>Weaponcraft nabízí Vagorsereq (Longknife) a tři druhy kovových zbrojí. Masonry je určené pro samostatnou plastiku. Čas posouvá Kalendář.</p>'+
-    projectResourcesHTML('Klidné místo pro reverie, nástroje a materiál pro zvolené řemeslo.')+entryFields,
+    projectResourcesHTML(['Klidné místo pro reverie, nástroje a materiál pro zvolené řemeslo.','Podmínka původu: Ælrhin.'])+
+    (preview?'<div data-project-action-requirements></div>':'')+entryFields,
     'Potvrdit vstup do reverie a zahájit práci',true));
  }else{
   const {project,entry,minutes,deadline,readyMinute}=active,plan=project.calendarFaeriecraft.input,next=faerieNext(active,now);
@@ -6768,6 +6800,7 @@ function faeriecraftPanel(actor){
 document.addEventListener('change',event=>{
  if(!event.target.matches?.('[data-faerie-step="start"] [name="craftSkill"]'))return;
  const form=event.target.form,kind=FAERIE_CRAFTS[form.elements.craftSkill.value];
+ refreshFaerieProjectRequirements(form);
  for(const group of form.querySelectorAll('[data-faerie-product]'))group.disabled=group.hidden=group.dataset.faerieProduct!==kind;
 });
 document.addEventListener('submit',event=>{
@@ -8683,32 +8716,112 @@ const PROJECT_DISCIPLINES={
  trapping:'Survival',fishing:'Fishing',animal:'Animalcraft',shipwright:'Shipwright',
  breadBaking:'Milling',writing:'Writing, Scribing a Reading',construction:'Stavba · Woodworking / Masonry',faeriecraft:'Faeriecraft'
 };
+const projectPreviewClock=createCampaignCalendar({day:1,hour:0,minute:0,
+ eventId:'project-preview',campaignId:'project-preview',characterIds:[],gmConfirmed:true});
+const projectSkill=(name,minML=1)=>({name,minML});
+const projectAnySkill=(names,label='Stačí jedna z těchto dovedností')=>({skills:names.map(name=>projectSkill(name)),label});
+function projectQualifications(actor){
+ const ml=new Map(availableMasteries(actor).map(row=>[row.name,row.ml]));
+ const sheet=new Map((actor?.hmk?.creation?calculateSheetSkills(actor):[]).map(row=>[row.name,row]));
+ return ({name,minML})=>{
+  const currentML=ml.get(name)??0,row=sheet.get(name);
+  // One DP opens a skill with no inherent mastery. Higher ML is its own requirement,
+  // since the DP needed to reach it depends on Skill Base and mastery boosts.
+  const minDP=row?.baseSM===0&&!row.subskillOf&&(currentML===0||row.totalDP>0)?1:0;
+  const currentDP=row?.totalDP;
+  return {name,minML,currentML,currentDP,minDP,missingML:Math.max(0,minML-currentML),
+   missingDP:minDP?Math.max(0,minDP-(currentDP??0)):0};
+ };
+}
+function projectQualificationStatus(lookup,requirements=[]){
+ const groups=requirements.map(requirement=>({
+  label:requirement.label,rows:(requirement.skills??[requirement]).map(lookup)
+ }));
+ return {blocked:groups.some(({rows})=>rows.length&&!rows.some(row=>!row.missingML&&!row.missingDP)),
+  html:groups.length?`<div class="hmk-specialty-facts" aria-label="Požadavky na dovednosti">${groups.map(({label,rows})=>
+   `<div>${label?`<p><strong>${esc(label)}</strong></p>`:''}${rows.map(row=>
+    `<p><strong>${esc(row.name)} · min. ML ${row.minML}${row.minDP?` · otevření ${row.minDP} DP`:''}</strong>
+    <span>Postava: ML ${row.currentML}${Number.isFinite(row.currentDP)?` · ${row.currentDP} DP`:''}. ${[
+     row.missingML?`Chybí ${row.missingML} ML`:'',row.missingDP?`chybí ${row.missingDP} DP`:''
+    ].filter(Boolean).join(' · ')||'Splněno'}</span></p>`).join('')}</div>`).join('')}</div>`:''};
+}
+function projectProcedureAvailability(procedure,lookup,active){
+ const status=projectQualificationStatus(lookup,procedure.requirements);
+ if(active&&!status.blocked)return {...procedure,html:status.html+procedure.html};
+ const content=document.createElement('template');
+ content.innerHTML=procedure.html;
+ const actions=[...content.content.querySelectorAll('button:not([data-project-draft-cancel]),input[type="submit"]')];
+ for(const button of actions)button.disabled=true;
+ for(const form of content.content.querySelectorAll('form'))form.dataset.projectReadOnly='yes';
+ return {...procedure,html:status.html+content.innerHTML+
+  (status.blocked&&!actions.length?'<button type="button" disabled>Zahájit činnost</button>':'')};
+}
+const projectActionRequirementMarkup=new WeakMap();
+function refreshProjectActionRequirements(form,requirements,{blocked=false}={}){
+ if(view!=='sheet'||activeSheetSection!=='projects')return;
+ const area=form.querySelector('[data-project-action-requirements]');
+ if(!area)return;
+ const reports=requirements.map(({actor,skills})=>projectQualificationStatus(projectQualifications(actor),skills));
+ const markup=reports.map(report=>report.html).join('');
+ if(projectActionRequirementMarkup.get(area)!==markup){
+  area.innerHTML=markup;
+  projectActionRequirementMarkup.set(area,markup);
+ }
+ const button=form.querySelector('button[type="submit"]');
+ if(button)button.disabled=form.dataset.projectReadOnly==='yes'||blocked||reports.some(report=>report.blocked);
+}
+window.addEventListener('submit',event=>{
+ if(event.target.matches?.('form[data-project-read-only="yes"]')||
+    event.target.querySelector?.('[data-project-action-requirements]')&&
+    event.target.querySelector('button[type="submit"]')?.disabled){
+  event.preventDefault();
+  event.stopImmediatePropagation();
+ }
+},true);
+function refreshFaerieProjectRequirements(form){
+ if(!form.querySelector('[data-project-action-requirements]'))return;
+ const actor=character(selected),craft=form.elements.craftSkill.value;
+ const skills=[projectSkill('Spirit'),craft?projectSkill(craft):projectAnySkill(Object.keys(FAERIE_CRAFTS),'Řemeslo podle výrobku')];
+ refreshProjectActionRequirements(form,[{actor,skills}],{blocked:!isFaerieCrafter(actor)||!craft});
+}
+function refreshProjectTextSource(form){
+ if(!form.querySelector('[data-project-action-requirements]'))return;
+ const actor=character(selected),journal=projectJournal(),cid=campaignKey(data.campaignClock);
+ const id=form.elements.sourceId.value,copy=form.dataset.scriptCopy==='start';
+ const source=copy?copySource(journal,id,cid):readingSource(journal,id,cid);
+ if(!source)return;
+ const lookup=projectQualifications(actor);
+ const scriptML=lookup(projectSkill(source.script)).currentML;
+ const languageML=lookup(projectSkill(source.language)).currentML;
+ const rows=readingRows(journal,cid,actor.id);
+ const work=copy?copyRecords(journal,cid,actor.id):rows;
+ const earlier=work.findLast(row=>(copy?row.calendarScriptCopy:row.calendarScriptReading)?.stage==='start'&&
+  (copy?row.calendarScriptCopy:row.calendarScriptReading).sourceId===source.id);
+ const tested=earlier&&(copy?findCopyStages(journal,earlier):readingStages(rows,earlier)).test;
+ const minimumScript=copy&&tested?Math.max(1,tested.calendarScriptCopy.input.scriptML+10):1;
+ const minimumLanguage=!copy&&tested?tested.calendarScriptReading.input.languageML+10:1;
+ const requirements=copy?[projectSkill('Drawing'),...(form.elements.method.value==='script'?
+  [projectSkill(source.language),projectSkill(source.script,minimumScript)]:minimumScript>1?[projectSkill(source.script,minimumScript)]:[])]:
+  [projectSkill(source.language,minimumLanguage),projectSkill(source.script)];
+ const available=copy?copyRetryAllowed(journal,cid,actor.id,id,scriptML):
+  readingCanStart(rows,source,languageML)&&!rows.some(row=>row.calendarScriptReading.stage==='start'&&
+   !readingStages(rows,row).done&&readingSource(journal,row.calendarScriptReading.sourceId,cid)?.originalId===source.originalId);
+ refreshProjectActionRequirements(form,[{actor,skills:requirements}],{blocked:!available});
+}
 function characterProjectDisciplines(actor){
- const masteries=availableMasteries(actor);
  const specialties=new Map(characterSpecialtyChapters(actor).map(item=>[item.id,item]));
  const sections=CHARACTER_SPECIALTY_DEFINITIONS.map(definition=>{
-  const {id,label}=definition;
-  const specialty=specialties.get(id);
-  const preview=!specialty&&id==='special-alchemy';
-  return {id,label,enabled:!!specialty||preview,preview,specialty:specialty||(preview?
-   {...definition,reason:'Postava zatím nemá osvojenou Alchemy.',details:[{name:'Alchemy ML',value:0}]}:null)};
+  const specialty=specialties.get(definition.id);
+  return {id:definition.id,label:definition.label,specialty:specialty??{...definition,details:[]}};
  });
- sections.push({id:'work:Timbercraft',label:'Timbercraft',enabled:true,projects:[]});
- for(const name of fieldDisciplines)sections.push({id:'work:'+name,label:name,enabled:name==='Weather Lore'||
-  masteries.some(row=>row.name===name&&row.ml>0),projects:[]});
+ for(const name of ['Timbercraft',...fieldDisciplines])sections.push({id:'work:'+name,label:name,projects:[]});
  const bySkill=new Map();
  for(const [kind,label] of TIMED_PROJECT_CHOICES){
   const skill=TIMED_SKILL_NAMES_600[kind]||PROJECT_DISCIPLINES[kind];
-  const mastery=masteries.find(m=>m.name===skill&&m.ml>0);
-  const known=kind==='writing'?masteries.some(m=>isWritingLanguage(m.name)&&m.ml>0):
-   kind==='construction'?masteries.some(m=>['Woodworking','Masonry'].includes(m.name)&&m.ml>0):
-   kind==='faeriecraft'?isFaerieCrafter(actor):!!mastery;
   const name=PROJECT_DISCIPLINES[kind]||skill;
   const id='work:'+name;
-  if(!bySkill.has(id))bySkill.set(id,{id,label:name,mastery,projects:[],enabled:false});
-  const section=bySkill.get(id);
-  section.enabled ||= known;
-  section.projects.push({kind,label,known});
+  if(!bySkill.has(id))bySkill.set(id,{id,label:name,projects:[]});
+  bySkill.get(id).projects.push({kind,label,skill});
  }
  return [...bySkill.values(),...sections].sort((a,b)=>a.label.localeCompare(b.label,'cs'));
 }
@@ -8851,14 +8964,14 @@ document.addEventListener('click',event=>{
  });
 });
 const characterProcedureSelections=new Map();
-function projectProcedurePicker(actor,discipline,procedures){
+function projectProcedurePicker(actor,discipline,procedures,lookup,active){
  if(!procedures.length)return '';
  const key=actor.id+'::'+discipline;
  const procedure=procedures.find(item=>item.id===characterProcedureSelections.get(key))||procedures[0];
  return `${procedures.length>1?`<label>Postup<select data-character-project-procedure data-discipline="${esc(discipline)}">
   ${procedures.map(item=>`<option value="${esc(item.id)}" ${item===procedure?'selected':''}>${esc(item.label)}</option>`).join('')}
  </select></label>`:''}
- <section class="hmk-project-procedure"><h4>${esc(procedure.label)}</h4>${procedure.html}</section>`;
+ <section class="hmk-project-procedure"><h4>${esc(procedure.label)}</h4>${projectProcedureAvailability(procedure,lookup,active).html}</section>`;
 }
 function alchemyExaminationTargets(clock){
  const cid=campaignKey(clock),journal=data.journal;
@@ -9551,60 +9664,52 @@ document.addEventListener('submit',event=>{
 
 function characterProjectsChapter(actor){
  const disciplines=characterProjectDisciplines(actor);
- const section=disciplines.find(item=>item.enabled&&item.id===characterProjectSelections.get(actor.id))||disciplines.find(item=>item.enabled&&!item.preview)||disciplines.find(item=>item.enabled);
- const clock=data.campaignClock;
- const active=clock&&calendarMemberIds(clock,[actor]).length>0;
- const options=(section?'':'<option value="" selected disabled>Postava zatím nemá dostupný obor</option>')+
-  disciplines.map(item=>`<option value="${esc(item.id)}"${item.enabled?'':' disabled'}${item===section?' selected':''}>${esc(item.label)}</option>`).join('');
+ const section=disciplines.find(item=>item.id===characterProjectSelections.get(actor.id))||disciplines[0];
+ const clock=data.campaignClock??projectPreviewClock;
+ const active=!!data.campaignClock&&calendarMemberIds(clock,[actor]).length>0;
+ const lookup=projectQualifications(actor);
+ const options=disciplines.map(item=>`<option value="${esc(item.id)}"${item===section?' selected':''}>${esc(item.label)}</option>`).join('');
  const jump=(kind,label)=>`<button type="button" class="secondary" data-character-project-open="${kind}">${label}</button>`;
  const available=[],progress=[],procedures=[];
  const agenda=active?campaignCalendarAgenda(clock,data.characters,data.journal,data.inventory):{all:[]};
- if(section?.projects?.length){
-  const skillRows=actor.hmk?.creation?calculateSheetSkills(actor):[];
-  const relevant=section.id==='work:'+PROJECT_DISCIPLINES.writing?skillRows.filter(row=>isWritingLanguage(row.name)&&row.ml>0):
-   section.id==='work:'+PROJECT_DISCIPLINES.construction?skillRows.filter(row=>['Woodworking','Masonry'].includes(row.name)&&row.ml>0):
-   section.id==='work:'+PROJECT_DISCIPLINES.faeriecraft?skillRows.filter(row=>(row.name==='Spirit'||Object.hasOwn(FAERIE_CRAFTS,row.name))&&row.ml>0):
-   skillRows.filter(row=>row.name===section.mastery?.name);
-  const known=relevant.length?relevant:section.mastery?[section.mastery]:[];
-  available.push(`<details open><summary>O oboru a způsobilosti postavy</summary>
-   <div class="hmk-specialty-facts">${known.map(row=>`<p><strong>${esc(row.name)} · ML ${esc(row.ml)}</strong>
-   ${Number.isFinite(row.totalDP)?`<span>Vývoj dovednosti · ${esc(row.totalDP)} DP</span>`:''}</p>`).join('')}</div>
-   <p>${section.id==='work:'+PROJECT_DISCIPLINES.faeriecraft?'Faeriecraft vyžaduje původ Ælrhin, Spirit a odpovídající řemeslo.':'Způsobilost závisí na osvojené dovednosti a podmínkách vybraného postupu.'}</p>
-  </details>`);
- }
- if(active&&section?.id==='work:Timbercraft'){
+ if(section?.id==='work:Timbercraft'){
   const timber=timbercraftPanel(actor,clock);
-  procedures.push(...timber.procedures);
-  progress.push(timber.progress);
+  procedures.push(...timber.procedures.map(procedure=>({...procedure,requirements:
+   procedure.id==='timber-lore'?[projectSkill('Timbercraft')]:[],
+   html:procedure.id==='timber-work'?projectResourcesHTML('K práci se stromem se mohou přidat i pracovníci bez Timbercraft. Postup s Timbercraft využívá jeho ML.')+procedure.html:procedure.html})));
+  if(active)progress.push(timber.progress);
  }
-
- if(active&&fieldDisciplines.includes(section?.label)&&section.id==='work:'+section.label){
+ if(fieldDisciplines.includes(section?.label)&&section.id==='work:'+section.label){
   const field=fieldCraftPanel(actor,clock,section.label);
-  procedures.push(...field.procedures);
-  progress.push(field.progress);
+  procedures.push(...field.procedures.map(procedure=>({...procedure,requirements:
+   procedure.id==='forecast'?[projectAnySkill(WEATHER_SKILLS)]:procedure.id==='wind'?[]:[projectSkill(section.label)],
+   html:procedure.html+(procedure.id==='wind'?'<p>Stav větru určuje GM. Dovednost postavy se netestuje.</p>':'')})));
+  if(active)progress.push(field.progress);
  }
  if(section?.specialty){
   const sp=section.specialty;
   const specialtyPage=sp.id==='special-herblore'?'HMK str. 74–75':sp.page;
-  const alchemyML=sp.id==='special-alchemy'?availableMasteries(actor).find(row=>row.name==='Alchemy')?.ml??0:null;
-  const alchemyEligibility=alchemyML===null?'':[
-   ['Příprava běžného elixíru',alchemyPreparationML.create],['Vynález vlastního elixíru',alchemyPreparationML.invent]
-  ].map(([label,threshold])=>`<p><strong>${label} · ML ${threshold}+</strong><span>${alchemyML<threshold?`Chybí ${threshold-alchemyML} ML`:'ML splněno'}</span></p>`).join('');
   available.push(`<h4>${esc(sp.title)} (${esc(specialtyPage)})</h4>
-   <details open><summary>O oboru a způsobilosti postavy</summary><p>${esc(sp.reason)}</p>
-   <div class="hmk-specialty-facts">${sp.details.map(fact=>`<p><strong>${esc(fact.name)}</strong><span>${esc(fact.value)}</span></p>`).join('')}${alchemyEligibility}</div>
-   ${sp.note?`<p>${esc(sp.note)}</p>`:''}</details>`);
-  if(!['special-alchemy','special-herblore'].includes(sp.id)){
-   const requirements={
-    'special-spellbook':'Znalost konkrétního kouzla a splněné podmínky jeho seslání.',
-    'special-talents':'Doložený vhodný Talent. Vědomá invokace vyžaduje ML 20+.',
-    'special-runes':'Osvojená Runecraft a doložená konkrétní runa a vzor pro zvolený postup.',
-    'special-rituals':'Odpovídající Ritual a vyznání. Některé obřady vyžadují Circle of Command a postavení.',
-    'special-spirits':'Doložená konkrétní Spirit Power a podmínky dané schopnosti.'
-   };
-   available.push(projectResourcesHTML(requirements[sp.id]));
+   ${sp.reason?`<p>${esc(sp.reason)}</p>`:''}
+   <div class="hmk-specialty-facts">${sp.details.map(fact=>`<p><strong>${esc(fact.name)}</strong><span>${esc(fact.value)}</span></p>`).join('')}</div>
+   ${sp.note?`<p>${esc(sp.note)}</p>`:''}`);
+  const specialized={
+   'special-spellbook':{requirements:[projectSkill('Pvârism')],description:'Seslání vyžaduje znalost konkrétního kouzla a splnění jeho podmínek.'},
+   'special-talents':{requirements:[],description:'Vědomá invokace vyžaduje doložený konkrétní Talent s ML 20+.'},
+   'special-runes':{requirements:[projectSkill('Runecraft')],description:'Postup vyžaduje také konkrétní runu a odpovídající vzor.'},
+   'special-rituals':{requirements:[],description:'Potřebujete Ritual příslušného vyznání s ML 1+. U vyšších obřadů záleží také na Circle of Command a postavení.'},
+   'special-spirits':{requirements:[projectSkill('Spirit')],description:'Použití vyžaduje doloženou konkrétní Spirit Power a podmínky dané schopnosti.'}
+  }[sp.id];
+  if(specialized){
+   const names=actor.hmk?.creation?calculateSheetSkills(actor).map(row=>row.name):[];
+   const talents=sp.id==='special-talents'?(actor.hmk?.creation?.values?.arcaneTalentProof?.generated??[]).map(name=>projectSkill('Talent ('+name+')',20)):[];
+   const rituals=sp.id==='special-rituals'?names.filter(name=>/^Ritual \(.+\)$/.test(name)):[];
+   const requirements=talents.length?talents:rituals.length?[projectAnySkill(rituals,'Ritual podle vyznání')]:
+    sp.id==='special-rituals'?[projectSkill('Ritual')]:specialized.requirements;
+   available.push(projectResourcesHTML(specialized.description)+projectQualificationStatus(lookup,requirements).html);
   }
   if(sp.id==='special-alchemy')available.push(`<section class="hmk-alchemy-path"><h4>Alchemy od přípravy po použití</h4>
+   ${projectQualificationStatus(lookup,[{skills:[projectSkill('Mathematics')],label:'Mathematics · volitelný Secondary Roll při přípravě'}]).html}
    <ol>
     <li>Vyberte běžný elixír nebo známou recepturu. Vlastní recepturu lze vynalézt při ML 100+. Vyberte dílnu a určete dobu přípravy.</li>
     <li>V termínu otevřete dávku vpravo a proveďte Preparation Roll. Výsledek určí, zda dávka vznikne a jakou má sílu AS.</li>
@@ -9621,24 +9726,32 @@ function characterProjectsChapter(actor){
    'U běžného bylinného výrobku použijte výrobní dovednost a Herblore jako Secondary Modifier. Strong přidává +1 SV, Great +2 SV.'
   ]));
   if(['special-alchemy','special-herblore'].includes(sp.id)){
-   if(active){
-    const craft=characterCraftProcedures(clock,actor,sp.id);
-    if(craft.preparationRules)available.push(craft.preparationRules);
-    if(sp.id==='special-alchemy')available.push(alchemyStartingDosesHTML(clock,actor));
-    procedures.push(...craft.procedures);
-    progress.push(characterProjectRows(actor,[sp.id],agenda),craft.progress?'<section class="hmk-workshop-project-94019">'+craft.progress+'</section>':'');
-   }else available.push(projectResourcesHTML(sp.id==='special-alchemy'?alchemyWorkshopNeeds:Object.values(herbProjectNeeds)));
+   const craft=characterCraftProcedures(clock,actor,sp.id);
+   if(craft.preparationRules)available.push(craft.preparationRules);
+   if(active&&sp.id==='special-alchemy')available.push(alchemyStartingDosesHTML(clock,actor));
+   procedures.push(...craft.procedures.map(procedure=>{
+    const id=procedure.id;
+    const alchemyMinimum=alchemyPreparationML[id]??({recognise:10,identify:20})[id];
+    const requirements=sp.id==='special-alchemy'&&alchemyMinimum?
+     [projectSkill('Alchemy',alchemyMinimum),...(id==='recognise'?[projectSkill('Perception',5)]:Object.hasOwn(alchemyPreparationML,id)?
+      ['Herblore','Mineralogy'].map(name=>projectSkill(name)):[])]:
+     sp.id==='special-herblore'&&['assess','preserve','potion','mundane'].includes(id)?
+     [projectSkill('Herblore'),...(id==='mundane'?[projectAnySkill(['Brewing','Cookery','Embalming','Perfumery'],'Výrobní dovednost podle receptu')]:[])]:[];
+    return {...procedure,requirements};
+   }));
+   if(active)progress.push(characterProjectRows(actor,[sp.id],agenda),craft.progress?'<section class="hmk-workshop-project-94019">'+craft.progress+'</section>':'');
   }
  }
- if(active)for(const {kind,label,known} of section?.projects||[]){
-  const panel=kind==='construction'?constructionPanel(actor):kind==='shipwright'?shipwrightPanel(actor):
-   kind==='faeriecraft'?faeriecraftPanel(actor):['engineering','writing',...CRAFT_TIMED_LIST_600].includes(kind)?timedSkillProjectsPanel591(actor,{kind}):'';
+ for(const {kind,label,skill} of section?.projects||[]){
+  const panel=kind==='construction'?constructionPanel(actor,clock):kind==='shipwright'?shipwrightPanel(actor,clock):
+   kind==='faeriecraft'?faeriecraftPanel(actor,{clock,preview:true}):['engineering','writing',...CRAFT_TIMED_LIST_600].includes(kind)?timedSkillProjectsPanel591(actor,{kind,clock}):'';
+  const skills=kind==='construction'?[]:kind==='writing'?[]:kind==='faeriecraft'?[]:[projectSkill(skill)];
   if(panel){
    const content=folioHTMLNodes(panel)[0];
    const forms=[...content.querySelectorAll('form[data-hmk-project-start-591],form[data-construction-project="start"],form[data-shipwright-project="start"],form[data-faerie-step="start"]')];
    const requirements=forms[0]?.querySelector('.hmk-project-resources')?.outerHTML||'';
-   procedures.push({id:kind,label:kind==='writing'?'Napsat text (HMK str. 132)':label,html:known&&forms.length?forms.map(form=>form.outerHTML).join(''):
-    `${requirements}<p>${known?'Příprava nyní není dostupná.':'Postava nemá potřebnou dovednost.'}</p><button type="button" disabled>Zahájit činnost</button>`});
+   procedures.push({id:kind,label:kind==='writing'?'Napsat text (HMK str. 132)':label,requirements:skills,html:forms.length?forms.map(form=>form.outerHTML).join(''):
+    `${requirements}<p>Příprava nyní není dostupná.</p><button type="button" disabled>Zahájit činnost</button>`});
    if(kind==='faeriecraft'&&!forms.length)procedures.at(-1).html=projectResourcesHTML('Způsobilá postava Ælrhin, osvojený Spirit a odpovídající řemeslo, klidné místo pro reverie a vybavení pro vybranou zakázku.')+procedures.at(-1).html;
    for(const form of forms)form.remove();
    let quickActions='';
@@ -9648,13 +9761,13 @@ function characterProjectsChapter(actor){
     list.remove();
     content.querySelectorAll(':scope > p').forEach(p=>p.remove());
    }
-   const rows=characterProjectRows(actor,kind==='writing'?[kind,'script-copy','script-reading']:[kind],agenda);
+   const rows=active?characterProjectRows(actor,kind==='writing'?[kind,'script-copy','script-reading']:[kind],agenda):'';
    let actions='';
    if(kind==='writing'){
-    actions=pendingWritingWorkHTML591(actor)+completedWritingHTML992(actor);
+    actions=active?pendingWritingWorkHTML591(actor)+completedWritingHTML992(actor):'';
     for(const [id,name,html,requirements] of [
-     ['copy','Zahájit opis (HMK str. 83, 132)',scriptCopyHTML993(actor),'Přístup k doložené předloze a materiál a pomůcky pro opis.'],
-     ['reading','Zahájit čtení (HMK str. 83, 132)',readingHTML994(actor),'Dostupná a čitelná předloha a znalost jejího jazyka a písma.']
+     ['copy','Zahájit opis (HMK str. 83, 132)',scriptCopyHTML993(actor,{preview:true})||'<section></section>','Přístup k doložené předloze a materiál a pomůcky pro opis.'],
+     ['reading','Zahájit čtení (HMK str. 83, 132)',readingHTML994(actor,{preview:true})||'<section>'+readingRegistrationHTML(actor)+'</section>','Dostupná a čitelná předloha a znalost jejího jazyka a písma.']
     ]){
      for(const panel of folioHTMLNodes(html)){
       const startForms=[...panel.querySelectorAll('form[data-script-copy="start"],form[data-script-reading="start"]')];
@@ -9664,7 +9777,8 @@ function characterProjectsChapter(actor){
        register.remove();
       }
       procedures.push({id,label:name,html:startForms.length?startForms.map(form=>form.outerHTML).join(''):
-       projectResourcesHTML(requirements)+'<p>Chybí způsobilá předloha.</p><button type="button" disabled>Zahájit činnost</button>'});
+       projectResourcesHTML([requirements,id==='copy'?'Opis přes Drawing potřebuje Drawing ML 1+. Opis přes Script potřebuje navíc jazyk a písmo předlohy, oba s ML 1+.':
+        'Jazyk i písmo konkrétní předlohy musí mít ML 1+.'])+'<p>Chybí předloha.</p><button type="button" disabled>Zahájit činnost</button>'});
       for(const form of startForms)form.remove();
       for(const info of panel.querySelectorAll(':scope > p'))info.remove();
       if(panel.querySelector('form,article'))actions+=panel.outerHTML;
@@ -9672,12 +9786,11 @@ function characterProjectsChapter(actor){
     }
    }
    const continuation=content.querySelector('form,article,.hsk-project-pending')?content.outerHTML:'';
-   if(rows||continuation||quickActions||actions)progress.push(`<section class="hmk-project-kind">${rows?'<h4>'+esc(label)+'</h4>'+rows:''}${continuation}${quickActions}${actions}</section>`);
+   if(active&&(rows||continuation||quickActions||actions))progress.push(`<section class="hmk-project-kind">${rows?'<h4>'+esc(label)+'</h4>'+rows:''}${continuation}${quickActions}${actions}</section>`);
   }else{
-   procedures.push({id:kind,label,html:projectResourcesHTML(projectFieldRequirements[kind])+
-    (known?jump(kind,kind==='animal'?'Otevřít výcvik ve Stáji':kind==='fishing'?'Otevřít Fishing':'Otevřít kladení pastí'):
-     '<p>Postava nemá potřebnou dovednost.</p><button type="button" disabled>Zahájit činnost</button>')});
-   progress.push(characterProjectRows(actor,kind==='writing'?[kind,'script-copy','script-reading']:[kind],agenda));
+   procedures.push({id:kind,label,requirements:skills,html:projectResourcesHTML(projectFieldRequirements[kind])+
+    jump(kind,kind==='animal'?'Otevřít výcvik ve Stáji':kind==='fishing'?'Otevřít Fishing':'Otevřít kladení pastí')});
+   if(active)progress.push(characterProjectRows(actor,[kind],agenda));
   }
   for(const procedure of procedures.filter(item=>item.id===kind||kind==='writing'&&['copy','reading','reading-register'].includes(item.id))){
    procedure.html=projectRulesFor(kind)+procedure.html;
@@ -9685,14 +9798,16 @@ function characterProjectsChapter(actor){
  }
  const left=`<section class="panel panel--chapter hmk-project-page"><label>Obor<select data-character-project-discipline ${options?'':'disabled'}>${options||'<option>Žádný dostupný obor</option>'}</select></label>
   <h3>Co může postava dělat</h3>
-  ${available.join('')}${projectProcedurePicker(actor,section?.id,procedures)}${!available.length&&!procedures.length?'<p>V tomto oboru není dostupné zahájení projektu.</p>':''}
-  ${active?'':clock?'<p>Postava musí být účastníkem otevřené kampaně.</p>':'<p>Časované projekty vyžadují otevřenou kampaň.</p>'}</section>`;
+  ${available.join('')}${projectProcedurePicker(actor,section?.id,procedures,lookup,active)}${!available.length&&!procedures.length?'<p>V tomto oboru není dostupné zahájení projektu.</p>':''}
+  ${active?'':data.campaignClock?'<p>Postava musí být účastníkem otevřené kampaně.</p>':'<p>Časované projekty vyžadují otevřenou kampaň.</p>'}</section>`;
  const right=`<section class="panel panel--chapter hmk-project-page"><h3>Průběh a výsledky</h3>${progress.filter(Boolean).join('')||'<p>Zatím tu nejsou žádné projekty.</p>'}</section>`;
  return journalShell(folioChapterSpread('Dovednosti a projekty',actor.name,left+right,'journal-book--character-projects'),'journal-book--chapter journal-book--character-projects');
 }
 
 document.addEventListener('change',event=>{
  const field=event.target;
+ if(['sourceId','method'].includes(field.name)&&field.form?.matches('[data-script-copy="start"],[data-script-reading="start"]'))
+  refreshProjectTextSource(field.form);
  if(field.matches?.('[data-alchemy-elixir-picker]')&&view==='sheet'&&activeSheetSection==='projects'){
   alchemyElixirSelections.set(selected,field.value);
   const help=field.closest('label')?.nextElementSibling;
@@ -9715,7 +9830,7 @@ document.addEventListener('change',event=>{
   return;
  }
  if(!field.matches?.('[data-character-project-discipline]')||view!=='sheet'||activeSheetSection!=='projects')return;
- if(!characterProjectDisciplines(character(selected)).some(item=>item.enabled&&item.id===field.value))return;
+ if(!characterProjectDisciplines(character(selected)).some(item=>item.id===field.value))return;
  characterProjectSelections.set(selected,field.value);
  render();
  document.querySelector('[data-character-project-discipline]')?.focus({preventScroll:true});
@@ -9746,7 +9861,7 @@ document.addEventListener('click',event=>{
   }
   if(row.calendarAlchemyStart||row.calendarAlchemyExaminationStart){openCharacterCraft(actor,'special-alchemy',row.id);return;}
   const kind=row.calendarSkillProjectStart591?.kind||(row.calendarFishingStart590?'fishing':row.calendarAnimalTrainingStart590?'animal':null);
-  const section=characterProjectDisciplines(actor).find(item=>item.enabled&&item.projects?.some(p=>p.kind===kind));
+  const section=characterProjectDisciplines(actor).find(item=>item.projects?.some(p=>p.kind===kind));
   if(!section)return;
   characterProjectReturn=null;selected=actor.id;characterProjectSelections.set(selected,section.id);
   view='sheet';activeSheetSection='projects';render();
@@ -9766,7 +9881,8 @@ document.addEventListener('click',event=>{
  if(!clock||!calendarMemberIds(clock,[actor]).length||episodeOpenActorRequest(selected))return;
  const kind=button.dataset.characterProjectOpen,source=button.dataset.projectSource;
  const disciplines=characterProjectDisciplines(actor);
- if(!disciplines.some(item=>item.id===kind||item.projects?.some(project=>project.kind===kind)))return;
+ const project=disciplines.flatMap(item=>item.projects??[]).find(item=>item.kind===kind);
+ if(!project||projectQualificationStatus(projectQualifications(actor),[projectSkill(project.skill)]).blocked)return;
  const dest=kind==='animal'?'stable':'skills';
  if(dest==='stable'&&!verifiedLivestock(data,campaignKey(clock)).some(animal=>animal.ownerId===selected&&!stableBurden(data,campaignKey(clock),animal).exit))return alert('Postava nemá v kampani aktivní zvíře.');
  characterProjectReturn={view:dest,actorId:selected,campaignId:campaignKey(clock),source};
@@ -9815,7 +9931,7 @@ function openHerbalCalendarCheck(sourceId){
  }
 }
 function openCharacterCraft(actor,discipline,source){
- if(!characterProjectDisciplines(actor).some(item=>item.enabled&&item.id===discipline)){
+ if(!characterProjectDisciplines(actor).some(item=>item.id===discipline)){
   alert('Tato postava nemá dostupný obor. Otevřete přípravu u postavy, která ji zahájila.');
   return false;
  }
@@ -16953,6 +17069,9 @@ document.addEventListener('submit',event=>{
  try{
   const actor=character(selected),cid=campaignKey(data.campaignClock),minute=data.campaignClock?.minute;
   const kind=form.elements.namedItem('kind').value;
+  const primary=TIMED_SKILL_NAMES_600[kind];
+  if(view==='sheet'&&activeSheetSection==='projects'&&kind!=='writing'&&primary&&
+   !availableMasteries(actor).some(row=>row.name===primary))throw Error('Postava nemá osvojenou dovednost '+primary+'.');
   let scope=form.elements.namedItem('scope').value,jewelcraft=null;
   if(kind==='jewelcraft'){
    const value=name=>form.elements.namedItem(name).value;
@@ -22267,6 +22386,9 @@ document.addEventListener('submit',e=>{
   if(f.matches('[data-alchemy-start]')){
    const who=character(actorId),actualML=availableMasteries(who).find(x=>x.name==='Alchemy')?.ml;
    if(!actualML||actualML!==Number(v.alchemyML))throw Error('Alchemy ML se změnilo; obnovte panel.');
+   if(view==='sheet'&&activeSheetSection==='projects'&&
+    projectQualificationStatus(projectQualifications(who),['Herblore','Mineralogy'].map(name=>projectSkill(name))).blocked)
+    throw Error('Příprava vyžaduje osvojené Herblore a Mineralogy.');
    if(who.hmk?.arcane?.auralShockLevels>0||who.hmk?.healthState?.shock==='KIA')throw Error('Alchemy nelze zahájit během Aural Shock ani po smrti postavy (HMK 169,190).');
    const actualSunsign=who.hmk?.sunsign||who.hmk?.creation?.computed?.sunsign||'';
    if(v.sunsign!==actualSunsign)throw Error('Sunsign se změnil; obnovte panel.');
@@ -22364,6 +22486,8 @@ document.addEventListener('submit',e=>{
   if(f.matches('[data-herb-assess]')){
    actorId=v('actorId');const inputs=[...f.querySelectorAll('input[name^="dice_"]')],n=inputs.length/7;
    if(!Number.isSafeInteger(n)||n<1)throw Error('Chybí dávky');
+   if(view==='sheet'&&activeSheetSection==='projects'&&projectQualifications(character(actorId))(projectSkill('Herblore')).missingML)
+    throw Error('Vyhodnocení potence vyžaduje osvojenou Herblore.');
    const doses=Array.from({length:n},(_,i)=>{
     const x=Array.from({length:7},(_,k)=>field(`dice_${i}_${k}`));
     const origin=el=>el.dataset.herbGenerated===el.value?'cryptographic-software-die':'manual';
