@@ -1148,7 +1148,7 @@ table.hmk-project-resources :is(th, td) {
 
 [data-alchemy-start] > fieldset[data-alchemy-dose] {
   min-width: 0;
-  border: 1px solid #000;
+  border: 1px solid var(--folio-rule);
 }
 
 .hmk-alchemy-start-actions {
