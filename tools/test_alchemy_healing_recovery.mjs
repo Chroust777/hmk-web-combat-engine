@@ -172,3 +172,45 @@ assert.equal(independent.state.shock,'UNC');
 assert.equal(independent.state.coma.hr,4);
 assert.equal(independent.state.coma.nextCourseDays,3);
 console.log('PASS Healing: independent Extended Shock and Coma, cold Exposure, Infection, no timer advance on arcane failure');
+
+const {prepareDiseaseExposure,prepareDiseaseProfile,prepareDiseaseOnset,prepareDiseaseCourse}=await import('../src/integration/hmk-disease-course.js');
+const {preparePoisonStart,preparePoisonOnset,preparePoisonCourse}=await import('../src/integration/hmk-poison-course.js');
+const diseaseArgs={actor,sourceId:'qa-fever',gmConfirmed:true};
+const poisonArgs={actor,sourceId:'qa-toxin',gmConfirmed:true};
+const exposure=prepareDiseaseExposure({...diseaseArgs,state:initialCombatState(),diseaseKey:'QA Fever',
+ transmission:'contact',contagionIndex:1,contagionD100:97,confirmedStandardLethal:true});
+const profile=prepareDiseaseProfile({...diseaseArgs,state:exposure.state,onsetD6:1,initialHR:4,symptomD10s:[1,2,3,4]});
+const sick=prepareDiseaseOnset({...diseaseArgs,state:profile.state,elapsedMinutes:1440});
+const poisonStart=preparePoisonStart({...poisonArgs,state:sick.state,transmission:'digested',initialHR:4,
+ onsetMinutes:15,periodMinutes:30,symptomD10s:[1,2,3,4],actualExposureConfirmed:true});
+const ailments=preparePoisonOnset({...poisonArgs,state:poisonStart.state,elapsedMinutes:15}).state;
+const ailmentClock=anchorCampaignOrigin(anchorCampaignOrigin(clock,{kind:'disease',characterId:actor.id,
+ episodeId:'disease:qa-fever',elapsedMinutes:1440,eventId:'fever-anchor',gmConfirmed:true}),{
+ kind:'poison',characterId:actor.id,episodeId:'poison:qa-toxin',elapsedMinutes:15,eventId:'poison-anchor',gmConfirmed:true});
+const ailmentInput={...context,clock:ailmentClock,state:ailments,imbibing:{...imbibing,sl:'S',finalAS:8}};
+const resolved=startAlchemyHealingRecovery({...ailmentInput,rolls:[roll('disease','qa-fever',100),roll('poison','qa-toxin',1)]});
+assert.equal(resolved.state.diseaseCourses[0].hr,4);
+assert.equal(resolved.state.toxinCourses[0].hr,5);
+assert.equal(resolved.state.toxinCourses[0].elapsedMinutes,15);
+assert.equal(resolved.state.diseaseCourses[0].elapsedMinutes,1440);
+assert.equal(resolved.state.toxinCourses[0].sequence,0);
+assert.equal(resolved.state.diseaseCourses[0].sequence,0);
+assert.equal(resolved.state.fatigue.otherWeakness,15);
+assert.equal(resolved.state.events.find(e=>e.type==='alchemy-healing-disease').details.failureIgnored,true);
+assert.equal(resolved.receipt.nextMinute,clock.minute+DAY_MINUTES);
+assert.throws(()=>preparePoisonCourse({...poisonArgs,state:resolved.state,elapsedMinutes:16,courseD100:1}),/přesně/);
+const naturalPoison=preparePoisonCourse({...poisonArgs,state:resolved.state,elapsedMinutes:45,courseD100:1});
+assert.equal(naturalPoison.course.status,'defeated');
+assert.equal(naturalPoison.course.sequence,1);
+assert.equal(naturalPoison.state.events.at(-1).id,'poison:qa-toxin:course:1');
+const naturalDisease=prepareDiseaseCourse({...diseaseArgs,state:naturalPoison.state,elapsedMinutes:2880,courseD100:1});
+assert.equal(naturalDisease.episode.hr,5);
+assert.equal(naturalDisease.episode.sequence,1);
+const dayAfter=time(ailmentClock,1);
+const dailyAilments=advanceAlchemyHealingRecovery({...ailmentInput,clock:dayAfter,state:naturalDisease.state,dailyRoll:r10(1),
+ rolls:[roll('disease','qa-fever',1)]});
+assert.equal(dailyAilments.state.diseaseCourses[0].status,'defeated');
+assert.equal(dailyAilments.receipt.nextMinute,null);
+assert.equal(dailyAilments.state.fatigue.otherWeakness,0);
+assert.deepEqual(ailments.diseaseCourses[0],sick.episode);
+console.log('PASS Healing: disease and toxin isolation, natural Course preservation, ignored CF, daily recovery');

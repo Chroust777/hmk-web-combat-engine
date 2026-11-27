@@ -87,12 +87,12 @@ import {startConcurrentProcedure,finishConcurrentProcedure,cancelConcurrentProce
 import {validateGlobalActionLedger,assertGlobalActionLedgerAppendOnly,recordGlobalActionReceipt} from './src/integration/hmk-global-action-ledger.js';
 import {prepareColdWaterShock,prepareExposureSkinInjuries,previewExposureSkinLocation,verifiedHumanLocationShock} from './src/integration/hmk-weather-trauma-completion.js?v=94.118';
 import {prepareMundaneFireStrike,prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from './src/integration/hmk-mundane-fire-smoke.js';
-import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse} from './src/integration/hmk-poison-course.js';
+import {preparePoisonStart,preparePoisonOnset,preparePoisonCourse} from './src/integration/hmk-poison-course.js?v=94.153';
 import {herbalPoisonProfile,prepareHerbalPoisonExposure,validateHerbalPoisonExposureJournal,assertHerbalPoisonExposureAppendOnly} from './src/integration/hmk-herbal-poison-exposure.js';
 import {pendingGreatPoisons,requireGreatPoisonRoundMayAdvance,requireGreatPoisonGMTimeMayAdvance,prepareGreatPoisonOnset,validateGreatPoisonJournal,assertGreatPoisonAppendOnly} from './src/integration/hmk-herbal-great-poison.js';
 import {createHerbWeaponPaste,createHerbWeaponPasteHit,createHerbWeaponPasteDiscard,pendingWeaponPoisonPastes,validateHerbWeaponPasteJournal,assertHerbWeaponPasteAppendOnly,assertActiveHerbWeaponPastes} from './src/integration/hmk-herbal-weapon-paste.js';
 import {createWeaponPoisonResistance,pendingWeaponPoisonResistance,validateWeaponPoisonResistanceJournal,assertWeaponPoisonResistanceAppendOnly,requireWeaponPoisonResistanceRoundMayAdvance,requireWeaponPoisonResistanceGMTimeMayAdvance} from './src/integration/hmk-herbal-weapon-resistance.js';
-import {prepareDiseaseExposure,prepareDiseaseProfile,prepareDiseaseOnset,prepareDiseaseCourse} from './src/integration/hmk-disease-course.js';
+import {prepareDiseaseExposure,prepareDiseaseProfile,prepareDiseaseOnset,prepareDiseaseCourse} from './src/integration/hmk-disease-course.js?v=94.153';
 import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js?v=94.005';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
 import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
@@ -295,7 +295,7 @@ import {alchemyElixirStrength,alchemyElixirStates,pendingAlchemyDecay,createAlch
 import {alchemyVialBinding,alchemyVialState,createAlchemyVialBinding,createAlchemyVialEmpty,projectAlchemyVialInventory,validateAlchemyVialJournal,assertAlchemyVialAppendOnly,assertActiveAlchemyVials} from './src/integration/hmk-alchemy-vial-ledger.js';
 import {activeEgosight,createAlchemyEgosightImbibing,applyAlchemyEgosightAural,createEgosightProfusionIll,applyEgosightProfusionAural,validateEgosightProfusionJournal,assertEgosightProfusionAppendOnly,activeErudition,createAlchemyEruditionImbibing,applyAlchemyEruditionAural,activeFootpad,createAlchemyFootpadImbibing,applyAlchemyFootpadAural,activeDarkvision,createAlchemyPhysicImbibing,applyAlchemyPhysicAural,createAlchemyDarkvisionImbibing,createDarkvisionProfusionIll,createEruditionProfusionIll,applyEruditionProfusionAural,createFootpadProfusionIll,applyFootpadProfusionAural,validateFootpadProfusionJournal,assertFootpadProfusionAppendOnly,validateEruditionProfusionJournal,assertEruditionProfusionAppendOnly,validateDarkvisionProfusionJournal,assertDarkvisionProfusionAppendOnly,validateAlchemyImbibingJournal,assertAlchemyImbibingAppendOnly} from './src/integration/hmk-alchemy-imbibing.js?v=94.036';
 import {createAlchemyHealingImbibing} from './src/integration/hmk-alchemy-imbibing.js?v=94.150';
-import {prepareAlchemyHealingUse,advanceAlchemyHealingRecovery,alchemyHealingRollPlan,pendingAlchemyHealing,assertAlchemyHealingMayAdvance,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed} from './src/integration/hmk-alchemy-healing-recovery.js?v=94.151';
+import {prepareAlchemyHealingUse,advanceAlchemyHealingRecovery,alchemyHealingRollPlan,pendingAlchemyHealing,assertAlchemyHealingMayAdvance,validateAlchemyHealingRecovery,assertAlchemyHealingRecoveryAppendOnly,healingArcaneRollAlreadyUsed} from './src/integration/hmk-alchemy-healing-recovery.js?v=94.153';
 import {darkvisionHealingState,pendingDarkvisionHealing,createDarkvisionHealingStart,createDarkvisionHealingRoll,requireDarkvisionHealingGMTimeMayAdvance,validateDarkvisionHealingJournal,assertDarkvisionHealingAppendOnly} from './src/integration/hmk-alchemy-darkvision-healing.js';
 import {darkvisionSkillContext} from './src/integration/hmk-alchemy-darkvision-skill.js';
 import {eruditionSkillEvidence,applyEruditionSkillResult} from './src/integration/hmk-alchemy-erudition-skill.js';
@@ -418,7 +418,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.152';
+const APP_VERSION='94.153';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -22359,7 +22359,8 @@ document.addEventListener('submit',e=>{
  }catch(err){alert('Erudition: '+err.message)}
 },true);
 const ALCHEMY_HEALING_CHECK_LABELS={injury:'Injury Healing',infection:'Infection Course',
- 'blood-loss':'Blood Loss Healing',exposure:'Exposure Healing','extended-shock':'Extended Shock Course',coma:'Coma Course'};
+ 'blood-loss':'Blood Loss Healing',exposure:'Exposure Healing','extended-shock':'Extended Shock Course',coma:'Coma Course',
+ disease:'Disease Course',poison:'Poison/Toxin Course'};
 const alchemyHealingField=(name,faces,label)=>`<label class="hmk-medical-required-target">${esc(label)}
  <input name="${esc(name)}" type="number" min="1" max="${faces}" step="1" required>
  <button type="button" class="hc-small" data-alchemy-healing-generate="${esc(name)}">⚄ d${faces}</button></label>`;
@@ -22423,7 +22424,9 @@ function refreshAlchemyHealingForm(form){
    container.innerHTML=rolls.map(({kind,sourceId},index)=>{
     const woundIndex=state.wounds.findIndex(w=>w.id===sourceId);
     const wound=['injury','infection'].includes(kind)?' · '+medicalWoundOptionLabel(actor,state.wounds[woundIndex],woundIndex+1):'';
-    return alchemyHealingField('heal'+index,100,ALCHEMY_HEALING_CHECK_LABELS[kind]+' d100'+wound);
+    const ailment=kind==='disease'?state.diseaseCourses?.find(course=>course.sourceId===sourceId)?.diseaseKey:
+     kind==='poison'?'otrava '+(rolls.slice(0,index).filter(roll=>roll.kind==='poison').length+1):null;
+    return alchemyHealingField('heal'+index,100,ALCHEMY_HEALING_CHECK_LABELS[kind]+' d100'+wound+(ailment?' · '+ailment:''));
    }).join('')+(rolls.some(roll=>roll.kind==='coma')?
     '<label>Klidné chráněné prostředí při Coma Course<select name="healingShelter" required><option value="">Vyberte skutečné prostředí</option><option value="yes">Ano</option><option value="no">Ne · postih −20</option></select></label>':'')+darkvision.map(effect=>alchemyHealingField('healingHp_'+effect.sourceUseId,6,'Darkvision Ill Effect · Healing Period d6')).join('');
    container.dataset.signature=signature;

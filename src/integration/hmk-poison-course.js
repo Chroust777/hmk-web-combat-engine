@@ -92,13 +92,17 @@ export function preparePoisonOnset({actor,state,sourceId,round=1,elapsedMinutes,
  return {state:s,course:structuredClone(t),report:{phase:'onset',...effects,elapsedMinutes}};
 }
 export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes,
- courseD100,physicianSV=0,physicianConfirmed=false,gmConfirmed=false,herbalContext=null}={}){
+ courseD100,physicianSV=0,physicianConfirmed=false,gmConfirmed=false,arcaneEventId=null,herbalContext=null}={}){
  const s=prepare(actor,state,round);check(gmConfirmed===true&&isGoodId(sourceId),'Potvrďte GM a toxin');
  const t=entry(s,sourceId);
  check(t.status==='active','Poison Course smí pokračovat až po doloženém onset a jen při aktivním průběhu');
  check(int(courseD100,1,100)&&int(physicianSV,0,30)&&
   (physicianSV===0||physicianConfirmed===true),'Poison: skutečný d100, doložený Physician SV / GM potvrzení');
- check(elapsedMinutes===t.elapsedMinutes+t.periodMinutes,
+ const arcane=arcaneEventId!==null;
+ check(!arcane||typeof arcaneEventId==='string'&&arcaneEventId.length>0&&
+  Number.isSafeInteger(elapsedMinutes)&&elapsedMinutes>=t.elapsedMinutes,
+  'Arcane Recovery potřebuje doložený čas po poslední zdravotní kontrole.');
+ check(arcane||elapsedMinutes===t.elapsedMinutes+t.periodMinutes,
   'Poison: další Course je splatný přesně po '+t.periodMinutes+' minutách; žádné tiché přeskočení');
  const hb=profile(actor),baseEML=hb*t.hr+physicianSV;
  let antivenin={bonus:0,sourceIds:[],completeIds:[],sourcePage:75};
@@ -113,12 +117,14 @@ export function preparePoisonCourse({actor,state,sourceId,round=1,elapsedMinutes
    combatRound:herbalContext.combatRound??null,timelineId:herbalContext.timelineId??null});
  }
  const rawEML=baseEML+antivenin.bonus,
-  sl=successLevel(courseD100,rawEML),course=ailmentCourse({healingRate:t.hr,sl});
- const beforeHR=t.hr;t.elapsedMinutes=elapsedMinutes;t.sequence++;
- const effects=applyOutcome(s,t,course.healingRate,round);
- push(s,t.id+':course:'+t.sequence,'poison-course',round,
+  sl=successLevel(courseD100,rawEML),course=ailmentCourse({healingRate:t.hr,sl,arcaneRecovery:arcane});
+ const beforeHR=t.hr, failureIgnored=course.arcaneFailureIgnored===true;
+ if(!arcane){t.elapsedMinutes=elapsedMinutes;t.sequence++;}
+ const effects=failureIgnored?{hr:t.hr,shock:s.shock,weakness:t.weaknessApplied,status:t.status}:
+  applyOutcome(s,t,course.healingRate,round);
+ push(s,arcaneEventId??t.id+':course:'+t.sequence,arcane?'alchemy-healing-poison':'poison-course',round,
   {elapsedMinutes,beforeHR,afterHR:t.hr,hb,rawEML,courseD100,sl:names[sl],
-   physicianSV,physicianConfirmed,baseEML,antivenin,delta:course.delta,conditions:effects,rulePages:[75,183,184,186]});
+   physicianSV,physicianConfirmed,baseEML,antivenin,delta:course.delta,conditions:effects,rulePages:[75,183,184,186],...(arcane?{arcaneFreeRoll:true,failureIgnored,sourceId:t.sourceId}:{})});
  return {state:s,course:structuredClone(t),report:{phase:'course',beforeHR,...effects,hb,rawEML,
-  courseD100,sl:names[sl],physicianSV,baseEML,antivenin,elapsedMinutes,nextDueMinutes:t.status==='active'?elapsedMinutes+t.periodMinutes:null}};
+  courseD100,sl:names[sl],physicianSV,baseEML,antivenin,elapsedMinutes,nextDueMinutes:t.status==='active'?t.elapsedMinutes+t.periodMinutes:null}};
 }

@@ -156,7 +156,7 @@ export function prepareDiseaseOnset({actor,state,sourceId,round=1,elapsedMinutes
 }
 export function prepareDiseaseCourse({actor,state,sourceId,round=1,elapsedMinutes,
  courseD100,physicianSV=0,physicianConfirmed=false,selfTreatment=false,
- gmConfirmed=false}={}){
+ gmConfirmed=false,arcaneEventId=null}={}){
  const s=draft(actor,state,round),t=find(s,sourceId);
  check(gmConfirmed===true&&t.status==='active','Disease: Course lze provést jen po nástupu aktivní nemoci');
  check(integer(courseD100,1,100)&&integer(physicianSV,0,30),
@@ -164,20 +164,26 @@ export function prepareDiseaseCourse({actor,state,sourceId,round=1,elapsedMinute
  check(physicianSV===0||physicianConfirmed===true,
   'Disease: kladný Physician SV vyžaduje potvrzený úspěšný test');
  check(!selfTreatment||t.initialHR>=4,'Disease: self-treatment je povolen jen při počáteční HR4 nebo HR5');
- check(elapsedMinutes===t.elapsedMinutes+1440,'Disease: Course probíhá každých 24 hodin po nástupu');
+ const arcane=arcaneEventId!==null;
+ check(!arcane||typeof arcaneEventId==='string'&&arcaneEventId.length>0&&
+  Number.isSafeInteger(elapsedMinutes)&&elapsedMinutes>=t.elapsedMinutes,
+  'Arcane Recovery potřebuje doložený čas po poslední zdravotní kontrole.');
+ check(arcane||elapsedMinutes===t.elapsedMinutes+1440,'Disease: Course probíhá každých 24 hodin po nástupu');
  conflict(s,{exceptId:t.id,allowCurrentDiseaseShock:true});
  const hb=actorProfile(actor).hb,rawEML=hb*t.hr+physicianSV;
- const sl=successLevel(courseD100,rawEML),course=ailmentCourse({healingRate:t.hr,sl});
- const beforeHR=t.hr;t.elapsedMinutes=elapsedMinutes;t.sequence+=1;
+ const sl=successLevel(courseD100,rawEML),course=ailmentCourse({healingRate:t.hr,sl,arcaneRecovery:arcane});
+ const beforeHR=t.hr, failureIgnored=course.arcaneFailureIgnored===true;
+ if(!arcane){t.elapsedMinutes=elapsedMinutes;t.sequence++;}
  const appliedHR=Math.max(t.floorHR||0,course.healingRate);
  const floorApplied=appliedHR!==course.healingRate;
- const outcome=apply(s,t,appliedHR,round);
- push(s,t.id+':course:'+t.sequence,'disease-course',round,{elapsedMinutes,beforeHR,
+ const outcome=failureIgnored?{hr:t.hr,shock:t.shockApplied,weakness:t.weaknessApplied,status:t.status}:
+  apply(s,t,appliedHR,round);
+ push(s,arcaneEventId??t.id+':course:'+t.sequence,arcane?'alchemy-healing-disease':'disease-course',round,{elapsedMinutes,beforeHR,
   afterHR:t.hr,hb,eml:rawEML,courseD100,sl:slNames[sl],physicianSV,
   physicianConfirmed,selfTreatment,delta:course.delta,unflooredHR:course.healingRate,
-   floorApplied,gmFloor:t.floorHR||0,outcome,rulePage:184});
+   floorApplied,gmFloor:t.floorHR||0,outcome,rulePage:184,...(arcane?{arcaneFreeRoll:true,failureIgnored,sourceId:t.sourceId}:{})});
  return {state:s,episode:structuredClone(t),report:{phase:'course',beforeHR,
   ...outcome,hb,rawEML,courseD100,sl:slNames[sl],physicianSV,elapsedMinutes,
   floorApplied,unflooredHR:course.healingRate,gmFloor:t.floorHR||0,
-  nextDueMinutes:t.status==='active'?elapsedMinutes+1440:null}};
+  nextDueMinutes:t.status==='active'?t.elapsedMinutes+1440:null}};
 }

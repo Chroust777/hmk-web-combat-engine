@@ -14,6 +14,9 @@ import {concurrentShockSources,initializeConcurrentShock,projectConcurrentShock}
 import {healingBase} from '../rules/healing.js';
 import {resolveElixirExposureRecovery} from './hmk-weather-hazard-aftermath.js?v=94.151';
 
+import {prepareDiseaseCourse} from './hmk-disease-course.js?v=94.153';
+import {preparePoisonCourse} from './hmk-poison-course.js?v=94.153';
+
 const integer=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
 const check=(condition,message)=>{if(!condition)throw Error('Healing: '+message);};
 const die=(proof,faces)=>integer(proof?.value,1,faces)&&['manual','cryptographic-software-die'].includes(proof.origin);
@@ -27,6 +30,7 @@ function anchorFor(clock,actorId,{kind,sourceId},state){
   const hazard=state?.environmentalHazards?.find(item=>item.sourceId===sourceId);
   return getCampaignEpisodeAnchor(clock,'weather',actorId,hazard?.id??sourceId)??getCampaignEpisodeAnchor(clock,'weather',actorId,sourceId);
  }
+ if(kind==='disease'||kind==='poison')return getCampaignEpisodeAnchor(clock,kind,actorId,kind+':'+sourceId);
  if(kind==='injury'||kind==='infection')return getCampaignAnchor(clock,'wound',actorId,sourceId);
  return getCampaignAnchor(clock,kind,actorId);
 }
@@ -39,7 +43,9 @@ function activeTraumas(state,clock,actorId,initial){
   ...state.wounds.filter(wound=>wound.healing?.infected).map(wound=>({kind:'infection',sourceId:wound.id})),
   ...(state.extendedShock?[{kind:'extended-shock',sourceId:extendedId}]:[]),
   ...(state.coma?.active?[{kind:'coma',sourceId:comaId}]:[]),
-  ...(state.environmentalHazards??[]).filter(hazard=>hazard.active).map(hazard=>({kind:'exposure',sourceId:hazard.sourceId}))
+  ...(state.environmentalHazards??[]).filter(hazard=>hazard.active).map(hazard=>({kind:'exposure',sourceId:hazard.sourceId})),
+  ...(state.diseaseCourses??[]).filter(course=>course.status==='active').map(course=>({kind:'disease',sourceId:course.sourceId})),
+  ...(state.toxinCourses??[]).filter(course=>course.status==='active').map(course=>({kind:'poison',sourceId:course.sourceId}))
  ];
  return current.filter(trauma=>{
   switch(trauma.kind){
@@ -47,6 +53,8 @@ function activeTraumas(state,clock,actorId,initial){
    case 'infection':return state.wounds.some(wound=>wound.id===trauma.sourceId&&wound.healing?.infected);
    case 'extended-shock':return !!state.extendedShock&&extendedId===trauma.sourceId;
    case 'coma':return state.coma?.active&&comaId===trauma.sourceId;
+   case 'disease':return state.diseaseCourses?.some(course=>course.status==='active'&&course.sourceId===trauma.sourceId);
+   case 'poison':return state.toxinCourses?.some(course=>course.status==='active'&&course.sourceId===trauma.sourceId);
    case 'exposure':return state.environmentalHazards?.some(hazard=>hazard.active&&hazard.sourceId===trauma.sourceId);
    case 'blood-loss':return state.bloodLoss.bp>0&&(!initial||anchorFor(clock,actorId,trauma)?.eventId===trauma.sourceId);
    default:return false;
@@ -55,7 +63,7 @@ function activeTraumas(state,clock,actorId,initial){
 }
 function requireHandledTrauma(state){
  check(!state.asphyxiaComaPending&&!state.sleepDeprivation?.activeWeariness&&!state.herbalSoporific&&!state.herbalParalysis&&
-  concurrentShockSources(state).every(source=>source.kind==='weather')&&
+  concurrentShockSources(state).every(source=>['weather','disease','poison'].includes(source.kind))&&
   !(state.environmentalHazards??[]).some(hazard=>hazard.active&&hazard.skinPending),
   'tento krok zatím neumí vyhodnotit všechny přítomné druhy traumatu.');
 }
@@ -113,6 +121,15 @@ function recoverTraumas({actor,state,clock,campaignId,traumas,rolls,id,round,jou
      return woundAnchor?[[woundId,Math.floor((clock.minute-woundAnchor.minute)/DAY_MINUTES)]]:[];
     }));
     action=applyConfirmedInfectionCourse({...woundContext,otherWoundDays});break;
+   }
+   case 'disease':
+   case 'poison':{
+    const poison=trauma.kind==='poison';
+    const prepare=poison?preparePoisonCourse:prepareDiseaseCourse;
+    action=prepare({...common,actor,sourceId:trauma.sourceId,arcaneEventId:common.eventId,courseD100:dice.value,
+     elapsedMinutes:clock.minute-anchor.minute,
+     ...(poison?{herbalContext:{journal,campaignId,minute:clock.minute,poisonOriginMinute:anchor.minute}}:{})});
+    break;
    }
    case 'exposure':action=resolveElixirExposureRecovery({...common,actor,sourceId:trauma.sourceId,recoveryD100:dice.value});break;
    case 'extended-shock':action=applyExtendedShockCourse({...common,healingBase:healingBase({endurance,will}),physicianStars});break;
