@@ -54,7 +54,7 @@ import {auditCharacterSheet,characterSheetSummaryHTML} from './src/integration/h
 import {FAERIE_ARMOUR_ARTICLES,faerieArmourItem,FAERIE_CRAFTS,FAERIE_SPAN,FAERIE_TOTAL,faerieWorkshopKind,faerieWorkshopState,faerieWorkshopPlan,faerieWorkshopItem,isFaerieCrafter,faerieState,faerieNext,resolveFaerieStep,validateFaeriecraft,assertFaerieAppendOnly} from './src/integration/hmk-faeriecraft.js?v=94.012';
 import {availableMasteries,resolveSkillTest,resolveOpposedTests,canResolveOpposedTie,resolveOptionalOpposedTie,testSecondaryRoll,adjustSkillResultForTrauma,secondaryMastery,successValueTier} from './src/integration/hmk-skill-test-engine.js?v=94.014';
 import {effectiveMasteryLevel} from './src/rules/tests.js';
-import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.046';
+import {skillWorkbenchHTML,sheetCombatActionHTML,skillSpecificNextHTML,animalTrainingNextHTML} from './src/integration/hmk-skill-workbench-ui.js?v=94.175';
 import {skillTestEvidenceHTML} from './src/integration/hmk-skill-result-evidence-529.js';
 import {personalEpisodeTests,personalEpisodeFlavor,personalEpisodeActivities,personalEpisodeRoles,personalEpisodeWeather,personalTerrainLabel,personalEpisodeEncounter,personalEpisodeHazard,personalTestConsequence,personalTestHelp,personalChronicleBeats,personalGMFollowups,personalInjuryHelp} from './src/integration/hmk-personal-logbook-93882.js?v=94.043';
 import {composeTravelChronicle,chronicleRollStories,campaignBookChapters953} from './src/integration/hmk-chronicle-travel-93951.js?v=94.137';
@@ -95,7 +95,7 @@ import {createWeaponPoisonResistance,pendingWeaponPoisonResistance,validateWeapo
 import {prepareDiseaseExposure,prepareDiseaseProfile,prepareDiseaseOnset,prepareDiseaseCourse} from './src/integration/hmk-disease-course.js?v=94.153';
 import {skillSecondaryRoutines,skillSecondaryRoutineById,skillSecondaryRoutineEligible} from './src/integration/hmk-skill-secondary-routines.js?v=94.005';
 import {SPECIAL_SECONDARY_ROLLS,HMK_CEREMONY_STYLES,specialSecondaryById,resolveSpecialSR} from './src/integration/hmk-special-secondary-routines.js';
-import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js';
+import {applyRecordedSpecialOutcome,activeSpecialEffects,activeDoctrineModifier,validateSpecialEffectEvidence} from './src/integration/hmk-special-outcome-commit.js?v=94.175';
 import {applyTalismanBestowal,projectTalismanStatus,validateTalismanEvidence,activeShamanSkillModifier,reconcileTalismanPossession} from './src/integration/hmk-shaman-talisman-state.js';
 import {HMK_OPPOSED_ACTIONS,opposedActionOptions,opposedPairIsPrinted,resolveOpposedDefenderMastery} from './src/integration/hmk-opposed-skill-pairs.js';
 import {skillNarrativeSolo,skillNarrativeOpposed,skillNarrativeTiebreak} from './src/integration/hmk-skill-narrative.js';
@@ -302,7 +302,7 @@ import {footpadSkillEvidence,footpadMastery} from './src/integration/hmk-alchemy
 import {footpadAcousticState,createFootpadAcousticObservation,validateFootpadAcousticJournal,assertFootpadAcousticAppendOnly} from './src/integration/hmk-alchemy-footpad-acoustics.js';
 import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPlan,startExtendedAlchemy,pendingExtendedAlchemy,advanceExtendedAlchemy,applyExtendedAlchemyInteractions,settleExtendedAlchemy,requireExtendedAlchemyTime,validateExtendedAlchemy,assertExtendedAlchemyAppendOnly,projectAlchemyDormancy} from './src/integration/hmk-alchemy-extended.js?v=94.174';
 import {activeWarmth,createWarmthProximity,latestWarmthProximity,warmthProtection,validateWarmthProximityJournal,assertWarmthProximityAppendOnly} from './src/integration/hmk-alchemy-warmth.js?v=94.174';
-import {airtapEvidence,airtapTravelUnits} from './src/integration/hmk-alchemy-airtap.js?v=94.174';
+import {campaignAirtapEvidence,airtapTravelUnits} from './src/integration/hmk-alchemy-airtap.js?v=94.175';
 import {soulcloakStatus,createSoulcloakDefence,validateSoulcloakJournal,assertSoulcloakAppendOnly} from './src/integration/hmk-alchemy-soulcloak.js?v=94.174';
 import {elixirBreathSources,activeElixirBreathAreas,createElixirBreath,validateElixirBreathJournal,assertElixirBreathAppendOnly} from './src/integration/hmk-alchemy-exsiccation.js?v=94.174';
 import {applyAlchemyExsiccationAural,createExsiccationProfusionIll,applyExsiccationProfusionAural,validateExsiccationProfusionJournal,assertExsiccationProfusionAppendOnly} from './src/integration/hmk-alchemy-imbibing.js?v=94.174';
@@ -377,7 +377,7 @@ import {guidedTurnChoices} from './src/integration/hmk-guided-turn-choices.js?v=
 import {prepareGuidedFreeAction} from './src/integration/hmk-guided-free-actions.js';
 import {prepareGuidedIntimidation,resolveGuidedIntimidationOpposition} from './src/integration/hmk-guided-intimidation.js';
 import {createGuidedDeclaredManeuver,guidedDeclaredRequirement,chooseGuidedDeclared,submitGuidedDeclaredDie,submitGuidedDeclaredDisplacement,submitGuidedDeclaredFact,advanceGuidedDeclared,advanceGuidedDeclaredForcedConsequence,completeGuidedDeclaredManeuver} from './src/integration/hmk-guided-declared-maneuver.js';
-import {projectGuidedSpatialPath,commitGuidedSpatialTurn,verifySpatialStumbleStop,isPermanentlyBlind} from './src/integration/hmk-guided-spatial-actions.js';
+import {projectGuidedSpatialPath,commitGuidedSpatialTurn,verifySpatialStumbleStop,isPermanentlyBlind} from './src/integration/hmk-guided-spatial-actions.js?v=94.175';
 import {liveSpatialEvade} from './src/integration/hmk-spatial-evasion.js';
 import {baseMove} from './src/rules/movement.js';
 import {projectChronicleMovement} from './src/integration/hmk-chronicle-movement-556.js';
@@ -424,7 +424,7 @@ function ArmourArticle({id=kernelUUID(),definitionId,ownerId=null,locations={},a
 // HMK Keeper’s Ledger v93.446 — visible release identification and cache-busted entry assets; user storage unchanged.
 const CRAFT_KIND_LIST_600=Object.keys(CRAFT_WORK_600);
 const CRAFT_TIMED_LIST_600=[...Object.keys(WORKSHOP_CRAFT_PROJECTS),'drawing','cookery','glassworking','woodworking','jewelcraft',...Object.keys(MILLING_PROJECTS),...CRAFT_KIND_LIST_600];
-const APP_VERSION='94.174';
+const APP_VERSION='94.175';
 const STORAGE='hmk-keepers-ledger-v1';
 const campaignStorage=createCampaignStorage(localStorage,STORAGE);
 const uuid=()=>globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -13608,12 +13608,14 @@ function continueGuidedSpatial(){
   }
   if(requirement.kind==='complete'){
    const seq=liveInitiativeSequence(),states=combatSequenceStates();
+   const actor=character(s.actorId),name=actor.name;
    const staged=commitGuidedSpatialTurn({id:s.id,sequence:seq,states,battlefield:s.battlefield,
     projection:s.projection,stumbleRolls:s.stumbleRolls,stumbleStopPoint:s.stumbleStopPoint,
-    enduranceRoll:s.enduranceRoll,enduranceTN:s.enduranceTN,personalFatigue:Math.max(5,5+s.profile.encumbrance)});
-   const actor=character(s.actorId),name=actor.name;
+    enduranceRoll:s.enduranceRoll,enduranceTN:s.enduranceTN,personalFatigue:Math.max(5,5+s.profile.encumbrance),airtap:actorAirtap(actor)});
+   const airtapFatigue=staged.proof.airtapFatigue;
    const actualStop=staged.stumbleStop,position=actualStop?.point??s.projection.finalPosition;
-   const summary=`${name}: ${s.action}, ${(actualStop?.actualFt??s.projection.actualFt).toFixed(1)} stop; konec (${position.x.toFixed(2)}, ${position.y.toFixed(2)})${actualStop?', po neúspěšném Stumble upadl a leží prone':''}${!actualStop&&s.projection.contact?`, zastaveno EZ ${s.projection.contact.enemyId}`:''}.`;
+   let summary=`${name}: ${s.action}, ${(actualStop?.actualFt??s.projection.actualFt).toFixed(1)} stop; konec (${position.x.toFixed(2)}, ${position.y.toFixed(2)})${actualStop?', po neúspěšném Stumble upadl a leží prone':''}${!actualStop&&s.projection.contact?`, zastaveno EZ ${s.projection.contact.enemyId}`:''}.`;
+   if(airtapFatigue)summary+=` Airtap: Windedness +${airtapFatigue.added} (běžně +${airtapFatigue.base}).`;
    staged.sequence.spatialUnits=staged.battlefield.units.map(u=>({id:u.id,x:u.x,y:u.y}));
    const journalEntry={id:uuid(),characterId:actor.id,createdAt:stamp(),
     title:`HMK pohyb, kolo ${s.round}`,body:summary,
@@ -13621,7 +13623,7 @@ function continueGuidedSpatial(){
      actionKind:s.action,sourceEventId:s.id,spatial:structuredClone(s.projection),stumbleStop:staged.stumbleStop,
      dice:[...s.stumbleRolls.map(r=>({faces:100,value:r.roll,eml:r.eml,cause:r.cause,technique:r.technique,usedArms:r.usedArms,source:'GM-entered-physical-die'})),
       ...(s.enduranceRoll===null?[]:[{faces:10,value:s.enduranceRoll,source:'GM-entered-physical-die'}])],
-     stumbleSL:s.stumbleSL,stumbleRolls:structuredClone(s.stumbleRolls),stumbleCause:s.stumbleRolls.find(r=>successLevel(r.roll,r.eml)<SL.S)?.cause??null,enduranceTN:s.enduranceTN??null,windednessAccrued:staged.fatigueAdded}};
+     stumbleSL:s.stumbleSL,stumbleRolls:structuredClone(s.stumbleRolls),stumbleCause:s.stumbleRolls.find(r=>successLevel(r.roll,r.eml)<SL.S)?.cause??null,enduranceTN:s.enduranceTN??null,windednessAccrued:staged.fatigueAdded,...(airtapFatigue?{airtapFatigue}:{})}};
    // The scheduler, state changes and journal share one durable write.
    commitGuidedTransition(staged.sequence,()=>{
     if(data.journal.some(j=>j.combatProof?.sourceEventId===s.id))throw Error('Duplicitní dokončení pohybu');
@@ -15662,7 +15664,7 @@ function hskResultRichHTML(proof,body){
   hskVerdictMetric('Zdroj HMK','str. '+proof.page)+hskVerdictMetric('Secondary TN',proof.outcome.tn)+
   hskVerdictMetric('Úspěšné SR',proof.outcome.successes+'/'+proof.outcome.rolls.length)+
   hskVerdictMetric('Hody d10',proof.outcome.rolls.join(', ')||'—')+
-  (proof.outcome.kind==='fatigue'?hskVerdictMetric('Nová únava','+'+proof.outcome.accrual,'z původních '+proof.outcome.base):'')+
+  (proof.outcome.kind==='fatigue'?hskVerdictMetric(['fatigue-full-run','fatigue-sprint'].includes(proof.routineId)?'Únava před Airtap':'Nová únava','+'+proof.outcome.accrual,'z původních '+proof.outcome.base):'')+
   (proof.outcome.kind==='recovery'?hskVerdictMetric('Obnovená weariness','−'+proof.outcome.wearinessRecovered):'')+
   (proof.outcome.kind==='divine'?hskVerdictMetric(proof.outcome.benedictionModifier===null?'Renewed Faith':'Benediction modifier',proof.outcome.benedictionModifier===null?(proof.outcome.renewedFaith?'+1 maximální Piety':'nepřidáno'):'+'+proof.outcome.benedictionModifier):'')+
   '</div><p class="hsk-verdict-footnote">'+esc(proof.explanation)+'</p></section>';
@@ -19965,7 +19967,8 @@ function hskSpecialRefresh(form){
  row('[data-special-festival]',routine.id==='festival-style');
  const label=form.querySelector('[data-special-description]');
  if(label)label.textContent='HMK str. '+routine.page+' · '+(routine.description||'Úspěšný SR sníží přírůstek únavy o 5; primární test tím není zrušen.')+
- (kind==='fatigue'?' · Období: '+routine.period+'.':'');
+ (kind==='fatigue'?' · Období: '+routine.period+'.':'')+
+ (routine.id==='fatigue-full-run'?' Před hodem nastavte kalendář na konec pětiminutového běhu.':'');
  const priestBox=form.querySelector('[name=specialPriest]'),ritualSelect=form.querySelector('[name=specialRitual]');
  if(priestBox&&ritualSelect){const priest=character(priestBox.value),sk=priest?availableMasteries(priest):[];
  const allowed=sk.filter(x=>routine.id==='astral-rite-member'?x.name==='Trance':x.name==='Ritual'||x.name.startsWith('Ritual ('));
@@ -20051,7 +20054,10 @@ function hskSpecialRun(form){
   resolveSpecialSR({routine,secondaryML,rolls,stars,baseFatigue:fatigue,styleTNAdjust:tnAdjustment,outsider,moralityDifference,priestSuccessLevel:primaryResult?.level,criticalBenedictionPenalty});
  let explanation=routine.description||'Úspěch Endurance SR sníží přírůstek o 5.';
  if(kind==='divine')explanation+=' Použitý Style: '+styleInfo.name+' ML '+styleInfo.ml+'. '+modifierDetails+'; hvězd: '+stars+'.'+(routine.id==='festival-style'?' Renewed Faith po alespoň jednom úspěchu (+1 maximum Piety na rok).':' Každý úspěch Style SR přidává +1 k Benediction Modifier.');
- if(kind==='fatigue')explanation+=' Nový přírůstek za jedno období '+routine.period+': '+outcome.accrual+' únavy.';
+ if(kind==='fatigue'){
+  const timing=['fatigue-full-run','fatigue-sprint'].includes(routine.id)?' před započtením Airtap':'';
+  explanation+=' Přírůstek za jedno období '+routine.period+timing+': '+outcome.accrual+' únavy.';
+ }
  if(kind==='recovery')explanation+=' Výsledná obnova weariness: '+outcome.wearinessRecovered+'.';
  if(criticalWill)explanation+=' Ritual CF: následný Will d100 '+criticalWill.roll+' → '+criticalWill.level+'; úprava Benediction Modifier '+criticalBenedictionPenalty+'.';
  if(routine.id==='astral-rite-member')explanation+=' '+modifierDetails+'; bonus +2 TN pouze při Trance CS.';
@@ -22566,9 +22572,7 @@ document.addEventListener('submit',event=>{
  }catch(error){alert(error.message);}
 },true);
 function actorAirtap(actor,clock=data.campaignClock){
- if(!clock?.characterIds?.includes(actor?.id)||actor.hmk?.healthState?.shock==='KIA')return null;
- return airtapEvidence({journal:data.journal,campaignId:campaignKey(clock),minute:clock.minute,actorId:actor.id,
-  auralShockLevels:actor.hmk?.arcane?.auralShockLevels??0});
+ return campaignAirtapEvidence(data.journal,clock,actor);
 }
 function extendedAlchemyHealthHTML(actors,clock){
  const campaignId=campaignKey(clock);
