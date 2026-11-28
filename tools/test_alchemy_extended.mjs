@@ -9,7 +9,10 @@ import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPla
  validateExtendedAlchemy,assertExtendedAlchemyAppendOnly} from '../src/integration/hmk-alchemy-extended.js';
 import {warmthProtection,createWarmthProximity,validateWarmthProximityJournal,assertWarmthProximityAppendOnly} from '../src/integration/hmk-alchemy-warmth.js';
 import {soulcloakStatus,createSoulcloakDefence,validateSoulcloakJournal,assertSoulcloakAppendOnly} from '../src/integration/hmk-alchemy-soulcloak.js';
-import {airtapEvidence,airtapTravelUnits} from '../src/integration/hmk-alchemy-airtap.js';
+import {createEncounterSequence,startEncounterTurn} from '../src/integration/encounter-turn-sequence.js';
+import {projectGuidedSpatialPath,commitGuidedSpatialTurn} from '../src/integration/hmk-guided-spatial-actions.js';
+import {applyRecordedSpecialOutcome} from '../src/integration/hmk-special-outcome-commit.js';
+import {campaignAirtapEvidence,airtapEvidence,airtapTravelUnits} from '../src/integration/hmk-alchemy-airtap.js';
 import {calculateTimeEpisode,validateTimeEpisodes} from '../src/integration/hmk-time-episodes.js';
 import {prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from '../src/integration/hmk-mundane-fire-smoke.js';
 import {prepareSwimmingConsequence} from '../src/integration/hmk-skill-environment-consequences.js';
@@ -358,3 +361,52 @@ assert.equal(badAir.actor.hmk.healthState.fatigue.weariness,30);
 const clearAir=drink({name:'Physic',useId:'air-physic',prior:air.journal,actor:air.actor,baseAS:9});
 assert.equal(airtapEvidence({...airContext,journal:clearAir.journal}),null);
 console.log('PASS Airtap: swimming and smoke, ordinary and fast march, fractional carry, history, CF and Physic');
+
+const states={[actorId]:air.actor.hmk.healthState};
+const seq=startEncounterTurn(createEncounterSequence({timelineId:'air-initiative',
+ roster:[{id:actorId,initiativeML:50,awarenessEML:40}]}),states);
+const battlefield={units:[{id:actorId,x:0,y:0,foe:false,threatens:false,aware:true,helpless:false,
+ concentrating:false,reachImpeded:false,reachFt:5}]};
+const movementArgs={actorId,battlefield,path:[{x:0,y:0},{x:10,y:0}],action:'move',effectiveMove:20};
+const sprint={id:'air-sprint',sequence:seq,states,battlefield,
+ projection:projectGuidedSpatialPath({...movementArgs,moveRate:'double'}),
+ enduranceRoll:6,enduranceTN:5,personalFatigue:5};
+const unassistedSprint=commitGuidedSpatialTurn(sprint);
+assert.equal(unassistedSprint.fatigueAdded,5);
+const activeAir=campaignAirtapEvidence(air.journal,clock,air.actor);
+const assistedSprint=commitGuidedSpatialTurn({...sprint,airtap:activeAir});
+assert.equal(assistedSprint.actorState.fatigue.windedness,3);
+assert.deepEqual(assistedSprint.proof.airtapFatigue,{sources:[activeAir],base:5,added:3});
+assert.equal(commitGuidedSpatialTurn({...sprint,airtap:activeAir,enduranceRoll:5}).fatigueAdded,0);
+assert.equal(commitGuidedSpatialTurn({...sprint,airtap:activeAir,enduranceRoll:5,personalFatigue:15}).fatigueAdded,5);
+const fullMove=commitGuidedSpatialTurn({...sprint,airtap:activeAir,enduranceRoll:null,
+ projection:projectGuidedSpatialPath({...movementArgs,moveRate:'full'})});
+assert.equal(fullMove.fatigueAdded,0);
+assert.equal(fullMove.proof.airtapFatigue,undefined);
+
+const exercise=(routineId,when,actor=air.actor,journal=air.journal)=>{
+ const sourceId='exercise-source';
+ const document={campaignClock:{...clock,minute:when},characters:[actor],journal:[...journal,{
+  id:sourceId,title:routineId,characterId:actor.id,skillTestProof:{
+   type:'special-secondary-roll',actorId:actor.id,campaignMinute:when,routineId,outcome:{kind:'fatigue',accrual:10}
+  }
+ }]};
+ const args={sourceId,commitId:'exercise-commit',gmConfirmed:true,attestedPeriod:true};
+ const result=applyRecordedSpecialOutcome({...args,document});
+ assert.throws(()=>applyRecordedSpecialOutcome({...args,document:result.document}),/už byl zapsán/);
+ return result;
+};
+const running=exercise('fatigue-full-run',minute+5);
+assert.equal(running.effect.delta,5);
+assert.equal(running.effect.airtapFatigue.sources.length,5);
+assert.equal(running.document.characters[0].hmk.healthState.fatigue.windedness,5);
+assert.equal(exercise('fatigue-full-run',minute+2).effect.delta,8);
+assert.equal(exercise('fatigue-full-run',minute).effect.delta,10);
+assert.equal(exercise('fatigue-full-run',airEffect.untilMinute+2).effect.delta,7);
+assert.equal(exercise('fatigue-sprint',minute).effect.delta,5);
+assert.equal(exercise('fatigue-sprint',airEffect.untilMinute).effect.delta,10);
+assert.equal(exercise('fatigue-sprint',minute,clearAir.actor,clearAir.journal).effect.delta,10);
+const shock={...air.actor,hmk:{...air.actor.hmk,arcane:{auralShockLevels:1}}};
+assert.equal(exercise('fatigue-sprint',minute,shock).effect.delta,10);
+assert.equal(exercise('fatigue-melee',minute+5).effect.delta,10);
+console.log('PASS Airtap: Initiative sprint, END, timed running, onset/expiry, Aural Shock, Physic and one-shot recording');
