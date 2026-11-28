@@ -10,7 +10,7 @@ import {prepareDoomFlameSource,doomFlameRequirement,submitDoomFlameDie,resolveDo
 import {assertFumebombLineOfSight} from './hmk-alchemy-area-los.js';
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 import {prepareMountedRideBy,finalizeMountedRideBy,persistMountedRideBy} from './hmk-mounted-ride-by.js';
-import {prepareMountedSharedMove,finalizeMountedSharedMove,persistMountedSharedMove} from './hmk-mounted-shared-turn.js';
+import {prepareMountedSharedMove,finalizeMountedSharedMove,persistMountedSharedMove} from './hmk-mounted-shared-turn.js?v=94.176';
 import {guidedAttackRequirement,chooseGuidedAttack,submitGuidedAttackDie,advanceGuidedAttack,completeGuidedAttack} from './hmk-guided-attack-journey.js';
 import {resolveVerifiedAreaProtection} from './hmk-verified-area-protection.js';
 import {equipmentUsable} from './hmk-equipment-serviceability.js';
@@ -496,7 +496,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
      path:[{x:riderUnit.x,y:riderUnit.y},...pts],declaredDistanceFt:real(v.distance),
      previousRate:v.previousRate,newRate:v.newRate,effectiveMountMove:mount.hmk.verifiedMountedMove,
      mountRiderImpact:mount.hmk.verifiedRiderImpact,controlEventId:control.id,
-     overrunRequested:v.overrunRequested==='yes',participants:document.characters,
+     overrunRequested:v.overrunRequested==='yes',participants:document.characters,document,
      fallProof,inventory:fallProof?document.inventory:null,
      doubleMoveProof:v.newRate==='double'?{enduranceD10:positive(v.enduranceD10,1,10),
       ...(v.stumbleD100?{stumbleD100:positive(v.stumbleD100,1,100),
@@ -505,7 +505,7 @@ export function createG04ActionWizards({getDocument,getBaseline,getStorage,getSt
          states[mount.id].fatigue.otherWeakness+states[mount.id].bloodLoss.weaknessFatigue))}:{}),
       enduranceTN:mount.hmk.attributes?.end,personalFatigue:mount.hmk.verifiedMountedPersonalFatigue}:null,
      gmConfirmed:true});
-    const plan=finalizeMountedSharedMove({stage,sequence:seq,states,rider,mount,battlefield:bf,participants:document.characters});
+    const plan=finalizeMountedSharedMove({stage,sequence:seq,states,rider,mount,battlefield:bf,participants:document.characters,document});
     const out=persistMountedSharedMove({stage,plan,document,storage:getStorage(),key:getStorageKey(),baseline:getBaseline()});
     if(!out.ok)throw Error('Atomický Mounted Move zápis nebyl potvrzen: '+(out.code??out.reason));
     notice='';onCommit(out);return true;

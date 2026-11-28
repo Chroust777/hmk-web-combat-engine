@@ -1,6 +1,5 @@
 /** HMK 271. Airtap doubles held breath and halves movement fatigue. */
 import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.174';
-
 import {campaignKey} from './hmk-calendar-multi-campaign.js';
 
 export function campaignAirtapEvidence(journal,clock,actor,minute=clock?.minute){
@@ -12,6 +11,25 @@ export function campaignAirtapEvidence(journal,clock,actor,minute=clock?.minute)
 export function airtapMovementFatigue(base,sources,periods=sources.length){
  if(!sources.length)return null;
  return {sources,base,added:Math.round(base*(1-sources.length/(2*periods)))};
+}
+
+// A confirmed duration ends at the outcome minute. A sprint uses the live round.
+export function airtapPeriodFatigue(journal,clock,actor,base,minutes){
+ const end=clock.minute;
+ if(minutes===0){
+  const source=campaignAirtapEvidence(journal,clock,actor);
+  return source?airtapMovementFatigue(base,[source]):null;
+ }
+ const campaignId=campaignKey(clock);
+ if(!journal.some(row=>row.calendarCampaignId===campaignId&&row.campaignMinute<end&&
+  row.calendarAlchemyImbibing?.elixirName==='Airtap'&&row.calendarAlchemyImbibing.targetId===actor.id&&
+  row.calendarAlchemyImbibing.finalAS>0))return null;
+ const sources=[];
+ for(let t=Math.max(0,end-minutes);t<end;t++){
+  const source=campaignAirtapEvidence(journal,clock,actor,t);
+  if(source)sources.push(source);
+ }
+ return airtapMovementFatigue(base,sources,minutes);
 }
 
 export function airtapEvidence({journal,campaignId,minute,actorId,auralShockLevels=0}){

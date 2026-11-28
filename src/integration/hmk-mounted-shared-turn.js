@@ -9,6 +9,7 @@
 import {validateEncounterSequence,currentEncounterActor,finishEncounterTurn,startEncounterTurn} from './encounter-turn-sequence.js';
 import {projectGuidedSpatialPath} from './hmk-guided-spatial-actions.js';
 import {deriveVerifiedMountedOverrun} from './hmk-mounted-size-overrun.js';
+import {airtapPeriodFatigue} from './hmk-alchemy-airtap.js?v=94.176';
 import {validateCombatState,applyConfirmedFatigue} from './persistent-combat-state.js';
 import {applyConfirmedMountedCharge} from './hmk-combat-aftereffects.js';
 import {controlEML,mountTurnDistance,riderImpactEffect} from '../rules/mounted.js';
@@ -52,7 +53,7 @@ function previousMountRate(seq,mountId){
  * own ACTUAL upcoming turn on the rider's exact IR. No hidden extra turn. */
 export function prepareMountedSharedMove({id,sequence,states,rider,mount,battlefield,path,declaredDistanceFt,
  previousRate='stop',newRate='half',effectiveMountMove,mountRiderImpact,
- controlEventId,doubleMoveProof=null,fallProof=null,inventory=null,overrunRequested=false,participants=null,gmConfirmed=false}={}){
+ controlEventId,doubleMoveProof=null,fallProof=null,inventory=null,overrunRequested=false,participants=null,document=null,gmConfirmed=false}={}){
  assert(gmConfirmed===true,'GM musí potvrdit jízdní akci a skutečnou trasu');
  const seq=validateEncounterSequence(sequence);
  assert(seq.active===true&&!seq.pendingEndTurnAction&&!seq.interruptActiveId&&
@@ -183,9 +184,12 @@ export function prepareMountedSharedMove({id,sequence,states,rider,mount,battlef
    doubleMoveProof&&num(doubleMoveProof.enduranceD10,1,10)&&
    doubleMoveProof.personalFatigue===pf&&doubleMoveProof.enduranceTN===end,
    'Double Move potřebuje GM fyzické END d10 a ověřené END/PF živého zvířete');
+  const base=Math.max(0,pf-(doubleMoveProof.enduranceD10<=end?5:0));
+  const airtapFatigue=document?.campaignClock?
+   airtapPeriodFatigue(document.journal,document.campaignClock,mount,base,0):null;
   verifiedDouble={enduranceD10:doubleMoveProof.enduranceD10,enduranceTN:end,
-   personalFatigue:pf,fatigueAdded:Math.max(0,pf-(doubleMoveProof.enduranceD10<=end?5:0)),
-   stumble,physicalDice:[{faces:10,value:doubleMoveProof.enduranceD10,source:'GM-entered-physical-die'},
+   personalFatigue:pf,fatigueAdded:airtapFatigue?.added??base,
+   ...(airtapFatigue?{airtapFatigue}:{}),stumble,physicalDice:[{faces:10,value:doubleMoveProof.enduranceD10,source:'GM-entered-physical-die'},
     ...(stumble?[stumble.physicalDie]:[])]};
  }else {assert(doubleMoveProof===null,'END SR nepatří k pohybu half/full');
   assert(fallProof===null,'Pád mounta vyžaduje Double Move Stumble');}
@@ -202,7 +206,7 @@ export function prepareMountedSharedMove({id,sequence,states,rider,mount,battlef
 /** A shared Move where the rider does not also Attack. Rider Attack/Ride-by
  * requires a separate combined hit journey and is intentionally rejected;
  * completing only a Move must never fabricate a successful strike. */
-export function finalizeMountedSharedMove({stage,sequence,states,rider,mount,battlefield,participants=null}={}){
+export function finalizeMountedSharedMove({stage,sequence,states,rider,mount,battlefield,participants=null,document=null}={}){
  assert(stage?.format==='hmk-mounted-shared-move-stage-v1'&&
   same(sequence)===stage.sequenceWitness&&same(states)===stage.statesWitness&&
   same(battlefield)===stage.battlefieldWitness&&same(rider)===stage.riderWitness&&same(mount)===stage.mountWitness,
@@ -212,7 +216,7 @@ export function finalizeMountedSharedMove({stage,sequence,states,rider,mount,bat
   previousRate:stage.previousRate,newRate:stage.newRate,
   effectiveMountMove:stage.projection.effectiveMove,
   mountRiderImpact:mount.hmk.verifiedRiderImpact,controlEventId:stage.controlEventId,
-  overrunRequested:stage.overrunRequested,participants,
+  overrunRequested:stage.overrunRequested,participants,document,
   fallProof:stage.fallProof,inventory:stage.falling?JSON.parse(stage.inventoryWitness):null,
   doubleMoveProof:stage.doubleMoveProof?{enduranceD10:stage.doubleMoveProof.enduranceD10,enduranceTN:stage.doubleMoveProof.enduranceTN,personalFatigue:stage.doubleMoveProof.personalFatigue,
    ...(stage.doubleMoveProof.stumble?{stumbleD100:stage.doubleMoveProof.stumble.roll,stumbleEML:stage.doubleMoveProof.stumble.eml}:{})}:null,gmConfirmed:true});
@@ -306,7 +310,7 @@ export function persistMountedSharedMove({stage,plan,document,storage,key,baseli
  if(stage.falling)assert(same(document.inventory)===stage.inventoryWitness,
   'Inventář obou zraněných účastníků se před atomickým commitem změnil');
  const liveStage=prepareMountedSharedMove({id:stage.id,sequence:seq,states,rider,mount,battlefield,
-  overrunRequested:stage.overrunRequested,participants:document.characters,
+  overrunRequested:stage.overrunRequested,participants:document.characters,document,
   path:stage.projection.requestedPath,declaredDistanceFt:stage.declaredDistanceFt,
   previousRate:stage.previousRate,newRate:stage.newRate,
   effectiveMountMove:stage.projection.effectiveMove,mountRiderImpact:mount.hmk.verifiedRiderImpact,
@@ -315,7 +319,7 @@ export function persistMountedSharedMove({stage,plan,document,storage,key,baseli
   doubleMoveProof:stage.doubleMoveProof?{enduranceD10:stage.doubleMoveProof.enduranceD10,enduranceTN:stage.doubleMoveProof.enduranceTN,personalFatigue:stage.doubleMoveProof.personalFatigue,
    ...(stage.doubleMoveProof.stumble?{stumbleD100:stage.doubleMoveProof.stumble.roll,stumbleEML:stage.doubleMoveProof.stumble.eml}:{})}:null,gmConfirmed:true});
  assert(same(liveStage)===same(stage),'Montovaná fáze se od připraveného stavu změnila');
- const recomputed=finalizeMountedSharedMove({stage:liveStage,sequence:seq,states,rider,mount,battlefield,participants:document.characters});
+ const recomputed=finalizeMountedSharedMove({stage:liveStage,sequence:seq,states,rider,mount,battlefield,participants:document.characters,document});
  assert(same(recomputed)===same(plan),'Mounted plán neodpovídá přepočtené společné akci');
  assert(!document.journal.some(j=>j.id===`mounted:${stage.id}`)&&
   !seq.log.some(e=>e.type==='mounted-shared-move'&&e.eventId===stage.id),
@@ -341,9 +345,11 @@ export function persistMountedSharedMove({stage,plan,document,storage,key,baseli
    'Povinný Rider Impact chybí v atomickém plánu');
   out.characters.find(c=>c.id===stage.riderId).hmk.healthState=cp(plan.riderState);
  }
+ const airtap=stage.doubleMoveProof?.airtapFatigue;
+ const airtapNote=airtap?` Airtap · ${mount.name}: Windedness +${airtap.added} (běžně +${airtap.base}).`:'';
  out.journal.push({id:`mounted:${stage.id}`,characterId:stage.riderId,
   createdAt:new Date().toISOString(),title:`HMK společný jízdní pohyb, kolo ${stage.round}`,
-  body:`Jezdec a zvíře se přesunuli společně; Ride-by bez útoku, Rider Impact ${stage.impactPreview.bonus}.`,
+  body:`Jezdec a zvíře se přesunuli společně; Ride-by bez útoku, Rider Impact ${stage.impactPreview.bonus}.${airtapNote}`,
   combatProof:{actionKind:'mounted-shared-move',timelineId:stage.timelineId,round:stage.round,
    sourceEventId:stage.id,riderId:stage.riderId,mountId:stage.mountId,
    projection:cp(stage.projection),controlEventId:stage.controlEventId,
