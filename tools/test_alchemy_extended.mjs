@@ -9,8 +9,9 @@ import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPla
  validateExtendedAlchemy,assertExtendedAlchemyAppendOnly} from '../src/integration/hmk-alchemy-extended.js';
 import {warmthProtection,createWarmthProximity,validateWarmthProximityJournal,assertWarmthProximityAppendOnly} from '../src/integration/hmk-alchemy-warmth.js';
 import {soulcloakStatus,createSoulcloakDefence,validateSoulcloakJournal,assertSoulcloakAppendOnly} from '../src/integration/hmk-alchemy-soulcloak.js';
-import {createEncounterSequence,startEncounterTurn} from '../src/integration/encounter-turn-sequence.js';
+import {createEncounterSequence,startEncounterTurn,recordEncounterFreeAction} from '../src/integration/encounter-turn-sequence.js';
 import {projectGuidedSpatialPath,commitGuidedSpatialTurn} from '../src/integration/hmk-guided-spatial-actions.js';
+import {prepareMountedSharedMove,finalizeMountedSharedMove,persistMountedSharedMove} from '../src/integration/hmk-mounted-shared-turn.js';
 import {applyRecordedSpecialOutcome} from '../src/integration/hmk-special-outcome-commit.js';
 import {campaignAirtapEvidence,airtapEvidence,airtapTravelUnits} from '../src/integration/hmk-alchemy-airtap.js';
 import {calculateTimeEpisode,validateTimeEpisodes} from '../src/integration/hmk-time-episodes.js';
@@ -410,3 +411,69 @@ const shock={...air.actor,hmk:{...air.actor.hmk,arcane:{auralShockLevels:1}}};
 assert.equal(exercise('fatigue-sprint',minute,shock).effect.delta,10);
 assert.equal(exercise('fatigue-melee',minute+5).effect.delta,10);
 console.log('PASS Airtap: Initiative sprint, END, timed running, onset/expiry, Aural Shock, Physic and one-shot recording');
+
+for(const [routine,minutes,kind] of [
+ ['climbing',5,'windedness'],['swimming',1,'windedness'],['slow-swim',60,'weariness'],
+ ['walk',240,'weariness'],['riding',240,'weariness'],['double-walk',60,'weariness'],['double-drover',60,'weariness']
+]){
+ const withAirtap=exercise('fatigue-'+routine,minute+minutes);
+ assert.equal(withAirtap.effect.kind,kind,routine);
+ assert.equal(withAirtap.effect.delta,5,routine);
+ assert.equal(withAirtap.effect.airtapFatigue.sources.length,minutes,routine);
+ assert.equal(exercise('fatigue-'+routine,minute).effect.delta,10,routine);
+}
+assert.equal(exercise('fatigue-walk',minute+60).effect.delta,9);
+assert.equal(exercise('fatigue-swimming',airEffect.untilMinute+1).effect.delta,10);
+for(const routine of ['digging','melee','astral','summoning','sleep']){
+ assert.equal(exercise('fatigue-'+routine,minute+5).effect.airtapFatigue,undefined,routine);
+}
+
+const rider={id:'air-rider',name:'Rider',hmk:{skills:[{name:'Riding',ml:65}],healthState:initialCombatState()}};
+const mount={...structuredClone(air.actor),name:'Mount'};
+Object.assign(mount.hmk,{verifiedMountedBreed:'palfrey',verifiedMountedMove:60,verifiedRiderImpact:5,
+ verifiedMountedPersonalFatigue:15,skills:[{name:'Initiative',ml:40}]});
+mount.hmk.attributes.end=7;
+const mountedStates={[rider.id]:rider.hmk.healthState,[mount.id]:mount.hmk.healthState};
+const mountedMap={units:[rider,mount].map(c=>({...battlefield.units[0],id:c.id}))};
+const mountedSeq=createEncounterSequence({timelineId:'air-mounted',round:3,roster:[
+ {id:rider.id,initiativeML:40,awarenessEML:41},{id:mount.id,initiativeML:40,awarenessEML:40}
+]});
+mountedSeq.spatialUnits=mountedMap.units.map(({id,x,y})=>({id,x,y}));
+mountedSeq.log.push({type:'mounted-shared-move',eventId:'prior-mounted-move',round:2,riderId:rider.id,
+ mountId:mount.id,moveRate:'full'});
+mountedSeq.spatialEvents=[{id:'prior-mounted-move',actorId:mount.id,riderId:rider.id,round:2,
+ timelineId:mountedSeq.timelineId,sharedMounted:true,projection:{moveRate:'full'}}];
+const mountedActive=recordEncounterFreeAction(startEncounterTurn(mountedSeq,mountedStates),
+ {actorId:rider.id,kind:'mounted-control',states:mountedStates});
+rider.hmk.healthState.mountControl={round:3,controlled:true};
+rider.hmk.healthState.events.push({id:'air-control',type:'hmk-mounted-control',round:3,details:{
+ mountId:mount.id,eml:60,result:{controlled:true},
+ physicalDice:{rolls:[{faces:100,value:11,source:'GM-entered-physical-die'}]}
+}});
+const mountedDocument={campaignClock:{...clock,characterIds:[rider.id,mount.id]},characters:[rider,mount],
+ journal:air.journal,combatRuntime:{sequence:mountedActive},inventory:[]};
+const mountedArgs={id:'air-mounted-move',sequence:mountedActive,states:mountedStates,rider,mount,
+ battlefield:mountedMap,path:[{x:0,y:0},{x:10,y:0}],declaredDistanceFt:10,previousRate:'full',newRate:'double',
+ effectiveMountMove:60,mountRiderImpact:5,controlEventId:'air-control',gmConfirmed:true,
+ doubleMoveProof:{enduranceD10:10,enduranceTN:7,personalFatigue:15}};
+const mountedStage=prepareMountedSharedMove({...mountedArgs,document:mountedDocument});
+const normalStage=prepareMountedSharedMove(mountedArgs);
+assert.equal(normalStage.doubleMoveProof.fatigueAdded,15);
+assert.equal(mountedStage.doubleMoveProof.fatigueAdded,8);
+assert.equal(mountedStage.doubleMoveProof.airtapFatigue.sources[0].useId,'air');
+const mountedPlan=finalizeMountedSharedMove({...mountedArgs,stage:mountedStage,document:mountedDocument});
+assert.equal(mountedPlan.mountState.fatigue.windedness,8);
+assert.equal(mountedPlan.riderState.fatigue.windedness,0);
+const mountedStale=structuredClone(mountedDocument);
+mountedStale.campaignClock.minute=airEffect.untilMinute;
+assert.throws(()=>finalizeMountedSharedMove({...mountedArgs,stage:mountedStage,document:mountedStale}),/neodpovídá/);
+const riderOnly={...mountedDocument,journal:air.journal.map(r=>r.calendarAlchemyImbibing?
+ {...r,calendarAlchemyImbibing:{...r.calendarAlchemyImbibing,targetId:rider.id}}:r)};
+assert.equal(prepareMountedSharedMove({...mountedArgs,document:riderOnly}).doubleMoveProof.fatigueAdded,15);
+let stored=JSON.stringify(mountedDocument);
+const storage={getItem:()=>stored,setItem:(_key,value)=>{stored=value;},removeItem:()=>{stored=null;}};
+const mountedSaved=persistMountedSharedMove({stage:mountedStage,plan:mountedPlan,document:mountedDocument,
+ storage,key:'qa',baseline:stored});
+assert.equal(mountedSaved.ok,true);
+assert.equal(JSON.parse(stored).journal.at(-1).combatProof.doubleMoveProof.airtapFatigue.added,8);
+console.log('PASS Airtap: all movement SR, confirmed mounted sprint, rider isolation, expiry, and mounted storage');
