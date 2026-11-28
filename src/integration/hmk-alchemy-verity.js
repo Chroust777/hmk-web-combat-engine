@@ -1,7 +1,7 @@
 /** HMK pp.231, 270, 274. Verity reveals a real illusion; the GM establishes
  * how the imbiber encounters it. Seeing through it does not dispel it.
  */
-import {activeVerity} from './hmk-alchemy-imbibing.js?v=94.170';
+import {activeVerity} from './hmk-alchemy-imbibing.js?v=94.174';
 
 const check=(condition,message)=>{if(!condition)throw Error('Verity: '+message);};
 

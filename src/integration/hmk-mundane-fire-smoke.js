@@ -160,7 +160,7 @@ export function prepareEnclosedSmokeStart({actor,state,sourceId,round=1,
  * would require undefined initial Coma HR: fail closed, do not fabricate one.
  */
 export function prepareEnclosedSmokeCompletion({actor,state,sourceId,round=1,
- roundsWithoutAir,airRestored=false,willD100,deathD10=null,enduranceD100=null,
+ roundsWithoutAir,airRestored=false,willD100,deathD10=null,enduranceD100=null,airtap=null,
  gmConfirmed=false}={}){
  requireIt(gmConfirmed===true&&validSource(sourceId),'Neznámý nebo nepotvrzený zdroj Smoke');
  const s=roundState(actor,state,round),id='mundane-smoke:'+sourceId.trim();
@@ -180,7 +180,7 @@ export function prepareEnclosedSmokeCompletion({actor,state,sourceId,round=1,
  // larger of both values wins, with no synthetic secondary skill.
  const swim=availableMasteries(actor).find(e=>String(e.name).toLowerCase()==='swimming');
  const swimmingML=swim&&integer(swim.ml,1,200)?swim.ml:null;
- const maximumRounds=Math.max(0,asphyxiaCapacity({endurance:end,willSV,swimmingML}).maximumRounds);
+ const maximumRounds=Math.max(0,asphyxiaCapacity({endurance:end,willSV,swimmingML}).maximumRounds)*(airtap?2:1);
  let recovered='conscious',deadAfter=null,endRecovery=null;
  if(roundsWithoutAir>maximumRounds){
   die(deathD10,10,'death countdown d10');
@@ -213,7 +213,7 @@ export function prepareEnclosedSmokeCompletion({actor,state,sourceId,round=1,
  }
  const winded=roundsWithoutAir>maximumRounds/2?5:0;
  s.fatigue.windedness+=winded;
- const report={sourceId,roundsWithoutAir,maximumRounds,airRestored,willD100,willEML,willSV,
+ const report={sourceId,roundsWithoutAir,maximumRounds,...(airtap?{airtap}:{}),airRestored,willD100,willEML,willSV,
   willSL:levels[willSL],deathD10,deadAfter,enduranceD100,endRecovery,
   windednessAdded:winded,result:recovered,rulePages:[121,183,169]};
  s.events.push({id:id+':complete',type:'mundane-smoke-asphyxia-complete',round,details:report});

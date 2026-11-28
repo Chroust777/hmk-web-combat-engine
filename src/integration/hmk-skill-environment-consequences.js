@@ -61,7 +61,7 @@ export function previewSwimmingDanger({actor,inventory,original,water='inland',w
  */
 export function prepareSwimmingConsequence({actor,inventory,state,sourceId,round=1,original,water,windForce,
  soakedClothingENC,roundsWithoutAir=0,rescued=true,willD100=null,deathD10=null,
- enduranceD100=null,gmConfirmed=false}={}){
+ enduranceD100=null,airtap=null,gmConfirmed=false}={}){
  const {id,state:s}=base(state,actor,sourceId,round,'swimming',gmConfirmed);
  const swim=previewSwimmingDanger({actor,inventory,original,water,windForce,soakedClothingENC});
  req(integer(roundsWithoutAir,0,20000),'Doba bez vzduchu musí být doložena v pětisekundových kolech');
@@ -78,7 +78,7 @@ export function prepareSwimmingConsequence({actor,inventory,state,sourceId,round
   const end=actor.hmk?.attributes?.end;
   req(integer(end,1,200),'Chybí Endurance atribut pro Asphyxia');
   capacity=asphyxiaCapacity({endurance:end,willSV:will.sv,swimmingML:skillML(actor,'Swimming')}).maximumRounds;
-  capacity=Math.max(0,capacity);
+  capacity=Math.max(0,capacity)*(airtap?2:1);
   winded=roundsWithoutAir>capacity/2?5:0;
   if(roundsWithoutAir>capacity){
    req(integer(deathD10,1,10),'Po vyčerpání dechu je povinný skutečný d10 pro smrtelnou lhůtu');
@@ -111,7 +111,7 @@ export function prepareSwimmingConsequence({actor,inventory,state,sourceId,round
   }
  }
  if(winded)s.fatigue.windedness+=winded;
- const report={swim,asphyxia,roundsWithoutAir,capacity,deathAfter,will,recovery,windednessAdded:winded,
+ const report={swim,asphyxia,...(airtap&&swim.sinks?{airtap}:{}),roundsWithoutAir,capacity,deathAfter,will,recovery,windednessAdded:winded,
   proof:{originalRoll:original.roll,willD100,deathD10,enduranceD100},rulePages:[86,183,169]};
  return {state:append(s,id,round,'skill-swimming-consequence',{sourceId,...report}),report};
 }

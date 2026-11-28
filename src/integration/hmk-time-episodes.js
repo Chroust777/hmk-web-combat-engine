@@ -1,3 +1,4 @@
+import {airtapEvidence,airtapTravelUnits} from './hmk-alchemy-airtap.js?v=94.174';
 import {travelOccupancy93956,travelOccupancyContext93956} from './hmk-mixed-transport-93859.js';
 import {verifyPassiveWeatherResistance} from './hmk-weather-passive-93820.js';
 import {validateEquipmentTimeWork93844, EQUIPMENT_TIME_POLICY_93844} from './hmk-equipment-time-work-93844.js';
@@ -31,6 +32,7 @@ export const EPISODE_TRACKING_BEARING_MARKER_93904='minute-episode-tracking-cf-v
 // Opt-in: skip legacy/non-navigation episodes which have no confirmed direction state.
 export const EPISODE_PARTICIPANT_NAVIGATION_93945='hmk-member-navigation-v93.945';
 export const EPISODE_NAVIGATION_EVIDENCE_POLICY_93907='hmk-navigation-evidence-only-v93.907';
+const validFatigueCarry=n=>Number.isInteger(n*2)&&n>=0&&n<240;
 const must=(x,s)=>{if(!x)throw Error(s)};
 const whole=(x,a,b)=>Number.isSafeInteger(x)&&x>=a&&x<=b;
 export const EPISODE_KINDS=['travel','rest','sleep','winded','forage','tracking','watch','other'];
@@ -138,7 +140,7 @@ export function calculateTimeEpisode({minute,minutes,kind='travel',topography='f
   actors=memberIds.map(id=>{
    const end=enduranceByActor[id],inactive=inactiveByActor[id];
    const carryIn=previousCarry[id]??0;
-   must(whole(carryIn,0,239),'Neplatný zbytek poměrné únavy.');
+   must(validFatigueCarry(carryIn),'Neplatný zbytek poměrné únavy.');
    let activeMinutes=movementMinutes,earlyIncapacity=null;
    if(inactive){
     must(Number.isSafeInteger(inactive.minute)&&inactive.minute>=minute&&inactive.minute<=minute+minutes&&
@@ -420,7 +422,7 @@ export function lastTimeEpisodeCarry(journal=[],campaignId,actorId){
   const a=[...(ep.actors||[]),...(ep.animals||[]),...(ep.weatherRestFatigue||[])].find(x=>x.id===actorId);
   if(a){
    if(a.carryOut===undefined)return 0; // legacy pre-carry documents
-   must(whole(a.carryOut,0,239),'Historický zbytek minutové únavy je neplatný.');
+   must(validFatigueCarry(a.carryOut),'Historický zbytek minutové únavy je neplatný.');
    return a.carryOut;
   }
  }return 0;
@@ -1309,7 +1311,7 @@ export function validateTimeEpisodes(journal=[]){
   if(e.minuteCarryRule==='fixed-point-240-v93.684'){
    for(const a of [...(e.actors||[]),...(e.animals||[]),...(e.weatherRestFatigue||[])]){
     must(a.carryIn===lastTimeEpisodeCarry(prior,j.calendarCampaignId,a.id)&&
-     whole(a.carryOut,0,239),
+     validFatigueCarry(a.carryOut),
      'Časová epizoda ztratila potvrzený zbytek minutové únavy postavy.');
    }
   }else must(e.minuteCarryRule===undefined,'Neznámý model minutové únavy.');
@@ -1344,6 +1346,20 @@ export function validateTimeEpisodes(journal=[]){
      'Minutová únava způsobená počasím neodpovídá doloženému Cold/Heat Hazard.');
    }
   }
+  if(e.kind==='travel'&&e.actors?.some(actor=>actor.airtap)){
+   const preceding=journal.slice(0,journal.indexOf(j));
+   for(const actor of e.actors.filter(item=>item.airtap)){
+    const canonical=airtapEvidence({journal:preceding,campaignId:j.calendarCampaignId,minute:e.startMinute,actorId:actor.id});
+    const minutes=actor.earlyIncapacity?.activeMovementMinutes??e.movementMinutes??e.minutes;
+    const begin=e.startMinute+(e.travelDelay?.applied??0);
+    const expected=airtapTravelUnits(actor,{minutes,begin,
+     onFoot:e.conveyance==='foot'||(e.walkingHandlerIds||[]).includes(actor.id),airtap:canonical});
+    const total=actor.carryIn+expected+(actor.weatherFatigueUnits??0);
+    must(!actor.endNotRequired&&minutes>0&&JSON.stringify(actor.airtap)===JSON.stringify(canonical)&&
+     actor.movementFatigueUnits===expected&&actor.delta===Math.floor(total/240)&&actor.carryOut===total%240,
+     'Airtap: pohybová únava nemá doložený účinek dávky.');
+   }
+  }
   // New Double Time receipts are strictly backed by ONE independent END SR
   // for each real hour, not a reused watch-wide roll (HMK 150).
   // Keep older pre-93.663 receipts readable without inventing missing dice.
@@ -1360,7 +1376,7 @@ export function validateTimeEpisodes(journal=[]){
     const expected=a.hourlyEndSR.reduce((n,r,i)=>n+Math.min(60,Math.max(0,active-60*i))*4*
      Math.max(0,(e.conveyance==='foot'||(e.walkingHandlerIds||[]).includes(a.id)?10:5)-(r.success?5:0)),0)+
      active*(a.extraFatigue+a.duneFatigue);
-    must(a.movementFatigueUnits===expected&&a.roll===a.hourlyEndSR[0]?.roll,
+    must((a.airtap||a.movementFatigueUnits===expected)&&a.roll===a.hourlyEndSR[0]?.roll,
      'Hourly END audit: skutečná hodinová únava neodpovídá dokladům.');
    }
   }

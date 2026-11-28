@@ -1,5 +1,5 @@
 /** HMK 243, 270–271, 274: breathing elixirs create temporary moving areas. */
-import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.170';
+import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.174';
 
 const breathField={Exsiccation:'calendarAlchemyExsiccationBreath',Shadowbreath:'calendarAlchemyShadowbreath'};
 
