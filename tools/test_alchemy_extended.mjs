@@ -9,6 +9,10 @@ import {fireshieldProtection,iceshieldProtection,quiescenceUses,mindsalveRollPla
  validateExtendedAlchemy,assertExtendedAlchemyAppendOnly} from '../src/integration/hmk-alchemy-extended.js';
 import {warmthProtection,createWarmthProximity,validateWarmthProximityJournal,assertWarmthProximityAppendOnly} from '../src/integration/hmk-alchemy-warmth.js';
 import {soulcloakStatus,createSoulcloakDefence,validateSoulcloakJournal,assertSoulcloakAppendOnly} from '../src/integration/hmk-alchemy-soulcloak.js';
+import {airtapEvidence,airtapTravelUnits} from '../src/integration/hmk-alchemy-airtap.js';
+import {calculateTimeEpisode,validateTimeEpisodes} from '../src/integration/hmk-time-episodes.js';
+import {prepareEnclosedSmokeStart,prepareEnclosedSmokeCompletion} from '../src/integration/hmk-mundane-fire-smoke.js';
+import {prepareSwimmingConsequence} from '../src/integration/hmk-skill-environment-consequences.js';
 import {elixirBreathSources,activeElixirBreathAreas,createElixirBreath,validateElixirBreathJournal,assertElixirBreathAppendOnly} from '../src/integration/hmk-alchemy-exsiccation.js';
 import {applyAlchemyExsiccationAural,createExsiccationProfusionIll,applyExsiccationProfusionAural,validateExsiccationProfusionJournal} from '../src/integration/hmk-alchemy-imbibing.js';
 import {historicalHMKCalendarEntries} from '../src/integration/hmk-calendar-history.js';
@@ -318,3 +322,39 @@ assert.deepEqual(activeElixirBreathAreas({...shadowContext,journal:darkJournal,e
 const physicShadow=drink({name:'Physic',useId:'shadow-physic',actor:shadow.actor,prior:darkJournal});
 assert.deepEqual(activeElixirBreathAreas({...shadowContext,journal:physicShadow.journal}),[]);
 console.log('PASS Shadowbreath: moving area, expiry, AS consumption, CF and Physic');
+
+const air=drink({name:'Airtap',useId:'air',d100:11});
+const airContext={journal:air.journal,campaignId,actorId,minute};
+const airEffect=airtapEvidence(airContext);
+assert.equal(airEffect.sourcePage,271);
+assert.equal(airtapEvidence({...airContext,auralShockLevels:1}),null);
+const march=calculateTimeEpisode({minute,minutes:97,memberIds:[actorId],enduranceByActor:{[actorId]:12},endRollByActor:{[actorId]:10}});
+const walker=march.actors[0];
+const halfUnits=airtapTravelUnits(walker,{minutes:97,begin:minute,onFoot:true,airtap:airEffect});
+assert.equal(halfUnits,walker.movementFatigueUnits/2);
+assert.equal(halfUnits,242.5);
+const afterMarch=calculateTimeEpisode({minute:minute+97,minutes:1,memberIds:[actorId],enduranceByActor:{[actorId]:12},endRollByActor:{[actorId]:10},previousCarry:{[actorId]:halfUnits%240}});
+assert.equal(afterMarch.actors[0].carryOut,7.5);
+const movement={...walker,airtap:airEffect,movementFatigueUnits:halfUnits,rate:halfUnits/97,delta:1,carryOut:2.5};
+assert.doesNotThrow(()=>validateTimeEpisodes([...air.journal,row('air-march','calendarTimeEpisode',{...march,actors:[movement]})]));
+assert.throws(()=>validateTimeEpisodes([...air.journal,row('air-march','calendarTimeEpisode',{...march,actors:[{...movement,movementFatigueUnits:480}]})]),/Airtap/);
+const fast=calculateTimeEpisode({minute,minutes:90,memberIds:[actorId],enduranceByActor:{[actorId]:12},endRollByActor:{[actorId]:[3,9]},doubleTime:true});
+assert.equal(airtapTravelUnits(fast.actors[0],{minutes:90,begin:minute,onFoot:true,airtap:airEffect}),fast.actors[0].movementFatigueUnits/2);
+assert.equal(airtapTravelUnits(walker,{minutes:97,begin:airEffect.untilMinute-1,onFoot:true,airtap:airEffect}),482.5);
+const swimmer={...air.actor,hmk:{...air.actor.hmk,attributes:{str:12,end:12,wil:12},skills:[{name:'Swimming',ml:30}]}};
+const swimArgs={actor:swimmer,state:swimmer.hmk.healthState,inventory:[],sourceId:'actual-swimming',round:1,
+ original:{roll:58,rawEML:-20,ml:30},water:'inland',windForce:0,soakedClothingENC:0,
+ roundsWithoutAir:2,rescued:true,willD100:11,gmConfirmed:true};
+const normalSwim=prepareSwimmingConsequence(swimArgs).report;
+assert.equal(prepareSwimmingConsequence({...swimArgs,airtap:airEffect}).report.capacity,normalSwim.capacity*2);
+const smoke=prepareEnclosedSmokeStart({actor:swimmer,state:swimmer.hmk.healthState,sourceId:'actual-smoke',round:1,
+ enclosedArea:true,firePresent:true,smokePresent:true,gmConfirmed:true});
+const smoky={actor:swimmer,state:smoke.state,sourceId:'actual-smoke',round:1,airRestored:true,roundsWithoutAir:2,willD100:11,gmConfirmed:true};
+const baseBreath=prepareEnclosedSmokeCompletion(smoky).report.maximumRounds;
+const longBreath=prepareEnclosedSmokeCompletion({...smoky,airtap:airEffect,roundsWithoutAir:baseBreath+1}).report;
+assert.equal(longBreath.maximumRounds,baseBreath*2);
+const badAir=drink({name:'Airtap',useId:'air-cf',d100:95});
+assert.equal(badAir.actor.hmk.healthState.fatigue.weariness,30);
+const clearAir=drink({name:'Physic',useId:'air-physic',prior:air.journal,actor:air.actor,baseAS:9});
+assert.equal(airtapEvidence({...airContext,journal:clearAir.journal}),null);
+console.log('PASS Airtap: swimming and smoke, ordinary and fast march, fractional carry, history, CF and Physic');
