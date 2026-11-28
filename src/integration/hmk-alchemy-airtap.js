@@ -1,6 +1,19 @@
 /** HMK 271. Airtap doubles held breath and halves movement fatigue. */
 import {activeAdditionalTemporary} from './hmk-alchemy-imbibing.js?v=94.174';
 
+import {campaignKey} from './hmk-calendar-multi-campaign.js';
+
+export function campaignAirtapEvidence(journal,clock,actor,minute=clock?.minute){
+ if(!clock?.characterIds?.includes(actor?.id)||actor.hmk?.healthState?.shock==='KIA')return null;
+ return airtapEvidence({journal,campaignId:campaignKey(clock),minute,actorId:actor.id,
+  auralShockLevels:actor.hmk?.arcane?.auralShockLevels??0});
+}
+
+export function airtapMovementFatigue(base,sources,periods=sources.length){
+ if(!sources.length)return null;
+ return {sources,base,added:Math.round(base*(1-sources.length/(2*periods)))};
+}
+
 export function airtapEvidence({journal,campaignId,minute,actorId,auralShockLevels=0}){
  if(auralShockLevels!==0)return null;
  const sources=activeAdditionalTemporary(journal,campaignId,actorId,minute,'Airtap')

@@ -5,6 +5,7 @@
  */
 import {initialCombatState,applyConfirmedFatigue} from './persistent-combat-state.js';
 import {DAY_MINUTES} from './hmk-campaign-calendar.js';
+import {campaignAirtapEvidence,airtapMovementFatigue} from './hmk-alchemy-airtap.js?v=94.175';
 import {doctrineChoices} from './hmk-creation-doctrine.js';
 
 const ensure=(ok,msg)=>{if(!ok)throw Error(msg);};
@@ -64,7 +65,21 @@ export function applyRecordedSpecialOutcome({document,sourceId,commitId,gmConfir
   const kind=winded?'windedness':'weariness';
   const max=outcome.kind==='recovery'?Math.min(state.fatigue.weariness,outcome.wearinessRecovered):outcome.accrual;
   ensure(W(max,0,500)&&max%5===0,'Neověřený přírůstek/obnova Fatigue');
-  const delta=outcome.kind==='recovery'?-max:max;
+  let airtapFatigue=null;
+  if(outcome.kind==='fatigue'&&id==='fatigue-sprint'){
+   const airtap=campaignAirtapEvidence(next.journal,next.campaignClock,actor);
+   if(airtap)airtapFatigue=airtapMovementFatigue(max,[airtap]);
+  }
+  if(outcome.kind==='fatigue'&&id==='fatigue-full-run'){
+   // The GM confirms a five-minute period ending at the current clock minute.
+   const sources=[];
+   for(let t=Math.max(0,minute-5);t<minute;t++){
+    const airtap=campaignAirtapEvidence(next.journal,next.campaignClock,actor,t);
+    if(airtap)sources.push(airtap);
+   }
+   airtapFatigue=airtapMovementFatigue(max,sources,5);
+  }
+  const delta=outcome.kind==='recovery'?-max:(airtapFatigue?.added??max);
   // A single period cannot be charged repeatedly against re-rolled d10 on the same campaign minute.
   ensure(!next.journal.some(j=>j.specialOutcomeProof?.actorId===actor.id&&
    j.specialOutcomeProof?.minute===minute&&['fatigue','recovery'].includes(j.specialOutcomeProof?.family)),
@@ -73,6 +88,10 @@ export function applyRecordedSpecialOutcome({document,sourceId,commitId,gmConfir
   h.healthState=updated.state;
   detail=`${kind} ${delta>=0?'+':''}${delta}; celkem ${Object.values(updated.state.fatigue).reduce((a,b)=>a+b,0)+updated.state.bloodLoss.weaknessFatigue}`;
   effect={family:outcome.kind,kind,delta};
+  if(airtapFatigue){
+   effect.airtapFatigue=airtapFatigue;
+   detail+=`. Airtap: +${delta} místo +${max}`;
+  }
  }else if(id==='festival-style'){
   const faith=religionOf(actor),priest=next.characters.find(c=>c.id===proof.priestId);
   ensure(faith&&faith===religionOf(priest),'Festival vyžaduje doložené shodné náboženství účastníka i vedoucího.');

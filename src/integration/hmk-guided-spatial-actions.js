@@ -10,6 +10,7 @@ import {moveAction,evadeAction,chargeEligibility,chargeAttackChoice} from '../ru
 import {guidedTurnChoices} from './hmk-guided-turn-choices.js';
 import {finishEncounterTurn,validateEncounterSequence,currentEncounterActor} from './encounter-turn-sequence.js';
 import {successLevel,SL} from '../rules/tests.js';
+import {airtapMovementFatigue} from './hmk-alchemy-airtap.js?v=94.175';
 import {applyConfirmedFatigue} from './persistent-combat-state.js';
 import {requireParalysisAction} from './hmk-paralysis-sequela.js';
 import {validateSpatialBarriers,pathCrossesClosedBarrier} from './hmk-guided-spatial-barriers.js';
@@ -217,7 +218,7 @@ export function verifySpatialStumbleStop(projection,point){
  * A double Move with a bend requires a physical Stumble test before commit.
  */
 export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projection,
- stumbleRoll=null,stumbleEML=null,stumbleTechnique=null,stumbleUsedArms=null,stumbleRolls=null,stumbleStopPoint=null,enduranceRoll=null,enduranceTN=null,personalFatigue=null}={}){
+ stumbleRoll=null,stumbleEML=null,stumbleTechnique=null,stumbleUsedArms=null,stumbleRolls=null,stumbleStopPoint=null,enduranceRoll=null,enduranceTN=null,personalFatigue=null,airtap=null}={}){
  requireRule(projection?.format==='hmk-guided-spatial-projection-v1','Chybí ověřená prostorová akce');
  const s=validateEncounterSequence(sequence);
  requireRule(s.active&&currentEncounterActor(s)===projection.actorId,'Není tah správného účastníka');
@@ -288,7 +289,7 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
  const positions=Object.fromEntries(battlefield.units.map(u=>[u.id,{x:u.x,y:u.y}]));
  const start=positions[projection.actorId];
  requireRule(distance(start,projection.actualPath[0])<EQ,'Pozice se po výpočtu změnila');
- let actorState=null,fatigueAdded=0,stop=null;
+ let actorState=null,fatigueAdded=0,stop=null,airtapFatigue=null;
  const failedStumble=firstFailure>=0;
  const failureCause=failedStumble?dice[firstFailure].cause:null;
  if(failedStumble){
@@ -315,6 +316,8 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
  if(doubleMove){
   const base=actorState??structuredClone(states[projection.actorId]);
   fatigueAdded=Math.max(0,personalFatigue-(enduranceRoll<=enduranceTN?5:0));
+  airtapFatigue=airtapMovementFatigue(fatigueAdded,airtap?[airtap]:[]);
+  fatigueAdded=airtapFatigue?.added??fatigueAdded;
   actorState=applyConfirmedFatigue({state:base,round:s.round,eventId:id+':double-move-fatigue',
    kind:'windedness',delta:fatigueAdded}).state;
  }
@@ -333,5 +336,6 @@ export function commitGuidedSpatialTurn({id,sequence,states,battlefield,projecti
  proof.dice=[...dice.map(r=>({faces:100,value:r.roll,eml:r.eml,kind:'stumble',technique:r.technique,usedArms:r.usedArms,cause:r.cause})),
   ...(enduranceRoll===null?[]:[{faces:10,value:enduranceRoll,tn:enduranceTN,kind:'endurance-sr'}])];
  proof.fatigueAdded=fatigueAdded;
+ if(airtapFatigue)proof.airtapFatigue=airtapFatigue;
  return {sequence:next,battlefield:updated,actorState,proof,fatigueAdded,stumbleStop:stop};
 }
